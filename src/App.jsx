@@ -5,11 +5,17 @@ import ComingSoonModal from './components/ComingSoonModal'
 import GuitarHero from './games/GuitarHero'
 import BalloonPop from './games/BalloonPop'
 import MemoryGame from './games/MemoryGame'
+import PizzaCatch from './games/PizzaCatch'
+import LuckySpin from './games/LuckySpin'
+import RepairShop from './games/RepairShop'
 
 const PLAYABLE_COMPONENTS = {
   'guitar-hero': GuitarHero,
   'balloon-pop': BalloonPop,
   'memory-game': MemoryGame,
+  'pizza-catch': PizzaCatch,
+  'lucky-spin': LuckySpin,
+  'repair-shop': RepairShop,
 }
 
 export default function App() {

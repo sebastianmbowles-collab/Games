@@ -5,7 +5,7 @@ export const GAMES = [
     blurb: 'Spin the wheel and try to land on the big prize.',
     color: '#f2b90c',
     icon: '🎡',
-    playable: false,
+    playable: true,
   },
   {
     key: 'guitar-hero',
@@ -21,7 +21,7 @@ export const GAMES = [
     blurb: 'Catch falling pizzas, dodge the gross toppings.',
     color: '#f2c40c',
     icon: '🍕',
-    playable: false,
+    playable: true,
   },
   {
     key: 'treasure-hunt',
@@ -93,7 +93,7 @@ export const GAMES = [
     blurb: 'Reconnect the wires before the timer hits zero.',
     color: '#e0699c',
     icon: '🔧',
-    playable: false,
+    playable: true,
   },
   {
     key: 'game-room',
