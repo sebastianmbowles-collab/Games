@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { GAMES } from './data/games'
 import GameCard from './components/GameCard'
 import ComingSoonModal from './components/ComingSoonModal'
+import CornerMascot from './components/CornerMascot'
 import GuitarHero from './games/GuitarHero'
 import BalloonPop from './games/BalloonPop'
 import MemoryGame from './games/MemoryGame'
@@ -49,6 +50,7 @@ export default function App() {
         ))}
       </div>
       <ComingSoonModal game={soonGame} onClose={() => setSoonGame(null)} />
+      <CornerMascot />
     </div>
   )
 }

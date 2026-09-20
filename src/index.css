@@ -518,3 +518,81 @@ body {
 .repair-node.connected {
   box-shadow: 0 0 12px currentColor;
 }
+
+/* ---------- Corner mascot ---------- */
+
+.corner-mascot {
+  position: fixed;
+  left: 10px;
+  bottom: -14px;
+  width: 68px;
+  height: 68px;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.92;
+  animation: mascot-bob 4s ease-in-out infinite;
+}
+
+.corner-mascot-body {
+  font-size: 56px;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(242, 185, 12, 0.35));
+}
+
+.corner-mascot-eyes {
+  position: absolute;
+  top: 16px;
+  left: 15px;
+  display: flex;
+  gap: 10px;
+}
+
+.corner-mascot-eye {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f2b90c;
+  box-shadow: 0 0 6px 2px rgba(242, 185, 12, 0.9);
+  animation: mascot-blink 4.5s ease-in-out infinite;
+}
+
+.corner-mascot-eye:last-child {
+  animation-delay: 0.02s;
+}
+
+@keyframes mascot-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes mascot-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+
+@media (max-width: 640px) {
+  .corner-mascot {
+    width: 50px;
+    height: 50px;
+    bottom: -10px;
+  }
+  .corner-mascot-body {
+    font-size: 40px;
+  }
+  .corner-mascot-eyes {
+    top: 11px;
+    left: 10px;
+    gap: 8px;
+  }
+}

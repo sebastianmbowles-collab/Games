@@ -47,7 +47,6 @@ export default function LuckySpin({ game, onExit }) {
   }
 
   function restart() {
-    setRotation(0)
     setSpinning(false)
     setSpinsLeft(START_SPINS)
     setTokens(0)

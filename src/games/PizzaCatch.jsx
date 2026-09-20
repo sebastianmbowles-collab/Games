@@ -130,7 +130,11 @@ export default function PizzaCatch({ game, onExit }) {
       <div
         className="balloon-field"
         ref={fieldRef}
-        style={{ '--card-color': game.color, position: 'relative', cursor: 'none' }}
+        style={{
+          '--card-color': game.color,
+          position: 'relative',
+          cursor: status === 'playing' ? 'none' : 'default',
+        }}
         onPointerMove={handlePointerMove}
       >
         {items.map((item) => (
