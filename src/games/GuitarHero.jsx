@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import GameTitle from '../components/GameTitle'
 
 const LANES = [
   { key: 'D', color: '#e0393e' },
@@ -108,7 +109,7 @@ export default function GuitarHero({ game, onExit }) {
   return (
     <div className="game-screen">
       <div className="game-topbar">
-        <h2 style={{ color: game.color }}>{game.title}</h2>
+        <GameTitle game={game} />
         <button className="exit-btn" onClick={onExit}>
           Exit
         </button>

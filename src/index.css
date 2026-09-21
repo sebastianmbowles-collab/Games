@@ -198,6 +198,17 @@ body {
   margin: 0;
 }
 
+.game-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.game-title-row svg {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.4));
+}
+
 .exit-btn {
   background: transparent;
   border: 1px solid var(--muted);
@@ -1087,31 +1098,8 @@ body {
   animation: mascot-bob 4s ease-in-out infinite;
 }
 
-.corner-mascot-body {
-  font-size: 56px;
-  line-height: 1;
+.corner-mascot svg {
   filter: drop-shadow(0 0 8px rgba(242, 185, 12, 0.35));
-}
-
-.corner-mascot-eyes {
-  position: absolute;
-  top: 16px;
-  left: 15px;
-  display: flex;
-  gap: 10px;
-}
-
-.corner-mascot-eye {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #f2b90c;
-  box-shadow: 0 0 6px 2px rgba(242, 185, 12, 0.9);
-  animation: mascot-blink 4.5s ease-in-out infinite;
-}
-
-.corner-mascot-eye:last-child {
-  animation-delay: 0.02s;
 }
 
 @keyframes mascot-bob {
@@ -1124,29 +1112,14 @@ body {
   }
 }
 
-@keyframes mascot-blink {
-  0%,
-  92%,
-  100% {
-    transform: scaleY(1);
-  }
-  96% {
-    transform: scaleY(0.1);
-  }
-}
-
 @media (max-width: 640px) {
   .corner-mascot {
     width: 50px;
     height: 50px;
     bottom: -10px;
   }
-  .corner-mascot-body {
-    font-size: 40px;
-  }
-  .corner-mascot-eyes {
-    top: 11px;
-    left: 10px;
-    gap: 8px;
+  .corner-mascot svg {
+    width: 50px;
+    height: 50px;
   }
 }

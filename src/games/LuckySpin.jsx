@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { addTokens, getTokens } from '../utils/tokens'
+import GameTitle from '../components/GameTitle'
+import PixelSprite from '../sprites/PixelSprite'
 
 const SEGMENTS = [
   { label: '25', tokens: 25, color: '#e0393e' },
@@ -59,7 +61,7 @@ export default function LuckySpin({ game, onExit }) {
   return (
     <div className="game-screen">
       <div className="game-topbar">
-        <h2 style={{ color: game.color }}>{game.title}</h2>
+        <GameTitle game={game} />
         <button className="exit-btn" onClick={onExit}>
           Exit
         </button>
@@ -104,7 +106,7 @@ export default function LuckySpin({ game, onExit }) {
           })}
         </div>
         <div className="wheel-hub" style={{ borderColor: game.color }}>
-          🐻
+          <PixelSprite name="freddy" size={40} />
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import GameTitle from '../components/GameTitle'
 
 const COLORS = ['#e0393e', '#2b7de0', '#2bb673', '#f2c40c', '#8a3ddb']
 const TARGET = '#e0393e'
@@ -74,7 +75,7 @@ export default function BalloonPop({ game, onExit }) {
   return (
     <div className="game-screen">
       <div className="game-topbar">
-        <h2 style={{ color: game.color }}>{game.title}</h2>
+        <GameTitle game={game} />
         <button className="exit-btn" onClick={onExit}>
           Exit
         </button>

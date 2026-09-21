@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getTokens, spendTokens } from '../utils/tokens'
+import GameTitle from '../components/GameTitle'
 
 const COST = 20
 const PRIZES = [
@@ -49,7 +50,7 @@ export default function PrizeCorner({ game, onExit }) {
   return (
     <div className="game-screen">
       <div className="game-topbar">
-        <h2 style={{ color: game.color }}>{game.title}</h2>
+        <GameTitle game={game} />
         <button className="exit-btn" onClick={onExit}>
           Exit
         </button>

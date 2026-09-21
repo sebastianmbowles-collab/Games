@@ -5,6 +5,7 @@ export const GAMES = [
     blurb: 'Spin the wheel and try to land on the big prize.',
     color: '#f2b90c',
     icon: '🎡',
+    spriteKey: 'freddy',
     playable: true,
   },
   {
@@ -13,6 +14,7 @@ export const GAMES = [
     blurb: 'Hit the notes as they fly toward Bonnie.',
     color: '#8a3ddb',
     icon: '🎸',
+    spriteKey: 'bonnie',
     playable: true,
   },
   {
@@ -21,6 +23,7 @@ export const GAMES = [
     blurb: 'Catch falling pizzas, dodge the gross toppings.',
     color: '#f2c40c',
     icon: '🍕',
+    spriteKey: 'chica',
     playable: true,
   },
   {
@@ -29,6 +32,7 @@ export const GAMES = [
     blurb: 'Dig through Pirate Cove looking for treasure.',
     color: '#e05a2b',
     icon: '🏴‍☠️',
+    spriteKey: 'foxy',
     playable: true,
   },
   {
@@ -37,6 +41,7 @@ export const GAMES = [
     blurb: 'Pop the red balloons before the timer runs out.',
     color: '#e0393e',
     icon: '🎈',
+    spriteKey: 'balloon-freddy',
     playable: true,
   },
   {
@@ -45,6 +50,7 @@ export const GAMES = [
     blurb: 'Inflate balloons to exactly the right size.',
     color: '#2b7de0',
     icon: '🎪',
+    spriteKey: 'balloon-boy',
     playable: true,
   },
   {
@@ -53,6 +59,7 @@ export const GAMES = [
     blurb: 'Hit golf balls through ridiculous obstacles.',
     color: '#2bb673',
     icon: '⛳',
+    spriteKey: 'monty',
     playable: true,
   },
   {
@@ -61,6 +68,7 @@ export const GAMES = [
     blurb: 'Race the other animatronics around a tiny track.',
     color: '#e0339c',
     icon: '🏎️',
+    spriteKey: 'roxy',
     playable: true,
   },
   {
@@ -69,6 +77,7 @@ export const GAMES = [
     blurb: 'Keep the music box playing by hitting notes in rhythm.',
     color: '#7a3de0',
     icon: '🎵',
+    spriteKey: 'puppet',
     playable: true,
   },
   {
@@ -77,6 +86,7 @@ export const GAMES = [
     blurb: 'Watch the sequence, then repeat it.',
     color: '#e0a72b',
     icon: '✨',
+    spriteKey: 'golden-freddy',
     playable: true,
   },
   {
@@ -85,6 +95,7 @@ export const GAMES = [
     blurb: 'Find all the hidden objects around the building.',
     color: '#5c8a3d',
     icon: '🔦',
+    spriteKey: 'springtrap',
     playable: true,
   },
   {
@@ -93,6 +104,7 @@ export const GAMES = [
     blurb: 'Reconnect the wires before the timer hits zero.',
     color: '#e0699c',
     icon: '🔧',
+    spriteKey: 'mangle',
     playable: true,
   },
   {
@@ -101,6 +113,7 @@ export const GAMES = [
     blurb: 'Several tiny arcade games in one room.',
     color: '#2b9ce0',
     icon: '🕹️',
+    spriteKey: 'toy-freddy',
     playable: true,
   },
   {
@@ -117,6 +130,7 @@ export const GAMES = [
     blurb: 'Grab a plushie before the claw gets annoying.',
     color: '#2b7de0',
     icon: '🧸',
+    spriteKey: 'freddy',
     playable: true,
   },
   {
@@ -125,6 +139,7 @@ export const GAMES = [
     blurb: 'Watch the cameras and find who moved.',
     color: '#2be07d',
     icon: '📷',
+    spriteKey: 'security-puppet',
     playable: true,
   },
   {

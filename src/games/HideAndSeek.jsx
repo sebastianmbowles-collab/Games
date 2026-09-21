@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import GameTitle from '../components/GameTitle'
 
 const ICONS = ['🔦', '🗝️', '📦', '🪞', '🕯️', '🧸', '🎭', '⚙️', '🪑', '🧵', '🖼️', '🧰']
 const GRID_SIZE = 24
@@ -60,7 +61,7 @@ export default function HideAndSeek({ game, onExit }) {
   return (
     <div className="game-screen">
       <div className="game-topbar">
-        <h2 style={{ color: game.color }}>{game.title}</h2>
+        <GameTitle game={game} />
         <button className="exit-btn" onClick={onExit}>
           Exit
         </button>

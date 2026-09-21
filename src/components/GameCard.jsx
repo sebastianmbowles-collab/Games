@@ -1,3 +1,5 @@
+import PixelSprite from '../sprites/PixelSprite'
+
 export default function GameCard({ game, onPlay }) {
   return (
     <button
@@ -5,7 +7,9 @@ export default function GameCard({ game, onPlay }) {
       style={{ '--card-color': game.color }}
       onClick={() => onPlay(game)}
     >
-      <div className="game-card-icon">{game.icon}</div>
+      <div className="game-card-icon">
+        {game.spriteKey ? <PixelSprite name={game.spriteKey} size={48} /> : game.icon}
+      </div>
       <h3 className="game-card-title">{game.title}</h3>
       <p className="game-card-blurb">{game.blurb}</p>
       <span className="game-card-tag">
