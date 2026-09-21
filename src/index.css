@@ -519,6 +519,560 @@ body {
   box-shadow: 0 0 12px currentColor;
 }
 
+/* ---------- Treasure Hunt ---------- */
+
+.dig-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 70px);
+  grid-template-rows: repeat(4, 70px);
+  gap: 10px;
+}
+
+.dig-tile {
+  border-radius: 10px;
+  border: 2px solid var(--card-color, #444);
+  background: #2a1f14;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.dig-tile:disabled {
+  cursor: default;
+}
+
+.dig-tile.found-treasure {
+  background: #3a2a0c;
+  box-shadow: 0 0 12px #f2c40c;
+}
+
+.dig-tile.found-empty {
+  background: #1a1a24;
+  opacity: 0.7;
+}
+
+@media (max-width: 480px) {
+  .dig-grid {
+    grid-template-columns: repeat(5, 56px);
+    grid-template-rows: repeat(4, 56px);
+  }
+}
+
+/* ---------- Balloon Factory ---------- */
+
+.factory-wrap {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 30px;
+  height: 300px;
+  margin-bottom: 14px;
+}
+
+.factory-balloon {
+  border-radius: 50% 50% 45% 45%;
+  transition: width 0.05s linear, height 0.05s linear;
+  box-shadow: 0 0 20px currentColor;
+}
+
+.factory-meter {
+  position: relative;
+  width: 34px;
+  height: 260px;
+  background: #151521;
+  border: 2px solid var(--card-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.factory-meter-target {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(43, 182, 115, 0.4);
+  border-top: 2px solid #2bb673;
+  border-bottom: 2px solid #2bb673;
+}
+
+.factory-meter-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--card-color);
+}
+
+.factory-message {
+  text-align: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  min-height: 20px;
+  margin: 0 0 10px;
+}
+
+.inflate-btn {
+  display: block;
+  margin: 0 auto;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 28px;
+  color: #0d0d16;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.inflate-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---------- Monty's Golf ---------- */
+
+.golf-field {
+  position: relative;
+  background: repeating-linear-gradient(
+    45deg,
+    #1c5c34,
+    #1c5c34 20px,
+    #1a5430 20px,
+    #1a5430 40px
+  );
+  border: 2px solid var(--card-color, #2bb673);
+  border-radius: 12px;
+  cursor: crosshair;
+  overflow: hidden;
+}
+
+.golf-hole {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #0a0a12;
+  box-shadow: inset 0 0 8px #000;
+  transform: translate(-50%, -50%);
+}
+
+.golf-obstacle {
+  position: absolute;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #6b4423;
+  border: 3px solid #4a2f18;
+  transform: translate(-50%, -50%);
+}
+
+.golf-ball {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f2f2f2;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+}
+
+/* ---------- Roxy's Racing ---------- */
+
+.race-track {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  height: 480px;
+  background: #202028;
+  border: 2px solid var(--card-color, #e0339c);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.race-lane-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.35) 0,
+    rgba(255, 255, 255, 0.35) 16px,
+    transparent 16px,
+    transparent 32px
+  );
+}
+
+.race-obstacle,
+.race-player {
+  position: absolute;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  transition: left 0.12s ease;
+}
+
+/* ---------- Puppet's Music Box ---------- */
+
+.music-meter-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.music-meter-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  color: #9b9bb0;
+}
+
+.music-meter {
+  flex: 1;
+  height: 16px;
+  background: #151521;
+  border: 2px solid #444;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.music-meter-fill {
+  height: 100%;
+  transition: width 0.1s linear;
+}
+
+.music-bar {
+  position: relative;
+  height: 70px;
+  background: #151521;
+  border: 2px solid var(--card-color, #7a3de0);
+  border-radius: 10px;
+}
+
+.music-bar.flash-hit {
+  box-shadow: 0 0 20px var(--card-color);
+}
+
+.music-bar.flash-miss {
+  box-shadow: 0 0 20px #e0393e;
+}
+
+.music-bar-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(242, 185, 12, 0.35);
+  border-left: 3px solid #f2b90c;
+  border-right: 3px solid #f2b90c;
+}
+
+.music-bar-indicator {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 4px;
+  background: #fff;
+  box-shadow: 0 0 8px #fff;
+  transform: translateX(-50%);
+}
+
+/* ---------- Hide and Seek ---------- */
+
+.seek-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 56px);
+  grid-template-rows: repeat(4, 56px);
+  gap: 8px;
+}
+
+.seek-tile {
+  border-radius: 8px;
+  border: 2px solid var(--card-color, #444);
+  background: #151521;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.seek-tile.wrong {
+  background: rgba(224, 57, 62, 0.4);
+  border-color: #e0393e;
+}
+
+@media (max-width: 480px) {
+  .seek-grid {
+    grid-template-columns: repeat(6, 46px);
+    grid-template-rows: repeat(4, 46px);
+    gap: 6px;
+  }
+}
+
+/* ---------- Toy Freddy's Game Room ---------- */
+
+.room-panel {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  background: var(--panel);
+  border: 2px solid var(--card-color, #2b9ce0);
+  border-radius: 12px;
+  padding: 26px 22px;
+}
+
+.room-panel h3 {
+  margin: 0 0 12px;
+  color: var(--card-color, #2b9ce0);
+}
+
+.reaction-box {
+  width: 100%;
+  height: 160px;
+  border-radius: 10px;
+  border: none;
+  background: #3a2020;
+  color: #fff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.reaction-box.go {
+  background: #2bb673;
+}
+
+.reaction-box.early {
+  background: #e0393e;
+  font-size: 12px;
+}
+
+.reaction-box.mash {
+  background: var(--card-color, #2b9ce0);
+  color: #0d0d16;
+  font-size: 40px;
+  font-family: 'Press Start 2P', monospace;
+  height: 140px;
+}
+
+.odd-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 70px);
+  grid-template-rows: repeat(2, 70px);
+  gap: 10px;
+  justify-content: center;
+}
+
+.odd-tile {
+  border-radius: 10px;
+  border: 2px solid var(--card-color, #2b9ce0);
+  background: #151521;
+  font-size: 28px;
+  cursor: pointer;
+}
+
+/* ---------- Prize Corner ---------- */
+
+.prize-machine {
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+  background: var(--panel);
+  border: 2px solid var(--card-color, #e0393e);
+  border-radius: 14px;
+  padding: 26px 22px;
+}
+
+.prize-reveal {
+  font-size: 64px;
+  margin-bottom: 10px;
+  min-height: 76px;
+}
+
+.prize-reveal.rolling {
+  animation: prize-shake 0.15s infinite;
+}
+
+@keyframes prize-shake {
+  0% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(8deg);
+  }
+  100% {
+    transform: rotate(-8deg);
+  }
+}
+
+.prize-shelf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 420px;
+  margin-top: 18px;
+}
+
+.prize-shelf-item {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid #444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+/* ---------- Claw Machine ---------- */
+
+.claw-machine {
+  width: 100%;
+  max-width: 460px;
+  margin-bottom: 14px;
+}
+
+.claw-rail {
+  position: relative;
+  height: 36px;
+  border-top: 4px solid #444;
+}
+
+.claw-arm {
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  font-size: 26px;
+  transition: top 0.7s ease;
+}
+
+.claw-arm.dropping {
+  top: 130px;
+}
+
+.claw-glass {
+  position: relative;
+  display: flex;
+  height: 180px;
+  background: linear-gradient(#1a1a28, #0d0d16);
+  border: 3px solid var(--card-color, #2b7de0);
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+}
+
+.claw-plushie {
+  position: absolute;
+  bottom: 10px;
+  transform: translateX(-50%);
+  font-size: 34px;
+}
+
+/* ---------- Security Puppet ---------- */
+
+.cam-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 100px);
+  grid-template-rows: repeat(2, 90px);
+  gap: 10px;
+}
+
+.cam-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  border: 2px solid #333;
+  background: #0a0a12;
+  cursor: pointer;
+  filter: grayscale(0.5) brightness(0.85);
+}
+
+.cam-tile:hover {
+  filter: none;
+}
+
+.cam-tile.wrong {
+  border-color: #e0393e;
+  box-shadow: 0 0 12px #e0393e;
+}
+
+.cam-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  color: #2be07d;
+}
+
+.cam-icon {
+  font-size: 26px;
+}
+
+@media (max-width: 480px) {
+  .cam-grid {
+    grid-template-columns: repeat(4, 76px);
+    grid-template-rows: repeat(2, 72px);
+  }
+}
+
+/* ---------- Fazbear Delivery ---------- */
+
+.delivery-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 14px;
+}
+
+.delivery-table {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 10px;
+  border-radius: 10px;
+  border: 2px solid #333;
+  background: #151521;
+  cursor: pointer;
+  min-height: 90px;
+}
+
+.delivery-table.active {
+  border-color: #f2c40c;
+  box-shadow: 0 0 16px rgba(242, 196, 12, 0.5);
+}
+
+.delivery-table.wrong {
+  border-color: #e0393e;
+  box-shadow: 0 0 12px #e0393e;
+}
+
+.delivery-table-label {
+  font-size: 12px;
+  color: #9b9bb0;
+}
+
+.delivery-bubble {
+  font-size: 28px;
+}
+
+.delivery-heat {
+  width: 100%;
+  height: 6px;
+  background: #0a0a12;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.delivery-heat-fill {
+  height: 100%;
+}
+
 /* ---------- Corner mascot ---------- */
 
 .corner-mascot {

@@ -29,7 +29,7 @@ export const GAMES = [
     blurb: 'Dig through Pirate Cove looking for treasure.',
     color: '#e05a2b',
     icon: '🏴‍☠️',
-    playable: false,
+    playable: true,
   },
   {
     key: 'balloon-pop',
@@ -45,7 +45,7 @@ export const GAMES = [
     blurb: 'Inflate balloons to exactly the right size.',
     color: '#2b7de0',
     icon: '🎪',
-    playable: false,
+    playable: true,
   },
   {
     key: 'golf',
@@ -53,7 +53,7 @@ export const GAMES = [
     blurb: 'Hit golf balls through ridiculous obstacles.',
     color: '#2bb673',
     icon: '⛳',
-    playable: false,
+    playable: true,
   },
   {
     key: 'racing',
@@ -61,7 +61,7 @@ export const GAMES = [
     blurb: 'Race the other animatronics around a tiny track.',
     color: '#e0339c',
     icon: '🏎️',
-    playable: false,
+    playable: true,
   },
   {
     key: 'music-box',
@@ -69,7 +69,7 @@ export const GAMES = [
     blurb: 'Keep the music box playing by hitting notes in rhythm.',
     color: '#7a3de0',
     icon: '🎵',
-    playable: false,
+    playable: true,
   },
   {
     key: 'memory-game',
@@ -85,7 +85,7 @@ export const GAMES = [
     blurb: 'Find all the hidden objects around the building.',
     color: '#5c8a3d',
     icon: '🔦',
-    playable: false,
+    playable: true,
   },
   {
     key: 'repair-shop',
@@ -101,7 +101,7 @@ export const GAMES = [
     blurb: 'Several tiny arcade games in one room.',
     color: '#2b9ce0',
     icon: '🕹️',
-    playable: false,
+    playable: true,
   },
   {
     key: 'prize-corner',
@@ -109,7 +109,7 @@ export const GAMES = [
     blurb: 'Spend your Faz-Tokens on random prizes.',
     color: '#e0393e',
     icon: '🎁',
-    playable: false,
+    playable: true,
   },
   {
     key: 'claw-machine',
@@ -117,7 +117,7 @@ export const GAMES = [
     blurb: 'Grab a plushie before the claw gets annoying.',
     color: '#2b7de0',
     icon: '🧸',
-    playable: false,
+    playable: true,
   },
   {
     key: 'security-puppet',
@@ -125,7 +125,7 @@ export const GAMES = [
     blurb: 'Watch the cameras and find who moved.',
     color: '#2be07d',
     icon: '📷',
-    playable: false,
+    playable: true,
   },
   {
     key: 'delivery',
@@ -133,6 +133,6 @@ export const GAMES = [
     blurb: 'Deliver pizzas to the right tables before they get cold.',
     color: '#8a3ddb',
     icon: '🍕',
-    playable: false,
+    playable: true,
   },
 ]

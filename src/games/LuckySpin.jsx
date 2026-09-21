@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { addTokens, getTokens } from '../utils/tokens'
 
 const SEGMENTS = [
   { label: '25', tokens: 25, color: '#e0393e' },
@@ -16,6 +17,7 @@ export default function LuckySpin({ game, onExit }) {
   const [spinning, setSpinning] = useState(false)
   const [spinsLeft, setSpinsLeft] = useState(START_SPINS)
   const [tokens, setTokens] = useState(0)
+  const [wallet, setWallet] = useState(getTokens)
   const [lastPrize, setLastPrize] = useState(null)
   const wheelRef = useRef(null)
 
@@ -42,6 +44,7 @@ export default function LuckySpin({ game, onExit }) {
       setSpinning(false)
       setSpinsLeft((s) => s - 1)
       setTokens((t) => t + SEGMENTS[targetIndex].tokens)
+      setWallet(addTokens(SEGMENTS[targetIndex].tokens))
       setLastPrize(SEGMENTS[targetIndex])
     }, 3000)
   }
@@ -67,6 +70,9 @@ export default function LuckySpin({ game, onExit }) {
         </span>
         <span className="stat-pill" style={{ '--card-color': game.color }}>
           TOKENS {tokens}
+        </span>
+        <span className="stat-pill" style={{ '--card-color': game.color }}>
+          WALLET {wallet}
         </span>
       </div>
 

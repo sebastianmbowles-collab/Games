@@ -9,6 +9,17 @@ import MemoryGame from './games/MemoryGame'
 import PizzaCatch from './games/PizzaCatch'
 import LuckySpin from './games/LuckySpin'
 import RepairShop from './games/RepairShop'
+import TreasureHunt from './games/TreasureHunt'
+import BalloonFactory from './games/BalloonFactory'
+import MontyGolf from './games/MontyGolf'
+import RoxyRacing from './games/RoxyRacing'
+import MusicBox from './games/MusicBox'
+import HideAndSeek from './games/HideAndSeek'
+import GameRoom from './games/GameRoom'
+import PrizeCorner from './games/PrizeCorner'
+import ClawMachine from './games/ClawMachine'
+import SecurityPuppet from './games/SecurityPuppet'
+import FazbearDelivery from './games/FazbearDelivery'
 
 const PLAYABLE_COMPONENTS = {
   'guitar-hero': GuitarHero,
@@ -17,6 +28,17 @@ const PLAYABLE_COMPONENTS = {
   'pizza-catch': PizzaCatch,
   'lucky-spin': LuckySpin,
   'repair-shop': RepairShop,
+  'treasure-hunt': TreasureHunt,
+  'balloon-factory': BalloonFactory,
+  golf: MontyGolf,
+  racing: RoxyRacing,
+  'music-box': MusicBox,
+  'hide-and-seek': HideAndSeek,
+  'game-room': GameRoom,
+  'prize-corner': PrizeCorner,
+  'claw-machine': ClawMachine,
+  'security-puppet': SecurityPuppet,
+  delivery: FazbearDelivery,
 }
 
 export default function App() {
