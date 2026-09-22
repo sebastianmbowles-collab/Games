@@ -3,6 +3,7 @@ import { GAMES } from './data/games'
 import GameCard from './components/GameCard'
 import ComingSoonModal from './components/ComingSoonModal'
 import CornerMascot from './components/CornerMascot'
+import Intro from './components/Intro'
 import GuitarHero from './games/GuitarHero'
 import BalloonPop from './games/BalloonPop'
 import MemoryGame from './games/MemoryGame'
@@ -42,6 +43,7 @@ const PLAYABLE_COMPONENTS = {
 }
 
 export default function App() {
+  const [entered, setEntered] = useState(false)
   const [activeGame, setActiveGame] = useState(null)
   const [soonGame, setSoonGame] = useState(null)
 
@@ -51,6 +53,10 @@ export default function App() {
     } else {
       setSoonGame(game)
     }
+  }
+
+  if (!entered) {
+    return <Intro onEnter={() => setEntered(true)} />
   }
 
   if (activeGame) {

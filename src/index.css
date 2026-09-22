@@ -1123,3 +1123,135 @@ body {
     height: 50px;
   }
 }
+
+/* ---------- Intro screen ---------- */
+
+.intro-screen {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 20px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.intro-glow {
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  width: 900px;
+  height: 900px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(242, 185, 12, 0.16), transparent 60%);
+  pointer-events: none;
+}
+
+.intro-title {
+  position: relative;
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(20px, 4vw, 36px);
+  color: #f2b90c;
+  text-shadow: 0 0 16px rgba(242, 185, 12, 0.6);
+  margin: 0;
+}
+
+.intro-subtitle {
+  position: relative;
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+
+.intro-cast {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 36px;
+  margin-bottom: 30px;
+}
+
+.intro-character {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  animation: intro-pop 0.6s ease-out forwards, intro-bob 3s ease-in-out infinite 0.6s;
+}
+
+.intro-bubble {
+  background: var(--panel);
+  border: 2px solid var(--card-color);
+  color: var(--card-color);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  position: relative;
+}
+
+.intro-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 7px 6px 0;
+  border-style: solid;
+  border-color: var(--card-color) transparent transparent;
+}
+
+.intro-enter-btn {
+  position: relative;
+  background: #f2b90c;
+  color: #0d0d16;
+  border: none;
+  border-radius: 8px;
+  padding: 16px 40px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 0 24px rgba(242, 185, 12, 0.45);
+}
+
+.intro-enter-btn:hover {
+  transform: translateY(-2px);
+}
+
+.intro-hint {
+  position: relative;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 14px;
+}
+
+@keyframes intro-pop {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes intro-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (max-width: 480px) {
+  .intro-cast {
+    gap: 20px;
+  }
+}
