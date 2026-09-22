@@ -1,5 +1,13 @@
 import { useMemo } from 'react'
-import { buildSpriteGrid, spriteCellColor, GRID_SIZE, EYE_RADIUS, EYE_POSITIONS } from './buildSprite'
+import {
+  buildSpriteGrid,
+  spriteCellColor,
+  GRID_WIDTH,
+  GRID_HEIGHT,
+  HEAD_VIEW_HEIGHT,
+  EYE_RADIUS,
+  EYE_POSITIONS,
+} from './buildSprite'
 import { CHARACTERS } from './characters'
 
 function hashDelay(name, spread) {
@@ -8,15 +16,17 @@ function hashDelay(name, spread) {
   return (h / 997) * spread
 }
 
-export default function PixelSprite({ name, size = 48, className, bob = true, blink = true }) {
+export default function PixelSprite({ name, size = 48, className, bob = true, blink = true, mode = 'full' }) {
   const def = CHARACTERS[name]
   const grid = useMemo(() => (def ? buildSpriteGrid(def.shape) : null), [def])
 
   if (!def || !grid) return null
 
+  const viewHeight = mode === 'head' ? HEAD_VIEW_HEIGHT : GRID_HEIGHT
+
   const rects = []
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
+  for (let y = 0; y < viewHeight; y++) {
+    for (let x = 0; x < GRID_WIDTH; x++) {
       const kind = grid[y][x]
       if (!kind) continue
       const color = spriteCellColor(kind, def.palette)
@@ -43,12 +53,14 @@ export default function PixelSprite({ name, size = 48, className, bob = true, bl
       ))
     : null
 
+  const width = size * (GRID_WIDTH / viewHeight)
+
   return (
     <svg
       className={[className, bob ? 'sprite-bob' : ''].filter(Boolean).join(' ')}
-      width={size}
+      width={width}
       height={size}
-      viewBox={`0 0 ${GRID_SIZE} ${GRID_SIZE}`}
+      viewBox={`0 0 ${GRID_WIDTH} ${viewHeight}`}
       shapeRendering="crispEdges"
       style={bob ? { animationDelay: `${bobDelay}s` } : undefined}
       aria-hidden="true"

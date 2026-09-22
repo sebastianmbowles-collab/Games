@@ -106,7 +106,7 @@ export default function LuckySpin({ game, onExit }) {
           })}
         </div>
         <div className="wheel-hub" style={{ borderColor: game.color }}>
-          <PixelSprite name="freddy" size={40} />
+          <PixelSprite name="freddy" size={40} mode="head" />
         </div>
       </div>
 

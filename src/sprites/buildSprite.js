@@ -1,4 +1,6 @@
-const GRID = 16
+const WIDTH = 16
+const HEIGHT = 24
+const HEAD_CY = 7
 
 function inEllipse(x, y, cx, cy, rx, ry) {
   const dx = (x - cx) / rx
@@ -15,16 +17,16 @@ function inTriangle(px, py, ax, ay, bx, by, cx, cy) {
   return !(hasNeg && hasPos)
 }
 
-// config: { earType, eyePatchSide, beak, mask, accent, wide }
+// config: { earType, eyePatchSide, beak, mask, accent, wide, prop }
 export function buildSpriteGrid(config) {
-  const cx = GRID / 2 - 0.5
-  const cy = GRID / 2 - 0.5
+  const cx = WIDTH / 2 - 0.5
+  const cy = HEAD_CY
   const headRx = config.wide ? 6.6 : 6
   const headRy = 5.7
-  const cells = Array.from({ length: GRID }, () => Array(GRID).fill(null))
+  const cells = Array.from({ length: HEIGHT }, () => Array(WIDTH).fill(null))
 
   const set = (x, y, kind) => {
-    if (x < 0 || x >= GRID || y < 0 || y >= GRID) return
+    if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return
     cells[Math.round(y)][Math.round(x)] = kind
   }
 
@@ -154,7 +156,7 @@ export function buildSpriteGrid(config) {
     for (let x = cx - 1.6; x <= cx + 1.6; x++) set(x, cy + 3, 'mouth')
   }
 
-  // accent
+  // accent (worn right at the neckline, like a bowtie/bib collar)
   if (config.accent === 'bowtie') {
     for (let y = cy + 4.6; y <= cy + 6; y++) {
       for (let x = cx - 2; x <= cx + 2; x++) {
@@ -171,47 +173,90 @@ export function buildSpriteGrid(config) {
     }
   }
 
-  // held prop, tucked into the free bottom-right corner
+  // body: torso, arms, legs, feet
+  const bodyTop = cy + headRy + 0.8
+  const torsoBottom = bodyTop + 5
+  for (let y = bodyTop; y <= torsoBottom; y++) {
+    const t = (y - bodyTop) / (torsoBottom - bodyTop)
+    const halfW = 3.6 - t * 0.4
+    for (let x = cx - halfW; x <= cx + halfW; x++) set(x, y, 'body')
+  }
+
+  const heldSide = config.prop ? 'right' : null
+
+  // left arm (always plain)
+  for (let y = bodyTop + 0.6; y <= torsoBottom - 0.4; y++) {
+    for (let x = cx - 6; x <= cx - 4.1; x++) set(x, y, 'arm')
+  }
+  // right arm (plain, unless holding a prop)
+  if (heldSide !== 'right') {
+    for (let y = bodyTop + 0.6; y <= torsoBottom - 0.4; y++) {
+      for (let x = cx + 4.1; x <= cx + 6; x++) set(x, y, 'arm')
+    }
+  } else {
+    for (let y = bodyTop + 0.6; y <= bodyTop + 2.6; y++) {
+      for (let x = cx + 4.1; x <= cx + 6; x++) set(x, y, 'arm')
+    }
+  }
+
+  const legTop = torsoBottom + 0.4
+  const legBottom = legTop + 2.6
+  for (let y = legTop; y <= legBottom; y++) {
+    for (let x = cx - 2.6; x <= cx - 0.6; x++) set(x, y, 'leg')
+    for (let x = cx + 0.6; x <= cx + 2.6; x++) set(x, y, 'leg')
+  }
+  for (let y = legBottom + 0.1; y <= legBottom + 1.4; y++) {
+    for (let x = cx - 3; x <= cx - 0.2; x++) set(x, y, 'foot')
+    for (let x = cx + 0.2; x <= cx + 3; x++) set(x, y, 'foot')
+  }
+
+  // held prop, resting beside the right hand
+  const handX = cx + 5
+  const handY = bodyTop + 3.4
   if (config.prop === 'guitar') {
-    for (let y = 12; y <= 14; y++) {
-      for (let x = 11; x <= 13; x++) set(x, y, 'guitarBody')
+    for (let y = handY - 1; y <= handY + 1.6; y++) {
+      for (let x = handX - 1.4; x <= handX + 1.4; x++) set(x, y, 'guitarBody')
     }
     const neck = [
-      [11.5, 12],
-      [12.3, 10.8],
-      [13.1, 9.6],
-      [13.9, 8.4],
-      [14.7, 7.2],
+      [handX - 0.8, handY - 1.2],
+      [handX - 0.1, handY - 2.4],
+      [handX + 0.6, handY - 3.6],
+      [handX + 1.3, handY - 4.8],
+      [handX + 2, handY - 6],
     ]
     for (const [nx, ny] of neck) set(nx, ny, 'guitarNeck')
-    set(14.7, 6.4, 'guitarPeg')
+    set(handX + 2, handY - 6.8, 'guitarPeg')
   } else if (config.prop === 'mic') {
-    for (let y = 9.6; y <= 11.6; y++) {
-      for (let x = 11.8; x <= 13.8; x++) {
-        if (inEllipse(x, y, 12.8, 10.6, 1, 1)) set(x, y, 'micHead')
+    const mx = handX + 0.2
+    const my = handY - 1
+    for (let y = my - 1; y <= my + 1; y++) {
+      for (let x = mx - 1; x <= mx + 1; x++) {
+        if (inEllipse(x, y, mx, my, 1, 1)) set(x, y, 'micHead')
       }
     }
-    for (let y = 10; y <= 11.2; y++) {
-      for (let x = 12.2; x <= 13.4; x++) {
-        if (inEllipse(x, y, 12.8, 10.6, 0.6, 0.6)) set(x, y, 'micGrille')
+    for (let y = my - 0.6; y <= my + 0.6; y++) {
+      for (let x = mx - 0.6; x <= mx + 0.6; x++) {
+        if (inEllipse(x, y, mx, my, 0.6, 0.6)) set(x, y, 'micGrille')
       }
     }
-    for (let y = 11.8; y <= 15; y++) {
-      set(12.4, y, 'micHandle')
-      set(13.2, y, 'micHandle')
+    for (let y = my + 1.2; y <= my + 4.4; y++) {
+      set(mx - 0.4, y, 'micHandle')
+      set(mx + 0.4, y, 'micHandle')
     }
   } else if (config.prop === 'cupcake') {
-    for (let y = 13; y <= 14.5; y++) {
-      const t = (y - 13) / 1.5
-      const halfW = 1 + t * 0.6
-      for (let x = 13 - halfW; x <= 13 + halfW; x++) set(x, y, 'cupBase')
+    const bx = handX + 0.3
+    const by = handY
+    for (let y = by; y <= by + 1.5; y++) {
+      const t = (y - by) / 1.5
+      const halfW = 0.8 + t * 0.5
+      for (let x = bx - halfW; x <= bx + halfW; x++) set(x, y, 'cupBase')
     }
-    for (let y = 10.8; y <= 12.6; y++) {
-      for (let x = 11.6; x <= 14.4; x++) {
-        if (inEllipse(x, y, 13, 11.6, 1.5, 1.1)) set(x, y, 'cupFrosting')
+    for (let y = by - 1.8; y <= by; y++) {
+      for (let x = bx - 1.4; x <= bx + 1.4; x++) {
+        if (inEllipse(x, y, bx, by - 0.8, 1.4, 1)) set(x, y, 'cupFrosting')
       }
     }
-    set(13, 9.8, 'cupCandle')
+    set(bx, by - 2.6, 'cupCandle')
   }
 
   return cells
@@ -224,7 +269,13 @@ export function spriteCellColor(kind, palette) {
     case 'earInner':
       return palette.earInner ?? palette.dark
     case 'face':
+    case 'body':
+    case 'arm':
       return palette.face
+    case 'leg':
+      return palette.earOuter ?? palette.face
+    case 'foot':
+      return palette.dark ?? '#1a1a1a'
     case 'eyeWhite':
       return '#f5f5f5'
     case 'pupil':
@@ -270,10 +321,14 @@ export function spriteCellColor(kind, palette) {
   }
 }
 
-export const GRID_SIZE = GRID
+export const GRID_WIDTH = WIDTH
+export const GRID_HEIGHT = HEIGHT
+export const HEAD_VIEW_HEIGHT = 14
+export const GRID_SIZE = WIDTH
 export const EYE_RADIUS = 1.7
-export const EYE_CENTER = GRID / 2 - 0.5
+export const EYE_CENTER_X = WIDTH / 2 - 0.5
+export const EYE_CENTER_Y = HEAD_CY
 export const EYE_POSITIONS = [
-  { x: EYE_CENTER - 2.6, y: EYE_CENTER - 0.4, side: 'left' },
-  { x: EYE_CENTER + 2.6, y: EYE_CENTER - 0.4, side: 'right' },
+  { x: EYE_CENTER_X - 2.6, y: EYE_CENTER_Y - 0.4, side: 'left' },
+  { x: EYE_CENTER_X + 2.6, y: EYE_CENTER_Y - 0.4, side: 'right' },
 ]

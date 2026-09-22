@@ -39,7 +39,7 @@ export default function Intro({ onEnter }) {
               >
                 {c.line}
               </div>
-              <PixelSprite name={c.name} size={84} bob={false} />
+              <PixelSprite name={c.name} size={110} bob={false} mode="full" />
             </div>
           ))}
         </div>
