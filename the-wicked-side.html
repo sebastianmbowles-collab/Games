@@ -1,0 +1,1204 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Wicked Side</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap">
+<style>
+  /* A single, deliberately dark world: this game is always played with the lights off. */
+  :root {
+    color-scheme: dark;
+    --ink: #08070b;
+    --wall: #17131a;
+    --bone: #e4dccb;
+    --dim: #8f877b;
+    --candle: #f0b35e;
+    --mirror: #6fe3c9;
+    --blood: #c43a4c;
+    --display: "IM Fell English SC", "Iowan Old Style", Georgia, serif;
+    --body: "IM Fell English", "Iowan Old Style", Georgia, serif;
+    --type: "Special Elite", "Courier New", ui-monospace, monospace;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    background: var(--ink);
+    color: var(--bone);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.45;
+    padding-inline: 16px;
+    padding-block: 16px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .stage {
+    position: relative;
+    width: 100%;
+    max-width: min(100%, calc((100vh - 130px) * 1.5), 1100px);
+    aspect-ratio: 3 / 2;
+    border: 1px solid #231d22;
+    box-shadow: 0 0 60px rgba(111, 227, 201, 0.05), 0 20px 50px rgba(0, 0, 0, 0.6);
+    background: #000;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: auto; }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 14px;
+    padding: clamp(16px, 5%, 56px);
+    background: linear-gradient(90deg, rgba(4, 3, 6, 0.94) 0%, rgba(4, 3, 6, 0.78) 55%, rgba(4, 3, 6, 0.35) 100%);
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+  .overlay.center { align-items: center; text-align: center; background: rgba(4, 3, 6, 0.86); }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(34px, 8.2vw, 92px);
+    line-height: 0.9;
+    margin: 0;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+  h1 .real { color: var(--bone); display: block; }
+  /* "Side" is written from the other side of the glass. */
+  h1 .mirrored {
+    display: inline-block;
+    color: var(--mirror);
+    transform: scaleX(-1);
+    text-shadow: 0 0 18px rgba(111, 227, 201, 0.45);
+    position: relative;
+    animation: breathe 5s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.92; filter: blur(0); }
+    50% { opacity: 0.7; filter: blur(0.6px); }
+  }
+  .eyebrow {
+    font-family: var(--type);
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--candle);
+    margin: 0;
+  }
+  .lede { max-width: 34ch; margin: 0; font-size: clamp(15px, 1.9vw, 19px); color: var(--bone); }
+  .lede em { color: var(--mirror); font-style: italic; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 10px; }
+  button {
+    font-family: var(--type);
+    font-size: 15px;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    background: var(--candle);
+    border: 0;
+    padding: 10px 18px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: transform 0.12s ease, background 0.2s ease;
+  }
+  button:hover { transform: translateY(-1px); background: #f7c67e; }
+  button.ghost { background: transparent; color: var(--bone); box-shadow: inset 0 0 0 1px #4a4148; }
+  button.ghost:hover { background: rgba(255, 255, 255, 0.05); }
+  button:focus-visible { outline: 2px solid var(--mirror); outline-offset: 3px; }
+
+  .keys {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 3px 14px;
+    margin: 4px 0 0;
+    font-family: var(--type);
+    font-size: 13px;
+    color: var(--dim);
+  }
+  .keys dt { color: var(--bone); }
+  .keys dd { margin: 0; }
+
+  /* The notes are torn diary pages. */
+  .paper {
+    background: #e6dcc4;
+    color: #2a211b;
+    font-family: var(--type);
+    font-size: clamp(14px, 1.8vw, 17px);
+    line-height: 1.6;
+    max-width: 44ch;
+    padding: 26px 28px 20px;
+    transform: rotate(-1.2deg);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+    clip-path: polygon(0 2%, 8% 0, 22% 1.5%, 40% 0, 63% 1.2%, 80% 0, 100% 1.8%, 99% 100%, 70% 98.5%, 45% 100%, 20% 98.6%, 0 100%);
+    text-align: left;
+  }
+  .paper .date { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #7b5a3a; margin: 0 0 8px; }
+  .paper p { margin: 0 0 12px; }
+  .paper .close { font-size: 12px; color: #7b5a3a; margin: 0; }
+
+  .big {
+    font-family: var(--display);
+    font-size: clamp(30px, 6vw, 64px);
+    line-height: 1;
+    margin: 0;
+    font-weight: 400;
+  }
+  .big.bad { color: var(--blood); text-shadow: 0 0 22px rgba(196, 58, 76, 0.5); }
+  .big.good { color: var(--candle); }
+  .sub { margin: 0; max-width: 40ch; color: var(--bone); }
+  .stats { font-family: var(--type); font-size: 14px; color: var(--dim); margin: 0; font-variant-numeric: tabular-nums; }
+
+  .controls {
+    width: 100%;
+    max-width: min(100%, calc((100vh - 130px) * 1.5), 1100px);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .controls .row button { font-size: 13px; padding: 8px 14px; }
+  .legend { font-family: var(--type); font-size: 12px; color: var(--dim); margin: 0; }
+  .legend b { color: var(--bone); font-weight: 400; }
+  @media (pointer: coarse) { .legend { display: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    h1 .mirrored { animation: none; }
+    button { transition: none; }
+  }
+</style>
+
+<div class="stage" id="stage">
+  <canvas id="game" width="960" height="640" aria-label="The Wicked Side game screen"></canvas>
+
+  <div class="overlay" id="titleScreen">
+    <p class="eyebrow">Grandma's house · 12:04 a.m.</p>
+    <h1><span class="real">The Wicked</span> <span class="mirrored">Side</span></h1>
+    <p class="lede">Grandma's hall mirror cracked into five shards, and they fell through to <em>the other side</em> of the house. Cross over, find all five, and get out the front door before the thing that lives there finds you.</p>
+    <div class="row">
+      <button id="btnBrave" type="button">Enter the house</button>
+      <button id="btnEasy" class="ghost" type="button">Enter (a bit less scary)</button>
+    </div>
+    <dl class="keys">
+      <dt>WASD / arrows</dt><dd>walk</dd>
+      <dt>Mouse</dt><dd>point your flashlight</dd>
+      <dt>Space</dt><dd>cross to the other side</dd>
+      <dt>Shift</dt><dd>run</dd>
+      <dt>E</dt><dd>read a note</dd>
+    </dl>
+  </div>
+
+  <div class="overlay center" id="noteScreen" hidden>
+    <div class="paper">
+      <p class="date" id="noteDate"></p>
+      <div id="noteBody"></div>
+      <p class="close">Press E or tap to put it down</p>
+    </div>
+  </div>
+
+  <div class="overlay center" id="pauseScreen" hidden>
+    <p class="big good">Paused</p>
+    <p class="sub">The house waits for you. So does the other thing.</p>
+    <div class="row"><button id="btnResume" type="button">Keep going</button><button id="btnQuit" class="ghost" type="button">Back to the title</button></div>
+  </div>
+
+  <div class="overlay center" id="caughtScreen" hidden>
+    <p class="big bad">It found you.</p>
+    <p class="sub" id="caughtTip"></p>
+    <p class="stats" id="caughtStats"></p>
+    <div class="row"><button id="btnRetry" type="button">Try again</button><button id="btnTitle1" class="ghost" type="button">Title</button></div>
+  </div>
+
+  <div class="overlay center" id="winScreen" hidden>
+    <p class="big good">You got out.</p>
+    <p class="sub">The mirror is whole again, and the front door clicks shut behind you. But if you look back at the window… something waves.</p>
+    <p class="stats" id="winStats"></p>
+    <div class="row"><button id="btnAgain" type="button">Play again</button><button id="btnTitle2" class="ghost" type="button">Title</button></div>
+  </div>
+</div>
+
+<div class="controls">
+  <p class="legend"><b>Space</b> cross over · <b>Shift</b> run · <b>E</b> read · <b>P</b> pause · <b>M</b> sound</p>
+  <div class="row">
+    <button id="btnFlip" class="ghost" type="button">Cross over</button>
+    <button id="btnRead" class="ghost" type="button">Read</button>
+    <button id="btnPause" class="ghost" type="button">Pause</button>
+    <button id="btnSound" class="ghost" type="button">Sound: on</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- The house ----------
+  // #  wall on both sides
+  // n  wall only on the Normal side (on the Wicked side it has crumbled away)
+  // w  wall only on the Wicked side (on the Normal side it's an open doorway)
+  // M  mirror shard (only exists on the Wicked side)
+  // T  diary note     P  you     X  it     E  front door
+  const MAP = [
+    '##############################',
+    '#P...#........#.......#.....M#',
+    '#....#........n.......#......#',
+    '#....n...T....#...M...w......#',
+    '#....#........#.......#......#',
+    '###.####w#######.###########n#',
+    '#..........#.........#.......#',
+    '#..T.......#.........#...T...#',
+    '#..........w....X....n.......#',
+    '#..........#.........#.......#',
+    '######n#####.........####.####',
+    '#.........M#.........#.......#',
+    '#..........##n######.#.......#',
+    '#...........#....#...w...M...#',
+    '####w########....#...#.......#',
+    '#...........#....n...#########',
+    '#...M.......w....#...........#',
+    '#...........#....#..T.......E#',
+    '#...........#....#...........#',
+    '##############################',
+  ];
+  const T = 32, COLS = 30, ROWS = 20, W = 960, H = 640;
+  const NORMAL = 0, WICKED = 1;
+  const TOTAL_SHARDS = 5;
+
+  const NOTES = [
+    { date: 'October 3rd', body: ['There is something on the other side. It is tall and it has no face except for the eyes and the smile.', 'But it HATES light. When I pointed my flashlight right at it, it hissed and slowed right down.'] },
+    { date: 'October 1st', body: ['I figured out how to cross. You hold your breath and think really hard about the wrong side of the mirror.', 'Then everything goes cold and green and you are THERE. (Press Space.)', 'Some walls are only walls on one side. If you are stuck, try crossing over.'] },
+    { date: 'October 5th', body: ['The mirror fell off the wall tonight. Five pieces went through to the Wicked Side and the front door locked all by itself.', 'I think the door will only open again when the mirror is whole.'] },
+    { date: 'October 6th', body: ['If you are reading this, I got out. You can too.', 'Run when it sees you. Hold Shift. Don’t cross back over right on top of it.', '— G.'] },
+  ];
+  const TIPS = [
+    'Shine your flashlight straight at it. Light makes it slow.',
+    'On the Normal side it can’t touch you, but it still follows. Check where its eyes are before you cross back.',
+    'Holding Shift lets you run for a few seconds. Save it for when it sees you.',
+    'Faint sparkles on the Normal side show where a shard is waiting on the other side.',
+    'The room in the bottom left has no way in for it. Catch your breath there.',
+  ];
+
+  const grid = MAP.map((r) => r.split(''));
+  const shardSpots = [], noteSpots = [];
+  let startPos, spawnPos, exitTile;
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const c = grid[y][x];
+      const cx = x * T + T / 2, cy = y * T + T / 2;
+      if (c === 'P') { startPos = { x: cx, y: cy }; grid[y][x] = '.'; }
+      else if (c === 'X') { spawnPos = { x: cx, y: cy }; grid[y][x] = '.'; }
+      else if (c === 'M') { shardSpots.push({ x: cx, y: cy }); grid[y][x] = '.'; }
+      else if (c === 'T') { noteSpots.push({ x: cx, y: cy, i: noteSpots.length }); grid[y][x] = '.'; }
+      else if (c === 'E') { exitTile = { x, y, cx, cy }; }
+    }
+  }
+
+  // ---------- State ----------
+  const S = {
+    mode: 'title', difficulty: 'brave', side: NORMAL, time: 0,
+    p: { x: 0, y: 0, aim: 0, stamina: 1, moving: false, running: false },
+    m: { x: 0, y: 0, active: false, wakeIn: -1, lit: false, sees: false, face: 0 },
+    shards: [], got: 0, doorOpen: false, notesRead: new Set(),
+    flipCd: 0, flipFx: 0, toast: null, scareT: 0, shake: 0,
+    hintFlipShown: false, blockedCd: 0, readingNote: null,
+  };
+
+  function reset() {
+    S.side = NORMAL; S.time = 0;
+    Object.assign(S.p, { x: startPos.x, y: startPos.y, aim: 0.6, stamina: 1, moving: false, running: false });
+    Object.assign(S.m, { x: spawnPos.x, y: spawnPos.y, active: false, wakeIn: -1, lit: false, sees: false });
+    S.shards = shardSpots.map((s) => ({ ...s, got: false }));
+    S.got = 0; S.doorOpen = false; S.notesRead = new Set();
+    S.flipCd = 0; S.flipFx = 0; S.toast = null; S.scareT = 0; S.shake = 0;
+    S.hintFlipShown = false; S.blockedCd = 0; S.readingNote = null;
+    audio.setSide(NORMAL);
+  }
+
+  // ---------- Collision ----------
+  function solidAt(tx, ty, side) {
+    if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) return true;
+    const c = grid[ty][tx];
+    if (c === '#') return true;
+    if (c === 'n') return side === NORMAL;
+    if (c === 'w') return side === WICKED;
+    if (c === 'E') return !S.doorOpen;
+    return false;
+  }
+  function blockedFor(px, py, r, side) {
+    const x0 = Math.floor((px - r) / T), x1 = Math.floor((px + r) / T);
+    const y0 = Math.floor((py - r) / T), y1 = Math.floor((py + r) / T);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (solidAt(x, y, side)) return true;
+    return false;
+  }
+  const monsterSolid = (tx, ty) => {
+    if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) return true;
+    const c = grid[ty][tx];
+    return c === '#' || c === 'w' || c === 'E';
+  };
+  function lineClear(ax, ay, bx, by) {
+    const d = Math.hypot(bx - ax, by - ay), n = Math.ceil(d / 8);
+    for (let i = 1; i < n; i++) {
+      const x = ax + (bx - ax) * i / n, y = ay + (by - ay) * i / n;
+      if (monsterSolid(Math.floor(x / T), Math.floor(y / T))) return false;
+    }
+    return true;
+  }
+
+  // Distance field for the monster to follow through the Wicked side.
+  const field = new Int16Array(COLS * ROWS);
+  const queue = new Int16Array(COLS * ROWS * 2);
+  let fieldTimer = 0;
+  function buildField(tx, ty) {
+    field.fill(-1);
+    let h = 0, t = 0;
+    field[ty * COLS + tx] = 0; queue[t++] = tx; queue[t++] = ty;
+    while (h < t) {
+      const x = queue[h++], y = queue[h++], d = field[y * COLS + x];
+      const nb = [x + 1, y, x - 1, y, x, y + 1, x, y - 1];
+      for (let k = 0; k < 8; k += 2) {
+        const nx = nb[k], ny = nb[k + 1];
+        if (monsterSolid(nx, ny) || field[ny * COLS + nx] !== -1) continue;
+        field[ny * COLS + nx] = d + 1; queue[t++] = nx; queue[t++] = ny;
+      }
+    }
+  }
+
+  // ---------- Input ----------
+  const keys = new Set();
+  const mouse = { x: W / 2, y: H / 2, active: false };
+  const stick = { id: null, ox: 0, oy: 0, dx: 0, dy: 0 };
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k) && S.mode !== 'title') e.preventDefault();
+    if (e.repeat) { keys.add(k); return; }
+    keys.add(k);
+    if (k === ' ') { if (S.mode === 'play') flip(); }
+    else if (k === 'e') {
+      if (S.mode === 'note') closeNote();
+      else if (S.mode === 'play') tryRead();
+    }
+    else if (k === 'p' || k === 'escape') {
+      if (S.mode === 'play') setMode('pause');
+      else if (S.mode === 'pause') setMode('play');
+      else if (S.mode === 'note') closeNote();
+    }
+    else if (k === 'm') toggleSound();
+    else if (k === 'r' && (S.mode === 'caught' || S.mode === 'won')) startGame(S.difficulty);
+  });
+  addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+  addEventListener('blur', () => keys.clear());
+
+  function toCanvas(clientX, clientY) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (clientX - r.left) * W / r.width, y: (clientY - r.top) * H / r.height };
+  }
+  canvas.addEventListener('mousemove', (e) => {
+    const c = toCanvas(e.clientX, e.clientY);
+    mouse.x = c.x; mouse.y = c.y; mouse.active = true;
+  });
+  canvas.addEventListener('touchstart', (e) => {
+    audio.init();
+    for (const t of e.changedTouches) {
+      const c = toCanvas(t.clientX, t.clientY);
+      if (c.x < W * 0.55 && stick.id === null) {
+        stick.id = t.identifier; stick.ox = c.x; stick.oy = c.y; stick.dx = 0; stick.dy = 0;
+        mouse.active = false;
+      } else if (S.mode === 'play') {
+        flip();
+      }
+    }
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== stick.id) continue;
+      const c = toCanvas(t.clientX, t.clientY);
+      let dx = c.x - stick.ox, dy = c.y - stick.oy;
+      const len = Math.hypot(dx, dy), max = 60;
+      if (len > max) { dx *= max / len; dy *= max / len; }
+      stick.dx = dx / max; stick.dy = dy / max;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  const endTouch = (e) => {
+    for (const t of e.changedTouches) if (t.identifier === stick.id) { stick.id = null; stick.dx = stick.dy = 0; }
+  };
+  canvas.addEventListener('touchend', endTouch);
+  canvas.addEventListener('touchcancel', endTouch);
+
+  // ---------- Audio (all made from scratch, no sound files) ----------
+  const audio = (() => {
+    let ac = null, master, droneA, droneB, droneF, windG, windF, noise, muted = false;
+    function init() {
+      if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+      try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; return; }
+      master = ac.createGain(); master.gain.value = muted ? 0 : 0.8; master.connect(ac.destination);
+      noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+      const d = noise.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+      droneF = ac.createBiquadFilter(); droneF.type = 'lowpass'; droneF.frequency.value = 240;
+      const dg = ac.createGain(); dg.gain.value = 0.07;
+      droneA = ac.createOscillator(); droneA.type = 'sawtooth'; droneA.frequency.value = 55;
+      droneB = ac.createOscillator(); droneB.type = 'sawtooth'; droneB.frequency.value = 55.7;
+      droneA.connect(droneF); droneB.connect(droneF); droneF.connect(dg); dg.connect(master);
+      droneA.start(); droneB.start();
+
+      const wind = ac.createBufferSource(); wind.buffer = noise; wind.loop = true;
+      windF = ac.createBiquadFilter(); windF.type = 'bandpass'; windF.frequency.value = 420; windF.Q.value = 0.8;
+      windG = ac.createGain(); windG.gain.value = 0.025;
+      const lfo = ac.createOscillator(); lfo.frequency.value = 0.08;
+      const lfoG = ac.createGain(); lfoG.gain.value = 180;
+      lfo.connect(lfoG); lfoG.connect(windF.frequency); lfo.start();
+      wind.connect(windF); windF.connect(windG); windG.connect(master); wind.start();
+      setSide(S.side);
+    }
+    function setSide(side) {
+      if (!ac) return;
+      const t = ac.currentTime;
+      droneA.frequency.setTargetAtTime(side ? 46.2 : 55, t, 0.3);
+      droneB.frequency.setTargetAtTime(side ? 47.1 : 55.7, t, 0.3);
+      droneF.frequency.setTargetAtTime(side ? 560 : 240, t, 0.3);
+      windG.gain.setTargetAtTime(side ? 0.06 : 0.025, t, 0.4);
+    }
+    function env(node, t, peak, attack, decay) {
+      node.gain.setValueAtTime(0.0001, t);
+      node.gain.exponentialRampToValueAtTime(peak, t + attack);
+      node.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    }
+    function thump(t, vol, f) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 0.6, t + 0.14);
+      env(g, t, vol, 0.01, 0.16);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.25);
+    }
+    function heartbeat(vol) {
+      if (!ac) return;
+      const t = ac.currentTime;
+      thump(t, vol, 62); thump(t + 0.17, vol * 0.7, 55);
+    }
+    function noiseHit(t, dur, vol, type, freq, freqEnd) {
+      const s = ac.createBufferSource(); s.buffer = noise;
+      const f = ac.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t);
+      if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
+      const g = ac.createGain(); env(g, t, vol, Math.min(0.02, dur / 4), dur);
+      s.connect(f); f.connect(g); g.connect(master);
+      s.start(t, Math.random()); s.stop(t + dur + 0.05);
+    }
+    function whoosh(toWicked) {
+      if (!ac) return;
+      const t = ac.currentTime;
+      noiseHit(t, 0.55, 0.35, 'bandpass', toWicked ? 180 : 2400, toWicked ? 2600 : 160);
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(toWicked ? 880 : 220, t);
+      o.frequency.exponentialRampToValueAtTime(toWicked ? 220 : 880, t + 0.5);
+      env(g, t, 0.08, 0.05, 0.5); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.6);
+    }
+    function chime() {
+      if (!ac) return;
+      const t = ac.currentTime;
+      [1318.5, 1760, 2637, 3520].forEach((f, i) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.frequency.value = f; env(g, t + i * 0.07, 0.09, 0.005, 1.3);
+        o.connect(g); g.connect(master); o.start(t + i * 0.07); o.stop(t + i * 0.07 + 1.4);
+      });
+    }
+    function step(run) {
+      if (!ac) return;
+      noiseHit(ac.currentTime, 0.05, run ? 0.05 : 0.03, 'highpass', 900);
+    }
+    function paper() {
+      if (!ac) return;
+      noiseHit(ac.currentTime, 0.18, 0.08, 'highpass', 2500);
+    }
+    function hiss() {
+      if (!ac) return;
+      noiseHit(ac.currentTime, 0.5, 0.06, 'highpass', 4000, 1500);
+    }
+    function blocked() {
+      if (!ac) return;
+      thump(ac.currentTime, 0.25, 90);
+    }
+    function door() {
+      if (!ac) return;
+      const t = ac.currentTime;
+      const o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(70, t); o.frequency.linearRampToValueAtTime(150, t + 1.2);
+      f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 6;
+      env(g, t, 0.15, 0.1, 1.3); o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t + 1.5);
+    }
+    function scream() {
+      if (!ac) return;
+      const t = ac.currentTime;
+      noiseHit(t, 0.9, 0.45, 'bandpass', 1800, 300);
+      [0, 7].forEach((det) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(760 + det * 10, t);
+        o.frequency.exponentialRampToValueAtTime(90, t + 0.9);
+        env(g, t, 0.18, 0.01, 0.9); o.connect(g); g.connect(master); o.start(t); o.stop(t + 1);
+      });
+    }
+    function win() {
+      if (!ac) return;
+      const t = ac.currentTime;
+      [523.3, 659.3, 784, 1046.5].forEach((f, i) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'triangle'; o.frequency.value = f; env(g, t + i * 0.15, 0.12, 0.01, 1.2);
+        o.connect(g); g.connect(master); o.start(t + i * 0.15); o.stop(t + i * 0.15 + 1.3);
+      });
+    }
+    function setMuted(m) {
+      muted = m;
+      if (ac) master.gain.setTargetAtTime(m ? 0 : 0.8, ac.currentTime, 0.05);
+    }
+    return { init, setSide, heartbeat, whoosh, chime, step, paper, hiss, blocked, door, scream, win, setMuted, get muted() { return muted; } };
+  })();
+
+  function toggleSound() {
+    audio.setMuted(!audio.muted);
+    document.getElementById('btnSound').textContent = audio.muted ? 'Sound: off' : 'Sound: on';
+  }
+
+  // ---------- Pre-drawn house (both sides) ----------
+  function rng(seed) {
+    let s = seed >>> 0;
+    return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  }
+  const RUGS = [
+    { x: 1.5, y: 1.6, w: 3, h: 2.2 }, { x: 13.4, y: 6.8, w: 6.2, h: 2.4 },
+    { x: 23, y: 11.4, w: 5, h: 2.2 }, { x: 2, y: 16, w: 5, h: 2.1 }, { x: 7.2, y: 1.8, w: 4.6, h: 2 },
+  ];
+  function makeHouse(side) {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    const r = rng(side ? 777 : 1234);
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const ch = grid[y][x], px = x * T, py = y * T;
+        const wall = ch === '#' || (ch === 'n' && side === NORMAL) || (ch === 'w' && side === WICKED);
+        if (!wall) {
+          if (side === NORMAL) {
+            const shade = 64 + Math.floor(r() * 10);
+            g.fillStyle = `rgb(${shade + 14},${shade},${shade - 16})`;
+            g.fillRect(px, py, T, T);
+            g.fillStyle = 'rgba(0,0,0,0.28)';
+            for (let k = 0; k < 4; k++) g.fillRect(px, py + k * 8 + 7, T, 1);
+            g.fillStyle = 'rgba(0,0,0,0.18)';
+            g.fillRect(px + ((y * 13) % 4) * 8, py + ((x + y) % 4) * 8, 1, 8);
+          } else {
+            const shade = 38 + Math.floor(r() * 8);
+            g.fillStyle = `rgb(${shade - 16},${shade + 10},${shade + 4})`;
+            g.fillRect(px, py, T, T);
+            g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1;
+            g.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1);
+            if (r() < 0.35) {
+              g.strokeStyle = 'rgba(111,227,201,0.1)';
+              g.beginPath(); g.moveTo(px + r() * T, py + r() * T);
+              for (let k = 0; k < 3; k++) g.lineTo(px + r() * T, py + r() * T);
+              g.stroke();
+            }
+            if (ch === 'n') {
+              g.fillStyle = 'rgba(80,90,88,0.6)';
+              for (let k = 0; k < 7; k++) g.fillRect(px + r() * 28, py + r() * 28, 2 + r() * 4, 2 + r() * 3);
+            }
+          }
+          if (ch === 'w' && side === NORMAL) {
+            g.setLineDash([2, 4]); g.strokeStyle = 'rgba(111,227,201,0.13)';
+            g.strokeRect(px + 3.5, py + 3.5, T - 7, T - 7); g.setLineDash([]);
+          }
+        } else if (side === NORMAL) {
+          g.fillStyle = '#5c4139'; g.fillRect(px, py, T, T);
+          g.fillStyle = 'rgba(255,220,180,0.035)';
+          for (let k = 0; k < 4; k++) g.fillRect(px + k * 8 + 3, py, 2, T);
+          g.fillStyle = '#74554a'; g.fillRect(px, py, T, 3);
+          g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(px, py + T - 3, T, 3);
+          if (ch === 'n') {
+            g.strokeStyle = 'rgba(111,227,201,0.3)'; g.lineWidth = 1.2;
+            g.beginPath(); g.moveTo(px + 6, py + 2); g.lineTo(px + 14, py + 12); g.lineTo(px + 10, py + 19); g.lineTo(px + 20, py + 30); g.stroke();
+          }
+        } else {
+          g.fillStyle = '#030605'; g.fillRect(px, py, T, T);
+          g.strokeStyle = 'rgba(111,227,201,0.4)'; g.lineWidth = 1;
+          g.strokeRect(px + 1.5, py + 1.5, T - 3, T - 3);
+          if (ch === 'w') {
+            g.fillStyle = 'rgba(111,227,201,0.18)';
+            g.fillRect(px + 10, py + 12, 3, 3); g.fillRect(px + 19, py + 12, 3, 3);
+          }
+        }
+      }
+    }
+    // Rugs on the normal side become dark puddles on the wicked side.
+    for (const rug of RUGS) {
+      const x = rug.x * T, y = rug.y * T, w = rug.w * T, h = rug.h * T;
+      if (side === NORMAL) {
+        g.fillStyle = '#4a1e24'; g.fillRect(x, y, w, h);
+        g.strokeStyle = '#b08a4a'; g.globalAlpha = 0.35; g.lineWidth = 2; g.strokeRect(x + 5, y + 5, w - 10, h - 10); g.globalAlpha = 1;
+      } else {
+        g.fillStyle = 'rgba(0,0,0,0.55)';
+        g.beginPath(); g.ellipse(x + w / 2, y + h / 2, w / 2, h / 2.3, 0, 0, Math.PI * 2); g.fill();
+      }
+    }
+    // Grandma's mirror, hanging on the top wall of the first room.
+    const mx = 2.5 * T, my = 12;
+    g.save();
+    g.fillStyle = side ? '#0f2522' : '#6b5330';
+    g.beginPath(); g.ellipse(mx, my, 20, 11, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = side ? '#6fe3c9' : '#8fa4a8'; g.globalAlpha = side ? 0.45 : 0.55;
+    g.beginPath(); g.ellipse(mx, my, 16, 8, 0, 0, Math.PI * 2); g.fill();
+    g.globalAlpha = 1; g.strokeStyle = '#111'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(mx - 6, my - 7); g.lineTo(mx + 1, my); g.lineTo(mx - 4, my + 7);
+    g.moveTo(mx + 1, my); g.lineTo(mx + 12, my - 3); g.stroke();
+    g.restore();
+    return c;
+  }
+  const house = [makeHouse(NORMAL), makeHouse(WICKED)];
+
+  const dark = document.createElement('canvas'); dark.width = W; dark.height = H;
+  const dctx = dark.getContext('2d');
+
+  const grain = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 200;
+    const g = c.getContext('2d'), img = g.createImageData(200, 200);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0); return c;
+  })();
+  const grainPattern = ctx.createPattern(grain, 'repeat');
+
+  const vignette = (() => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    const gr = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.62);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.75)');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H); return c;
+  })();
+
+  // ---------- Game flow ----------
+  const $ = (id) => document.getElementById(id);
+  const screens = { title: $('titleScreen'), note: $('noteScreen'), pause: $('pauseScreen'), caught: $('caughtScreen'), won: $('winScreen') };
+  function setMode(m) {
+    S.mode = m;
+    for (const [k, el] of Object.entries(screens)) el.hidden = k !== m;
+    if (m === 'play') canvas.focus?.();
+  }
+  function startGame(diff) {
+    audio.init();
+    S.difficulty = diff;
+    reset();
+    setMode('play');
+    toast('Find the 5 mirror shards. They only exist on the Wicked Side.', 5);
+  }
+  function toast(text, secs = 3.2) { S.toast = { text, t: secs, max: secs }; }
+
+  function flip() {
+    if (S.flipCd > 0) return;
+    const other = 1 - S.side;
+    if (blockedFor(S.p.x, S.p.y, 9, other)) {
+      if (S.blockedCd <= 0) { toast('Something solid is in the way on the other side. Step out of the doorway.', 2.4); audio.blocked(); S.blockedCd = 1; }
+      return;
+    }
+    S.side = other; S.flipCd = 1.4; S.flipFx = 1; S.hintFlipShown = true;
+    audio.whoosh(other === WICKED); audio.setSide(other);
+    if (other === WICKED && !S.m.active && S.m.wakeIn < 0) {
+      S.m.wakeIn = 2.5;
+      toast('Cold. Green. Quiet. You’re on the Wicked Side now… and something just woke up.', 4.5);
+    }
+    if (other === WICKED && S.m.active && Math.hypot(S.m.x - S.p.x, S.m.y - S.p.y) < 30) caught();
+  }
+
+  function tryRead() {
+    const n = nearNote();
+    if (!n) return;
+    S.readingNote = n.i; S.notesRead.add(n.i);
+    const note = NOTES[n.i];
+    $('noteDate').textContent = note.date;
+    const body = $('noteBody'); body.textContent = '';
+    for (const line of note.body) { const p = document.createElement('p'); p.textContent = line; body.appendChild(p); }
+    audio.paper();
+    setMode('note');
+  }
+  function closeNote() { audio.paper(); setMode('play'); }
+  function nearNote() {
+    if (S.side !== NORMAL) return null;
+    for (const n of noteSpots) if (Math.hypot(n.x - S.p.x, n.y - S.p.y) < 30) return n;
+    return null;
+  }
+
+  function caught() {
+    S.mode = 'scare'; S.scareT = 0; S.shake = 1;
+    for (const el of Object.values(screens)) el.hidden = true;
+    audio.scream();
+    $('caughtTip').textContent = 'Tip: ' + TIPS[Math.floor(Math.random() * TIPS.length)];
+    $('caughtStats').textContent = `Shards found: ${S.got} of ${TOTAL_SHARDS} · Time: ${fmt(S.time)}`;
+  }
+  function win() {
+    audio.win();
+    let best = null;
+    try {
+      const key = 'wicked-side-best-' + S.difficulty;
+      best = parseFloat(localStorage.getItem(key));
+      if (!(best > 0) || S.time < best) { localStorage.setItem(key, String(S.time)); best = S.time; }
+    } catch { best = null; }
+    $('winStats').textContent = `Time: ${fmt(S.time)}` + (best ? ` · Best: ${fmt(best)}` : '') + ` · Notes read: ${S.notesRead.size} of ${NOTES.length}`;
+    setMode('won');
+  }
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  // ---------- Update ----------
+  let stepTimer = 0, beatTimer = 0, idleAngle = 0;
+  const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
+  const CONE = 0.46;
+
+  function update(dt) {
+    if (S.mode === 'scare') {
+      S.scareT += dt; S.shake = Math.max(0, S.shake - dt * 0.8);
+      if (S.scareT > 1.15) setMode('caught');
+      return;
+    }
+    if (S.mode === 'title') { idleAngle += dt * 0.5; S.p.aim = 0.9 + Math.sin(idleAngle) * 0.7; return; }
+    if (S.mode !== 'play') return;
+
+    S.time += dt;
+    S.flipCd = Math.max(0, S.flipCd - dt);
+    S.flipFx = Math.max(0, S.flipFx - dt * 2);
+    S.blockedCd -= dt;
+    if (S.toast && (S.toast.t -= dt) <= 0) S.toast = null;
+    if (!S.hintFlipShown && S.time > 9 && !S.toast) { toast('Press Space (or tap the right side) to cross to the Wicked Side.', 5); S.hintFlipShown = true; }
+
+    // Movement
+    const p = S.p;
+    let mx = 0, my = 0;
+    if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
+    if (keys.has('d') || keys.has('arrowright')) mx += 1;
+    if (keys.has('w') || keys.has('arrowup')) my -= 1;
+    if (keys.has('s') || keys.has('arrowdown')) my += 1;
+    if (stick.id !== null) { mx += stick.dx; my += stick.dy; }
+    const len = Math.hypot(mx, my);
+    p.moving = len > 0.15;
+    if (len > 1) { mx /= len; my /= len; }
+    const wantRun = keys.has('shift') || (stick.id !== null && len > 0.95);
+    p.running = p.moving && wantRun && p.stamina > 0.02;
+    if (p.running) p.stamina = Math.max(0, p.stamina - dt / 2.6);
+    else p.stamina = Math.min(1, p.stamina + dt / (p.moving ? 4.5 : 3));
+    const speed = p.running ? 178 : 112;
+    const nx = p.x + mx * speed * dt, ny = p.y + my * speed * dt;
+    if (!blockedFor(nx, p.y, 9, S.side)) p.x = nx;
+    if (!blockedFor(p.x, ny, 9, S.side)) p.y = ny;
+
+    if (p.moving) {
+      stepTimer -= dt;
+      if (stepTimer <= 0) { audio.step(p.running); stepTimer = p.running ? 0.26 : 0.4; }
+    }
+    // Aim: follow the mouse if it's being used, otherwise the walking direction.
+    if (mouse.active) p.aim = Math.atan2(mouse.y - p.y, mouse.x - p.x);
+    else if (p.moving) p.aim += angDiff(Math.atan2(my, mx), p.aim) * Math.min(1, dt * 10);
+
+    // Front door
+    if (S.doorOpen && Math.floor(p.x / T) === exitTile.x && Math.floor(p.y / T) === exitTile.y) { win(); return; }
+
+    // Shards (only touchable on the Wicked side)
+    if (S.side === WICKED) {
+      for (const s of S.shards) {
+        if (s.got || Math.hypot(s.x - p.x, s.y - p.y) > 20) continue;
+        s.got = true; S.got++; audio.chime();
+        if (S.got === TOTAL_SHARDS) {
+          S.doorOpen = true; audio.door();
+          toast('The mirror is whole! Somewhere downstairs, the front door creaks open. RUN!', 5);
+        } else {
+          toast(`Shard ${S.got} of ${TOTAL_SHARDS}. It knows you took it. It’s getting faster.`, 3.5);
+        }
+      }
+    }
+
+    // The thing on the other side
+    const m = S.m;
+    if (m.wakeIn > 0 && (m.wakeIn -= dt) <= 0) { m.active = true; m.wakeIn = 0; }
+    if (m.active) {
+      const dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy);
+      m.sees = S.side === WICKED && d < T * 11 && lineClear(m.x, m.y, p.x, p.y);
+      const inLight = m.sees && d < 320 && Math.abs(angDiff(Math.atan2(-dy, -dx), p.aim)) < CONE + 0.05;
+      if (inLight && !m.lit) audio.hiss();
+      m.lit = inLight;
+      const base = S.difficulty === 'brave' ? 1 : 0.76;
+      let spd = S.side === WICKED ? (m.sees ? 124 : 90) : 44;
+      spd *= base * (1 + 0.07 * S.got);
+      if (m.lit) spd *= 0.42;
+
+      fieldTimer -= dt;
+      if (fieldTimer <= 0) { buildField(Math.floor(p.x / T), Math.floor(p.y / T)); fieldTimer = 0.2; }
+      let tx = p.x, ty = p.y;
+      if (!m.sees) {
+        const cx = Math.floor(m.x / T), cy = Math.floor(m.y / T);
+        const here = field[cy * COLS + cx];
+        if (here > 0) {
+          let best = here, bx = cx, by = cy;
+          for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const v = monsterSolid(cx + ox, cy + oy) ? -1 : field[(cy + oy) * COLS + cx + ox];
+            if (v >= 0 && v < best) { best = v; bx = cx + ox; by = cy + oy; }
+          }
+          tx = bx * T + T / 2; ty = by * T + T / 2;
+        } else if (here < 0) { tx = m.x; ty = m.y; }
+      }
+      const ddx = tx - m.x, ddy = ty - m.y, dd = Math.hypot(ddx, ddy);
+      if (dd > 0.5) {
+        const stepLen = Math.min(dd, spd * dt);
+        m.x += ddx / dd * stepLen; m.y += ddy / dd * stepLen;
+        m.face = Math.atan2(ddy, ddx);
+      }
+      if (S.side === WICKED && d < 21) { caught(); return; }
+
+      // Heartbeat speeds up as it gets closer.
+      if (d < 440) {
+        beatTimer -= dt;
+        if (beatTimer <= 0) {
+          const k = d / 440;
+          audio.heartbeat(0.55 - k * 0.4);
+          beatTimer = 0.34 + k * 1.1;
+        }
+      }
+    }
+  }
+
+  // ---------- Drawing ----------
+  const rays = new Float32Array(360 * 2);
+  function castLight(px, py, aim, side, reach) {
+    const N = 360;
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2;
+      const off = Math.abs(angDiff(a, aim));
+      let maxLen;
+      if (off < CONE) maxLen = reach;
+      else if (off < CONE + 0.14) maxLen = 58 + (reach - 58) * (1 - (off - CONE) / 0.14);
+      else maxLen = 58;
+      const cx = Math.cos(a), cy = Math.sin(a);
+      let l = 0;
+      while (l < maxLen) {
+        l += 4;
+        if (solidAt(Math.floor((px + cx * l) / T), Math.floor((py + cy * l) / T), side)) { l += 7; break; }
+      }
+      l = Math.min(l, maxLen);
+      rays[i * 2] = px + cx * l; rays[i * 2 + 1] = py + cy * l;
+    }
+  }
+
+  function drawPlayer(p) {
+    ctx.save(); ctx.translate(p.x, p.y);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.ellipse(0, 4, 10, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.rotate(p.aim);
+    // flashlight
+    ctx.fillStyle = '#9aa0a6'; ctx.fillRect(6, 3, 9, 4);
+    ctx.fillStyle = '#fff4d6'; ctx.fillRect(14, 3, 2, 4);
+    // body (hoodie) and head
+    ctx.fillStyle = '#4f6283';
+    ctx.beginPath(); ctx.ellipse(0, 0, 8, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e2c4a0';
+    ctx.beginPath(); ctx.arc(1, 0, 5.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3b2a1f';
+    ctx.beginPath(); ctx.arc(-0.5, 0, 5.8, Math.PI * 0.55, Math.PI * 1.45); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawMonster(m, t, alpha) {
+    ctx.save(); ctx.translate(m.x, m.y); ctx.globalAlpha = alpha;
+    const jitter = m.lit ? 2.5 : 0.6;
+    ctx.translate((Math.random() - 0.5) * jitter, (Math.random() - 0.5) * jitter);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.ellipse(0, 6, 16, 8, 0, 0, Math.PI * 2); ctx.fill();
+    // long arms, reaching toward where it's going
+    ctx.strokeStyle = '#020403'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (const s of [-1, 1]) {
+      const a = m.face + s * 0.7 + Math.sin(t * 6 + s) * 0.15;
+      ctx.beginPath(); ctx.moveTo(Math.cos(m.face + s * 1.4) * 8, Math.sin(m.face + s * 1.4) * 8);
+      ctx.quadraticCurveTo(Math.cos(a) * 16, Math.sin(a) * 16, Math.cos(m.face + s * 0.35) * 26, Math.sin(m.face + s * 0.35) * 26);
+      ctx.stroke();
+    }
+    // ragged body
+    ctx.fillStyle = '#020403';
+    ctx.beginPath();
+    for (let i = 0; i <= 18; i++) {
+      const a = (i / 18) * Math.PI * 2;
+      const r = 14 + Math.sin(a * 5 + t * 7) * 2.5 + (i % 2 ? 3 : 0);
+      i ? ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r) : ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawEyes(m, alpha) {
+    ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.face + Math.PI / 2);
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = '#6fe3c9'; ctx.shadowBlur = 10;
+    ctx.fillStyle = '#eafff9';
+    ctx.beginPath(); ctx.ellipse(-4.5, -3, 2.6, 1.6, -0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(4.5, -3, 2.6, 1.6, 0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#eafff9'; ctx.lineWidth = 1.2; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.moveTo(-6, 3);
+    for (let i = 1; i <= 6; i++) ctx.lineTo(-6 + i * 2, 3 + (i % 2 ? 1.8 : 0) + Math.sin(i / 6 * Math.PI) * 1.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawShard(s, t, bright) {
+    ctx.save(); ctx.translate(s.x, s.y + Math.sin(t * 2 + s.x) * 2); ctx.rotate(t * 0.8 + s.y);
+    ctx.shadowColor = '#6fe3c9'; ctx.shadowBlur = 16 * bright;
+    ctx.fillStyle = `rgba(215,255,246,${0.9 * bright})`;
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 2); ctx.lineTo(1, 8); ctx.lineTo(-5, 3); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = `rgba(111,227,201,${bright})`; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawDoor(t) {
+    const x = exitTile.x * T, y = exitTile.y * T;
+    ctx.save();
+    if (S.side === NORMAL) {
+      ctx.fillStyle = S.doorOpen ? '#140d08' : '#5a3a22'; ctx.fillRect(x + 2, y + 1, T - 4, T - 2);
+      if (!S.doorOpen) {
+        ctx.strokeStyle = '#3a2414'; ctx.lineWidth = 2; ctx.strokeRect(x + 6, y + 5, T - 12, T - 10);
+        ctx.fillStyle = '#c9a15a'; ctx.beginPath(); ctx.arc(x + 9, y + T / 2, 2, 0, Math.PI * 2); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = '#020403'; ctx.fillRect(x + 1, y + 1, T - 2, T - 2);
+      ctx.strokeStyle = S.doorOpen ? 'rgba(240,179,94,0.8)' : 'rgba(111,227,201,0.4)'; ctx.lineWidth = 1.5; ctx.strokeRect(x + 3.5, y + 3.5, T - 7, T - 7);
+    }
+    if (S.doorOpen) {
+      const g = ctx.createRadialGradient(x + T / 2, y + T / 2, 2, x + T / 2, y + T / 2, 40 + Math.sin(t * 4) * 3);
+      g.addColorStop(0, 'rgba(255,214,150,0.85)'); g.addColorStop(1, 'rgba(255,214,150,0)');
+      ctx.fillStyle = g; ctx.fillRect(x - 40, y - 40, T + 80, T + 80);
+    }
+    ctx.restore();
+  }
+
+  function drawNote(n) {
+    ctx.save(); ctx.translate(n.x, n.y); ctx.rotate(((n.i * 37) % 10 - 5) / 20);
+    ctx.fillStyle = S.notesRead.has(n.i) ? '#8f8674' : '#e6dcc4'; ctx.fillRect(-7, -9, 14, 18);
+    ctx.fillStyle = 'rgba(40,30,20,0.6)';
+    for (let k = 0; k < 4; k++) ctx.fillRect(-5, -6 + k * 4, 8 + (k % 2) * 2, 1);
+    ctx.restore();
+  }
+
+  function render(t) {
+    if (S.mode === 'scare') { drawScare(t); return; }
+    const p = S.p, m = S.m, side = S.side;
+
+    ctx.save();
+    if (S.shake > 0) ctx.translate((Math.random() - 0.5) * 10 * S.shake, (Math.random() - 0.5) * 10 * S.shake);
+    ctx.drawImage(house[side], 0, 0);
+
+    if (side === NORMAL) for (const n of noteSpots) drawNote(n);
+    drawDoor(t);
+    if (side === WICKED) for (const s of S.shards) if (!s.got) drawShard(s, t, 1);
+    if (m.active && side === WICKED) drawMonster(m, t, 1);
+    drawPlayer(p);
+
+    // Darkness with a flashlight-shaped hole in it
+    const nearDanger = m.active ? Math.max(0, 1 - Math.hypot(m.x - p.x, m.y - p.y) / 260) : 0;
+    let flick = 1;
+    if (side === WICKED && nearDanger > 0 && Math.random() < nearDanger * 0.25) flick = 0.35 + Math.random() * 0.4;
+    const reach = side === WICKED ? 285 : 330;
+    castLight(p.x, p.y, p.aim, side, reach);
+    dctx.globalCompositeOperation = 'source-over';
+    dctx.globalAlpha = 1;
+    dctx.fillStyle = side === WICKED ? 'rgba(1,6,5,0.975)' : 'rgba(5,3,3,0.965)';
+    dctx.fillRect(0, 0, W, H);
+    dctx.globalCompositeOperation = 'destination-out';
+    dctx.globalAlpha = flick;
+    const lg = dctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, reach);
+    lg.addColorStop(0, 'rgba(0,0,0,1)'); lg.addColorStop(0.5, 'rgba(0,0,0,0.88)'); lg.addColorStop(1, 'rgba(0,0,0,0)');
+    dctx.fillStyle = lg;
+    dctx.beginPath(); dctx.moveTo(rays[0], rays[1]);
+    for (let i = 1; i < 360; i++) dctx.lineTo(rays[i * 2], rays[i * 2 + 1]);
+    dctx.closePath(); dctx.fill();
+    dctx.globalAlpha = 1;
+    const glow = (x, y, r, a) => {
+      const g = dctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+      dctx.fillStyle = g; dctx.fillRect(x - r, y - r, r * 2, r * 2);
+    };
+    if (side === WICKED) for (const s of S.shards) if (!s.got) glow(s.x, s.y, 30, 0.7);
+    if (S.doorOpen) glow(exitTile.cx, exitTile.cy, 60, 0.8);
+    ctx.drawImage(dark, 0, 0);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = flick;
+    const beam = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, reach);
+    beam.addColorStop(0, side === WICKED ? 'rgba(90,220,190,0.22)' : 'rgba(255,210,150,0.22)');
+    beam.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = beam;
+    ctx.beginPath(); ctx.moveTo(rays[0], rays[1]);
+    for (let i = 1; i < 360; i++) ctx.lineTo(rays[i * 2], rays[i * 2 + 1]);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    // Tint the whole world a sick green on the wicked side
+    if (side === WICKED) {
+      ctx.fillStyle = 'rgba(40,120,100,0.07)'; ctx.fillRect(0, 0, W, H);
+    }
+    // Things you can sense through the dark
+    if (m.active) {
+      const d = Math.hypot(m.x - p.x, m.y - p.y);
+      if (side === WICKED && d < T * 12) drawEyes(m, 0.9);
+      if (side === NORMAL && d < T * 6) {
+        drawMonster(m, t, 0.1 + 0.06 * Math.sin(t * 5));
+        drawEyes(m, 0.25 + 0.1 * Math.sin(t * 3));
+      }
+    }
+    if (side === NORMAL) {
+      for (const s of S.shards) {
+        if (s.got) continue;
+        const d = Math.hypot(s.x - p.x, s.y - p.y);
+        if (d < T * 6) drawShard(s, t, (0.14 + 0.12 * Math.sin(t * 3 + s.x)) * (1 - d / (T * 6)) * 2);
+      }
+    }
+
+    ctx.drawImage(vignette, 0, 0);
+    ctx.globalAlpha = 0.07; ctx.fillStyle = grainPattern;
+    ctx.save(); ctx.translate(Math.random() * -200, Math.random() * -200); ctx.fillRect(0, 0, W + 200, H + 200); ctx.restore();
+    ctx.globalAlpha = 1;
+
+    // The crossing ripple
+    if (S.flipFx > 0) {
+      const f = S.flipFx;
+      for (let y = 0; y < H; y += 16) {
+        const off = Math.sin(y * 0.045 + t * 30) * f * 22;
+        ctx.drawImage(canvas, 0, y, W, 16, off, y, W, 16);
+      }
+      ctx.fillStyle = side === WICKED ? `rgba(160,255,230,${f * 0.35})` : `rgba(255,230,190,${f * 0.3})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.restore();
+
+    if (S.mode !== 'title') drawHud(t);
+  }
+
+  function drawHud(t) {
+    const side = S.side;
+    ctx.save();
+    ctx.font = '15px "Special Elite", "Courier New", monospace';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = side === WICKED ? '#6fe3c9' : '#f0b35e';
+    ctx.fillText(side === WICKED ? 'THE WICKED SIDE' : 'THE NORMAL SIDE', 18, 16);
+
+    for (let i = 0; i < TOTAL_SHARDS; i++) {
+      const x = 26 + i * 20, y = 50;
+      ctx.beginPath(); ctx.moveTo(x, y - 7); ctx.lineTo(x + 5, y + 1); ctx.lineTo(x + 1, y + 7); ctx.lineTo(x - 4, y + 2); ctx.closePath();
+      if (i < S.got) { ctx.fillStyle = '#d7fff6'; ctx.shadowColor = '#6fe3c9'; ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0; }
+      else { ctx.strokeStyle = 'rgba(228,220,203,0.35)'; ctx.lineWidth = 1; ctx.stroke(); }
+    }
+
+    // Crossing readiness and run meter
+    ctx.fillStyle = 'rgba(228,220,203,0.55)';
+    ctx.font = '12px "Special Elite", "Courier New", monospace';
+    ctx.fillText(S.flipCd > 0 ? 'crossing…' : 'SPACE: cross over', 18, 66);
+    ctx.fillStyle = 'rgba(228,220,203,0.15)'; ctx.fillRect(18, 84, 90, 4);
+    ctx.fillStyle = S.p.stamina < 0.25 ? '#c43a4c' : 'rgba(228,220,203,0.7)'; ctx.fillRect(18, 84, 90 * S.p.stamina, 4);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(228,220,203,0.5)';
+    ctx.font = '13px "Special Elite", "Courier New", monospace';
+    ctx.fillText(fmt(S.time), W - 18, 16);
+
+    ctx.textAlign = 'center';
+    const n = nearNote();
+    if (n && S.mode === 'play') {
+      ctx.fillStyle = '#e6dcc4'; ctx.font = '15px "Special Elite", "Courier New", monospace';
+      ctx.fillText('Press E to read the note', W / 2, H - 92);
+    }
+    if (S.toast) {
+      const a = Math.min(1, S.toast.t * 2, (S.toast.max - S.toast.t) * 4);
+      ctx.globalAlpha = a;
+      ctx.font = '17px "Special Elite", "Courier New", monospace';
+      const tw = Math.min(W - 80, ctx.measureText(S.toast.text).width + 36);
+      ctx.fillStyle = 'rgba(6,5,8,0.8)'; ctx.fillRect(W / 2 - tw / 2, H - 56, tw, 34);
+      ctx.fillStyle = side === WICKED ? '#bff5e8' : '#f3dfbd';
+      ctx.fillText(S.toast.text, W / 2, H - 47, W - 110);
+      ctx.globalAlpha = 1;
+    }
+    if (S.m.sees && S.mode === 'play') {
+      ctx.fillStyle = `rgba(196,58,76,${0.5 + 0.4 * Math.sin(t * 10)})`;
+      ctx.font = '14px "Special Elite", "Courier New", monospace';
+      ctx.fillText(S.m.lit ? 'IT HATES THE LIGHT' : 'IT SEES YOU', W / 2, 18);
+    }
+    // touch joystick
+    if (stick.id !== null) {
+      ctx.strokeStyle = 'rgba(228,220,203,0.3)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 60, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(228,220,203,0.3)';
+      ctx.beginPath(); ctx.arc(stick.ox + stick.dx * 60, stick.oy + stick.dy * 60, 20, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawScare(t) {
+    const k = Math.min(1, S.scareT / 0.25);
+    ctx.save();
+    ctx.fillStyle = S.scareT < 0.5 && Math.floor(S.scareT * 20) % 2 ? '#2a0508' : '#000';
+    ctx.fillRect(0, 0, W, H);
+    ctx.translate(W / 2 + (Math.random() - 0.5) * 24 * S.shake, H / 2 + (Math.random() - 0.5) * 24 * S.shake);
+    const s = 0.6 + k * 1.4;
+    ctx.scale(s, s);
+    ctx.fillStyle = '#030605';
+    ctx.beginPath();
+    for (let i = 0; i <= 30; i++) {
+      const a = (i / 30) * Math.PI * 2, r = 130 + (i % 2 ? 14 : 0) + Math.sin(a * 3 + t * 20) * 4;
+      i ? ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r * 1.15) : ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r * 1.15);
+    }
+    ctx.fill();
+    ctx.shadowColor = '#6fe3c9'; ctx.shadowBlur = 30; ctx.fillStyle = '#eafff9';
+    ctx.beginPath(); ctx.ellipse(-45, -30, 26, 14, -0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(45, -30, 26, 14, 0.35, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(-45, -30, 3, 0, Math.PI * 2); ctx.arc(45, -30, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#eafff9'; ctx.shadowColor = '#6fe3c9'; ctx.shadowBlur = 20;
+    ctx.beginPath(); ctx.moveTo(-80, 30);
+    for (let i = 1; i <= 16; i++) ctx.lineTo(-80 + i * 10, 30 + (i % 2 ? 16 : 0) + Math.sin(i / 16 * Math.PI) * 26);
+    for (let i = 16; i >= 0; i--) ctx.lineTo(-80 + i * 10, 44 + Math.sin(i / 16 * Math.PI) * 40 - (i % 2 ? 10 : 0));
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ---------- Buttons ----------
+  $('btnBrave').addEventListener('click', () => startGame('brave'));
+  $('btnEasy').addEventListener('click', () => startGame('easy'));
+  $('btnRetry').addEventListener('click', () => startGame(S.difficulty));
+  $('btnAgain').addEventListener('click', () => startGame(S.difficulty));
+  $('btnResume').addEventListener('click', () => setMode('play'));
+  const toTitle = () => { reset(); setMode('title'); };
+  $('btnQuit').addEventListener('click', toTitle);
+  $('btnTitle1').addEventListener('click', toTitle);
+  $('btnTitle2').addEventListener('click', toTitle);
+  $('btnFlip').addEventListener('click', () => { if (S.mode === 'play') flip(); });
+  $('btnRead').addEventListener('click', () => { if (S.mode === 'play') tryRead(); else if (S.mode === 'note') closeNote(); });
+  $('btnPause').addEventListener('click', () => { if (S.mode === 'play') setMode('pause'); else if (S.mode === 'pause') setMode('play'); });
+  $('btnSound').addEventListener('click', () => { audio.init(); toggleSound(); });
+  $('noteScreen').addEventListener('click', closeNote);
+  // Buttons shouldn't keep keyboard focus, or Space would click them again.
+  document.querySelectorAll('button').forEach((b) => b.addEventListener('mouseup', () => b.blur()));
+  document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') setMode('pause'); });
+
+  // ---------- Loop ----------
+  reset();
+  setMode('title');
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt);
+    render(now / 1000);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</html>

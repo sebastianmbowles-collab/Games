@@ -14,3 +14,10 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the Oxlint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+
+## The Wicked Side
+
+A standalone flashlight horror game. Open `the-wicked-side.html` straight in a
+browser (no server or build needed). Cross between Grandma's house and its
+mirror-world with Space, collect the five mirror shards on the Wicked Side, and
+escape through the front door before the thing that lives there catches you.
