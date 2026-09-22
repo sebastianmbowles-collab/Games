@@ -17,20 +17,23 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## The Wicked Side
 
-A first-person 3D horror game set in Grandma's cottage. Open
+A first-person 3D horror game set in Grandma's two-storey cottage. Open
 `the-wicked-side.html` in a browser (it loads three.js from a CDN, so it needs
 an internet connection; no build step).
 
-Press Space to cross between the Normal Side and the Wicked Side, find the five
-mirror shards (they only exist on the Wicked Side) and escape through the front
-door. Watch out for:
+Press Space to cross between the Normal Side and the Wicked Side, find the six
+mirror shards (they only exist on the Wicked Side, two of them upstairs) and
+escape through the front door. Watch out for:
 
-- **Book**: a tall, skinny, reddish-brown creature with visible bones and a
-  book for a head. It lurks in the library and freezes while your flashlight
-  is on it.
+- **Book** (downstairs): a tall, skinny, reddish-brown creature with visible
+  bones and a book for a head. It lurks in the library and freezes while your
+  flashlight is on it.
 - **Luna**: your dog. On the Normal Side she follows you around and whines
   when danger is close. On the Wicked Side she is wolf-like, with a wide-open
   mouth, red eyes and sixteen bubble eyes, and she hunts by sound (hold C to
   sneak).
+- **The Moth** (upstairs): a towering moth with eye-spotted wings that flies
+  straight at your flashlight. Press F to turn the light off.
 
-Grandma's handwritten notes are scattered around the cottage (press E to read).
+Hide in wardrobes or under beds with E, as long as nothing sees you get in.
+Grandma's handwritten notes are scattered around the cottage (E to read).
