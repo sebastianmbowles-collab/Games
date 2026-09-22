@@ -92,9 +92,12 @@ export function buildSpriteGrid(config) {
 
   // mask tear streaks (puppet)
   if (config.mask) {
-    for (let i = 0; i < 4; i++) {
-      set(cx - 3.2 + i * 0.4, cy + 1 + i * 0.6, 'streak')
-      set(cx + 3.2 - i * 0.4, cy + 1 + i * 0.6, 'streak')
+    for (let i = 0; i < 5; i++) {
+      const y = cy - 1.4 + i * 0.9
+      set(cx - 3.4 + i * 0.25, y, 'streak')
+      set(cx - 3.4 + i * 0.25 - 1, y, 'streak')
+      set(cx + 3.4 - i * 0.25, y, 'streak')
+      set(cx + 3.4 - i * 0.25 + 1, y, 'streak')
     }
   }
 
@@ -143,6 +146,10 @@ export function buildSpriteGrid(config) {
       for (let x = cx - 2.6; x <= cx + 2.6; x++) set(x, y, 'mouth')
     }
     for (let x = cx - 2; x <= cx + 2; x += 1.3) set(x, cy + 3.6, 'tooth')
+    // brow ridge bumps for texture
+    for (const dx of [-3.2, 0, 3.2]) {
+      set(cx + dx, cy - headRy + 1.2, 'ridge')
+    }
   } else {
     for (let x = cx - 1.6; x <= cx + 1.6; x++) set(x, cy + 3, 'mouth')
   }
@@ -191,6 +198,8 @@ export function spriteCellColor(kind, palette) {
       return palette.dark ?? '#1a1a1a'
     case 'tooth':
       return '#f5f5f5'
+    case 'ridge':
+      return palette.dark ?? '#1a1a1a'
     case 'accent':
       return palette.accent ?? '#111'
     case 'accentCenter':

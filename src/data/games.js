@@ -130,7 +130,7 @@ export const GAMES = [
     blurb: 'Grab a plushie before the claw gets annoying.',
     color: '#2b7de0',
     icon: '🧸',
-    spriteKey: 'freddy',
+    spriteKey: 'plush-bear',
     playable: true,
   },
   {

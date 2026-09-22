@@ -52,7 +52,11 @@ export const CHARACTERS = {
     palette: { face: '#2bb673', dark: '#0d3a20', eye: '#8a3ddb', accent: '#f2b90c' },
   },
   'balloon-freddy': {
-    shape: { earType: 'round', accent: 'bowtie' },
-    palette: { face: '#a06835', earOuter: '#a06835', earInner: '#5c3a1a', dark: '#2a1a0d', eye: '#151008', accent: '#1a1a1a', accent2: '#e0393e' },
+    shape: { earType: 'round', accent: 'bib' },
+    palette: { face: '#b8763c', earOuter: '#b8763c', earInner: '#6b4420', dark: '#2a1a0d', eye: '#151008', accent: '#e0393e', accent2: '#f2f2f2' },
+  },
+  'plush-bear': {
+    shape: { earType: 'round', accent: null },
+    palette: { face: '#e0c090', earOuter: '#e0c090', earInner: '#b8895a', dark: '#6b4420', eye: '#6b4420' },
   },
 }
