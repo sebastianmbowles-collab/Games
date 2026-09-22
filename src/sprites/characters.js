@@ -1,6 +1,6 @@
 export const CHARACTERS = {
   freddy: {
-    shape: { earType: 'round', accent: 'bowtie' },
+    shape: { earType: 'round', accent: 'bowtie', prop: 'mic' },
     palette: { face: '#a06835', earOuter: '#a06835', earInner: '#5c3a1a', dark: '#2a1a0d', eye: '#151008', accent: '#1a1a1a', accent2: '#f2b90c' },
   },
   'golden-freddy': {
@@ -12,7 +12,7 @@ export const CHARACTERS = {
     palette: { face: '#c99a5b', earOuter: '#c99a5b', earInner: '#7a5228', dark: '#3a2610', eye: '#1560c9', accent: '#e0393e', accent2: '#f2f2f2' },
   },
   bonnie: {
-    shape: { earType: 'tall', accent: 'bowtie' },
+    shape: { earType: 'tall', accent: 'bowtie', prop: 'guitar' },
     palette: { face: '#8a3ddb', earOuter: '#6c22b8', earInner: '#c491f0', dark: '#2a1245', eye: '#f2b90c', accent: '#e0393e', accent2: '#f2f2f2' },
   },
   roxy: {
@@ -20,7 +20,7 @@ export const CHARACTERS = {
     palette: { face: '#e0339c', earOuter: '#a8206f', earInner: '#f5a8d8', dark: '#3a0d26', eye: '#2be0d0', accent: '#f2b90c', accent2: '#f2f2f2' },
   },
   chica: {
-    shape: { earType: 'none', beak: true, accent: 'bib' },
+    shape: { earType: 'none', beak: true, accent: 'bib', prop: 'cupcake' },
     palette: { face: '#f2c40c', earOuter: '#f2c40c', dark: '#4a3a00', eye: '#151008', accent: '#f2f2f2', accent2: '#e0393e' },
   },
   foxy: {

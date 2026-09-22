@@ -171,6 +171,49 @@ export function buildSpriteGrid(config) {
     }
   }
 
+  // held prop, tucked into the free bottom-right corner
+  if (config.prop === 'guitar') {
+    for (let y = 12; y <= 14; y++) {
+      for (let x = 11; x <= 13; x++) set(x, y, 'guitarBody')
+    }
+    const neck = [
+      [11.5, 12],
+      [12.3, 10.8],
+      [13.1, 9.6],
+      [13.9, 8.4],
+      [14.7, 7.2],
+    ]
+    for (const [nx, ny] of neck) set(nx, ny, 'guitarNeck')
+    set(14.7, 6.4, 'guitarPeg')
+  } else if (config.prop === 'mic') {
+    for (let y = 9.6; y <= 11.6; y++) {
+      for (let x = 11.8; x <= 13.8; x++) {
+        if (inEllipse(x, y, 12.8, 10.6, 1, 1)) set(x, y, 'micHead')
+      }
+    }
+    for (let y = 10; y <= 11.2; y++) {
+      for (let x = 12.2; x <= 13.4; x++) {
+        if (inEllipse(x, y, 12.8, 10.6, 0.6, 0.6)) set(x, y, 'micGrille')
+      }
+    }
+    for (let y = 11.8; y <= 15; y++) {
+      set(12.4, y, 'micHandle')
+      set(13.2, y, 'micHandle')
+    }
+  } else if (config.prop === 'cupcake') {
+    for (let y = 13; y <= 14.5; y++) {
+      const t = (y - 13) / 1.5
+      const halfW = 1 + t * 0.6
+      for (let x = 13 - halfW; x <= 13 + halfW; x++) set(x, y, 'cupBase')
+    }
+    for (let y = 10.8; y <= 12.6; y++) {
+      for (let x = 11.6; x <= 14.4; x++) {
+        if (inEllipse(x, y, 13, 11.6, 1.5, 1.1)) set(x, y, 'cupFrosting')
+      }
+    }
+    set(13, 9.8, 'cupCandle')
+  }
+
   return cells
 }
 
@@ -204,6 +247,24 @@ export function spriteCellColor(kind, palette) {
       return palette.accent ?? '#111'
     case 'accentCenter':
       return palette.accent2 ?? palette.accent ?? '#111'
+    case 'guitarBody':
+      return palette.accent ?? '#e0393e'
+    case 'guitarNeck':
+      return '#6b4420'
+    case 'guitarPeg':
+      return '#d9d9d9'
+    case 'micHead':
+      return '#e8e8ee'
+    case 'micGrille':
+      return '#4a4a52'
+    case 'micHandle':
+      return '#2a2a30'
+    case 'cupBase':
+      return '#f2f2f2'
+    case 'cupFrosting':
+      return '#f2a3d0'
+    case 'cupCandle':
+      return '#f2b90c'
     default:
       return null
   }
