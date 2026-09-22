@@ -201,3 +201,9 @@ export function spriteCellColor(kind, palette) {
 }
 
 export const GRID_SIZE = GRID
+export const EYE_RADIUS = 1.7
+export const EYE_CENTER = GRID / 2 - 0.5
+export const EYE_POSITIONS = [
+  { x: EYE_CENTER - 2.6, y: EYE_CENTER - 0.4, side: 'left' },
+  { x: EYE_CENTER + 2.6, y: EYE_CENTER - 0.4, side: 'right' },
+]

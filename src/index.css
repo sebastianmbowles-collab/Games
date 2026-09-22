@@ -1084,6 +1084,41 @@ body {
   height: 100%;
 }
 
+/* ---------- Sprite animation ---------- */
+
+.sprite-bob {
+  animation: sprite-bob-anim 2.6s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+
+@keyframes sprite-bob-anim {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+  }
+  50% {
+    transform: translateY(-3%) scaleY(1.02);
+  }
+}
+
+.sprite-eyelid {
+  transform: scaleY(0);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sprite-blink 3.6s ease-in-out infinite;
+}
+
+@keyframes sprite-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(0);
+  }
+  95% {
+    transform: scaleY(1);
+  }
+}
+
 /* ---------- Corner mascot ---------- */
 
 .corner-mascot {
