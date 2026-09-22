@@ -17,7 +17,20 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## The Wicked Side
 
-A standalone flashlight horror game. Open `the-wicked-side.html` straight in a
-browser (no server or build needed). Cross between Grandma's house and its
-mirror-world with Space, collect the five mirror shards on the Wicked Side, and
-escape through the front door before the thing that lives there catches you.
+A first-person 3D horror game set in Grandma's cottage. Open
+`the-wicked-side.html` in a browser (it loads three.js from a CDN, so it needs
+an internet connection; no build step).
+
+Press Space to cross between the Normal Side and the Wicked Side, find the five
+mirror shards (they only exist on the Wicked Side) and escape through the front
+door. Watch out for:
+
+- **Book**: a tall, skinny, reddish-brown creature with visible bones and a
+  book for a head. It lurks in the library and freezes while your flashlight
+  is on it.
+- **Luna**: your dog. On the Normal Side she follows you around and whines
+  when danger is close. On the Wicked Side she is wolf-like, with a wide-open
+  mouth, red eyes and sixteen bubble eyes, and she hunts by sound (hold C to
+  sneak).
+
+Grandma's handwritten notes are scattered around the cottage (press E to read).
