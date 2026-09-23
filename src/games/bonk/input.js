@@ -8,6 +8,11 @@ export function createInput() {
   return {
     keys,
     pads,
+    stick: { x: 0, y: 0 },
+    setStick(x, y) {
+      this.stick.x = x
+      this.stick.y = y
+    },
     pollPads() {
       const list = navigator.getGamepads ? navigator.getGamepads() : []
       for (const gp of list) {
@@ -60,9 +65,10 @@ export function readCommand(input, src) {
     })
     for (const [k, i] of Object.entries(EMOTE_ALT)) if (input.keys.pressed.has(k)) emote = i
   }
+  const useStick = src.scheme !== 'p2' && (input.stick.x || input.stick.y)
   return {
-    mx: (held(s.right) ? 1 : 0) - (held(s.left) ? 1 : 0),
-    my: (held(s.down) ? 1 : 0) - (held(s.up) ? 1 : 0),
+    mx: useStick ? input.stick.x : (held(s.right) ? 1 : 0) - (held(s.left) ? 1 : 0),
+    my: useStick ? input.stick.y : (held(s.down) ? 1 : 0) - (held(s.up) ? 1 : 0),
     jump: tapped(s.jump),
     bonk: held(s.bonk) || tapped(s.bonk),
     dash: tapped(s.dash),

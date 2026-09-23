@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { SCHEMES } from './data'
-import { animateMaterials, buildDuck, buildPet, mat, poseDuck, setBalloons } from './duck'
+import { DUCK_NAMES, PLAYER_COLORS, SCHEMES } from './data'
+import { animateMaterials, buildDuck, buildPet, disposeScene, mat, poseDuck, setBalloons } from './duck'
 import { COSTUMES } from './costumes'
 import { addLights, makeClouds, makeSky } from './matchView'
 import { sfx } from './sound'
@@ -314,15 +314,30 @@ export function createHub(renderer, profile, callbacks) {
   const screen = new THREE.Mesh(new THREE.BoxGeometry(70, 45, 4), mat('#00ff66', 'glow'))
   screen.position.set(0, -1920, -134)
   scene.add(screen)
-  // wandering hub ducks
+  // Other "players" hanging out in the hub, Roblox style.
+  const CHAT = [
+    'hi', 'gg', 'anyone wanna play?', 'BONK!', 'how do u get to the secret room', 'i found a secret!!',
+    'quack', 'lol', 'this game is so fun', 'who wants to race the hard obby', 'nice costume', 'brb',
+    'the giant duck scared me', 'i have 3 balloons left lol', 'follow me', 'jump on the green pad!!',
+    'im buying the dragon costume', 'wait for me', 'omg', 'i got bonked so far', 'lets gooo', 'ez',
+  ]
+  const SPOTS = [[0, 200], [-150, 300], [150, 300], [0, 380], [-220, 420], [220, 420], [0, -250], [-100, -150], [60, 60], [-250, 150], [280, 250], [200, 150]]
   const wanderers = []
-  const costumeKeys = Object.keys(COSTUMES).filter((k) => COSTUMES[k].price !== null && COSTUMES[k].price < 4000)
-  for (let i = 0; i < 5; i++) {
+  const costumeKeys = Object.keys(COSTUMES).filter((k) => COSTUMES[k].price !== null && COSTUMES[k].price < 6000)
+  const names = [...DUCK_NAMES].sort(() => Math.random() - 0.5)
+  function addBot(i, announce) {
     const d = buildDuck(costumeKeys[Math.floor(Math.random() * costumeKeys.length)], { hammer: false })
-    setBalloons(d, 1, ['#ff4d6d', '#3aa0ff', '#2bd96b', '#ffb000', '#b36bff'][i])
+    const color = PLAYER_COLORS[i % PLAYER_COLORS.length]
+    setBalloons(d, 1, color)
     scene.add(d.root)
-    wanderers.push({ d, x: (Math.random() - 0.5) * 600, z: (Math.random() - 0.5) * 600, tx: 0, tz: 0, t: 0, walk: 0 })
+    const [x, z] = SPOTS[Math.floor(Math.random() * SPOTS.length)]
+    const bot = { d, name: names[i % names.length], color, x: x + Math.random() * 60, y: 0, z: z + Math.random() * 60, vy: 0, tx: x, tz: z, t: 0, walk: 0, chat: null, chatT: 3 + Math.random() * 10, emote: null, emoteT: 0, life: 60 + Math.random() * 120 }
+    wanderers.push(bot)
+    if (announce) callbacks.chat({ system: true, text: `🦆 ${bot.name} joined the game` })
+    return bot
   }
+  for (let i = 0; i < 8; i++) addBot(i, false)
+  let nextBot = 8
 
   // player
   let duck = buildDuck(profile.costume, { hammer: false })
@@ -390,16 +405,22 @@ export function createHub(renderer, profile, callbacks) {
   }
 
   let bumpCd = 0
-  hub.step = (dt, keys) => {
+  hub.step = (dt, keys, stick) => {
     const s = SCHEMES.solo
     const held = (l) => l.some((k) => keys.down.has(k))
     const tapped = (l) => l.some((k) => keys.pressed.has(k))
     let mx = (held(s.right) ? 1 : 0) - (held(s.left) ? 1 : 0)
     let mz = (held(s.down) ? 1 : 0) - (held(s.up) ? 1 : 0)
-    const len = Math.hypot(mx, mz)
+    if (stick && (stick.x || stick.y)) {
+      mx = stick.x
+      mz = stick.y
+    }
+    if (keys.pressed.has('KeyE') || keys.pressed.has('KeyI')) interact()
+    const len = Math.min(1, Math.hypot(mx, mz))
     if (len) {
-      mx /= len
-      mz /= len
+      const l = Math.hypot(mx, mz)
+      mx = (mx / l) * len
+      mz = (mz / l) * len
     }
     const t = performance.now() / 1000
 
@@ -596,26 +617,93 @@ export function createHub(renderer, profile, callbacks) {
     }
     if (P.obby) P.obbyT += dt
 
-    // wanderers
-    for (const wd of wanderers) {
+    // bot players
+    for (const wd of [...wanderers]) {
       wd.t -= dt
+      wd.life -= dt
+      if (wd.life <= 0) {
+        callbacks.chat({ system: true, text: `👋 ${wd.name} left the game` })
+        scene.remove(wd.d.root)
+        wanderers.splice(wanderers.indexOf(wd), 1)
+        addBot(nextBot++, true)
+        continue
+      }
       if (wd.t <= 0) {
         wd.t = 2 + Math.random() * 4
-        wd.tx = (Math.random() - 0.5) * 900
-        wd.tz = (Math.random() - 0.5) * 800
-        if (Math.random() < 0.3) sfx.quack()
+        const r = Math.random()
+        if (r < 0.2) {
+          // come say hi to the real player
+          wd.tx = P.x + (Math.random() - 0.5) * 80
+          wd.tz = P.z + 60
+        } else {
+          const [x, z] = SPOTS[Math.floor(Math.random() * SPOTS.length)]
+          wd.tx = x + (Math.random() - 0.5) * 60
+          wd.tz = z + (Math.random() - 0.5) * 60
+        }
+        if (Math.random() < 0.25) {
+          wd.emote = ['spin', 'wave', 'flip', 'quack'][Math.floor(Math.random() * 4)]
+          wd.emoteT = 1.2
+        }
       }
       const dx = wd.tx - wd.x
       const dz = wd.tz - wd.z
       const d = Math.hypot(dx, dz)
-      if (d > 10) {
-        wd.x += (dx / d) * 90 * dt
-        wd.z += (dz / d) * 90 * dt
-        wd.walk += dt * 10
+      if (d > 10 && wd.emoteT <= 0) {
+        wd.x += (dx / d) * 150 * dt
+        wd.z += (dz / d) * 150 * dt
+        wd.walk += dt * 12
         wd.d.root.rotation.y = -Math.atan2(dz, dx)
       }
-      wd.d.root.position.set(wd.x, 0, wd.z)
-      poseDuck(wd.d, { walk: wd.walk, swing: 0, spin: 0, flip: 0, emote: null, t: t + wd.x, air: false })
+      // keep out of the fountain and the well
+      for (const [ox, oz, orr] of [[180, -120, 90], [-120, 120, 45]]) {
+        const ex = wd.x - ox
+        const ez = wd.z - oz
+        const ed = Math.hypot(ex, ez)
+        if (ed < orr) {
+          wd.x = ox + (ex / (ed || 1)) * orr
+          wd.z = oz + (ez / (ed || 1)) * orr
+        }
+      }
+      // hopping, and bounce pads send them flying
+      if (wd.y <= 0 && Math.random() < 0.006) wd.vy = 480
+      if (wd.y <= 0 && Math.hypot(wd.x - 200, wd.z - 150) < 35) wd.vy = 1150
+      wd.vy -= G * dt
+      wd.y = Math.max(0, wd.y + wd.vy * dt)
+      if (wd.y === 0) wd.vy = Math.max(0, wd.vy)
+      wd.emoteT -= dt
+      if (wd.emoteT <= 0) wd.emote = null
+      wd.chatT -= dt
+      if (wd.chatT <= 0) {
+        wd.chatT = 8 + Math.random() * 14
+        wd.chat = { text: CHAT[Math.floor(Math.random() * CHAT.length)], t: 4 }
+        callbacks.chat({ name: wd.name, color: wd.color, text: wd.chat.text })
+      }
+      if (wd.chat) {
+        wd.chat.t -= dt
+        if (wd.chat.t <= 0) wd.chat = null
+      }
+      wd.d.root.position.set(wd.x, wd.y, wd.z)
+      poseDuck(wd.d, { walk: wd.walk, swing: 0, spin: 0, flip: wd.emote === 'flip' ? 1 - wd.emoteT / 1.2 : 0, emote: wd.emote, t: t + wd.x, air: wd.y > 5 })
+    }
+  }
+
+  // Interact: open whatever menu you're standing near, otherwise quack.
+  function interact() {
+    let best = null
+    let bestD = Infinity
+    for (const z of world.zones) {
+      if (!z.label) continue
+      const d = Math.hypot(P.x - z.x, P.z - z.z)
+      if (d < z.r + 90 && Math.abs(P.y - z.y) < 120 && d < bestD) {
+        best = z
+        bestD = d
+      }
+    }
+    if (best) onZone(best.key)
+    else {
+      sfx.quack()
+      callbacks.stat('quacks', 1)
+      hub.emote('wave')
     }
   }
 
@@ -725,6 +813,14 @@ export function createHub(renderer, profile, callbacks) {
   const proj = new THREE.Vector3()
   hub.labels = (width, height) => {
     const out = []
+    for (const wd of wanderers) {
+      proj.set(wd.x, wd.y + 105, wd.z).project(camera)
+      if (proj.z > 1) continue
+      const x = (proj.x * 0.5 + 0.5) * width
+      const y = (-proj.y * 0.5 + 0.5) * height
+      out.push({ text: wd.name, color: '#ffffff', x, y, small: true })
+      if (wd.chat) out.push({ text: wd.chat.text, x, y: y - 26, bubble: true })
+    }
     for (const z of world.zones) {
       if (!z.label) continue
       proj.set(z.x, z.y + 90, z.z).project(camera)
@@ -734,6 +830,6 @@ export function createHub(renderer, profile, callbacks) {
     return out
   }
 
-  hub.dispose = () => {}
+  hub.dispose = () => disposeScene(scene)
   return hub
 }

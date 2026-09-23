@@ -2,13 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { ACHIEVEMENTS } from './bonk/achievements'
 import Achievements from './bonk/Achievements'
+import { nearestSafe } from './bonk/arena'
 import { EMOTE_ALT, EMOTE_KEYS, EMOTES, GAME_KEYS } from './bonk/data'
-import { createMatch, forceEvent, quitMatch, snapshot, step } from './bonk/engine'
+import { bonkLaunch, createMatch, forceEvent, quitMatch, snapshot, step } from './bonk/engine'
 import { createHub } from './bonk/hub'
 import { createInput, readCommand } from './bonk/input'
 import { createLoadingScene } from './bonk/loadingScene'
 import Lobby from './bonk/Lobby'
 import { createMatchView, drawOverlay } from './bonk/matchView'
+import { DuckHead, HowToPlay, Joystick, Settings } from './bonk/Menus'
+import { applySettings } from './bonk/settings'
+import { playMusic } from './bonk/music'
 import {
   findSecret,
   flush,
@@ -26,14 +30,14 @@ import {
 } from './bonk/profile'
 import { loadSave, onSaveChange, persist } from './bonk/save'
 import Shop from './bonk/Shop'
-import { isMuted, setMuted, sfx, unlockAudio } from './bonk/sound'
+import { isMuted, setSfxVolume, sfx, unlockAudio } from './bonk/sound'
 
 const STEP = 1 / 120
-const HAS_TOUCH = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
-function TouchButton({ input, code, className, children }) {
+function TouchButton({ input, code, className, children, label }) {
   const press = (e) => {
     e.preventDefault()
+    e.stopPropagation()
     unlockAudio()
     if (!input.keys.down.has(code)) input.keys.pressed.add(code)
     input.keys.down.add(code)
@@ -52,6 +56,7 @@ function TouchButton({ input, code, className, children }) {
       onContextMenu={(e) => e.preventDefault()}
     >
       {children}
+      {label && <small>{label}</small>}
     </button>
   )
 }
@@ -71,6 +76,32 @@ function doHubEmote(hub, i) {
   hub.emote(e.key)
 }
 
+function drawLabels(ctx, labels) {
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.lineJoin = 'round'
+  for (const l of labels) {
+    if (l.bubble) {
+      ctx.font = 'bold 13px system-ui, sans-serif'
+      const w = ctx.measureText(l.text).width + 16
+      ctx.fillStyle = 'rgba(255,255,255,0.95)'
+      ctx.beginPath()
+      if (ctx.roundRect) ctx.roundRect(l.x - w / 2, l.y - 13, w, 24, 10)
+      else ctx.rect(l.x - w / 2, l.y - 13, w, 24)
+      ctx.fill()
+      ctx.fillStyle = '#222'
+      ctx.fillText(l.text, l.x, l.y)
+      continue
+    }
+    ctx.font = l.small ? 'bold 12px system-ui, sans-serif' : '12px "Press Start 2P", monospace'
+    ctx.lineWidth = l.small ? 3 : 5
+    ctx.strokeStyle = 'rgba(20,10,30,0.85)'
+    ctx.strokeText(l.text, l.x, l.y)
+    ctx.fillStyle = l.color || '#fff'
+    ctx.fillText(l.text, l.x, l.y)
+  }
+}
+
 export default function Bonk({ onExit }) {
   const stageRef = useRef(null)
   const canvasRef = useRef(null)
@@ -79,18 +110,21 @@ export default function Bonk({ onExit }) {
   const ctrlRef = useRef(null)
   const [input] = useState(createInput)
 
-  const [screen, setScreen] = useState('loading')
+  const [screen, setScreen] = useState('device')
+  const [device, setDevice] = useState(() => loadSave().device || (navigator.maxTouchPoints > 0 ? 'mobile' : 'pc'))
   const [progress, setProgress] = useState(0)
   const [overlay, setOverlay] = useState(null)
   const overlayOpen = useRef(null)
   const [hud, setHud] = useState(null)
   const [results, setResults] = useState(null)
   const [toasts, setToasts] = useState([])
+  const [chat, setChat] = useState([])
   const [inObby, setInObby] = useState(false)
+  const [introKey, setIntroKey] = useState(0)
   const [, setTick] = useState(0)
-  const [muted, setMutedState] = useState(() => !!loadSave().muted)
   const lastConfig = useRef(null)
   const save = loadSave()
+  const mobile = device === 'mobile'
 
   useEffect(() => {
     overlayOpen.current = overlay
@@ -104,11 +138,95 @@ export default function Bonk({ onExit }) {
       }),
     [],
   )
-  useEffect(() => {
-    setMuted(!!loadSave().muted)
+
+  const setController = useCallback((ctrl) => {
+    const old = ctrlRef.current
+    ctrlRef.current = ctrl
+    if (stageRef.current) ctrl.resize?.(stageRef.current.clientWidth, stageRef.current.clientHeight)
+    if (old && old !== ctrl) old.dispose?.()
   }, [])
 
-  // ---------------------------------------------------------------- controllers
+  // ---------------------------------------------------------------- title screen
+
+  const goTitle = useCallback(() => {
+    const renderer = rendererRef.current
+    let w = null
+    let view = null
+    const fresh = () => {
+      view?.dispose()
+      w = createMatch({ humans: [], ducks: 8, difficulty: 'hard', challenge: 'none', attract: true })
+      view = createMatchView(renderer, w)
+      if (stageRef.current) view.resize(stageRef.current.clientWidth, stageRef.current.clientHeight)
+    }
+    fresh()
+    let acc = 0
+    let nextScript = 5
+    let script = null
+    let time = 0
+    setSfxVolume(0.35)
+    playMusic('title')
+    setController({
+      type: 'title',
+      resize: (width, height) => view.resize(width, height),
+      dispose: () => {
+        view.dispose()
+        setSfxVolume(1)
+      },
+      frame(dt, ctx, width, height) {
+        time += dt
+        acc += dt
+        // Every so often one duck walks to the middle, looks at you... BONK!
+        if (!script && time > nextScript) {
+          const pool = w.players.filter((p) => p.state === 'alive' && p.z <= 0 && p.stun <= 0)
+          const p = pool[Math.floor(Math.random() * pool.length)]
+          if (p) {
+            const spot = nearestSafe(w.arena, view.focus.x, view.focus.y)
+            script = { p, phase: 'walk', t: 0, spot }
+            p.scripted = true
+          }
+          nextScript = time + 12
+        }
+        if (script) {
+          const { p } = script
+          script.t += dt
+          if (p.state !== 'alive') {
+            p.scripted = false
+            script = null
+          } else if (script.phase === 'walk') {
+            const dx = script.spot.x - p.x
+            const dy = script.spot.y - p.y
+            const d = Math.hypot(dx, dy)
+            p.cmd = { mx: d > 8 ? dx / d : 0, my: d > 8 ? dy / d : 0, jump: false, bonk: false, dash: false, shield: false, emote: -1, aim: null }
+            if (d < 20 || script.t > 6) Object.assign(script, { phase: 'look', t: 0 })
+          } else if (script.phase === 'look') {
+            p.cmd = { mx: 0, my: 0, jump: false, bonk: false, dash: false, shield: false, emote: -1, aim: Math.PI / 2 }
+            p.facing = Math.PI / 2
+            if (script.t > 1.3) {
+              sfx.ding()
+              bonkLaunch(w, p)
+              p.scripted = false
+              script = null
+            }
+          }
+        }
+        while (acc >= STEP) {
+          step(w, STEP, () => null)
+          acc -= STEP
+        }
+        if (w.phase === 'over') fresh()
+        view.update(dt)
+        view.render()
+        drawOverlay(ctx, view, width, height, { title: true })
+      },
+    })
+    setOverlay(null)
+    setResults(null)
+    setHud(null)
+    setScreen('title')
+    setIntroKey((k) => k + 1)
+  }, [setController])
+
+  // ---------------------------------------------------------------- hub
 
   const goHub = useCallback(() => {
     const renderer = rendererRef.current
@@ -123,18 +241,21 @@ export default function Bonk({ onExit }) {
       },
       obbyDone: (level, reward, time, falls) => obbyFinished(level, reward, time, falls),
       devpc: () => setOverlay('devpc'),
+      chat: (msg) => setChat((list) => [...list.slice(-5), { ...msg, id: Math.random() }]),
     })
     if (import.meta.env.DEV) window.__hub = hub
     let obbyShown = false
-    const ctrl = {
+    playMusic('hub')
+    setController({
       type: 'hub',
       hub,
       resize: (w, h) => hub.resize(w, h),
+      dispose: () => hub.dispose(),
       frame(dt, ctx, width, height) {
         if (!overlayOpen.current) {
           for (let i = 0; i < EMOTE_KEYS.length; i++) if (input.keys.pressed.has(EMOTE_KEYS[i])) doHubEmote(hub, i)
           for (const [k, i] of Object.entries(EMOTE_ALT)) if (input.keys.pressed.has(k)) doHubEmote(hub, i)
-          hub.step(dt, input.keys)
+          hub.step(dt, input.keys, input.stick)
         }
         input.clearPressed()
         hub.render(renderer, dt)
@@ -143,34 +264,20 @@ export default function Bonk({ onExit }) {
           setInObby(obbyShown)
         }
         ctx.clearRect(0, 0, width, height)
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.lineJoin = 'round'
-        ctx.font = '12px "Press Start 2P", monospace'
-        for (const l of hub.labels(width, height)) {
-          ctx.lineWidth = 5
-          ctx.strokeStyle = 'rgba(20,10,30,0.85)'
-          ctx.strokeText(l.text, l.x, l.y)
-          ctx.fillStyle = l.color || '#fff'
-          ctx.fillText(l.text, l.x, l.y)
-        }
-        if (hub.P.obby) {
-          const text = `⏱ ${hub.P.obbyT.toFixed(1)}s`
-          ctx.strokeText(text, width / 2, 70)
-          ctx.fillStyle = '#fff'
-          ctx.fillText(text, width / 2, 70)
-        }
+        drawLabels(ctx, hub.labels(width, height))
+        if (hub.P.obby) drawLabels(ctx, [{ text: `⏱ ${hub.P.obbyT.toFixed(1)}s`, x: width / 2, y: 70 }])
       },
-    }
-    ctrl.resize(stageRef.current.clientWidth, stageRef.current.clientHeight)
-    ctrlRef.current = ctrl
+    })
     stat('welcome')
+    setChat([{ system: true, text: '🦆 Welcome to BONK! Walk into the pink portal to play.', id: 1 }])
     setScreen('hub')
     setOverlay(null)
     setResults(null)
     setHud(null)
     flush(true)
-  }, [input])
+  }, [input, setController])
+
+  // ---------------------------------------------------------------- match
 
   const startMatch = useCallback(
     (config) => {
@@ -181,15 +288,16 @@ export default function Bonk({ onExit }) {
       const w = createMatch({ ...config, hooks })
       if (import.meta.env.DEV) window.__bonk = { w, forceEvent: (key) => forceEvent(w, key) }
       matchStarted(config)
-      const renderer = rendererRef.current
-      const view = createMatchView(renderer, w)
+      const view = createMatchView(rendererRef.current, w)
       let acc = 0
       let hudT = 0
       let done = false
-      const ctrl = {
+      playMusic('match')
+      setController({
         type: 'match',
         w,
         resize: (width, height) => view.resize(width, height),
+        dispose: () => view.dispose(),
         frame(dt, ctx, width, height) {
           input.pollPads()
           acc += dt
@@ -214,13 +322,11 @@ export default function Bonk({ onExit }) {
             setTimeout(() => setResults({ ...w.results, earned }), 1800)
           }
         },
-      }
-      ctrl.resize(stageRef.current.clientWidth, stageRef.current.clientHeight)
-      ctrlRef.current = ctrl
+      })
       setScreen('match')
       setHud(snapshot(w))
     },
-    [input],
+    [input, setController],
   )
 
   // ---------------------------------------------------------------- renderer + loop
@@ -229,16 +335,18 @@ export default function Bonk({ onExit }) {
     const canvas = canvasRef.current
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
-    renderer.shadowMap.enabled = true
+    renderer.shadowMap.enabled = loadSave().settings?.shadows !== false
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     rendererRef.current = renderer
     startSession()
     stat('loadings')
+    applySettings()
 
     const loading = createLoadingScene()
     ctrlRef.current = {
       type: 'loading',
       resize: (w, h) => loading.resize(w, h),
+      dispose: () => loading.dispose(),
       frame(dt, ctx, width, height) {
         ctx.clearRect(0, 0, width, height)
         loading.frame(renderer, dt)
@@ -285,49 +393,57 @@ export default function Bonk({ onExit }) {
     }
     raf = requestAnimationFrame(frame)
 
-    // A pretend loading bar while the duck chase plays.
-    let p = 0
-    const load = setInterval(() => {
-      p = Math.min(100, p + 4 + Math.random() * 8)
-      setProgress(p)
-      if (p >= 100) clearInterval(load)
-    }, 120)
-
     return () => {
       cancelAnimationFrame(raf)
-      clearInterval(load)
       ro.disconnect()
+      ctrlRef.current?.dispose?.()
       renderer.dispose()
       flush(true)
     }
   }, [])
 
-  // Waiting on the title screen counts as "Buffering…"
+  // The loading bar (while the duck chase plays), then the title screen.
   useEffect(() => {
-    if (screen !== 'loading' || progress < 100) return
-    const id = setTimeout(() => stat('buffering'), 10000)
-    return () => clearTimeout(id)
-  }, [screen, progress])
+    if (screen !== 'loading') return
+    let p = 0
+    const id = setInterval(() => {
+      p = Math.min(100, p + 5 + Math.random() * 9)
+      setProgress(p)
+      if (p >= 100) {
+        clearInterval(id)
+        setTimeout(goTitle, 350)
+      }
+    }, 110)
+    return () => clearInterval(id)
+  }, [screen, goTitle])
+
+  // The logo intro: whoosh, B-O-N-K-!, slam.
+  useEffect(() => {
+    if (screen !== 'title') return
+    const timers = [setTimeout(() => sfx.dash(), 150)]
+    for (let i = 0; i < 5; i++) timers.push(setTimeout(() => sfx.letter(i), 800 + i * 130))
+    timers.push(setTimeout(() => sfx.slam(), 1500))
+    const buffer = setTimeout(() => stat('buffering'), 10000)
+    return () => {
+      timers.forEach(clearTimeout)
+      clearTimeout(buffer)
+    }
+  }, [screen, introKey])
 
   // keyboard, focus
   useEffect(() => {
     const k = input.keys
     const down = (e) => {
-      if (screen === 'loading') {
-        if (progress >= 100) {
-          unlockAudio()
-          goHub()
-        }
-        return
-      }
       if (overlayOpen.current) {
         if (e.code === 'Escape') setOverlay(null)
         return
       }
-      if (GAME_KEYS.has(e.code)) e.preventDefault()
-      if (!e.repeat) k.pressed.add(e.code)
-      k.down.add(e.code)
-      if (screen === 'hub' && ctrlRef.current?.hub) ctrlRef.current.hub.typeKey(e.code)
+      if (screen === 'hub' || screen === 'match') {
+        if (GAME_KEYS.has(e.code) || e.code === 'KeyI') e.preventDefault()
+        if (!e.repeat) k.pressed.add(e.code)
+        k.down.add(e.code)
+        if (screen === 'hub' && ctrlRef.current?.hub) ctrlRef.current.hub.typeKey(e.code)
+      }
     }
     const up = (e) => k.down.delete(e.code)
     const blur = () => k.down.clear()
@@ -344,7 +460,7 @@ export default function Bonk({ onExit }) {
       window.removeEventListener('blur', blur)
       document.removeEventListener('visibilitychange', vis)
     }
-  }, [screen, progress, goHub, input])
+  }, [screen, input])
 
   function onClickAnything(e) {
     if (e.target.closest('button')) {
@@ -353,13 +469,19 @@ export default function Bonk({ onExit }) {
     }
   }
 
-  function toggleMute() {
-    const m = !muted
-    setMuted(m)
-    setMutedState(m)
-    loadSave().muted = m
+  function chooseDevice(d) {
+    unlockAudio()
+    applySettings()
+    loadSave().device = d
     persist()
-    stat('settings')
+    setDevice(d)
+    if (screen === 'device') setScreen('loading')
+  }
+
+  function setShadows(on) {
+    rendererRef.current.shadowMap.enabled = on
+    const scene = ctrlRef.current?.hub?.scene
+    if (scene) scene.traverse((o) => o.material && (o.material.needsUpdate = true))
   }
 
   function exitMatch() {
@@ -380,37 +502,73 @@ export default function Bonk({ onExit }) {
 
   const unlocked = Object.keys(save.ach).length
   const me = hud?.players.find((p) => p.human)
+  const inGame = screen === 'hub' || screen === 'match'
 
   return (
-    <div className="bonk-root" onClick={onClickAnything}>
+    <div className={`bonk-root ${mobile ? 'is-mobile' : ''}`} onClick={onClickAnything}>
       <div className="bonk-stage" ref={stageRef}>
         <canvas ref={canvasRef} className="bonk-canvas" />
         <canvas ref={overlayRef} className="bonk-overlay-canvas" />
 
-        {screen === 'loading' && (
-          <div
-            className="bonk-title"
-            onClick={() => {
-              if (progress >= 100) {
-                unlockAudio()
-                goHub()
-              }
-            }}
-          >
-            <h1 className="bonk-logo">BONK!</h1>
-            <p>a rubber duck party brawl</p>
-            {progress < 100 ? (
-              <div className="bonk-loadbar">
-                <div style={{ width: `${progress}%` }} />
-                <span>Loading… {Math.floor(progress)}%</span>
-              </div>
-            ) : (
-              <button className="bonk-go pulse">TAP OR PRESS ANY KEY</button>
-            )}
+        {screen === 'device' && (
+          <div className="bonk-device">
+            <h2>Which device?</h2>
+            <div className="bonk-device-row">
+              <button className={device === 'pc' ? 'is-last' : ''} onClick={() => chooseDevice('pc')}>
+                <span>🖥</span>PC
+              </button>
+              <button className={device === 'mobile' ? 'is-last' : ''} onClick={() => chooseDevice('mobile')}>
+                <span>📱</span>Mobile
+              </button>
+            </div>
+            <p>Mobile adds a joystick, a jump button and an interact button.</p>
+            <button className="bonk-link" onClick={onExit}>
+              ← back to the arcade
+            </button>
           </div>
         )}
 
-        {screen !== 'loading' && (
+        {screen === 'loading' && (
+          <div className="bonk-loading">
+            <div className="bonk-loadbar">
+              <div style={{ width: `${progress}%` }} />
+              <span>Loading… {Math.floor(progress)}%</span>
+            </div>
+          </div>
+        )}
+
+        {screen === 'title' && !overlay && (
+          <div className="bonk-titlescreen" key={introKey}>
+            <DuckHead className="bonk-flyby" />
+            <h1 className="bonk-logo2" aria-label="BONK!">
+              <span style={{ '--i': 0 }}>B</span>
+              <span style={{ '--i': 1 }} className="o">
+                <DuckHead />
+              </span>
+              <span style={{ '--i': 2 }}>N</span>
+              <span style={{ '--i': 3 }}>K</span>
+              <span style={{ '--i': 4 }}>!</span>
+            </h1>
+            <p className="bonk-tagline2">JUMP. HIT. DON’T FALL.</p>
+            <nav className="bonk-menu">
+              <button onClick={goHub}>▶ PLAY</button>
+              <button onClick={() => setOverlay('costumes')}>👕 COSTUMES</button>
+              <button onClick={() => setOverlay('trophy')}>🏆 ACHIEVEMENTS</button>
+              <button onClick={() => setOverlay('shop')}>🪙 SHOP</button>
+              <button onClick={() => setOverlay('settings')}>⚙ SETTINGS</button>
+              <button onClick={() => setOverlay('howto')}>❓ HOW TO PLAY</button>
+            </nav>
+            <div className="bonk-corner tr">🪙 {save.bb.toLocaleString()} BB</div>
+            <div className="bonk-corner br">
+              🏆 {unlocked} / {ACHIEVEMENTS.length.toLocaleString()} ACHIEVEMENTS
+            </div>
+            <button className="bonk-corner bl bonk-exit" onClick={onExit}>
+              ← Arcade
+            </button>
+          </div>
+        )}
+
+        {inGame && (
           <div className="bonk-topbar">
             <span className="bonk-pill">🪙 {save.bb.toLocaleString()} BB</span>
             <span className="bonk-pill">🏆 {unlocked}/{ACHIEVEMENTS.length}</span>
@@ -430,6 +588,7 @@ export default function Bonk({ onExit }) {
                     Leave obby
                   </button>
                 )}
+                <button className="bonk-pill" onClick={goTitle}>🏠 Menu</button>
               </>
             )}
             {screen === 'match' && (
@@ -437,22 +596,29 @@ export default function Bonk({ onExit }) {
                 Quit
               </button>
             )}
-            <button className="bonk-pill" onClick={toggleMute}>{muted ? '🔇' : '🔊'}</button>
-            <button className="bonk-pill" onClick={onExit}>Exit</button>
+            <button className="bonk-pill" onClick={() => setOverlay('settings')}>⚙</button>
           </div>
         )}
 
         {screen === 'match' && hud && (
-          <div className="bonk-players">
-            {hud.players.map((p) => (
-              <div key={p.id} className={`bonk-pcard ${p.out ? 'is-out' : ''} ${p.human ? 'is-human' : ''}`} style={{ '--pc': p.color }}>
-                <b>
-                  {p.king ? '👑 ' : ''}
-                  {p.human ? p.tag : p.name}
-                </b>
-                <span>{p.out ? 'OUT' : '🎈'.repeat(Math.min(6, p.balloons))}</span>
-              </div>
-            ))}
+          <div className="bonk-leaderboard">
+            <div className="bonk-lb-head">
+              <span>Players</span>
+              <span>🎈</span>
+              <span>KO</span>
+            </div>
+            {[...hud.players]
+              .sort((a, b) => a.out - b.out || b.balloons - a.balloons)
+              .map((p) => (
+                <div key={p.id} className={`bonk-lb-row ${p.out ? 'is-out' : ''} ${p.human ? 'is-human' : ''}`}>
+                  <span style={{ color: p.color }}>
+                    {p.king ? '👑 ' : ''}
+                    {p.human ? `${p.tag} ${p.name}` : p.name}
+                  </span>
+                  <span>{p.out ? '💀' : p.balloons}</span>
+                  <span>{p.kos}</span>
+                </div>
+              ))}
           </div>
         )}
 
@@ -464,8 +630,57 @@ export default function Bonk({ onExit }) {
           </div>
         )}
 
-        {screen === 'hub' && !overlay && (
-          <div className="bonk-hint">WASD move · Space jump (twice!) · Shift dash · 1 wave · 2 spin · Q quack · 4 flip · 5 flop</div>
+        {screen === 'hub' && (
+          <div className="bonk-chat">
+            {chat.map((m) => (
+              <div key={m.id} className={m.system ? 'sys' : ''}>
+                {m.system ? (
+                  m.text
+                ) : (
+                  <>
+                    <b style={{ color: m.color }}>[{m.name}]:</b> {m.text}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {screen === 'hub' && !overlay && !mobile && (
+          <div className="bonk-hint">WASD move · Space jump (twice!) · Shift dash · E interact · 1 wave · 2 spin · Q quack · 4 flip · 5 flop</div>
+        )}
+
+        {inGame && mobile && !overlay && !results && (
+          <div className="bonk-mobile-controls">
+            <Joystick input={input} />
+            <div className="bonk-mobile-buttons">
+              {screen === 'hub' ? (
+                <>
+                  <TouchButton input={input} code="KeyE" className="interact" label="Interact">
+                    🤚
+                  </TouchButton>
+                  <TouchButton input={input} code="Space" className="jump" label="Jump">
+                    ⤴
+                  </TouchButton>
+                </>
+              ) : (
+                <>
+                  <TouchButton input={input} code="KeyE" label="Shield">
+                    🛡️
+                  </TouchButton>
+                  <TouchButton input={input} code="ShiftLeft" label="Dash">
+                    💨
+                  </TouchButton>
+                  <TouchButton input={input} code="Space" className="jump" label="Jump">
+                    ⤴
+                  </TouchButton>
+                  <TouchButton input={input} code="KeyF" className="bonk" label="BONK">
+                    🔨
+                  </TouchButton>
+                </>
+              )}
+            </div>
+          </div>
         )}
 
         <div className="bonk-toasts">
@@ -511,8 +726,9 @@ export default function Bonk({ onExit }) {
         )}
 
         {overlay === 'play' && <Lobby input={input} onStart={startMatch} onClose={() => setOverlay(null)} />}
-        {overlay === 'shop' && (
+        {(overlay === 'shop' || overlay === 'costumes') && (
           <Shop
+            initialTab={overlay === 'costumes' ? 'mine' : 'classic'}
             onClose={() => setOverlay(null)}
             onEquip={() => {
               const s = loadSave()
@@ -521,6 +737,8 @@ export default function Bonk({ onExit }) {
           />
         )}
         {overlay === 'trophy' && <Achievements onClose={() => setOverlay(null)} />}
+        {overlay === 'settings' && <Settings onClose={() => setOverlay(null)} onDevice={chooseDevice} onShadows={setShadows} />}
+        {overlay === 'howto' && <HowToPlay onClose={() => setOverlay(null)} />}
         {overlay === 'devpc' && (
           <div className="bonk-modal" onClick={() => setOverlay(null)}>
             <div className="bonk-panel bonk-terminal" onClick={(e) => e.stopPropagation()}>
@@ -545,24 +763,6 @@ export default function Bonk({ onExit }) {
           </div>
         )}
       </div>
-
-      {(screen === 'hub' || screen === 'match') && (
-        <div className={`bonk-touch ${HAS_TOUCH ? 'is-touch' : ''}`}>
-          <div className="bonk-dpad">
-            <TouchButton input={input} code="KeyW" className="up">▲</TouchButton>
-            <TouchButton input={input} code="KeyA" className="left">◀</TouchButton>
-            <TouchButton input={input} code="KeyD" className="right">▶</TouchButton>
-            <TouchButton input={input} code="KeyS" className="down">▼</TouchButton>
-          </div>
-          <div className="bonk-actions">
-            <TouchButton input={input} code="KeyQ">🦆</TouchButton>
-            <TouchButton input={input} code="KeyE">🛡️</TouchButton>
-            <TouchButton input={input} code="ShiftLeft">💨</TouchButton>
-            <TouchButton input={input} code="Space" className="jump">⤴</TouchButton>
-            <TouchButton input={input} code="KeyF" className="bonk">🔨</TouchButton>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

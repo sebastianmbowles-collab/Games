@@ -107,9 +107,10 @@ export const EMOTES = [
 ]
 
 export const DUCK_NAMES = [
-  'Quackers', 'Waddles', 'Puddles', 'Sir Honk', 'Bubbles', 'Nugget', 'Pickles', 'Ducky McDuckface',
-  'Beaky', 'Splash', 'Squishy', 'Captain Quack', 'Mr. Feathers', 'Wobble', 'Noodle', 'Biscuit',
-  'Sprinkles', 'Tater', 'Zoom', 'Bonkers',
+  'xX_QuackAttack_Xx', 'noob_duck123', 'BonkMaster2014', 'SirWaddles', 'duckyboi_77', 'EpicBonker',
+  'Puddles_YT', 'QuackQuackGo', 'xXBalloonKingXx', 'lil_quacker', 'TheRealDuck', 'Bonk_Legend99',
+  'feathers4life', 'PRO_DUCK_GAMER', 'waddle_waddle', 'MrQuackington', 'CoolDuck_2016', 'bread_lover',
+  'HammerTime_42', 'duckdash_pro', 'Nugget_Nation', 'SqueakyBoi', 'pond_patrol', 'BeakBreaker',
 ]
 
 export const PLAYER_COLORS = ['#ff4d6d', '#3aa0ff', '#2bd96b', '#ffb000', '#b36bff', '#00d1c1', '#ff7a1a', '#ff5fd2', '#8bd14a', '#e8e8e8']

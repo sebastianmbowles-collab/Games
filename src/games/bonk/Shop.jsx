@@ -48,16 +48,16 @@ function Preview({ costume, pet }) {
   return <canvas ref={ref} className="bonk-preview" width={220} height={220} />
 }
 
-export default function Shop({ onClose, onEquip }) {
+export default function Shop({ onClose, onEquip, initialTab = 'classic' }) {
   const save = loadSave()
-  const [tab, setTab] = useState('classic')
+  const [tab, setTab] = useState(initialTab)
   const [sel, setSel] = useState(save.costume)
   const [, force] = useState(0)
   const refresh = () => force((n) => n + 1)
 
   const isPets = tab === 'pets'
   const cat = COSTUME_CATEGORIES.find((c) => c.key === tab)
-  const items = isPets ? PETS : cat.items
+  const items = isPets ? PETS : tab === 'mine' ? save.owned.map((k) => COSTUMES[k]).filter(Boolean) : cat.items
   const selItem = isPets ? PET_MAP[sel] : COSTUMES[sel]
 
   function needMet(item) {
@@ -87,8 +87,13 @@ export default function Shop({ onClose, onEquip }) {
     <div className="bonk-modal" onClick={onClose}>
       <div className="bonk-panel bonk-shop" onClick={(e) => e.stopPropagation()}>
         <button className="bonk-close" onClick={onClose}>✕</button>
-        <h3>🛒 SHOP <span className="bonk-bb">🪙 {save.bb.toLocaleString()} BB</span></h3>
+        <h3>
+          {tab === 'mine' ? '👕 COSTUMES' : '🛒 SHOP'} <span className="bonk-bb">🪙 {save.bb.toLocaleString()} BB</span>
+        </h3>
         <div className="bonk-tabs">
+          <button className={tab === 'mine' ? 'is-on' : ''} onClick={() => setTab('mine')}>
+            👕 My Costumes
+          </button>
           {COSTUME_CATEGORIES.map((c) => (
             <button key={c.key} className={tab === c.key ? 'is-on' : ''} onClick={() => setTab(c.key)}>
               {c.name}

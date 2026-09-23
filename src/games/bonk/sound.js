@@ -43,13 +43,30 @@ export function setMuted(value) {
   muted = value
 }
 
+let sfxGain = null
+let sfxVolume = 1
+export const getAudio = () => ac
+// Lets the title screen play its background brawl more quietly.
+export function setSfxVolume(v) {
+  sfxVolume = v
+  if (sfxGain) sfxGain.gain.value = v
+}
+function out() {
+  if (!sfxGain) {
+    sfxGain = ac.createGain()
+    sfxGain.gain.value = sfxVolume
+    sfxGain.connect(ac.destination)
+  }
+  return sfxGain
+}
+
 export const isMuted = () => muted
 
 function file(name) {
   if (muted || !files[name]) return false
   try {
     const a = files[name].cloneNode()
-    a.volume = 0.6
+    a.volume = 0.6 * sfxVolume
     a.play().catch(() => {})
     return true
   } catch {
@@ -67,7 +84,7 @@ function tone(type, f0, f1, dur, vol, delay = 0) {
   if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur)
   g.gain.setValueAtTime(vol, t)
   g.gain.exponentialRampToValueAtTime(0.001, t + dur)
-  o.connect(g).connect(ac.destination)
+  o.connect(g).connect(out())
   o.start(t)
   o.stop(t + dur + 0.05)
 }
@@ -89,7 +106,7 @@ function noise(dur, vol, freq, delay = 0, type = 'bandpass') {
   g.gain.setValueAtTime(0.001, t)
   g.gain.linearRampToValueAtTime(vol, t + Math.min(0.03, dur / 3))
   g.gain.exponentialRampToValueAtTime(0.001, t + dur)
-  src.connect(f).connect(g).connect(ac.destination)
+  src.connect(f).connect(g).connect(out())
   src.start(t)
   src.stop(t + dur + 0.05)
 }
@@ -211,6 +228,18 @@ export const sfx = {
   bigQuack() {
     quackSynth(0.35, 0.4)
     quackSynth(0.36, 0.2)
+  },
+  letter(i) {
+    tone('square', [392, 494, 587, 698, 988][i % 5], 0, 0.12, 0.12)
+    noise(0.06, 0.2, 1200)
+  },
+  slam() {
+    tone('sine', 120, 40, 0.5, 0.5)
+    noise(0.35, 0.5, 300)
+    ;[523, 659, 784, 1047].forEach((f, i) => tone('square', f, f, 0.15, 0.08, 0.1 + i * 0.06))
+  },
+  ding() {
+    tone('triangle', 1760, 1760, 0.4, 0.12)
   },
   spooky() {
     tone('sine', 110, 55, 2.5, 0.25)

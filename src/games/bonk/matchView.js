@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { CX, CY, H, HAMMERS, TILE, W } from './data'
-import { animateMaterials, buildDuck, buildGiantDuck, buildPet, mat, poseDuck, setBalloons, setHammer } from './duck'
+import { animateMaterials, buildDuck, buildGiantDuck, buildPet, disposeScene, mat, poseDuck, setBalloons, setHammer } from './duck'
 import { radiusOf } from './engine'
 
 // Engine (x, y, z) → three.js (X, Y, Z) = (x - CX, z, y - CY)
@@ -473,9 +473,9 @@ export function createMatchView(renderer, w) {
   }
 
   view.dispose = () => {
-    scene.traverse((o) => {
-      if (o.geometry && !o.geometry.userData?.shared) o.geometry.dispose?.()
-    })
+    disposeScene(scene)
+    boxTex.dispose()
+    crateTex.dispose()
   }
   return view
 }
@@ -494,7 +494,7 @@ function outlined(ctx, text, x, y, size, color, font = '"Press Start 2P", monosp
   ctx.fillText(text, x, y)
 }
 
-export function drawOverlay(ctx, view, width, height) {
+export function drawOverlay(ctx, view, width, height, opts = {}) {
   const w = view.w
   const s = Math.min(width / 960, height / 640) * 1.1
   ctx.clearRect(0, 0, width, height)
@@ -517,7 +517,7 @@ export function drawOverlay(ctx, view, width, height) {
   }
 
   // name tags
-  for (const p of w.players) {
+  for (const p of opts.title ? [] : w.players) {
     if (p.state !== 'alive') continue
     const [x, y, ok] = view.project(p.x, p.y, p.z + 105 * (radiusOf(w, p) / 17), width, height)
     if (!ok) continue
@@ -541,7 +541,7 @@ export function drawOverlay(ctx, view, width, height) {
   }
 
   // off-screen arrows
-  for (const p of w.players) {
+  for (const p of opts.title ? [] : w.players) {
     if (p.state !== 'alive') continue
     const [x, y] = view.project(p.x, p.y, p.z, width, height)
     if (x >= 0 && x <= width && y >= 0 && y <= height) continue
@@ -591,7 +591,7 @@ export function drawOverlay(ctx, view, width, height) {
 
   // kill feed
   ctx.textAlign = 'left'
-  w.feed.forEach((f, i) => {
+  ;(opts.title ? [] : w.feed).forEach((f, i) => {
     ctx.globalAlpha = Math.min(1, 5 - f.t)
     ctx.font = `${Math.round(8 * s)}px "Press Start 2P", monospace`
     const tw = ctx.measureText(f.text).width
@@ -604,7 +604,7 @@ export function drawOverlay(ctx, view, width, height) {
   })
 
   // countdown
-  if (w.phase === 'countdown') {
+  if (w.phase === 'countdown' && !opts.title) {
     const n = Math.ceil(w.countdown)
     const f = w.countdown - Math.floor(w.countdown)
     outlined(ctx, String(n), width / 2, height / 2 - 30 * s, Math.round((60 + f * 40) * s), '#fff')
@@ -612,7 +612,7 @@ export function drawOverlay(ctx, view, width, height) {
   }
 
   // event banner
-  if (w.banner) {
+  if (w.banner && !opts.title) {
     const t = w.banner.t
     const k = t < 0.25 ? t / 0.25 : t > 2.4 ? Math.max(0, (2.8 - t) / 0.4) : 1
     ctx.save()

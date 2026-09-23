@@ -61,8 +61,23 @@ export function mat(color, kind = 'normal') {
     default:
       m = new THREE.MeshStandardMaterial({ color, roughness: 0.4 })
   }
+  m.userData.cached = true
   matCache.set(key, m)
   return m
+}
+
+// Free GPU memory for a scene, keeping the shared cached geometries/materials.
+export function disposeScene(scene) {
+  scene.traverse((o) => {
+    if (o.geometry && !o.geometry.userData.cached) o.geometry.dispose()
+    const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []
+    for (const m of mats) {
+      if (m.userData.cached) continue
+      if (m.map) m.map.dispose()
+      m.dispose()
+    }
+  })
+  if (scene.background && scene.background.dispose) scene.background.dispose()
 }
 
 export function animateMaterials(t) {
@@ -82,7 +97,11 @@ export function animateMaterials(t) {
 
 const geoCache = new Map()
 function geo(key, make) {
-  if (!geoCache.has(key)) geoCache.set(key, make())
+  if (!geoCache.has(key)) {
+    const g = make()
+    g.userData.cached = true
+    geoCache.set(key, g)
+  }
   return geoCache.get(key)
 }
 const SPH = (seg = 20) => geo(`s${seg}`, () => new THREE.SphereGeometry(1, seg, Math.max(8, seg * 0.7)))

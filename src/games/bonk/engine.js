@@ -106,7 +106,8 @@ export function createMatch(config) {
     countdown: 3,
     event: null,
     eventT: 0,
-    eventEvery: challenge === 'chaos' || challenge === 'ultimate' ? 8 : EVENT_EVERY,
+    attract: !!config.attract,
+    eventEvery: config.attract || challenge === 'chaos' || challenge === 'ultimate' ? 8 : EVENT_EVERY,
     // The first event arrives after 10 seconds, then one every 20.
     eventClock: challenge === 'chaos' || challenge === 'ultimate' ? 0 : EVENT_EVERY - 10,
     permFlags: perm,
@@ -288,7 +289,7 @@ function startEvent(w, ev) {
   w.banner = { ev, t: 0 }
   w.timers = {}
   sfx.rule()
-  w.hooks.event(ev.key)
+  if (w.players.some((p) => p.human)) w.hooks.event(ev.key)
   for (const p of w.players) if (p.human) {
     stat(w, p, 'eventsSeen')
     stat(w, p, `ev_${ev.key}`)
@@ -863,6 +864,8 @@ function botThink(w, p, dt) {
     c.my = 0
     return
   }
+  // On the title screen the bots show off: lots of random jumping.
+  if (w.attract && Math.random() < 0.012) c.jump = true
   const speed = Math.hypot(p.vx, p.vy)
   if (speed > 20 && !pathSafe(w, p, p.vx / speed, p.vy / speed, 22 + speed * 0.15)) {
     const s = nearestSafe(w.arena, p.x, p.y)
@@ -1054,7 +1057,9 @@ export function step(w, dt, readInput) {
   for (const p of w.players) {
     if (p.state !== 'alive') continue
     if (!playing) p.cmd = blankCmd()
-    else if (p.human) {
+    else if (p.scripted) {
+      // the title screen steers this duck itself
+    } else if (p.human) {
       p.cmd = readInput(p.input)
       if (w.realChallenge === 'mirror') {
         p.cmd.mx = -p.cmd.mx
@@ -1097,7 +1102,7 @@ export function step(w, dt, readInput) {
     updatePlayer(w, p, dt, g, playing)
     if (p.z > 5) airborne++
   }
-  if (airborne) w.hooks.max('best_airborneCount', airborne)
+  if (airborne && !w.attract) w.hooks.max('best_airborneCount', airborne)
 
   collide(w)
 
@@ -1594,6 +1599,22 @@ function finishMatch(w, winner) {
       .sort((a, b) => (b.state === 'alive') - (a.state === 'alive') || b.ms.score - a.ms.score)
       .map((p) => ({ name: p.name, tag: p.tag, color: p.color, kos: p.ms.kos, pops: p.ms.pops, human: p.human, won: p === winner })),
   }
+}
+
+// Title screen: send a duck flying straight up past the camera.
+export function bonkLaunch(w, p) {
+  p.lastHit = null
+  launch(w, p, 0, 1, 380, 1100)
+  p.spinV = 25
+  p.stun = 0.8
+  w.shake = 22
+  popup(w, p.x, p.y, 'BONK!', '#ffd23f', 44, 1.2, 80)
+  burst(w, p.x, p.y, 30, '#fff6a8', 20, 320)
+  sfx.bonk()
+}
+
+export function eventPopup(w, text, x = CX, y = CY) {
+  popup(w, x, y, text, '#fff', 26, 1, 60)
 }
 
 // Used by the dev build to test events on demand.

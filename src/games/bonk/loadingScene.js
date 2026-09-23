@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { animateMaterials, buildDuck, mat, poseDuck } from './duck'
+import { animateMaterials, buildDuck, disposeScene, mat, poseDuck } from './duck'
 import { addLights, makeClouds, makeSky } from './matchView'
 
 // Title/loading screen: a rubber duck runs in circles, chased by a duck with a hammer.
@@ -60,5 +60,6 @@ export function createLoadingScene() {
       poseDuck(chaser, { walk: t * 20, swing, spin: 0, flip: 0, emote: null, t, air: false })
       renderer.render(scene, camera)
     },
+    dispose: () => disposeScene(scene),
   }
 }
