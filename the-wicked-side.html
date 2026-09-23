@@ -122,6 +122,11 @@
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; margin: 0; font-family: var(--type); font-size: 13px; color: var(--dim); }
   .keys dt { color: var(--bone); }
   .keys dd { margin: 0; }
+  .song { display: inline-flex; align-items: baseline; gap: 10px; font-family: var(--type); font-size: 14px; color: var(--mirror); text-decoration: none; }
+  .song::before { content: ""; align-self: center; width: 0; height: 0; border-style: solid; border-width: 6px 0 6px 10px; border-color: transparent transparent transparent var(--mirror); }
+  .song span { font-size: 12px; color: var(--dim); }
+  .song:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .song:focus-visible { outline: 2px solid var(--mirror); outline-offset: 3px; }
   .fine { font-family: var(--type); font-size: 12px; color: var(--dim); margin: 0; max-width: 46ch; }
 
   /* Grandma's notes, in her handwriting */
@@ -186,6 +191,7 @@
       <button id="btnBrave" type="button">Enter the cottage</button>
       <button id="btnEasy" class="ghost" type="button">Enter (a bit less scary)</button>
     </div>
+    <a class="song" href="https://music.youtube.com/watch?v=XOc8GK0n1Y4" target="_blank" rel="noopener">Play the title song <span>opens YouTube Music in a new tab</span></a>
     <dl class="keys">
       <dt>Mouse</dt><dd>look around (click the game first)</dd>
       <dt>WASD</dt><dd>walk · Shift run · C sneak</dd>
