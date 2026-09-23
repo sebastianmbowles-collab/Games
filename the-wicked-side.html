@@ -225,7 +225,7 @@
   </div>
 </div>
 
-<div class="controls">
+<div class="controls" id="controls" hidden>
   <p class="legend"><b>Click</b> to look · <b>Space</b> cross · <b>F</b> light · <b>E</b> read / hide · <b>Shift</b> run · <b>C</b> sneak · <b>Esc</b> pause · <b>M</b> sound</p>
   <div class="row">
     <button id="btnFlip" class="ghost" type="button">Cross over</button>
@@ -1382,6 +1382,7 @@
     else if (k === 'f' && S.mode === 'play') { setFlash(!S.flashOn); audio.click(); }
     else if (k === 'p') { if (S.mode === 'play') setMode('pause'); else if (S.mode === 'pause') resume(); }
     else if (k === 'escape' && S.mode === 'note') closeNote();
+    else if (k === 'escape' && S.mode === 'play' && !locked) setMode('pause');
     else if (k === 'm') toggleSound();
     else if (k === 'r' && (S.mode === 'caught' || S.mode === 'won')) startGame(S.diff);
   });
@@ -1417,6 +1418,7 @@
     S.mode = m;
     for (const [k, el] of Object.entries(screens)) el.hidden = k !== m;
     $('hud').hidden = !(m === 'play' || m === 'note');
+    $('controls').hidden = !(m === 'play' || m === 'note');
     if (m !== 'play' && m !== 'note' && m !== 'scare' && locked && document.exitPointerLock) { hadLock = false; document.exitPointerLock(); }
   }
   function resume() { setMode('play'); lock(); }
@@ -1539,7 +1541,7 @@
     S.scare = { who, mon, t: 0, phase: 0, startYaw: S.yaw };
     if (S.hidden) { S.x = S.hidden.exitX; S.z = S.hidden.exitZ; S.hidden = null; S.eye = EYE; stage.classList.remove('hiding'); }
     for (const el of Object.values(screens)) el.hidden = true;
-    $('hud').hidden = true;
+    $('hud').hidden = true; $('controls').hidden = true;
     audio.silenceLoops(); audio.duck();
     mon.m.g.visible = true;
     $('caughtTitle').textContent = NAMES[who];
