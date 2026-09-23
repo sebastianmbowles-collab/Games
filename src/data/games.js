@@ -2,7 +2,7 @@ export const GAMES = [
   {
     key: 'bonk',
     title: 'BONK!',
-    blurb: 'Knock everyone off the floating platform with a giant hammer.',
+    blurb: 'Rubber duck balloon brawl in 3D! Pop everyone’s balloons with a giant hammer.',
     color: '#ff6b1a',
     icon: '🔨',
     playable: true,
