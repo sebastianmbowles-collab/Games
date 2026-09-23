@@ -1219,6 +1219,44 @@
       };
       loops.flutterW = makeLoop(wings(120, 9));
       loops.flutterH = makeLoop(wings(240, 16));
+      // Chase: a throbbing low rumble, a pounding pulse and tense trembling strings
+      loops.chase = makeLoop((dest) => {
+        const n = loopNoise(), lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 140;
+        const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 41; const og = ac.createGain(); og.gain.value = 0.35; o.connect(og); og.connect(lp); o.start();
+        const throb = ac.createGain(); throb.gain.value = 0.55; const l = ac.createOscillator(); l.type = 'square'; l.frequency.value = 2.2; const lg = ac.createGain(); lg.gain.value = 0.45; l.connect(lg); lg.connect(throb.gain); l.start();
+        n.connect(lp); lp.connect(throb); throb.connect(dest);
+        const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 1.2;
+        const trem = ac.createGain(); trem.gain.value = 0.5; const tl = ac.createOscillator(); tl.frequency.value = 7.5; const tg = ac.createGain(); tg.gain.value = 0.5; tl.connect(tg); tg.connect(trem.gain); tl.start();
+        [233.1, 246.9, 349.2].forEach((f) => { const s = ac.createOscillator(); s.type = 'sawtooth'; s.frequency.value = f; const sg = ac.createGain(); sg.gain.value = 0.05; s.connect(sg); sg.connect(bp); s.start(); });
+        bp.connect(trem); trem.connect(dest);
+      });
+      // Dark rumble under the whole Wicked Side
+      loops.rumble = makeLoop((dest) => {
+        const n = loopNoise(), lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 70;
+        const sw = ac.createGain(); sw.gain.value = 0.6; const l = ac.createOscillator(); l.frequency.value = 0.07; const lg = ac.createGain(); lg.gain.value = 0.4; l.connect(lg); lg.connect(sw.gain); l.start();
+        n.connect(lp); lp.connect(sw); sw.connect(dest);
+      });
+      // Whispering in the library (Book's ambience)
+      loops.whispers = makeLoop((dest) => {
+        const n = loopNoise(), bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 5;
+        const sweep = ac.createOscillator(); sweep.frequency.value = 0.31; const sg = ac.createGain(); sg.gain.value = 800; sweep.connect(sg); sg.connect(bp.frequency); sweep.start();
+        const am = ac.createGain(); am.gain.value = 0.4; const l = ac.createOscillator(); l.frequency.value = 3.7; const lg = ac.createGain(); lg.gain.value = 0.4; l.connect(lg); lg.connect(am.gain); l.start();
+        const low = ac.createOscillator(); low.frequency.value = 55; const lowg = ac.createGain(); lowg.gain.value = 0.15; low.connect(lowg); lowg.connect(dest); low.start();
+        n.connect(bp); bp.connect(am); am.connect(dest);
+      });
+      // Wicked Luna's heavy breathing
+      loops.breath = makeLoop((dest) => {
+        const n = loopNoise(), bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 1.4;
+        const am = ac.createGain(); am.gain.value = 0.35; const l = ac.createOscillator(); l.frequency.value = 0.55; const lg = ac.createGain(); lg.gain.value = 0.35; l.connect(lg); lg.connect(am.gain); l.start();
+        const rasp = ac.createOscillator(); rasp.type = 'sawtooth'; rasp.frequency.value = 38; const rg = ac.createGain(); rg.gain.value = 0.08; rasp.connect(rg); rg.connect(bp); rasp.start();
+        n.connect(bp); bp.connect(am); am.connect(dest);
+      });
+      // Upstairs: a thin, eerie whistle in the rafters
+      loops.attic = makeLoop((dest) => {
+        const g = ac.createGain(); g.gain.value = 0.5; const l = ac.createOscillator(); l.frequency.value = 0.09; const lg = ac.createGain(); lg.gain.value = 0.5; l.connect(lg); lg.connect(g.gain); l.start();
+        [1567.98, 1661.2, 2489].forEach((f, i) => { const o = ac.createOscillator(); o.frequency.value = f; const v = ac.createOscillator(); v.frequency.value = 0.2 + i * 0.13; const vg = ac.createGain(); vg.gain.value = 6; v.connect(vg); vg.connect(o.frequency); v.start(); const og = ac.createGain(); og.gain.value = 0.02; o.connect(og); og.connect(g); o.start(); });
+        g.connect(dest);
+      });
       // An old music box: a little out of tune, echoing in an empty room
       music.in = ac.createGain();
       music.out = ac.createGain(); music.out.gain.value = 0; music.out.connect(master);
@@ -1344,6 +1382,33 @@
       whine(x, z) { if (!ac) return; const p = place(x, z, 12, 0); const o = out(Math.max(0.15, p.vol) * 0.5, p.pan), t = ac.currentTime; const osc = tone(o, t, 'sine', 900, 0, 0.8, 0.1, 0.1); osc.frequency.linearRampToValueAtTime(1250, t + 0.35); osc.frequency.linearRampToValueAtTime(820, t + 0.8); },
       pant(x, z) { if (!ac) return; const p = place(x, z, 8, 0); if (p.vol < 0.01) return; const o = out(p.vol * 0.6, p.pan), t = ac.currentTime; for (let i = 0; i < 4; i++) hiss(o, t + i * 0.18, 0.1, 0.12, 'bandpass', 1400 + (i % 2) * 300, 0, 1.5); },
       crackle(x, z) { if (!ac) return; const p = place(x, z, 9, 0); if (p.vol < 0.01) return; hiss(out(p.vol, p.pan), ac.currentTime, 0.015 + Math.random() * 0.03, 0.3 * Math.random(), 'highpass', 1500 + Math.random() * 3000); },
+      // A sudden horror hit: sub drop, a slam and a burst of distorted noise
+      impact(v = 1) {
+        if (!ac) return; const t = ac.currentTime;
+        tone(bus, t, 'sine', 70, 24, 1.2, 0.9 * v, 0.003);
+        hiss(bus, t, 0.5, 0.7 * v, 'lowpass', 1500, 90);
+        const d = distortion(60), dg = ac.createGain(); dg.gain.value = 0.3 * v; d.connect(dg); dg.connect(bus);
+        hiss(d, t, 0.35, 0.8, 'bandpass', 900, 300, 0.8);
+        tone(bus, t, 'triangle', 196, 98, 0.9, 0.12 * v, 0.003);
+      },
+      // "It saw you": a hit plus a stabbing, dissonant string sting that rises
+      spotted() {
+        if (!ac) return; const t = ac.currentTime;
+        this.impact(0.8);
+        const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.setValueAtTime(900, t); bp.frequency.exponentialRampToValueAtTime(3200, t + 1.2); bp.Q.value = 1.5; bp.connect(bus);
+        [466.2, 493.9, 698.5, 739.99].forEach((f) => { const o = tone(bp, t, 'sawtooth', f, f * 1.06, 1.3, 0.09, 0.005); const v = ac.createOscillator(), vg = ac.createGain(); v.frequency.value = 9; vg.gain.value = 8; v.connect(vg); vg.connect(o.frequency); v.start(t); v.stop(t + 1.4); });
+      },
+      // A sudden flurry of flapping pages (Book's scare)
+      pageFlurry(x, z) {
+        if (!ac) return; const p = place(x, z, 20, 0), o = out(Math.max(0.5, p.vol), p.pan), t = ac.currentTime;
+        for (let i = 0; i < 34; i++) { const at = t + Math.pow(i / 34, 0.7) * 0.9; hiss(o, at, 0.035, 0.45, 'bandpass', 2500 + Math.random() * 3500, 0, 1.6); }
+        hiss(o, t, 0.9, 0.35, 'bandpass', 600, 3000, 0.7);
+      },
+      // One huge wingbeat
+      wingThump(x, z, big) {
+        if (!ac) return; const p = place(x, z, 10, 1); if (p.vol < 0.01) return; const o = out(p.vol * (big ? 0.9 : 0.6), p.pan), t = ac.currentTime;
+        hiss(o, t, 0.28, 0.7, 'lowpass', 420, 90); tone(o, t, 'sine', 55, 35, 0.25, 0.4, 0.02);
+      },
       screech(x, z) {
         if (!ac) return; const p = place(x, z, 30, 1), o = out(Math.max(0.3, p.vol), p.pan), t = ac.currentTime;
         const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 6; f.connect(o);
@@ -1352,6 +1417,7 @@
       },
       chitter(x, z) { if (!ac) return; const p = place(x, z, 18, 1); if (p.vol < 0.01) return; const o = out(p.vol * 0.6, p.pan), t = ac.currentTime; for (let i = 0; i < 7; i++) tone(o, t + i * 0.045, 'square', 2600 + Math.random() * 900, 0, 0.02, 0.08, 0.003); },
       loop(name, v, x, z, lv) { if (!ac) return; const L = loops[name], p = place(x, z, 16, lv); L.g.gain.setTargetAtTime(v * p.vol, ac.currentTime, 0.1); if (L.p) L.p.pan.setTargetAtTime(p.pan, ac.currentTime, 0.1); },
+      bed(name, v) { if (!ac) return; loops[name].g.gain.setTargetAtTime(v, ac.currentTime, 0.3); if (loops[name].p) loops[name].p.pan.value = 0; },
       silenceLoops() { if (!ac) return; for (const L of Object.values(loops)) L.g.gain.setTargetAtTime(0, ac.currentTime, 0.02); },
       // The jumpscare: first everything goes quiet...
       duck() { if (!ac) return; bus.gain.cancelScheduledValues(ac.currentTime); bus.gain.setTargetAtTime(0.02, ac.currentTime, 0.03); },
@@ -1504,7 +1570,7 @@
     shards.forEach((s) => { s.got = false; s.g.visible = true; s.hint.visible = true; });
     notes.forEach((n) => n.mesh.material.color.setHex(0xffffff));
     door.pivot.rotation.y = 0; doorLight.intensity = 0; lunaGlow.intensity = 0;
-    applySide(NORMAL); audio.setSide(NORMAL); audio.restore();
+    applySide(NORMAL); audio.setSide(NORMAL); audio.restore(); audio.silenceLoops(); chaseLvl = 0; spottedCd = -99;
     toast(null);
   }
   function startGame(diff) {
@@ -1663,7 +1729,9 @@
   }
 
   // ================= Update =================
-  let stepAcc = 0, beatT = 0, crackleT = 0, titleT = 0;
+  let stepAcc = 0, beatT = 0, crackleT = 0, titleT = 0, chaseLvl = 0, wingT = 0, spottedCd = 0;
+  // 'It saw you' hit + sting, but never more than once every few seconds
+  function spottedFx() { if (S.time - spottedCd > 6) { spottedCd = S.time; audio.spotted(); } }
   const fwd = new THREE.Vector3();
 
   function update(dt) {
@@ -1732,7 +1800,7 @@
         s.got = true; s.g.visible = false; s.hint.visible = false; S.got++;
         audio.chime(); S.noise = Math.max(S.noise, 9);
         if (S.got === 2 && !luna.active) {
-          luna.active = true; luna.m.g.visible = true; audio.howl(luna.x, luna.z);
+          luna.active = true; luna.m.g.visible = true; audio.impact(0.7); audio.howl(luna.x, luna.z);
           toast('A howl from downstairs… that sounded like Luna. She hunts by SOUND. Hold C to sneak.', 6);
         } else if (S.got === TOTAL) {
           S.doorOpen = true; audio.door();
@@ -1749,6 +1817,20 @@
     for (const r of rockers) r.rotation.x = S.side === WICKED ? Math.sin(t * 2.2) * 0.18 : 0;
     for (const d of dressForms) d.rotation.y = S.side === WICKED ? Math.atan2(S.x - d.position.x, S.z - d.position.z) : 0;
 
+    // --- ambience and chase music ---
+    const onW = S.side === WICKED;
+    const chasing = onW && hunters.some((m) => isActive(m) && m.lv === S.lv && m.state === 'hunt');
+    chaseLvl += ((chasing ? 1 : 0) - chaseLvl) * Math.min(1, dt * (chasing ? 3 : 0.6));
+    audio.bed('chase', chaseLvl * 0.55);
+    audio.bed('rumble', onW ? 0.5 : 0);
+    audio.bed('whispers', onW && inLibrary(S.x, S.z) ? 0.35 : 0);
+    audio.bed('attic', onW && S.lv === 1 ? 0.6 : 0);
+    audio.loop('breath', onW && luna.active ? 1.4 : 0, luna.x, luna.z, 0);
+    wingT -= dt;
+    if (onW && S.lv === 1 && wingT <= 0) {
+      let best = null; for (const o of moths) if (!best || monDist(o) < monDist(best)) best = o;
+      if (best && monDist(best) < 9) { audio.wingThump(best.x, best.z, best === hunter); wingT = best.state === 'hunt' ? 0.35 : 0.8; }
+    }
     // --- heartbeat ---
     let near = 99;
     if (S.side === WICKED) for (const m of hunters) if (isActive(m)) near = Math.min(near, monDist(m));
@@ -1788,11 +1870,11 @@
     b.lit = sees && S.flashOn && d < 16 && dot > Math.cos(0.4);
     if (b.lit && !wasLit) audio.pages(b.x, b.z);
     if (onW && !S.bookSeen && sees && d < 12 && dot > Math.cos(0.6)) {
-      S.bookSeen = true; audio.sting();
+      S.bookSeen = true; audio.impact(); audio.pageFlurry(b.x, b.z);
       toast('That’s BOOK. It can’t move while your flashlight is on it. Don’t look away!', 6);
     }
     if (!onW) { b.state = 'lurk'; b.knowsHide = false; }
-    else if (sees && (d < 7 || inLibrary(S.x, S.z))) { if (b.state !== 'hunt') audio.groan(b.x, b.z); b.state = 'hunt'; b.lostT = 0; }
+    else if (sees && (d < 7 || inLibrary(S.x, S.z))) { if (b.state !== 'hunt') { audio.groan(b.x, b.z); spottedFx(); } b.state = 'hunt'; b.lostT = 0; }
     else if (b.state === 'hunt' && !b.knowsHide) { b.lostT += dt; if (b.lostT > 6) { b.state = 'lurk'; b.goal = null; } }
     let spd;
     if (b.state === 'hunt') {
@@ -1824,7 +1906,7 @@
     const L = luna; if (!L.active) return;
     const onW = S.side === WICKED, sameLv = S.lv === 0, d = monDist(L);
     if (!onW) { if (L.state === 'hunt') L.state = 'prowl'; L.knowsHide = false; }
-    else if (sameLv && !S.hidden && d < S.noise) { if (L.state !== 'hunt') audio.bark(L.x, L.z); L.state = 'hunt'; L.goal = { x: S.x, z: S.z }; L.quietT = 0; }
+    else if (sameLv && !S.hidden && d < S.noise) { if (L.state !== 'hunt') { audio.bark(L.x, L.z); spottedFx(); } L.state = 'hunt'; L.goal = { x: S.x, z: S.z }; L.quietT = 0; }
     let spd;
     if (L.state === 'hunt') {
       if (S.hidden && L.knowsHide) L.goal = hideTarget();
@@ -1848,12 +1930,12 @@
     const lit = sees && S.flashOn && (fwd.x * dx + fwd.y * dy + fwd.z * dz) / d3 > Math.cos(0.42);
     o.m.eyeMat.emissive.setHex(lit ? (isWatcher ? 0x300404 : 0x7a0606) : 0x000000);
     if (onW && !o.seen && sees && d < 9) {
-      o.seen = true; if (isWatcher) audio.sting(); else audio.screech(o.x, o.z);
+      o.seen = true; audio.impact(); if (isWatcher) audio.sting(); else audio.screech(o.x, o.z);
       toast(isWatcher ? 'Something is hanging from the ceiling. Watching. Moths LOVE light \u2014 press F to turn yours OFF!' : 'THE HUNTER. Spikes and eyes everywhere. It dives at your light \u2014 press F!', 6);
     }
     if (!onW) { o.state = 'wander'; o.knowsHide = false; }
     else if (sees && (S.flashOn || d < 1.8)) {
-      if (o.state !== 'hunt' && !isWatcher) audio.screech(o.x, o.z);
+      if (o.state !== 'hunt') { if (!isWatcher) audio.screech(o.x, o.z); spottedFx(); }
       o.state = 'hunt'; o.lostT = 0; o.goal = { x: S.x, z: S.z };
     } else if (o.state === 'hunt' && !o.knowsHide) { o.lostT += dt; if (o.lostT > (S.flashOn ? 5 : 1.2)) { o.state = 'wander'; o.goal = null; } }
     let spd;
