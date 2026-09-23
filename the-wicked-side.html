@@ -122,11 +122,6 @@
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; margin: 0; font-family: var(--type); font-size: 13px; color: var(--dim); }
   .keys dt { color: var(--bone); }
   .keys dd { margin: 0; }
-  .song { display: inline-flex; align-items: baseline; gap: 10px; font-family: var(--type); font-size: 14px; color: var(--mirror); text-decoration: none; }
-  .song::before { content: ""; align-self: center; width: 0; height: 0; border-style: solid; border-width: 6px 0 6px 10px; border-color: transparent transparent transparent var(--mirror); }
-  .song span { font-size: 12px; color: var(--dim); }
-  .song:hover { text-decoration: underline; text-underline-offset: 3px; }
-  .song:focus-visible { outline: 2px solid var(--mirror); outline-offset: 3px; }
   .fine { font-family: var(--type); font-size: 12px; color: var(--dim); margin: 0; max-width: 46ch; }
 
   /* Grandma's notes, in her handwriting */
@@ -191,7 +186,6 @@
       <button id="btnBrave" type="button">Enter the cottage</button>
       <button id="btnEasy" class="ghost" type="button">Enter (a bit less scary)</button>
     </div>
-    <a class="song" href="https://music.youtube.com/watch?v=XOc8GK0n1Y4" target="_blank" rel="noopener">Play the title song <span>opens YouTube Music in a new tab</span></a>
     <dl class="keys">
       <dt>Mouse</dt><dd>look around (click the game first)</dd>
       <dt>WASD</dt><dd>walk · Shift run · C sneak</dd>
@@ -199,7 +193,7 @@
       <dt>F</dt><dd>flashlight on / off</dd>
       <dt>E</dt><dd>read a note · hide · come out</dd>
     </dl>
-    <p class="fine">Best with headphones and the lights off.</p>
+    <p class="fine" id="boxHint">Click anywhere to wind up the music box. Best with headphones and the lights off.</p>
   </div>
 
   <div class="overlay center" id="noteScreen" hidden>
@@ -1189,6 +1183,7 @@
   const audio = (() => {
     let ac = null, master, bus, noiseBuf, muted = false, droneA, droneB, droneF, rainG, choirG;
     const loops = {};
+    const music = { on: false, wanted: false, timer: 0 };
     function init() {
       if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
       try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { ac = null; return; }
@@ -1224,7 +1219,67 @@
       };
       loops.flutterW = makeLoop(wings(120, 9));
       loops.flutterH = makeLoop(wings(240, 16));
+      // An old music box: a little out of tune, echoing in an empty room
+      music.in = ac.createGain();
+      music.out = ac.createGain(); music.out.gain.value = 0; music.out.connect(master);
+      const dry = ac.createGain(); dry.gain.value = 0.8; music.in.connect(dry); dry.connect(music.out);
+      const dl = ac.createDelay(1); dl.delayTime.value = 0.31; const fb = ac.createGain(); fb.gain.value = 0.38;
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2400;
+      music.in.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(music.out);
+      const crackle = loopNoise(), cf = ac.createBiquadFilter(); cf.type = 'highpass'; cf.frequency.value = 3000;
+      const cg = ac.createGain(); cg.gain.value = 0.006; crackle.connect(cf); cf.connect(cg); cg.connect(music.out);
       setSide(S.side);
+      if (music.wanted) musicStart();
+    }
+    // A slow minor-key lullaby in 3/4 (made up for this game). [note, beats]
+    const TUNE = [
+      [88, 1], [84, 1], [81, 1], [83, 1], [80, 1], [76, 1], [81, 1], [84, 1], [88, 1], [86, 2], [0, 1],
+      [89, 1], [88, 1], [86, 1], [84, 1], [83, 1], [81, 1], [80, 1], [83, 1], [88, 1], [81, 2], [0, 1],
+      [76, 1], [81, 1], [84, 1], [83, 1.5], [81, 0.5], [80, 1], [81, 1], [77, 1], [74, 1], [76, 2], [0, 1],
+      [84, 1], [83, 1], [81, 1], [80, 1], [76, 1], [80, 1], [81, 3], [0, 3],
+    ];
+    const BASS = [69, 64, 69, 74, 65, 69, 64, 69, 69, 64, 62, 64, 69, 64, 69, 69];
+    function boxNote(t, midi, vol, pitch) {
+      const f = 440 * Math.pow(2, (midi - 69) / 12) * pitch;
+      for (const [mul, amp, len] of [[1, 1, 2.4], [2.005, 0.32, 1.0], [3.01, 0.12, 0.6], [4.23, 0.05, 0.3]]) {
+        const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f * mul;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * amp, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+        o.connect(g); g.connect(music.in); o.start(t); o.stop(t + len + 0.05);
+      }
+      hiss(music.in, t, 0.01, vol * 0.25, 'highpass', 5000);
+    }
+    function musicSchedule() {
+      if (!music.on) return;
+      while (music.next < ac.currentTime + 0.35) {
+        const [note, beats] = TUNE[music.i];
+        const total = TUNE.length, left = total - music.i;
+        // it winds down near the end of each loop: slower, and sagging flat
+        const wind = left < 9 ? 1 + (9 - left) * 0.09 : 1;
+        const sag = left < 9 ? 1 - (9 - left) * 0.0035 : 1;
+        const wob = 1 + Math.sin(music.next * 0.9) * 0.012;
+        if (note) boxNote(music.next, note, 0.16, sag * wob * (1 + (Math.random() - 0.5) * 0.006));
+        if (music.beat % 3 === 0) boxNote(music.next, BASS[Math.floor(music.beat / 3) % BASS.length] - 12, 0.07, sag * wob);
+        const dur = 0.46 * beats * wind;
+        music.next += dur; music.beat += beats; music.i++;
+        if (music.i >= total) { music.i = 0; music.beat = 0; music.next += 1.2; }
+      }
+    }
+    function musicStart() {
+      music.wanted = true;
+      if (!ac || music.on) return;
+      music.on = true; music.i = 0; music.beat = 0;
+      const t = ac.currentTime;
+      // winding the key
+      for (let k = 0; k < 9; k++) { hiss(music.in, t + k * 0.09, 0.02, 0.2, 'bandpass', 2600 + (k % 2) * 700, 0, 4); }
+      music.next = t + 1.1;
+      music.out.gain.cancelScheduledValues(t); music.out.gain.setTargetAtTime(0.9, t, 0.1);
+      clearInterval(music.timer); music.timer = setInterval(musicSchedule, 60);
+    }
+    function musicStop() {
+      music.wanted = false;
+      if (!ac || !music.on) return;
+      music.on = false; clearInterval(music.timer);
+      music.out.gain.cancelScheduledValues(ac.currentTime); music.out.gain.setTargetAtTime(0, ac.currentTime, 0.35);
     }
     function makeLoop(build) {
       const g = ac.createGain(); g.gain.value = 0;
@@ -1268,7 +1323,7 @@
       ws.curve = curve; return ws;
     }
     return {
-      init, setSide,
+      init, setSide, musicStart, musicStop,
       step(run, sneak) { if (!ac) return; const t = ac.currentTime; hiss(bus, t, 0.06, run ? 0.09 : sneak ? 0.015 : 0.045, 'bandpass', 500 + Math.random() * 300, 0, 1.2); if (Math.random() < 0.18 && !sneak) tone(bus, t, 'triangle', 180 + Math.random() * 60, 120, 0.25, 0.02, 0.05); },
       heartbeat(v) { if (!ac) return; const t = ac.currentTime; tone(bus, t, 'sine', 62, 38, 0.16, v); tone(bus, t + 0.17, 'sine', 55, 34, 0.16, v * 0.7); },
       whoosh(toW) { if (!ac) return; const t = ac.currentTime; hiss(bus, t, 0.6, 0.4, 'bandpass', toW ? 180 : 2600, toW ? 2600 : 160); tone(bus, t, 'sine', toW ? 880 : 220, toW ? 180 : 880, 0.55, 0.08, 0.05); },
@@ -1453,7 +1508,7 @@
     toast(null);
   }
   function startGame(diff) {
-    audio.init(); S.diff = diff; reset(); setMode('play'); lock();
+    audio.init(); audio.musicStop(); S.diff = diff; reset(); setMode('play'); lock();
     toast('Grandma left a note on the floor. Walk over and press E to read it.', 6);
   }
   let toastTimer = 0;
@@ -1986,7 +2041,7 @@
   $('btnRetry').addEventListener('click', () => startGame(S.diff));
   $('btnAgain').addEventListener('click', () => startGame(S.diff));
   $('btnResume').addEventListener('click', resume);
-  const toTitle = () => { reset(); setMode('title'); };
+  const toTitle = () => { reset(); setMode('title'); audio.musicStart(); };
   $('btnQuit').addEventListener('click', toTitle);
   $('btnTitle1').addEventListener('click', toTitle);
   $('btnTitle2').addEventListener('click', toTitle);
@@ -2000,6 +2055,10 @@
   document.querySelectorAll('button').forEach((b) => b.addEventListener('mouseup', () => b.blur()));
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.mode === 'play') setMode('pause'); });
 
+  // The title-screen music box starts on the first click or key press (browsers need one)
+  const wakeMusic = () => { if (S.mode === 'title') { audio.init(); audio.musicStart(); $('boxHint').textContent = 'Best with headphones and the lights off.'; } };
+  addEventListener('pointerdown', wakeMusic, true);
+  addEventListener('keydown', wakeMusic, true);
   // ================= Go =================
   reset();
   // Compile both looks up front so the first crossing doesn't stutter
