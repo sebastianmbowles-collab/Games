@@ -1422,3 +1422,340 @@ body {
     gap: 20px;
   }
 }
+
+/* ---------- BONK! ---------- */
+
+.bonk-wide {
+  max-width: 960px;
+}
+
+.bonk-menu {
+  width: 100%;
+  max-width: 960px;
+  background: var(--panel);
+  border: 2px solid var(--card-color);
+  border-radius: 14px;
+  padding: 28px 24px;
+  text-align: center;
+}
+
+.bonk-logo {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 40px;
+  margin: 0 0 14px;
+  color: var(--card-color);
+  text-shadow: 4px 4px 0 #3a1400;
+  animation: bonk-wobble 1.4s ease-in-out infinite;
+}
+
+@keyframes bonk-wobble {
+  0%,
+  100% {
+    transform: rotate(-3deg) scale(1);
+  }
+  50% {
+    transform: rotate(3deg) scale(1.06);
+  }
+}
+
+.bonk-tagline {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 22px;
+}
+
+.bonk-mode-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.bonk-big-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 16px;
+  background: var(--card-color);
+  color: #1a0a00;
+  border: none;
+  border-radius: 10px;
+  padding: 18px 26px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 5px 0 #8a3000;
+  transition: transform 0.08s;
+}
+
+.bonk-big-btn small {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bonk-big-btn:hover {
+  transform: translateY(-2px);
+}
+
+.bonk-big-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #8a3000;
+}
+
+.bonk-help-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.bonk-help-grid h4,
+.bonk-rules-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  color: var(--card-color);
+  margin: 0 0 10px;
+}
+
+.bonk-help-grid p {
+  margin: 0 0 8px;
+}
+
+.bonk-help-grid kbd {
+  background: #2a2a3a;
+  border: 1px solid #444;
+  border-bottom-width: 3px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+.bonk-rules-title {
+  margin-top: 18px;
+}
+
+.bonk-rule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.bonk-chip {
+  background: #22222f;
+  border: 1px solid #3a3a4d;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bonk-stage {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+  border: 3px solid var(--card-color);
+  border-radius: 12px;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.bonk-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.bonk-overlay {
+  line-height: 1.4;
+  border-radius: 0;
+  padding: 16px;
+}
+
+.bonk-overlay h3 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.bonk-standings {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bonk-cards {
+  width: 100%;
+  max-width: 960px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.bonk-card {
+  background: var(--panel);
+  border: 2px solid var(--pc);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 12px;
+  transition: opacity 0.3s;
+}
+
+.bonk-card.is-out {
+  opacity: 0.4;
+}
+
+.bonk-card-name {
+  font-weight: 800;
+  color: var(--pc);
+  font-size: 14px;
+}
+
+.bonk-card-name span {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: var(--text);
+  margin-left: 4px;
+}
+
+.bonk-card-dmg {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 20px;
+  margin: 6px 0;
+}
+
+.bonk-card-row {
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.bonk-cds {
+  display: flex;
+  gap: 8px;
+}
+
+.bonk-cds span {
+  opacity: 0.35;
+}
+
+.bonk-cds span.ready {
+  opacity: 1;
+  color: var(--text);
+}
+
+.bonk-touch {
+  display: none;
+  width: 100%;
+  max-width: 960px;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  user-select: none;
+  touch-action: none;
+}
+
+.bonk-touch.is-touch {
+  display: flex;
+}
+
+@media (pointer: coarse) {
+  .bonk-touch {
+    display: flex;
+  }
+}
+
+.bonk-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(3, 56px);
+  gap: 4px;
+}
+
+.bonk-dpad .up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.bonk-dpad .left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.bonk-dpad .right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.bonk-dpad .down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.bonk-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.bonk-touch-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 2px solid #3a3a4d;
+  background: #22222f;
+  color: var(--text);
+  font-size: 22px;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.bonk-touch-btn.bonk {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #ff6b1a;
+  border-color: #8a3000;
+  font-size: 34px;
+}
+
+@media (max-width: 640px) {
+  .bonk-logo {
+    font-size: 26px;
+  }
+
+  .bonk-help-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bonk-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bonk-overlay h3 {
+    font-size: 12px;
+  }
+
+  .bonk-dpad {
+    grid-template-columns: repeat(3, 46px);
+    grid-template-rows: repeat(3, 46px);
+  }
+
+  .bonk-touch-btn {
+    width: 46px;
+    height: 46px;
+    font-size: 18px;
+  }
+
+  .bonk-touch-btn.bonk {
+    width: 66px;
+    height: 66px;
+    font-size: 28px;
+  }
+}

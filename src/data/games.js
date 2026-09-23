@@ -1,5 +1,13 @@
 export const GAMES = [
   {
+    key: 'bonk',
+    title: 'BONK!',
+    blurb: 'Knock everyone off the floating platform with a giant hammer.',
+    color: '#ff6b1a',
+    icon: '🔨',
+    playable: true,
+  },
+  {
     key: 'lucky-spin',
     title: "Freddy's Lucky Spin",
     blurb: 'Spin the wheel and try to land on the big prize.',
