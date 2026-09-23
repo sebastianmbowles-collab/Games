@@ -32,8 +32,10 @@ escape through the front door. Watch out for:
   when danger is close. On the Wicked Side she is wolf-like, with a wide-open
   mouth, red eyes and sixteen bubble eyes, and she hunts by sound (hold C to
   sneak).
-- **The Moth** (upstairs): a towering moth with eye-spotted wings that flies
-  straight at your flashlight. Press F to turn the light off.
+- **The Moths** (upstairs), two of them, with huge reddish eye-spotted wings,
+  stilt legs, black eyes and feathery antennae. The Watcher hangs silently near
+  the attic ceiling and drops on you; the Hunter is spiky, has extra eyes,
+  screeches and dives. Both fly at your flashlight: press F to turn it off.
 
 Hide in wardrobes or under beds with E, as long as nothing sees you get in.
 Grandma's handwritten notes are scattered around the cottage (E to read).
