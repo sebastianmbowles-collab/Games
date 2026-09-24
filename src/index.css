@@ -2885,3 +2885,52 @@ button.bonk-pill:hover {
   background: #d7263d;
   border-color: #ff9ea9;
 }
+
+/* ---------- Arcade reset ---------- */
+
+.arcade-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+.arcade-reset-btn,
+.arcade-reset-row button {
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.arcade-reset-btn:hover {
+  border-color: #ff4d6d;
+  color: #ff4d6d;
+}
+
+.arcade-reset-box {
+  max-width: 520px;
+  background: rgba(255, 45, 45, 0.12);
+  border: 2px solid #ff4d6d;
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.arcade-reset-box p {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.arcade-reset-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.arcade-reset-row button.danger {
+  background: #d7263d;
+  border-color: #ff9ea9;
+}

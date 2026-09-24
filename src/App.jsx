@@ -5,6 +5,7 @@ import ComingSoonModal from './components/ComingSoonModal'
 import CornerMascot from './components/CornerMascot'
 import Intro from './components/Intro'
 import GameErrorBoundary from './components/GameErrorBoundary'
+import ResetArcade from './components/ResetArcade'
 import GuitarHero from './games/GuitarHero'
 import BalloonPop from './games/BalloonPop'
 import MemoryGame from './games/MemoryGame'
@@ -82,6 +83,9 @@ export default function App() {
           <GameCard key={game.key} game={game} onPlay={handlePlay} />
         ))}
       </div>
+      <footer className="arcade-footer">
+        <ResetArcade />
+      </footer>
       <ComingSoonModal game={soonGame} onClose={() => setSoonGame(null)} />
       <CornerMascot />
     </div>
