@@ -2934,3 +2934,14 @@ button.bonk-pill:hover {
   background: #d7263d;
   border-color: #ff9ea9;
 }
+
+.bonk-wifi-warn {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #ffe14d;
+  color: #5a1a00;
+  font-weight: 900;
+  text-align: center;
+  border: 3px solid #ff7a00;
+}

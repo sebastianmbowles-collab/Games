@@ -78,6 +78,7 @@ export default function Online({ onClose, onHostStart, onGuestJoined, onGuestMes
       <div className="bonk-panel bonk-online">
         <button className="bonk-close" onClick={cancel}>✕</button>
         <h3>🌐 ONLINE</h3>
+        <p className="bonk-wifi-warn">⚠️ WARNING: TO PLAY ONLINE, YOU NEED TO HAVE THE SAME WIFI.</p>
 
         {(mode === 'menu' || mode === 'join') && (
           <section>
