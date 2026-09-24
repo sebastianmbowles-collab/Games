@@ -2776,3 +2776,94 @@ button.bonk-pill:hover {
     transform: scale(1.04);
   }
 }
+
+/* ---------- BONK! online ---------- */
+
+.bonk-online-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.bonk-panel .bonk-big {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 12px;
+  font-size: 18px;
+}
+
+.bonk-big small {
+  font-weight: 600;
+  font-size: 12px;
+  color: #d9ccff;
+}
+
+.bonk-name {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-weight: 900;
+}
+
+.bonk-code-input {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 22px;
+  width: 150px;
+  text-align: center;
+  letter-spacing: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 3px solid #ffd23f;
+  background: #120a26;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.bonk-room-code {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 40px;
+  letter-spacing: 10px;
+  color: #ffd23f;
+  text-shadow: 3px 3px 0 #ff4d6d;
+  text-align: center;
+  margin: 6px 0;
+}
+
+.bonk-waiting {
+  font-weight: 900;
+  font-size: 16px;
+  text-align: center;
+}
+
+.bonk-nogl {
+  aspect-ratio: auto !important;
+  background: linear-gradient(160deg, #48b8ff, #b36bff) !important;
+  color: #fff;
+  padding: 30px;
+  line-height: 1.6;
+  font-size: 16px;
+  max-width: 760px;
+}
+
+.bonk-nogl h2 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.bonk-nogl li {
+  margin-bottom: 8px;
+}
+
+.bonk-loading {
+  background: #000;
+  z-index: 3;
+}
+
+.bonk-loading-chase {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

@@ -229,10 +229,10 @@ const blankCmd = () => ({ mx: 0, my: 0, jump: false, jumpHeld: false, bonk: fals
 const isHuman = (p) => p.human
 
 function stat(w, p, key, n = 1) {
-  if (p && isHuman(p)) w.hooks.stat(key, n)
+  if (p && isHuman(p)) w.hooks.stat(key, n, p)
 }
 function best(w, p, key, v) {
-  if (p && isHuman(p)) w.hooks.max(key, v)
+  if (p && isHuman(p)) w.hooks.max(key, v, p)
 }
 
 function sizeOf(w, p) {
@@ -1591,6 +1591,8 @@ function finishMatch(w, winner) {
     night: w.night,
     mysteryBot: w.players.some((p) => p.mystery),
     humans: humans.map((p) => ({
+      pid: p.id,
+      remote: p.input?.type === 'remote' ? p.input.id : null,
       name: p.name,
       costume: p.costume,
       won: p === winner,
@@ -1625,6 +1627,18 @@ export function eventPopup(w, text, x = CX, y = CY) {
 export function forceEvent(w, key) {
   const ev = [...EVENTS, ...RARE_EVENTS].find((e) => e.key === key)
   if (ev) startEvent(w, ev)
+}
+
+// An online guest left: their duck carries on as a bot.
+export function dropRemote(w, peerId) {
+  for (const p of w.players) {
+    if (p.input?.type === 'remote' && p.input.id === peerId) {
+      p.human = false
+      p.tag = 'CPU'
+      p.input = null
+      feed(w, `${p.name} left the game`)
+    }
+  }
 }
 
 export function quitMatch(w) {

@@ -118,7 +118,7 @@ function quackSynth(pitch = 1, vol = 0.22) {
   noise(0.1, vol * 0.5, 1500 * pitch)
 }
 
-export const sfx = {
+const rawSfx = {
   bonk() {
     if (file('bonk')) return
     tone('sine', 340, 70, 0.2, 0.4)
@@ -245,4 +245,23 @@ export const sfx = {
     tone('sine', 110, 55, 2.5, 0.25)
     tone('sine', 165, 80, 2.5, 0.12)
   },
+}
+
+// When hosting online, every sound the game makes is also recorded so it can
+// be sent to the guests.
+let recorder = null
+export function setSoundRecorder(fn) {
+  recorder = fn
+}
+export const sfx = Object.fromEntries(
+  Object.keys(rawSfx).map((k) => [
+    k,
+    (...args) => {
+      if (recorder) recorder(k)
+      rawSfx[k](...args)
+    },
+  ]),
+)
+export function playNamed(name) {
+  if (rawSfx[name]) rawSfx[name]()
 }

@@ -144,7 +144,10 @@ export function matchStarted(config) {
 }
 
 // Apply a finished match. Returns the Bonk Bucks breakdown for the results screen.
-export function matchFinished(r, muted) {
+// `mine` picks which of the human ducks belong to this computer (online play).
+export function matchFinished(result, muted, mine = (h) => !h.remote) {
+  const humans = result.humans.filter(mine)
+  const r = { ...result, humans, humanWon: humans.some((h) => h.won) }
   const s = loadSave()
   const won = r.humanWon
   stat('matches')
@@ -317,4 +320,9 @@ export function shopEquip(item, isPet) {
     s.costume = item.key
   }
   flush(true)
+}
+
+export function setOnlineName(name) {
+  loadSave().onlineName = name
+  persist()
 }

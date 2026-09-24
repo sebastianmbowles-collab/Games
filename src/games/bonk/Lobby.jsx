@@ -2,17 +2,15 @@ import { useEffect, useState } from 'react'
 import { CHALLENGES, DIFFICULTIES } from './data'
 import { COSTUMES } from './costumes'
 import { loadSave } from './save'
-import { stat } from './profile'
 
 // Match setup: who is playing, how many ducks, difficulty and challenge.
-export default function Lobby({ input, onStart, onClose }) {
+export default function Lobby({ input, onStart, onClose, onOnline }) {
   const save = loadSave()
   const [extra, setExtra] = useState([]) // extra local players: { kind: 'keys'|'pad', index, costume }
   const [ducks, setDucks] = useState(8)
   const [difficulty, setDifficulty] = useState('medium')
   const [challenge, setChallenge] = useState('none')
   const [pads, setPads] = useState([])
-  const [online, setOnline] = useState(false)
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -81,21 +79,10 @@ export default function Lobby({ input, onStart, onClose }) {
               </button>
             ))}
             {!pads.length && <span className="bonk-muted">🎮 Plug in a controller and press a button to see it here.</span>}
-            <button
-              onClick={() => {
-                setOnline(true)
-                stat('online')
-              }}
-            >
-              🌐 Online
+            <button className="is-on" onClick={onOnline}>
+              🌐 Play Online
             </button>
           </div>
-          {online && (
-            <p className="bonk-note">
-              📡 <b>Connection Lost…</b> Online multiplayer needs a game server on the internet, and this arcade runs
-              entirely in your browser. For now: grab a friend, a controller, and play on the same screen!
-            </p>
-          )}
         </section>
 
         <section>

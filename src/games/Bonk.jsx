@@ -4,10 +4,12 @@ import { ACHIEVEMENTS } from './bonk/achievements'
 import Achievements from './bonk/Achievements'
 import { nearestSafe } from './bonk/arena'
 import { EMOTE_ALT, EMOTE_KEYS, EMOTES, GAME_KEYS } from './bonk/data'
-import { bonkLaunch, createMatch, forceEvent, quitMatch, snapshot, step } from './bonk/engine'
+import { bonkLaunch, createMatch, dropRemote, forceEvent, quitMatch, snapshot, step } from './bonk/engine'
+import { applySnapshot, arenaInfo, buildMirror, makeSnapshot, smoothPlayers } from './bonk/net'
+import Online from './bonk/Online'
 import { createHub } from './bonk/hub'
 import { createInput, readCommand } from './bonk/input'
-import { createLoadingScene } from './bonk/loadingScene'
+import LoadingChase from './bonk/LoadingChase'
 import Lobby from './bonk/Lobby'
 import { createMatchView, drawOverlay } from './bonk/matchView'
 import { DuckHead, HowToPlay, Joystick, Settings } from './bonk/Menus'
@@ -30,9 +32,63 @@ import {
 } from './bonk/profile'
 import { loadSave, onSaveChange, persist } from './bonk/save'
 import Shop from './bonk/Shop'
-import { isMuted, setSfxVolume, sfx, unlockAudio } from './bonk/sound'
+import { isMuted, playNamed, setSfxVolume, setSoundRecorder, sfx, unlockAudio } from './bonk/sound'
 
 const STEP = 1 / 120
+
+// Some computers have 3D (WebGL) turned off. Try normal settings first,
+// then simpler ones, and return null if nothing works.
+function makeRenderer(canvas) {
+  const tries = [
+    { antialias: true },
+    { antialias: false, powerPreference: 'default', failIfMajorPerformanceCaveat: false },
+    { antialias: false, powerPreference: 'low-power', precision: 'mediump', failIfMajorPerformanceCaveat: false },
+  ]
+  for (const opts of tries) {
+    try {
+      return new THREE.WebGLRenderer({ canvas, ...opts })
+    } catch {
+      // try the next, simpler option
+    }
+  }
+  return null
+}
+
+function hasWebGL() {
+  try {
+    const c = document.createElement('canvas')
+    return !!(c.getContext('webgl2') || c.getContext('webgl') || c.getContext('experimental-webgl'))
+  } catch {
+    return false
+  }
+}
+
+function NoWebGL({ onExit }) {
+  return (
+    <div className="bonk-root">
+      <div className="bonk-stage bonk-nogl">
+        <h2>😢 BONK! can't draw 3D on this browser</h2>
+        <p>BONK! is a 3D game, and your browser has 3D graphics (called <b>WebGL</b>) switched off. Here's how to fix it:</p>
+        <ol>
+          <li>
+            Open the game in <b>Google Chrome</b> or <b>Microsoft Edge</b> (not inside another app's file preview).
+          </li>
+          <li>
+            In Chrome go to <b>Settings → System</b> and turn on <b>"Use graphics acceleration when available"</b>. In Edge it's{' '}
+            <b>Settings → System and performance</b>. Then restart the browser.
+          </li>
+          <li>
+            Visit <b>get.webgl.org</b>. If you see a spinning cube, 3D works!
+          </li>
+          <li>On a school or work computer, 3D might be blocked. Ask a grown-up.</li>
+        </ol>
+        <button className="bonk-go" onClick={onExit}>
+          ← Back to the arcade
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function TouchButton({ input, code, className, children, label }) {
   const press = (e) => {
@@ -111,6 +167,7 @@ export default function Bonk({ onExit }) {
   const [input] = useState(createInput)
 
   const [screen, setScreen] = useState('device')
+  const [noGL, setNoGL] = useState(() => !hasWebGL())
   const [device, setDevice] = useState(() => loadSave().device || (navigator.maxTouchPoints > 0 ? 'mobile' : 'pc'))
   const [progress, setProgress] = useState(0)
   const [overlay, setOverlay] = useState(null)
@@ -123,6 +180,10 @@ export default function Bonk({ onExit }) {
   const [introKey, setIntroKey] = useState(0)
   const [, setTick] = useState(0)
   const lastConfig = useRef(null)
+  const roomRef = useRef(null)
+  const guestRef = useRef(null)
+  const [myId, setMyId] = useState(null)
+  const [online, setOnline] = useState(null)
   const save = loadSave()
   const mobile = device === 'mobile'
 
@@ -305,12 +366,58 @@ export default function Bonk({ onExit }) {
   // ---------------------------------------------------------------- match
 
   const startMatch = useCallback(
-    (config) => {
+    (config, room = null) => {
       unlockAudio()
+      if (room) {
+        // (re)build the guest list from whoever is in the room right now
+        config = {
+          ...config,
+          humans: [config.humans[0], ...[...room.guests.values()].map((g) => ({ name: g.name, costume: g.costume || 'rookie', pet: g.pet, input: { type: 'remote', id: g.id } }))],
+        }
+      }
+      roomRef.current = room
+      setOnline(room ? 'host' : null)
+      setMyId(0)
       lastConfig.current = config
       setOverlay(null)
       setResults(null)
-      const w = createMatch({ ...config, hooks })
+      // Stats earned by online guests are sent to their own computers.
+      const outbox = new Map()
+      const route = (p) => (p?.input?.type === 'remote' ? p.input.id : null)
+      const box = (id) => {
+        if (!outbox.has(id)) outbox.set(id, { add: {}, max: {} })
+        return outbox.get(id)
+      }
+      const netHooks = room
+        ? {
+            ...hooks,
+            stat: (k, n, p) => {
+              const id = route(p)
+              if (!id) return hooks.stat(k, n)
+              const b = box(id)
+              b.add[k] = (b.add[k] || 0) + n
+            },
+            max: (k, v, p) => {
+              const id = route(p)
+              if (!id) return hooks.max(k, v)
+              const b = box(id)
+              b.max[k] = Math.max(b.max[k] || 0, v)
+            },
+          }
+        : hooks
+      const w = createMatch({ ...config, hooks: netHooks })
+      const sounds = []
+      if (room) {
+        room.handlers.onLeave = (id) => dropRemote(w, id)
+        room.broadcast({
+          t: 'start',
+          arena: arenaInfo(w.arena),
+          night: w.night,
+          players: w.players.map((p) => ({ id: p.id, name: p.name, tag: p.tag, color: p.color, costume: p.costume, pet: p.pet, human: p.human, remote: route(p) })),
+        })
+      }
+      let sendT = 0
+      let statT = 0
       if (import.meta.env.DEV) window.__bonk = { w, forceEvent: (key) => forceEvent(w, key) }
       matchStarted(config)
       const view = createMatchView(rendererRef.current, w)
@@ -327,11 +434,28 @@ export default function Bonk({ onExit }) {
           input.pollPads()
           acc += dt
           let first = true
+          if (room) setSoundRecorder((name) => sounds.length < 12 && sounds.push(name))
           while (acc >= STEP) {
-            step(w, STEP, (src) => readCommand(input, src))
+            step(w, STEP, (src) => (src.type === 'remote' ? room.readGuest(src.id) : readCommand(input, src)))
             if (first) input.clearPressed()
             first = false
             acc -= STEP
+          }
+          setSoundRecorder(null)
+          if (room) {
+            sendT += dt
+            statT += dt
+            if (sendT > 0.05) {
+              sendT = 0
+              const snap = makeSnapshot(w, snapshot(w))
+              snap.sounds = sounds.splice(0)
+              room.broadcast(snap)
+            }
+            if (statT > 0.5) {
+              statT = 0
+              for (const [id, b] of outbox) room.send(id, { t: 'stats', ...b })
+              outbox.clear()
+            }
           }
           view.update(dt)
           view.render()
@@ -354,11 +478,104 @@ export default function Bonk({ onExit }) {
     [input, setController],
   )
 
+  // ---------------------------------------------------------------- online guest
+
+  const guestStart = useCallback(
+    (msg) => {
+      const g = guestRef.current
+      if (!g) return
+      unlockAudio()
+      setOverlay(null)
+      setResults(null)
+      setOnline('guest')
+      const w = buildMirror(msg.arena, msg.night, g.peerId)
+      const byId = new Map()
+      for (const info of msg.players) {
+        const p = { ...info, x: 0, y: 0, z: 0, facing: 0, state: 'alive', balloons: 3, hammer: 'mallet', powers: {}, walk: 0, spin: 0, flipT: 0, emote: null, shieldT: 0, invuln: 0, king: false }
+        byId.set(p.id, p)
+        w.players.push(p)
+      }
+      const mine = msg.players.find((p) => p.remote === g.peerId)
+      setMyId(mine ? mine.id : null)
+      matchStarted({ challenge: 'none', humans: mine ? [{ costume: mine.costume }] : [] })
+      const view = createMatchView(rendererRef.current, w)
+      let acc = null
+      let sendT = 0
+      let done = false
+      playMusic('match')
+      g.onSnap = (s) => {
+        applySnapshot(w, s, byId)
+        for (const name of s.sounds || []) playNamed(name)
+        setHud(s.hud)
+        if (s.hud.results && !done) {
+          done = true
+          const r = s.hud.results
+          const earned = matchFinished(r, isMuted(), (h) => h.remote === g.peerId)
+          const meWon = r.humans.some((h) => h.remote === g.peerId && h.won)
+          setTimeout(() => setResults({ ...r, humanWon: meWon, earned, guest: true }), 1500)
+        }
+      }
+      setController({
+        type: 'guest',
+        w,
+        resize: (width, height) => view.resize(width, height),
+        dispose: () => view.dispose(),
+        frame(dt, ctx, width, height) {
+          input.pollPads()
+          const c = readCommand(input, { type: 'keys', scheme: 'solo' })
+          input.clearPressed()
+          acc = acc
+            ? { ...c, jump: c.jump || acc.jump, dash: c.dash || acc.dash, shield: c.shield || acc.shield, emote: acc.emote >= 0 ? acc.emote : c.emote }
+            : c
+          sendT += dt
+          if (sendT > 0.033) {
+            sendT = 0
+            g.conn.sendInput(acc)
+            acc = null
+          }
+          smoothPlayers(w, dt)
+          view.update(dt)
+          view.render()
+          drawOverlay(ctx, view, width, height)
+        },
+      })
+      setScreen('match')
+    },
+    [input, setController],
+  )
+
+  const guestMessage = useCallback(
+    (msg) => {
+      const g = guestRef.current
+      if (!g) return
+      if (msg.t === 'start') guestStart(msg)
+      else if (msg.t === 'snap') g.onSnap?.(msg)
+      else if (msg.t === 'stats') {
+        for (const [k, n] of Object.entries(msg.add || {})) stat(k, n)
+        for (const [k, v] of Object.entries(msg.max || {})) max(k, v)
+      }
+    },
+    [guestStart],
+  )
+
+  function leaveOnline() {
+    guestRef.current?.conn.close()
+    guestRef.current = null
+    roomRef.current?.close()
+    roomRef.current = null
+    setOnline(null)
+  }
+
   // ---------------------------------------------------------------- renderer + loop
 
   useEffect(() => {
     const canvas = canvasRef.current
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+    if (!canvas) return
+    const renderer = makeRenderer(canvas)
+    if (!renderer) {
+      setTimeout(() => setNoGL(true))
+      return
+    }
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
     renderer.shadowMap.enabled = loadSave().settings?.shadows !== false
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -367,14 +584,12 @@ export default function Bonk({ onExit }) {
     stat('loadings')
     applySettings()
 
-    const loading = createLoadingScene()
+    // Nothing 3D until the title screen; the loading screen is a 2D cartoon.
     ctrlRef.current = {
       type: 'loading',
-      resize: (w, h) => loading.resize(w, h),
-      dispose: () => loading.dispose(),
+      resize: () => {},
       frame(dt, ctx, width, height) {
         ctx.clearRect(0, 0, width, height)
-        loading.frame(renderer, dt)
       },
     }
 
@@ -432,7 +647,7 @@ export default function Bonk({ onExit }) {
     if (screen !== 'loading') return
     let p = 0
     const id = setInterval(() => {
-      p = Math.min(100, p + 5 + Math.random() * 9)
+      p = Math.min(100, p + 3 + Math.random() * 5)
       setProgress(p)
       if (p >= 100) {
         clearInterval(id)
@@ -512,6 +727,7 @@ export default function Bonk({ onExit }) {
   function exitMatch() {
     const c = ctrlRef.current
     if (c?.type === 'match') quitMatch(c.w)
+    leaveOnline()
     goHub()
   }
 
@@ -525,8 +741,10 @@ export default function Bonk({ onExit }) {
     }
   }
 
+  if (noGL) return <NoWebGL onExit={onExit} />
+
   const unlocked = Object.keys(save.ach).length
-  const me = hud?.players.find((p) => p.human)
+  const me = hud?.players.find((p) => (myId === null ? p.human : p.id === myId))
   const inGame = screen === 'hub' || screen === 'match'
 
   return (
@@ -555,10 +773,7 @@ export default function Bonk({ onExit }) {
 
         {screen === 'loading' && (
           <div className="bonk-loading">
-            <div className="bonk-loadbar">
-              <div style={{ width: `${progress}%` }} />
-              <span>Loading… {Math.floor(progress)}%</span>
-            </div>
+            <LoadingChase progress={progress} />
           </div>
         )}
 
@@ -741,16 +956,47 @@ export default function Bonk({ onExit }) {
               </div>
               <p className="bonk-earned">+{results.earned.bb} Bonk Bucks 🪙</p>
               <div className="bonk-chip-row center">
-                <button className="bonk-go" onClick={() => startMatch(lastConfig.current)}>
-                  Play Again
+                {results.guest ? (
+                  <button className="bonk-go" onClick={() => setResults(null)}>
+                    Wait for next round
+                  </button>
+                ) : (
+                  <button className="bonk-go" onClick={() => startMatch(lastConfig.current, roomRef.current)}>
+                    {online === 'host' ? 'Next Round' : 'Play Again'}
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    leaveOnline()
+                    goHub()
+                  }}
+                >
+                  {online ? 'Leave & Back to Hub' : 'Back to Hub'}
                 </button>
-                <button onClick={goHub}>Back to Hub</button>
               </div>
             </div>
           </div>
         )}
 
-        {overlay === 'play' && <Lobby input={input} onStart={startMatch} onClose={() => setOverlay(null)} />}
+        {overlay === 'play' && <Lobby input={input} onStart={(c) => startMatch(c)} onOnline={() => setOverlay('online')} onClose={() => setOverlay(null)} />}
+        {overlay === 'online' && (
+          <Online
+            onClose={() => setOverlay(null)}
+            onHostStart={(room, config) => startMatch(config, room)}
+            onGuestJoined={(conn, peerId) => {
+              guestRef.current = { conn, peerId }
+              setOnline('guest')
+            }}
+            onGuestMessage={guestMessage}
+            onGuestClosed={() => {
+              if (!guestRef.current) return
+              guestRef.current = null
+              setOnline(null)
+              toast('📡 The host left the room.', 'info')
+              goHub()
+            }}
+          />
+        )}
         {(overlay === 'shop' || overlay === 'costumes') && (
           <Shop
             initialTab={overlay === 'costumes' ? 'mine' : 'classic'}

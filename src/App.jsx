@@ -4,6 +4,7 @@ import GameCard from './components/GameCard'
 import ComingSoonModal from './components/ComingSoonModal'
 import CornerMascot from './components/CornerMascot'
 import Intro from './components/Intro'
+import GameErrorBoundary from './components/GameErrorBoundary'
 import GuitarHero from './games/GuitarHero'
 import BalloonPop from './games/BalloonPop'
 import MemoryGame from './games/MemoryGame'
@@ -64,7 +65,9 @@ export default function App() {
   if (activeGame) {
     const GameComponent = PLAYABLE_COMPONENTS[activeGame.key]
     return (
-      <GameComponent game={activeGame} onExit={() => setActiveGame(null)} />
+      <GameErrorBoundary onExit={() => setActiveGame(null)}>
+        <GameComponent game={activeGame} onExit={() => setActiveGame(null)} />
+      </GameErrorBoundary>
     )
   }
 
