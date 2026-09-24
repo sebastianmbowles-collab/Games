@@ -1,43 +1,39 @@
-import { loadSave, persist } from '../games/bonk/save'
+const KEY = 'fazTokens'
+const START_BALANCE = 100
 
-// The whole arcade shares one wallet: Bonk Bucks (BB), the same money BONK!
-// uses for costumes and pets.
-const OLD_KEY = 'fazTokens'
-
-function wallet() {
-  const s = loadSave()
-  // Move any old Faz-Tokens into Bonk Bucks (only happens once).
+function safeGet() {
   try {
-    const old = localStorage.getItem(OLD_KEY)
-    if (old !== null) {
-      const n = Number(old)
-      if (Number.isFinite(n) && n > 0) s.bb += n
-      localStorage.removeItem(OLD_KEY)
-      persist()
-    }
+    const raw = localStorage.getItem(KEY)
+    if (raw === null) return START_BALANCE
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : START_BALANCE
   } catch {
-    // storage unavailable: nothing to move
+    return START_BALANCE
   }
-  return s
+}
+
+function safeSet(value) {
+  try {
+    localStorage.setItem(KEY, String(value))
+  } catch {
+    // localStorage unavailable, balance just won't persist
+  }
 }
 
 export function getTokens() {
-  return wallet().bb
+  return safeGet()
 }
 
 export function addTokens(amount) {
-  const s = wallet()
-  s.bb += amount
-  if (amount > 0) s.stats.bbEarned = (s.stats.bbEarned || 0) + amount
-  persist()
-  return s.bb
+  const next = safeGet() + amount
+  safeSet(next)
+  return next
 }
 
 export function spendTokens(amount) {
-  const s = wallet()
-  if (s.bb < amount) return null
-  s.bb -= amount
-  s.stats.bbSpent = (s.stats.bbSpent || 0) + amount
-  persist()
-  return s.bb
+  const current = safeGet()
+  if (current < amount) return null
+  const next = current - amount
+  safeSet(next)
+  return next
 }
