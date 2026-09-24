@@ -581,7 +581,6 @@ export default function Bonk({ onExit, standalone = false }) {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     rendererRef.current = renderer
     startSession()
-    stat('loadings')
     applySettings()
 
     // Nothing 3D until the title screen; the loading screen is a 2D cartoon.
@@ -645,6 +644,8 @@ export default function Bonk({ onExit, standalone = false }) {
   // The loading bar (while the duck chase plays), then the title screen.
   useEffect(() => {
     if (screen !== 'loading') return
+    // Only now has the loading screen really been seen.
+    stat('loadings')
     let p = 0
     const id = setInterval(() => {
       p = Math.min(100, p + 3 + Math.random() * 5)
