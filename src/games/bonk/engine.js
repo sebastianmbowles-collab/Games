@@ -66,14 +66,16 @@ export function createMatch(config) {
   for (let i = 0; i < total; i++) {
     const h = config.humans[i]
     const mystery = !h && Math.random() < 0.03
+    // Very rarely, a certain someone joins the match...
+    const hero = !h && !mystery && i === total - 1 && Math.random() < 0.02
     players.push(
       makePlayer({
         id: i,
         human: !!h,
         input: h ? h.input : null,
         tag: h ? `P${i + 1}` : 'CPU',
-        name: h ? h.name : mystery ? '???' : names[i % names.length],
-        costume: h ? h.costume : mystery ? 'questionmark' : pick(BOT_COSTUMES),
+        name: h ? h.name : mystery ? '???' : hero ? 'Herobrine' : names[i % names.length],
+        costume: h ? h.costume : mystery ? 'questionmark' : hero ? 'herobrine' : pick(BOT_COSTUMES),
         pet: h ? h.pet : null,
         color: PLAYER_COLORS[i % PLAYER_COLORS.length],
         skill: diff.skill * (0.85 + Math.random() * 0.3),
@@ -669,6 +671,7 @@ function creditKo(w, a, t, info, cause) {
   if (w.flags.has('lowgrav')) S('lowgravKos')
   if (t.costume === 'chair') S('chairKos')
   if (t.king) S('kingKos')
+  if (t.name === 'Herobrine') S('egg_herobrine')
   if (w.playT < 10) S('earlyKos')
   if (cause !== 'fall') S('spaceKos')
   const kt = a.track.koTimes

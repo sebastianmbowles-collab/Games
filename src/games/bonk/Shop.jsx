@@ -105,17 +105,18 @@ export default function Shop({ onClose, onEquip, initialTab = 'classic' }) {
         </div>
         <div className="bonk-shop-body">
           <div className="bonk-shop-preview">
-            <Preview costume={isPets ? save.costume : selItem ? sel : save.costume} pet={isPets ? (selItem ? sel : save.pet) : save.pet} />
+            <Preview costume={isPets ? save.costume : selItem ? (selItem.unlock && !owns(selItem) ? 'questionmark' : sel) : save.costume} pet={isPets ? (selItem ? sel : save.pet) : save.pet} />
             {selItem && (
               <div className="bonk-shop-info">
-                <b>{selItem.name}</b>
+                <b>{selItem.unlock && !owns(selItem) ? '???' : selItem.name}</b>
                 <span>{selItem.price === null ? '???' : selItem.price === 0 ? 'FREE' : `🪙 ${selItem.price.toLocaleString()} BB`}</span>
+                {selItem.unlock && !owns(selItem) && <small>💎 Secret: {selItem.unlock[2]}</small>}
                 {selItem.need && <small>🔒 {selItem.need[2]} ({Math.min(derivedStat(save, selItem.need[0]), selItem.need[1])}/{selItem.need[1]})</small>}
                 {owns(selItem) ? (
                   <button onClick={() => equip(selItem)}>{equipped(selItem) ? (isPets ? 'Unequip' : 'Equipped ✓') : 'Equip'}</button>
                 ) : (
-                  <button onClick={() => buy(selItem)} disabled={!needMet(selItem) || save.bb < (selItem.price || 0)}>
-                    {!needMet(selItem) ? 'Locked' : save.bb < (selItem.price || 0) ? 'Not enough BB' : 'Buy'}
+                  <button onClick={() => buy(selItem)} disabled={!!selItem.unlock || !needMet(selItem) || save.bb < (selItem.price || 0)}>
+                    {selItem.unlock ? 'Find the secret!' : !needMet(selItem) ? 'Locked' : save.bb < (selItem.price || 0) ? 'Not enough BB' : 'Buy'}
                   </button>
                 )}
               </div>
@@ -128,10 +129,10 @@ export default function Shop({ onClose, onEquip, initialTab = 'classic' }) {
                 className={`bonk-item ${sel === item.key ? 'is-sel' : ''} ${owns(item) ? 'is-owned' : ''}`}
                 onClick={() => setSel(item.key)}
               >
-                <span className="bonk-swatch" style={{ background: item.body || item.color }} />
-                <b>{item.name}</b>
+                <span className="bonk-swatch" style={{ background: item.unlock && !owns(item) ? '#555' : item.body || item.color }} />
+                <b>{item.unlock && !owns(item) ? '???' : item.name}</b>
                 <small>
-                  {equipped(item) ? '✓ Equipped' : owns(item) ? 'Owned' : item.price === null ? '???' : item.price === 0 ? 'FREE' : `🪙 ${item.price.toLocaleString()}`}
+                  {equipped(item) ? '✓ Equipped' : owns(item) ? 'Owned' : item.unlock ? '🔒 Secret' : item.price === null ? '???' : item.price === 0 ? 'FREE' : `🪙 ${item.price.toLocaleString()}`}
                 </small>
               </button>
             ))}

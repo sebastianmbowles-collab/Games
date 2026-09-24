@@ -150,6 +150,29 @@ export const COSTUME_CATEGORIES = [
     ],
   },
   {
+    key: 'finds',
+    name: '💎 Secret Finds',
+    // Can't be bought: each one unlocks by itself when you discover its secret.
+    items: [
+      c('goldenrubber', 'Golden Rubber Duck', null, '#ffd700', ['shine'], { mat: 'gold', unlock: ['egg_goldduck', 1, 'Say hi to the golden duck hiding inside the tower'] }),
+      c('voidduck', 'Void Duck', null, '#1a0033', ['bigEyes'], { mat: 'galaxy', unlock: ['wellDives', 5, 'Dive into the well 5 times'] }),
+      c('cakeduck', 'Cake Duck', null, '#f8bbd0', ['cupWrapper', 'cherry'], { unlock: ['egg_cake', 3, 'Eat the cake in the secret room 3 times'] }),
+      c('impostor', 'The Impostor', null, '#e53935', ['visor', 'horns', 'backpack'], { accColor: '#b71c1c', unlock: ['egg_vent', 5, 'Use the vent 5 times'] }),
+      c('creeperking', 'Creeper King', null, '#4caf50', ['bigEyes', 'crown'], { mat: 'pixel', unlock: ['egg_creeper', 3, 'Get blown up by the hissing block 3 times'] }),
+      c('konami', 'Konami Commando', null, '#8d6e63', ['ninjaBand', 'pixelSword'], { mat: 'pixel', accColor: '#e53935', unlock: ['konami', 1, 'Enter a very famous cheat code in the hub'] }),
+      c('ghostwell', 'Ghost of the Well', null, '#ffffff', ['sheet'], { mat: 'ghost', unlock: ['egg_boo', 1, 'Type a spooky word in the hub'] }),
+      c('luckyduck', 'Lucky Duck', null, '#2bd96b', ['tophat', 'shine'], { unlock: ['egg_wish', 10, 'Make 10 wishes at the fountain'] }),
+      c('legendhero', 'Hero of Legend', null, '#ffd23f', ['wizardHat', 'pixelSword'], { accColor: '#1565c0', unlock: ['egg_sword', 1, 'Pull the sword from the stone'] }),
+      c('diamondminer', 'Diamond Miner', null, '#4dd0e1', ['hardHat'], { mat: 'diamond', accColor: '#ffb300', unlock: ['egg_diamond', 1, 'Find diamonds on a hidden platform'] }),
+      c('herobrine', 'Herobrine?', null, '#3fa7d6', ['pixelHair', 'glowEyes'], { mat: 'pixel', unlock: ['egg_herobrine', 1, 'Knock out a very rare, very mysterious bot'] }),
+      c('moonduck', 'Moon Duck', null, '#cfd8dc', ['spaceDome'], { unlock: ['best_height', 600, 'Get REALLY high up'] }),
+      c('nightowl', 'Night Owl', null, '#5d4037', ['bigEyes', 'wolfEars'], { accColor: '#3e2723', unlock: ['nightMatches', 5, 'Play 5 matches at night'] }),
+      c('bigrubber', 'Big Rubber Duck', null, '#ffeb3b', ['shine'], { scale: 1.35, unlock: ['survive_duck', 3, 'Survive the giant rubber duck 3 times'] }),
+      c('goldrunner', 'Golden Speedrunner', null, '#ffd700', ['ninjaBand', 'stopwatch'], { mat: 'gold', accColor: '#00e676', unlock: ['obbyHardFast', 1, 'Finish the Hard obby in under 60 seconds'] }),
+      c('buttonmasher', 'Button Masher', null, '#ff2d2d', ['mysteryBox'], { unlock: ['redButton', 100, 'Press the big red button 100 times'] }),
+    ],
+  },
+  {
     key: 'secret',
     name: '💀 SECRET',
     items: [
@@ -208,3 +231,5 @@ export const PET_MAP = Object.fromEntries(PETS.map((p) => [p.key, p]))
 export const BOT_COSTUMES = Object.values(COSTUMES)
   .filter((c) => c.price !== null && c.price <= 5000 && c.key !== 'rookie')
   .map((c) => c.key)
+
+export const SECRET_UNLOCKS = Object.values(COSTUMES).filter((c) => c.unlock)

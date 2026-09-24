@@ -243,9 +243,19 @@ export default function Bonk({ onExit }) {
       devpc: () => setOverlay('devpc'),
       chat: (msg) => setChat((list) => [...list.slice(-5), { ...msg, id: Math.random() }]),
       reward: (n, text) => {
-        loadSave().bb += n
+        const s = loadSave()
+        if (s.bb + n < 0) return false
+        s.bb += n
         persist()
-        toast(text, 'ach')
+        if (text) toast(text, 'ach')
+        return true
+      },
+      wins: () => loadSave().stats.wins || 0,
+      once: (key) => {
+        const s = loadSave()
+        const had = !!s.stats[`once_${key}`]
+        s.stats[`once_${key}`] = 1
+        return had
       },
       konami: () => {
         const s = loadSave()

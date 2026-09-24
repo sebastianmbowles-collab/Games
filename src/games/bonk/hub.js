@@ -169,6 +169,13 @@ function buildWorld() {
   solids.push(box(470, 25, 530, 40, 50, 40, '#4caf50', { creeper: true }))
   zones.push({ key: 'creeper', x: 470, y: 10, z: 530, r: 55, repeat: true })
   zones.push({ key: 'cake', x: -140, y: -1990, z: -120, r: 50, sign: '🎂 The cake is a lie.' })
+  // more easter eggs: golden duck in the tower, wishing fountain, sword in the stone, diamonds
+  zones.push({ key: 'goldduck', x: 560, y: 10, z: -440, r: 30 })
+  zones.push({ key: 'wish', x: 180, y: 30, z: -120, r: 70, label: '🪙 WISH (5 BB)', color: '#4cc9f0', repeat: true })
+  solids.push(box(250, 12, 540, 56, 24, 56, '#9e9e9e'))
+  zones.push({ key: 'sword', x: 250, y: 24, z: 540, r: 45, label: '🗡 ???', color: '#e0e0e0', repeat: true })
+  solids.push(box(0, -160, -900, 110, 20, 110, '#607d8b'))
+  zones.push({ key: 'diamond', x: 0, y: -150, z: -900, r: 60 })
   // dev room far below (reached through the well)
   solids.push(box(0, -2020, 0, 400, 40, 400, '#222233'))
   solids.push(box(0, -1960, -150, 80, 60, 30, '#111111'))
@@ -335,6 +342,33 @@ export function createHub(renderer, profile, callbacks) {
   cake.add(sponge, icing, candle, flame)
   cake.position.set(-140, -1990, -120)
   scene.add(cake)
+  // golden duck statue, sword in the stone, diamond ore
+  const golden = buildDuck('goldenrubber', { hammer: false })
+  golden.root.position.set(560, 0, -445)
+  golden.root.rotation.y = Math.PI / 2
+  scene.add(golden.root)
+  const sword = new THREE.Group()
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(6, 50, 2), mat('#cfd8dc', 'metal'))
+  blade.position.y = 25
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(22, 4, 5), mat('#ffd700', 'gold'))
+  guard.position.y = 50
+  const hilt = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 14, 8), mat('#1565c0'))
+  hilt.position.y = 59
+  sword.add(blade, guard, hilt)
+  sword.position.set(250, 20, 540)
+  deco.add(sword)
+  for (const [dx, dz] of [[-25, 0], [25, 10], [0, -25]]) {
+    const ore = new THREE.Group()
+    const stone = new THREE.Mesh(new THREE.BoxGeometry(30, 30, 30), mat('#78909c', 'pixel'))
+    ore.add(stone)
+    for (let i = 0; i < 5; i++) {
+      const gem = new THREE.Mesh(new THREE.BoxGeometry(7, 7, 7), mat('#4dd0e1', 'glow'))
+      gem.position.set((Math.random() - 0.5) * 24, (Math.random() - 0.5) * 24, 15.5)
+      ore.add(gem)
+    }
+    ore.position.set(dx, -135, -900 + dz)
+    scene.add(ore)
+  }
   // a door that leads nowhere
   const door = new THREE.Mesh(new THREE.BoxGeometry(40, 70, 6), mat('#6a4c93'))
   door.position.set(300, 35, -330)
@@ -379,6 +413,8 @@ export function createHub(renderer, profile, callbacks) {
     'do a barrel roll!', 'git gud', '1v1 me bro', 'its over 9000!!', 'hello there', 'press F to pay respects',
     'all your bonk are belong to us', 'its-a me, duckio', 'the ? block gives free BB', 'try the green pipe',
     'up up down down left right left right B A', 'noob', 'not the bees!', 'hmm yes the floor here is made of floor',
+    'did anyone else see herobrine??', 'the fountain told me my fortune', 'theres a sword stuck in a rock lol',
+    'i heard theres diamonds somewhere', 'type BOO near the well', 'the golden duck in the tower is so shiny',
   ]
   const SPOTS = [[0, 200], [-150, 300], [150, 300], [0, 380], [-220, 420], [220, 420], [0, -250], [-100, -150], [60, 60], [-250, 150], [280, 250], [200, 150]]
   const wanderers = []
@@ -786,6 +822,7 @@ export function createHub(renderer, profile, callbacks) {
   function onZone(key) {
     const z = world.zones.find((q) => q.key === key)
     if (key === 'vent') {
+      callbacks.stat('egg_vent', 1)
       const [x, zz] = [[-150, 300], [0, -250], [250, 250], [-250, 100]][Math.floor(Math.random() * 4)]
       teleport(x, 20, zz)
       callbacks.toast('🚨 You vented! Kinda sus...')
@@ -797,6 +834,7 @@ export function createHub(renderer, profile, callbacks) {
       setTimeout(() => {
         if (Math.hypot(P.x - 470, P.z - 530) < 90) {
           sfx.mega()
+          callbacks.stat('egg_creeper', 1)
           P.vy = 950
           P.vx = -300
           callbacks.toast('💥 Aww man!')
@@ -804,7 +842,38 @@ export function createHub(renderer, profile, callbacks) {
       }, 1500)
       return
     }
-    if (key === 'cake') return callbacks.toast(z.sign)
+    if (key === 'cake') {
+      callbacks.stat('egg_cake', 1)
+      return callbacks.toast(['🎂 The cake is a lie.', '🍰 Om nom nom!', '🎂 ...it was real all along?!'][Math.floor(Math.random() * 3)])
+    }
+    if (key === 'goldduck') {
+      sfx.bigQuack()
+      callbacks.stat('egg_goldduck', 1)
+      return callbacks.toast('✨ The golden duck quacks back at you!')
+    }
+    if (key === 'wish') {
+      if (!callbacks.reward(-5, null)) return callbacks.toast('🪙 You need 5 BB to make a wish.')
+      callbacks.stat('egg_wish', 1)
+      sfx.coin()
+      if (Math.random() < 0.03) return callbacks.reward(250, '🌟 JACKPOT! The fountain gives you 250 BB!')
+      const F = ['You will be bonked very soon.', 'A duck in a hat will betray you.', 'Beware the giant rubber duck.', 'Your next balloon is lucky.', 'Jump. Hit. Don’t fall.', 'Someone is watching from the cloud…', 'The pipe knows the way up.', 'Wish granted: nothing happens.', 'Try typing BOO.', 'You will find diamonds far to the north… and down.']
+      return callbacks.toast(`🔮 ${F[Math.floor(Math.random() * F.length)]}`)
+    }
+    if (key === 'sword') {
+      if (callbacks.wins() >= 5) {
+        callbacks.stat('egg_sword', 1)
+        sfx.win()
+        sword.visible = false
+        return callbacks.toast('🗡 You pulled the sword from the stone! A true hero!')
+      }
+      return callbacks.toast(`🗡 It won't budge... (win ${5 - callbacks.wins()} more matches)`)
+    }
+    if (key === 'diamond') {
+      callbacks.stat('egg_diamond', 1)
+      if (!callbacks.once('diamond')) callbacks.reward(50, '💎 DIAMONDS! +50 BB')
+      else callbacks.toast('💎 Still diamonds.')
+      return
+    }
     if (key === 'play' || key === 'shop' || key === 'trophy') return callbacks.open(key)
     if (key.startsWith('obby_')) return startObby(key.slice(5))
     if (key === 'redbutton') {
@@ -815,6 +884,7 @@ export function createHub(renderer, profile, callbacks) {
       return
     }
     if (key === 'well') {
+      callbacks.stat('wellDives', 1)
       if (P.flight && P.flight.peak > 250) callbacks.stat('secret_forbidden', 1)
       teleport(0, -1980, 0)
       callbacks.toast('...where am I?')
@@ -876,6 +946,33 @@ export function createHub(renderer, profile, callbacks) {
     const ch = code.startsWith('Key') ? code.slice(3) : ''
     P.typed = (P.typed + ch).slice(-4)
     if (P.typed === 'BONK') callbacks.stat('secret_typed', 1)
+    const say = (name, color, text) => callbacks.chat({ name, color, text })
+    const botName = () => (wanderers[Math.floor(Math.random() * wanderers.length)] || { name: 'noob_duck123' }).name
+    if (P.typed.endsWith('BOO')) {
+      callbacks.stat('egg_boo', 1)
+      sfx.spooky()
+      callbacks.toast('👻 Boo! Something in the well heard you…')
+      P.typed = ''
+    }
+    if (P.typed === 'DUCK') {
+      for (const wd of wanderers) wd.chat = { text: 'QUACK!', t: 2 }
+      sfx.bigQuack()
+      P.typed = ''
+    }
+    if (P.typed.endsWith('GG')) {
+      say(botName(), '#2bd96b', 'gg!!')
+      P.typed = ''
+    }
+    if (P.typed.endsWith('SUS')) {
+      callbacks.toast('🚨 EMERGENCY MEETING! (just kidding)')
+      say(botName(), '#ff4d6d', 'it was the duck in the hat')
+      P.typed = ''
+    }
+    if (P.typed === 'HELO' || P.typed.endsWith('HI')) {
+      say(botName(), '#3aa0ff', 'hello there!')
+      setTimeout(() => say(botName(), '#ffb000', 'General Quackobi!'), 900)
+      P.typed = ''
+    }
     if (P.typed.endsWith('OOF')) {
       sfx.fall()
       callbacks.toast('OOF!')

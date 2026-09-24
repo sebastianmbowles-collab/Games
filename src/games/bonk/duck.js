@@ -703,6 +703,9 @@ const ACC = {
     sph(h, mat('#9fe6ff', 'glass'), 9, 3, 0, 5, 4, 8)
     sph(h, mat('#ffffff', 'glow'), 12, 5, 3, 1.2)
   },
+  glowEyes: (h) => {
+    for (const s of [-1, 1]) sph(h, mat('#ffffff', 'glow'), 9.8, 4.3, s * 4.6, 2.4)
+  },
   glasses: (h) => {
     for (const s of [-1, 1]) {
       const t = tor(h, BLACK(), 10.5, 3, s * 4.5, 3, 0.12, 0)

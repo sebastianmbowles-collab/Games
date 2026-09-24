@@ -1,5 +1,5 @@
-import { checkAchievements, TOTAL_SECRETS } from './achievements'
-import { COSTUMES } from './costumes'
+import { checkAchievements, derivedStat, TOTAL_SECRETS } from './achievements'
+import { COSTUMES, SECRET_UNLOCKS } from './costumes'
 import { loadSave, persist } from './save'
 import { sfx } from './sound'
 
@@ -87,6 +87,16 @@ export function flush(force) {
   dirty = false
   const s = loadSave()
   const fresh = checkAchievements(s)
+  // Secret costumes unlock themselves when their secret is found.
+  for (const c of SECRET_UNLOCKS) {
+    if (s.owned.includes(c.key)) continue
+    const [key, n] = c.unlock
+    if (derivedStat(s, key) >= n) {
+      s.owned.push(c.key)
+      toast(`🎁 SECRET COSTUME UNLOCKED: ${c.name}!`, 'secret')
+      sfx.win()
+    }
+  }
   persist()
   fresh.slice(0, 5).forEach((a, i) => setTimeout(() => {
     toast(`🏆 ${a.name}  +${a.reward} BB`, 'ach')
@@ -268,6 +278,7 @@ export function obbyFinished(level, reward, time, falls) {
   const s = loadSave()
   stat(`obby_${level}`)
   stat('obbys')
+  if (level === 'hard' && time < 60) stat('obbyHardFast')
   if (level === 'hard' && falls === 0) {
     stat('obbyHardNoFall')
     stat('obbyHardNoCp')
