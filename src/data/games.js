@@ -1,13 +1,5 @@
 export const GAMES = [
   {
-    key: 'bonk',
-    title: 'BONK!',
-    blurb: 'Rubber duck balloon brawl in 3D! Pop everyone’s balloons with a giant hammer.',
-    color: '#ff6b1a',
-    icon: '🔨',
-    playable: true,
-  },
-  {
     key: 'lucky-spin',
     title: "Freddy's Lucky Spin",
     blurb: 'Spin the wheel and try to land on the big prize.',
