@@ -706,6 +706,36 @@ const ACC = {
   glowEyes: (h) => {
     for (const s of [-1, 1]) sph(h, mat('#ffffff', 'glow'), 9.8, 4.3, s * 4.6, 2.4)
   },
+  jesterHat: (h, b, c) => {
+    // two floppy points, one red and one blue, with golden bells
+    for (const [s, col] of [[-1, '#e53935'], [1, c || '#1e63d6']]) {
+      const pt = cone(h, mat(col), -2, 16, s * 9, 5, 18)
+      pt.rotation.x = s * 1.1
+      sph(h, mat('#ffd23f', 'gold'), -2, 21, s * 19, 2.6)
+    }
+    sph(h, mat('#e53935'), 0, 8, 0, 11.6, 6, 11.6)
+  },
+  bigGrin: (h) => {
+    box(h, WHITE(), 11.5, -5, 0, 2, 4, 14)
+    for (let i = -2; i <= 2; i++) box(h, BLACK(), 12.6, -5, i * 2.8, 0.4, 4.2, 0.5)
+  },
+  bunnyEars: (h, b, c) => {
+    for (const s of [-1, 1]) {
+      const e = sph(h, mat(c), -2, 20, s * 5, 3, 12, 2.5)
+      e.rotation.x = s * 0.2
+    }
+  },
+  buttonEye: (h) => {
+    const bt = cyl(h, BLACK(), 9.8, 4.3, 4.6, 3.3, 1)
+    bt.rotation.z = Math.PI / 2
+    for (const [y, z] of [[5, 5.4], [3.6, 3.8]]) sph(h, WHITE(), 10.4, y, z, 0.6)
+  },
+  comedyMask: (h, b, c) => {
+    const m = sph(h, mat(c || '#ffffff'), 8, 1, 0, 5, 9, 10)
+    m.scale.x = 4
+    for (const s of [-1, 1]) sph(h, BLACK(), 12, 4, s * 4, 1.6, 1, 1.8)
+    box(h, BLACK(), 12.4, -3, 0, 0.5, 1.2, 7)
+  },
   glasses: (h) => {
     for (const s of [-1, 1]) {
       const t = tor(h, BLACK(), 10.5, 3, s * 4.5, 3, 0.12, 0)

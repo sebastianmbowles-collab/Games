@@ -150,6 +150,18 @@ export const COSTUME_CATEGORIES = [
     ],
   },
   {
+    key: 'circus',
+    name: '🎪 Digital Circus',
+    items: [
+      c('jester', 'Jester Duck', 3000, '#e53935', ['jesterHat', 'bowtie'], { accColor: '#1e63d6' }),
+      c('ringmaster', 'Ringmaster Duck', 5000, '#e53935', ['tophat', 'bigGrin', 'cape'], { accColor: '#111111' }),
+      c('purplebunny', 'Purple Bunny Duck', 3500, '#7b5cd6', ['bunnyEars', 'bigGrin'], { accColor: '#7b5cd6' }),
+      c('ragdoll', 'Ragdoll Duck', 2500, '#f48fb1', ['buttonEye', 'hairTuft'], { accColor: '#e53935' }),
+      c('chessking', 'Chess King Duck', 4000, '#6d4c41', ['crown', 'bigEyes']),
+      c('maskduck', 'Mask Duck', 3000, '#f8bbd0', ['comedyMask'], { accColor: '#ffffff' }),
+    ],
+  },
+  {
     key: 'finds',
     name: '💎 Secret Finds',
     // Can't be bought: each one unlocks by itself when you discover its secret.
@@ -169,6 +181,7 @@ export const COSTUME_CATEGORIES = [
       c('nightowl', 'Night Owl', null, '#5d4037', ['bigEyes', 'wolfEars'], { accColor: '#3e2723', unlock: ['nightMatches', 5, 'Play 5 matches at night'] }),
       c('bigrubber', 'Big Rubber Duck', null, '#ffeb3b', ['shine'], { scale: 1.35, unlock: ['survive_duck', 3, 'Survive the giant rubber duck 3 times'] }),
       c('goldrunner', 'Golden Speedrunner', null, '#ffd700', ['ninjaBand', 'stopwatch'], { mat: 'gold', accColor: '#00e676', unlock: ['obbyHardFast', 1, 'Finish the Hard obby in under 60 seconds'] }),
+      c('abstracted', 'Abstracted Duck', null, '#111111', ['bigEyes'], { mat: 'glitch', unlock: ['egg_exit', 5, 'Keep looking for the EXIT'] }),
       c('buttonmasher', 'Button Masher', null, '#ff2d2d', ['mysteryBox'], { unlock: ['redButton', 100, 'Press the big red button 100 times'] }),
     ],
   },

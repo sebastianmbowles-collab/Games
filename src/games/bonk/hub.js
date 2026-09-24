@@ -154,7 +154,8 @@ function buildWorld() {
   zones.push({ key: 'secret_switch', x: 0, y: 20, z: -470, r: 30 })
   zones.push({ key: 'secret_message', x: 470, y: 20, z: 560, r: 40, sign: 'The duck is watching. 🦆' })
   zones.push({ key: 'hubCorner', x: -480, y: 20, z: 520, r: 45 })
-  zones.push({ key: 'secret_door', x: 300, y: 20, z: -300, r: 30 })
+  zones.push({ key: 'secret_door', x: 300, y: 20, z: -300, r: 30, repeat: true })
+  zones.push({ key: 'circus', x: -440, y: 10, z: 360, r: 60, label: '🎪 CIRCUS', color: '#ff4d6d' })
   // a little hut whose only entrance is at the back
   solids.push(box(-600, 40, -330, 120, 80, 8, '#f9c74f'))
   solids.push(box(-660, 40, -280, 8, 80, 100, '#f9c74f'))
@@ -369,6 +370,48 @@ export function createHub(renderer, profile, callbacks) {
     ore.position.set(dx, -135, -900 + dz)
     scene.add(ore)
   }
+  // a circus tent (and the door marked EXIT that leads nowhere)
+  const stripes = (() => {
+    const c = document.createElement('canvas')
+    c.width = 128
+    c.height = 8
+    const g = c.getContext('2d')
+    for (let i = 0; i < 16; i++) {
+      g.fillStyle = i % 2 ? '#ffffff' : '#e53935'
+      g.fillRect(i * 8, 0, 8, 8)
+    }
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  })()
+  const tentMat = new THREE.MeshStandardMaterial({ map: stripes })
+  const tentWall = new THREE.Mesh(new THREE.CylinderGeometry(70, 70, 60, 16, 1, true), tentMat)
+  tentWall.material.side = THREE.DoubleSide
+  tentWall.position.set(-440, 30, 360)
+  const tentRoof = new THREE.Mesh(new THREE.ConeGeometry(82, 70, 16), tentMat)
+  tentRoof.position.set(-440, 95, 360)
+  const flag = new THREE.Mesh(new THREE.ConeGeometry(6, 18, 4), mat('#1e63d6'))
+  flag.position.set(-440, 140, 360)
+  deco.add(tentWall, tentRoof, flag)
+  const exitSign = (() => {
+    const c = document.createElement('canvas')
+    c.width = 128
+    c.height = 48
+    const g = c.getContext('2d')
+    g.fillStyle = '#1b5e20'
+    g.fillRect(0, 0, 128, 48)
+    g.fillStyle = '#ffffff'
+    g.font = 'bold 34px sans-serif'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText('EXIT', 64, 26)
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(40, 15), new THREE.MeshBasicMaterial({ map: t }))
+    m.position.set(300, 80, -326)
+    return m
+  })()
+  deco.add(exitSign)
   // a door that leads nowhere
   const door = new THREE.Mesh(new THREE.BoxGeometry(40, 70, 6), mat('#6a4c93'))
   door.position.set(300, 35, -330)
@@ -413,7 +456,8 @@ export function createHub(renderer, profile, callbacks) {
     'do a barrel roll!', 'git gud', '1v1 me bro', 'its over 9000!!', 'hello there', 'press F to pay respects',
     'all your bonk are belong to us', 'its-a me, duckio', 'the ? block gives free BB', 'try the green pipe',
     'up up down down left right left right B A', 'noob', 'not the bees!', 'hmm yes the floor here is made of floor',
-    'did anyone else see herobrine??', 'the fountain told me my fortune', 'theres a sword stuck in a rock lol',
+    'did anyone else see herobrine??', 'has anyone found the exit?', 'THERE IS NO EXIT', 'the circus tent is so cool',
+    'i think the ringmaster duck is watching us', 'is this place digital??', 'welcome to the amazing digital circus!', 'the fountain told me my fortune', 'theres a sword stuck in a rock lol',
     'i heard theres diamonds somewhere', 'type BOO near the well', 'the golden duck in the tower is so shiny',
   ]
   const SPOTS = [[0, 200], [-150, 300], [150, 300], [0, 380], [-220, 420], [220, 420], [0, -250], [-100, -150], [60, 60], [-250, 150], [280, 250], [200, 150]]
@@ -897,6 +941,14 @@ export function createHub(renderer, profile, callbacks) {
       return
     }
     if (key === 'lowPlatform' || key === 'hubCorner') return callbacks.stat(key, 1)
+    if (key === 'secret_door') {
+      callbacks.stat('egg_exit', 1)
+      callbacks.toast(['🚪 EXIT? ...It is just a door. There is no exit.', '🚪 Still no exit.', '🎩 "Leaving so soon? The show is just getting started!"', '🚪 The door is painted on. Of course it is.'][Math.floor(Math.random() * 4)])
+    }
+    if (key === 'circus') {
+      sfx.win()
+      return callbacks.toast('🎪 Welcome to the Amazing Digital Duck Circus! Don’t look for the exit…')
+    }
     if (key.startsWith('secret_')) {
       callbacks.secret(key.slice(7))
       if (z && z.sign) callbacks.toast(`📜 "${z.sign}"`)
