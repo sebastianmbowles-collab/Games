@@ -736,6 +736,61 @@ const ACC = {
     for (const s of [-1, 1]) sph(h, BLACK(), 12, 4, s * 4, 1.6, 1, 1.8)
     box(h, BLACK(), 12.4, -3, 0, 0.5, 1.2, 7)
   },
+  bearEars: (h, b) => {
+    for (const s of [-1, 1]) sph(h, b.userData.bodyMat, -1, 10, s * 8, 4, 4, 2.5)
+  },
+  micHeld: (h, b) => {
+    cyl(b, BLACK(), 14, 4, 16, 1, 10)
+    sph(b, mat('#555', 'metal'), 14, 10, 16, 2.6)
+  },
+  guitar: (h, b) => {
+    const g = new THREE.Group()
+    g.position.set(10, 2, 15)
+    g.rotation.z = -0.9
+    b.add(g)
+    sph(g, mat('#e53935'), 0, 0, 0, 7, 9, 2.5)
+    box(g, mat('#3e2723'), 0, 14, 0, 2.5, 22, 1.5)
+    box(g, mat('#212121'), 0, 26, 0, 4, 5, 1.5)
+  },
+  bib: (h, b) => {
+    const bib = sph(b, WHITE(), 13, 4, 0, 4, 10, 10)
+    bib.scale.x = 2
+    box(b, mat('#e53935'), 16.6, 6, 0, 0.4, 2, 9)
+    box(b, mat('#1e88e5'), 16.6, 2, 0, 0.4, 2, 7)
+  },
+  cupcakeHeld: (h, b) => {
+    cyl(b, mat('#f48fb1'), 12, 2, 18, 4, 5)
+    sph(b, mat('#ff80ab'), 12, 6, 18, 4.5, 3, 4.5)
+    sph(b, WHITE(), 13.5, 8, 17, 1.2)
+    sph(b, WHITE(), 10.5, 8, 19, 1.2)
+    sph(b, mat('#e53935'), 12, 10, 18, 1.4)
+  },
+  hook: (h, b) => {
+    cyl(b, mat('#b0bec5', 'metal'), 8, 0, 19, 1.2, 8)
+    const t = add(b, geo('hookT', () => new THREE.TorusGeometry(1, 0.25, 6, 12, Math.PI * 1.3)), mat('#b0bec5', 'metal'), 8, -6, 19, 3)
+    t.rotation.y = Math.PI / 2
+  },
+  marionetteMask: (h) => {
+    const m = sph(h, WHITE(), 8, 1, 0, 3, 10, 10)
+    m.scale.x = 4.5
+    for (const s of [-1, 1]) {
+      sph(h, BLACK(), 11.5, 4, s * 4, 1.8)
+      sph(h, WHITE(), 12.2, 4, s * 4, 0.6)
+      sph(h, mat('#e53935'), 11.3, -1, s * 5.5, 1.8, 1.2, 1.8)
+      box(h, mat('#8e24aa'), 11.7, 0.5, s * 4, 0.4, 6, 0.6)
+    }
+    box(h, mat('#e53935'), 11.7, -5, 0, 0.4, 1, 5)
+  },
+  propellerCap: (h, b, c) => {
+    sph(h, mat(c || '#e53935'), 0, 6, 0, 11.8, 7, 11.8)
+    cyl(h, mat('#ffd23f'), 0, 14, 0, 0.8, 5)
+    const p = box(h, mat('#1e88e5'), 0, 16.5, 0, 16, 0.8, 2.5)
+    p.userData.spinY = true
+  },
+  balloonHeld: (h, b, c) => {
+    cyl(b, WHITE(), 12, 14, 18, 0.25, 30)
+    sph(b, mat(c || '#e53935'), 12, 32, 18, 7, 8.5, 7)
+  },
   glasses: (h) => {
     for (const s of [-1, 1]) {
       const t = tor(h, BLACK(), 10.5, 3, s * 4.5, 3, 0.12, 0)
@@ -914,6 +969,7 @@ export function poseDuck(duck, s) {
   duck.root.traverse((o) => {
     if (o.userData.flap) o.rotation.y = Math.sin(s.t * 12) * 0.3 * o.userData.flap
     if (o.userData.spin) o.rotation.z = s.t * 6
+    if (o.userData.spinY) o.rotation.y = s.t * 15
     if (o.userData.cape) o.rotation.x = Math.sin(s.t * 8) * 0.15
     if (o.userData.wiggle !== undefined) o.rotation.y = Math.sin(s.t * 6 + o.userData.wiggle) * 0.4
   })

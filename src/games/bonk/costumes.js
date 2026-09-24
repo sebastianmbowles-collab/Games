@@ -162,6 +162,20 @@ export const COSTUME_CATEGORIES = [
     ],
   },
   {
+    key: 'pizzeria',
+    name: '🍕 Pizzeria Nights',
+    items: [
+      c('rockbear', 'Rockstar Bear', 4000, '#8d5a2b', ['bearEars', 'tophat', 'bowtie', 'micHeld'], { accColor: '#111111' }),
+      c('rockbunny', 'Guitar Bunny', 4000, '#6c63d9', ['bunnyEars', 'bowtie', 'guitar'], { accColor: '#6c63d9' }),
+      c('cupcakechick', 'Cupcake Chick', 3500, '#ffd23f', ['bib', 'cupcakeHeld']),
+      c('piratefox', 'Pirate Fox', 4000, '#c0392b', ['wolfEars', 'eyepatch', 'hook'], { accColor: '#8e2a1e' }),
+      c('marionette', 'Marionette Duck', 5000, '#111111', ['marionetteMask', 'stripes'], { accColor: '#ffffff' }),
+      c('balloonkid', 'Balloon Kid', 2500, '#ffd23f', ['propellerCap', 'balloonHeld'], { accColor: '#e53935' }),
+      c('springbunny', 'Spring Bunny', 5000, '#8a9a5b', ['bunnyEars', 'bigGrin'], { accColor: '#6b7a40' }),
+      c('nightguard', 'Night Guard', 1500, '#ffd23f', ['policeCap', 'headset'], { accColor: '#1a237e' }),
+    ],
+  },
+  {
     key: 'finds',
     name: '💎 Secret Finds',
     // Can't be bought: each one unlocks by itself when you discover its secret.
@@ -181,6 +195,8 @@ export const COSTUME_CATEGORIES = [
       c('nightowl', 'Night Owl', null, '#5d4037', ['bigEyes', 'wolfEars'], { accColor: '#3e2723', unlock: ['nightMatches', 5, 'Play 5 matches at night'] }),
       c('bigrubber', 'Big Rubber Duck', null, '#ffeb3b', ['shine'], { scale: 1.35, unlock: ['survive_duck', 3, 'Survive the giant rubber duck 3 times'] }),
       c('goldrunner', 'Golden Speedrunner', null, '#ffd700', ['ninjaBand', 'stopwatch'], { mat: 'gold', accColor: '#00e676', unlock: ['obbyHardFast', 1, 'Finish the Hard obby in under 60 seconds'] }),
+      c('itsme', 'IT’S ME', null, '#ffd700', ['bearEars', 'tophat', 'bowtie'], { mat: 'gold', accColor: '#111111', unlock: ['egg_golden', 1, 'Spot a very rare golden bear in the security office'] }),
+      c('sixam', '6 AM Survivor', null, '#1a237e', ['policeCap', 'headset', 'trophy'], { accColor: '#ffd700', unlock: ['egg_office', 6, 'Survive 6 nights in the security office'] }),
       c('abstracted', 'Abstracted Duck', null, '#111111', ['bigEyes'], { mat: 'glitch', unlock: ['egg_exit', 5, 'Keep looking for the EXIT'] }),
       c('buttonmasher', 'Button Masher', null, '#ff2d2d', ['mysteryBox'], { unlock: ['redButton', 100, 'Press the big red button 100 times'] }),
     ],

@@ -1562,7 +1562,7 @@ function finishMatch(w, winner) {
   w.winner = winner
   if (winner) {
     winner.ms.score += 1000
-    popup(w, winner.x, winner.y, pick(['👑 WINNER!', '👑 WINNER WINNER DUCK DINNER!', '👑 VICTORY ROYALE!', '👑 FLAWLESS... ish']), '#ffd23f', 26, 3, 140)
+    popup(w, winner.x, winner.y, pick(['👑 WINNER!', '👑 WINNER WINNER DUCK DINNER!', '👑 VICTORY ROYALE!', '👑 FLAWLESS... ish', '🕕 6 AM! YOU SURVIVED!']), '#ffd23f', 26, 3, 140)
     sfx.win()
     sfx.cheer()
   } else sfx.lose()

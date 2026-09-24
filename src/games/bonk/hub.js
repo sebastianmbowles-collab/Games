@@ -156,6 +156,16 @@ function buildWorld() {
   zones.push({ key: 'hubCorner', x: -480, y: 20, z: 520, r: 45 })
   zones.push({ key: 'secret_door', x: 300, y: 20, z: -300, r: 30, repeat: true })
   zones.push({ key: 'circus', x: -440, y: 10, z: 360, r: 60, label: '🎪 CIRCUS', color: '#ff4d6d' })
+  // a pizzeria security office (open to the west)
+  solids.push(box(682, 36, 100, 8, 72, 118, '#3b3b4f'))
+  solids.push(box(642, 36, 44, 88, 72, 8, '#3b3b4f'))
+  solids.push(box(642, 36, 156, 88, 72, 8, '#3b3b4f'))
+  solids.push(box(640, 76, 100, 96, 8, 124, '#2a2a38'))
+  solids.push(box(660, 12, 100, 30, 24, 60, '#6d4c41'))
+  zones.push({ key: 'office', x: 628, y: 10, z: 100, r: 36, label: '🔦 OFFICE', color: '#ffd23f' })
+  zones.push({ key: 'honk', x: 640, y: 10, z: 22, r: 22 })
+  solids.push(box(560, 8, 230, 26, 16, 26, '#8e24aa'))
+  zones.push({ key: 'musicbox', x: 560, y: 16, z: 230, r: 40, label: '🎁', color: '#ff80ab' })
   // a little hut whose only entrance is at the back
   solids.push(box(-600, 40, -330, 120, 80, 8, '#f9c74f'))
   solids.push(box(-660, 40, -280, 8, 80, 100, '#f9c74f'))
@@ -370,6 +380,76 @@ export function createHub(renderer, profile, callbacks) {
     ore.position.set(dx, -135, -900 + dz)
     scene.add(ore)
   }
+  // security office: glowing camera monitor, desk fan, door buttons, a poster
+  const monitor = new THREE.Mesh(new THREE.BoxGeometry(6, 18, 26), mat('#2bd96b', 'glow'))
+  monitor.position.set(655, 33, 100)
+  scene.add(monitor)
+  const fan = new THREE.Group()
+  for (let i = 0; i < 3; i++) {
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(1, 12, 3), mat('#9e9e9e', 'metal'))
+    blade.rotation.x = (i * Math.PI * 2) / 3
+    blade.position.y = 0
+    fan.add(blade)
+  }
+  fan.position.set(652, 32, 78)
+  scene.add(fan)
+  for (const z of [51, 149]) {
+    for (const [y, col] of [[40, '#e53935'], [28, '#ffffff']]) {
+      const btn = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 6), mat(col, 'glow'))
+      btn.position.set(615, y, z)
+      scene.add(btn)
+    }
+  }
+  const poster = (() => {
+    const c = document.createElement('canvas')
+    c.width = c.height = 128
+    const g = c.getContext('2d')
+    g.fillStyle = '#1a1a2e'
+    g.fillRect(0, 0, 128, 128)
+    g.fillStyle = '#8d5a2b'
+    for (const x of [34, 94]) {
+      g.beginPath()
+      g.arc(x, 34, 16, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.beginPath()
+    g.arc(64, 70, 42, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#e8c08a'
+    g.beginPath()
+    g.ellipse(64, 86, 22, 16, 0, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#111'
+    for (const x of [48, 80]) {
+      g.beginPath()
+      g.arc(x, 62, 6, 0, Math.PI * 2)
+      g.fill()
+    }
+    g.beginPath()
+    g.ellipse(64, 80, 8, 6, 0, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#ffd23f'
+    g.font = 'bold 14px sans-serif'
+    g.textAlign = 'center'
+    g.fillText('CELEBRATE!', 64, 122)
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshBasicMaterial({ map: t }))
+    m.position.set(640, 38, 39)
+    m.rotation.y = Math.PI
+    return m
+  })()
+  scene.add(poster)
+  const goldBear = buildDuck('itsme', { hammer: false })
+  goldBear.root.position.set(665, 0, 128)
+  goldBear.root.rotation.set(0, Math.PI, 0.5)
+  goldBear.root.visible = false
+  scene.add(goldBear.root)
+  // music box with a crank
+  const crank = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 14), mat('#ffd700', 'gold'))
+  crank.position.set(560, 18, 245)
+  scene.add(crank)
+
   // a circus tent (and the door marked EXIT that leads nowhere)
   const stripes = (() => {
     const c = document.createElement('canvas')
@@ -456,7 +536,8 @@ export function createHub(renderer, profile, callbacks) {
     'do a barrel roll!', 'git gud', '1v1 me bro', 'its over 9000!!', 'hello there', 'press F to pay respects',
     'all your bonk are belong to us', 'its-a me, duckio', 'the ? block gives free BB', 'try the green pipe',
     'up up down down left right left right B A', 'noob', 'not the bees!', 'hmm yes the floor here is made of floor',
-    'did anyone else see herobrine??', 'has anyone found the exit?', 'THERE IS NO EXIT', 'the circus tent is so cool',
+    'did anyone else see herobrine??', 'was that a golden bear in the office??', 'its me', 'boop the poster nose lol',
+    'wind up the music box!!', 'i survived until 6 AM!', 'night 5 is so hard', 'has anyone found the exit?', 'THERE IS NO EXIT', 'the circus tent is so cool',
     'i think the ringmaster duck is watching us', 'is this place digital??', 'welcome to the amazing digital circus!', 'the fountain told me my fortune', 'theres a sword stuck in a rock lol',
     'i heard theres diamonds somewhere', 'type BOO near the well', 'the golden duck in the tower is so shiny',
   ]
@@ -762,6 +843,19 @@ export function createHub(renderer, profile, callbacks) {
       callbacks.max('best_grassIdle', P.grassIdle)
     }
     if (P.obby) P.obbyT += dt
+    // Surviving the night: stay in the security office for 6 "hours".
+    if (inside.has('office')) {
+      const before = Math.floor(P.officeT || 0)
+      P.officeT = (P.officeT || 0) + dt
+      const hour = Math.floor(P.officeT)
+      if (hour !== before && hour >= 1 && hour < 6) sfx.count()
+      if (P.officeT >= 6 && !P.officeDone) {
+        P.officeDone = true
+        sfx.chime()
+        callbacks.stat('egg_office', 1)
+        callbacks.toast('🕕 6 AM! You survived the night! 🎉')
+      }
+    }
 
     // bot players
     for (const wd of [...wanderers]) {
@@ -945,6 +1039,29 @@ export function createHub(renderer, profile, callbacks) {
       callbacks.stat('egg_exit', 1)
       callbacks.toast(['🚪 EXIT? ...It is just a door. There is no exit.', '🚪 Still no exit.', '🎩 "Leaving so soon? The show is just getting started!"', '🚪 The door is painted on. Of course it is.'][Math.floor(Math.random() * 4)])
     }
+    if (key === 'office') {
+      P.officeT = 0
+      P.officeDone = false
+      P.night = (P.night || 0) + 1
+      callbacks.toast(`🔦 Night ${P.night} has begun. It's 12 AM… stay in the office until 6 AM!`)
+      if (Math.random() < 0.12) {
+        goldBear.root.visible = true
+        sfx.spooky()
+        callbacks.stat('egg_golden', 1)
+        callbacks.toast('💛 IT’S ME')
+        setTimeout(() => (goldBear.root.visible = false), 1800)
+      }
+      return
+    }
+    if (key === 'honk') {
+      sfx.honk()
+      callbacks.stat('egg_honk', 1)
+      return callbacks.toast('👃 *honk*')
+    }
+    if (key === 'musicbox') {
+      sfx.musicBox()
+      return callbacks.toast('🎵 The music box is playing… don’t let it wind down.')
+    }
     if (key === 'circus') {
       sfx.win()
       return callbacks.toast('🎪 Welcome to the Amazing Digital Duck Circus! Don’t look for the exit…')
@@ -1061,6 +1178,8 @@ export function createHub(renderer, profile, callbacks) {
       pet.rotateY(-Math.PI / 2)
     }
     portal.rotation.z = t
+    fan.rotation.z = t * 20
+    crank.rotation.z = t * 3
     swirl.rotation.z = -t * 2
     redBtn.position.y = 25 + (P.lastZone.has('redbutton') ? -4 : 0)
     screen.material.emissiveIntensity = 0.5 + Math.random() * 0.5

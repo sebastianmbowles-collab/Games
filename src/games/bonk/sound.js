@@ -229,6 +229,18 @@ const rawSfx = {
     quackSynth(0.35, 0.4)
     quackSynth(0.36, 0.2)
   },
+  honk() {
+    tone('square', 880, 1320, 0.09, 0.12)
+    tone('square', 1320, 880, 0.12, 0.1, 0.09)
+  },
+  musicBox() {
+    const notes = [784, 659, 784, 659, 784, 880, 784, 659, 587, 523, 587, 659, 523]
+    notes.forEach((f, i) => tone('triangle', f * 2, f * 2, 0.35, 0.08, i * 0.22))
+  },
+  chime() {
+    ;[523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone('triangle', f, f, 0.3, 0.12, i * 0.18))
+    noise(1.2, 0.12, 1500, 0.2)
+  },
   letter(i) {
     tone('square', [392, 494, 587, 698, 988][i % 5], 0, 0.12, 0.12)
     noise(0.06, 0.2, 1200)
