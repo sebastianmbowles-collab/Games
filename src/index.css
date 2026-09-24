@@ -2867,3 +2867,21 @@ button.bonk-pill:hover {
   height: 100%;
   display: block;
 }
+
+.bonk-reset {
+  background: rgba(255, 45, 45, 0.15);
+  border: 2px solid #ff4d6d;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 6px;
+}
+
+.bonk-reset p {
+  margin: 6px 0 10px;
+  font-size: 13px;
+}
+
+.bonk-panel button.danger {
+  background: #d7263d;
+  border-color: #ff9ea9;
+}

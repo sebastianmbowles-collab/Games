@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { loadSave, persist } from './save'
+import { loadSave, persist, resetSave } from './save'
 import { applySettings } from './settings'
 
 // The round duck head used as the "O" in the logo (and the flyby).
@@ -65,20 +65,32 @@ export function Settings({ onClose, onDevice, onShadows }) {
         </div>
         <div className="bonk-set-row">
           <span>🗑 Progress</span>
-          <button
-            onClick={() => {
-              if (confirm < 2) return setConfirm(confirm + 1)
-              try {
-                localStorage.removeItem('bonkDuckSave.v1')
-              } catch {
-                // ignore
-              }
-              location.reload()
-            }}
-          >
-            {['Reset everything', 'Are you sure?', 'REALLY sure? Click again'][confirm]}
-          </button>
+          <button onClick={() => setConfirm(1)}>Reset everything</button>
         </div>
+        {confirm > 0 && (
+          <div className="bonk-reset">
+            <b>⚠️ Reset EVERYTHING?</b>
+            <p>
+              This erases all your Bonk Bucks 🪙, costumes 👕, pets 🐾, achievements 🏆, secrets 🔍 and stats. You start over
+              like it's your very first time. <b>You can't undo this!</b>
+            </p>
+            {confirm === 1 ? (
+              <div className="bonk-chip-row">
+                <button onClick={() => setConfirm(0)}>No, keep my stuff</button>
+                <button className="danger" onClick={() => setConfirm(2)}>
+                  Yes, reset
+                </button>
+              </div>
+            ) : (
+              <div className="bonk-chip-row">
+                <button onClick={() => setConfirm(0)}>No! Go back!</button>
+                <button className="danger" onClick={resetSave}>
+                  I'm 100% sure. RESET!
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

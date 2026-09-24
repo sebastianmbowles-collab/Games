@@ -35,9 +35,26 @@ export function loadSave() {
 }
 
 let writeTimer = null
+let resetting = false
+
+// Wipe everything and start fresh (Settings → Reset everything).
+export function resetSave() {
+  resetting = true
+  clearTimeout(writeTimer)
+  try {
+    localStorage.removeItem(KEY)
+  } catch {
+    // ignore
+  }
+  save = fresh()
+  location.reload()
+}
+
 export function persist() {
+  if (resetting) return
   clearTimeout(writeTimer)
   writeTimer = setTimeout(() => {
+    if (resetting) return
     try {
       localStorage.setItem(KEY, JSON.stringify(save))
     } catch {
