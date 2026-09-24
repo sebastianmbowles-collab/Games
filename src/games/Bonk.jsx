@@ -63,7 +63,7 @@ function hasWebGL() {
   }
 }
 
-function NoWebGL({ onExit }) {
+function NoWebGL({ onExit, standalone }) {
   return (
     <div className="bonk-root">
       <div className="bonk-stage bonk-nogl">
@@ -83,7 +83,7 @@ function NoWebGL({ onExit }) {
           <li>On a school or work computer, 3D might be blocked. Ask a grown-up.</li>
         </ol>
         <button className="bonk-go" onClick={onExit}>
-          ← Back to the arcade
+          {standalone ? '🔄 Try again' : '← Back to the arcade'}
         </button>
       </div>
     </div>
@@ -158,7 +158,7 @@ function drawLabels(ctx, labels) {
   }
 }
 
-export default function Bonk({ onExit }) {
+export default function Bonk({ onExit, standalone = false }) {
   const stageRef = useRef(null)
   const canvasRef = useRef(null)
   const overlayRef = useRef(null)
@@ -741,7 +741,7 @@ export default function Bonk({ onExit }) {
     }
   }
 
-  if (noGL) return <NoWebGL onExit={onExit} />
+  if (noGL) return <NoWebGL onExit={onExit} standalone={standalone} />
 
   const unlocked = Object.keys(save.ach).length
   const me = hud?.players.find((p) => (myId === null ? p.human : p.id === myId))
@@ -765,9 +765,11 @@ export default function Bonk({ onExit }) {
               </button>
             </div>
             <p>Mobile adds a joystick, a jump button and an interact button.</p>
-            <button className="bonk-link" onClick={onExit}>
-              ← back to the arcade
-            </button>
+            {!standalone && (
+              <button className="bonk-link" onClick={onExit}>
+                ← back to the arcade
+              </button>
+            )}
           </div>
         )}
 
@@ -802,9 +804,11 @@ export default function Bonk({ onExit }) {
             <div className="bonk-corner br">
               🏆 {unlocked} / {ACHIEVEMENTS.length.toLocaleString()} ACHIEVEMENTS
             </div>
-            <button className="bonk-corner bl bonk-exit" onClick={onExit}>
-              ← Arcade
-            </button>
+            {!standalone && (
+              <button className="bonk-corner bl bonk-exit" onClick={onExit}>
+                ← Arcade
+              </button>
+            )}
           </div>
         )}
 
