@@ -32,7 +32,7 @@ export default function PrizeCorner({ game, onExit }) {
     if (rolling) return
     const next = spendTokens(COST)
     if (next === null) {
-      setError('Not enough Faz-Tokens!')
+      setError('Not enough Bonk Bucks!')
       setTimeout(() => setError(''), 1500)
       return
     }
@@ -57,7 +57,7 @@ export default function PrizeCorner({ game, onExit }) {
       </div>
       <div className="stat-bar">
         <span className="stat-pill" style={{ '--card-color': game.color }}>
-          WALLET {wallet}
+          🪙 {wallet} BB
         </span>
         <span className="stat-pill" style={{ '--card-color': game.color }}>
           PRIZES {won.length}
@@ -84,7 +84,7 @@ export default function PrizeCorner({ game, onExit }) {
           onClick={redeem}
           disabled={rolling}
         >
-          {rolling ? 'Opening...' : `REDEEM (${COST} tokens)`}
+          {rolling ? 'Opening...' : `REDEEM (${COST} BB)`}
         </button>
       </div>
 
@@ -99,7 +99,7 @@ export default function PrizeCorner({ game, onExit }) {
       )}
 
       <p style={{ color: '#9b9bb0', marginTop: 12, fontSize: 13 }}>
-        Spend Faz-Tokens for a random prize. Earn more tokens at Freddy's Lucky Spin!
+        Spend Bonk Bucks for a random prize. Earn more at Freddy's Lucky Spin or in BONK!
       </p>
     </div>
   )

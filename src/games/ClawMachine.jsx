@@ -55,7 +55,7 @@ export default function ClawMachine({ game, onExit }) {
     if (phase !== 'moving') return
     const next = spendTokens(COST)
     if (next === null) {
-      setMessage('Not enough Faz-Tokens!')
+      setMessage('Not enough Bonk Bucks!')
       setTimeout(() => setMessage(''), 1500)
       return
     }
@@ -102,7 +102,7 @@ export default function ClawMachine({ game, onExit }) {
       </div>
       <div className="stat-bar">
         <span className="stat-pill" style={{ '--card-color': game.color }}>
-          WALLET {wallet}
+          🪙 {wallet} BB
         </span>
         <span className="stat-pill" style={{ '--card-color': game.color }}>
           WON {won.length}
@@ -147,7 +147,7 @@ export default function ClawMachine({ game, onExit }) {
           onClick={grab}
           disabled={phase !== 'moving'}
         >
-          GRAB ({COST} tokens)
+          GRAB ({COST} BB)
         </button>
       )}
 

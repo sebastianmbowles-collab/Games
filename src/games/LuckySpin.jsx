@@ -71,10 +71,10 @@ export default function LuckySpin({ game, onExit }) {
           SPINS {spinsLeft}
         </span>
         <span className="stat-pill" style={{ '--card-color': game.color }}>
-          TOKENS {tokens}
+          WON {tokens} BB
         </span>
         <span className="stat-pill" style={{ '--card-color': game.color }}>
-          WALLET {wallet}
+          🪙 {wallet} BB
         </span>
       </div>
 
@@ -112,7 +112,7 @@ export default function LuckySpin({ game, onExit }) {
 
       {lastPrize && !spinning && (
         <p className="wheel-result" style={{ color: game.color }}>
-          You won {lastPrize.tokens} Faz-Tokens!
+          You won {lastPrize.tokens} Bonk Bucks!
         </p>
       )}
 
@@ -128,7 +128,7 @@ export default function LuckySpin({ game, onExit }) {
       ) : (
         <div className="wheel-final" style={{ '--card-color': game.color }}>
           <h3>Out of spins!</h3>
-          <p>Total Faz-Tokens: {tokens}</p>
+          <p>Total Bonk Bucks won: {tokens}</p>
           <button onClick={restart}>Play Again</button>
         </div>
       )}

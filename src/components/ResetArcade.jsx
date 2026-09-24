@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
-// Every saved thing in the arcade: Faz-Tokens (all the mini-games) and BONK!.
+// Every saved thing in the arcade: the shared Bonk Bucks wallet + BONK! progress
+// (and the old Faz-Tokens key, in case it is still around).
 const SAVE_KEYS = ['fazTokens', 'bonkDuckSave.v1']
 
 export default function ResetArcade() {
@@ -26,7 +27,7 @@ export default function ResetArcade() {
     <div className="arcade-reset-box">
       <b>⚠️ Reset the WHOLE arcade?</b>
       <p>
-        This erases your Faz-Tokens 🎟️ from every game, plus all of your BONK! stuff: Bonk Bucks, costumes, pets,
+        This erases all your Bonk Bucks 🪙 (from every game) and all your BONK! stuff: costumes, pets,
         achievements and secrets. <b>You can't undo this!</b>
       </p>
       <div className="arcade-reset-row">

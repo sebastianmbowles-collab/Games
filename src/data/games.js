@@ -127,7 +127,7 @@ export const GAMES = [
   {
     key: 'prize-corner',
     title: 'The Prize Corner',
-    blurb: 'Spend your Faz-Tokens on random prizes.',
+    blurb: 'Spend your Bonk Bucks on random prizes.',
     color: '#e0393e',
     icon: '🎁',
     playable: true,
