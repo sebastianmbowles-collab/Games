@@ -17,7 +17,7 @@ export function DuckHead({ className = '' }) {
   )
 }
 
-export function Settings({ onClose, onDevice, onShadows }) {
+export function Settings({ onClose, onDevice, onShadows, onComfort }) {
   const save = loadSave()
   const [, force] = useState(0)
   const st = (save.settings = save.settings || {})
@@ -63,6 +63,22 @@ export function Settings({ onClose, onDevice, onShadows }) {
             {st.shadows !== false ? 'ON' : 'OFF (faster)'}
           </button>
         </div>
+        <div className="bonk-set-row">
+          <span>🤢 Sickness mode</span>
+          <button
+            className={st.comfort ? 'is-on' : ''}
+            onClick={() => {
+              set('comfort', !st.comfort)
+              onComfort?.()
+            }}
+          >
+            {st.comfort ? 'ON (isometric)' : 'OFF'}
+          </button>
+        </div>
+        <p className="bonk-muted bonk-set-note">
+          Feel sick playing 3D games? Sickness mode uses a flat isometric camera. It stays at one angle, glides gently and never
+          shakes or zooms. (In a match it starts next round.)
+        </p>
         <div className="bonk-set-row">
           <span>🗑 Progress</span>
           <button onClick={() => setConfirm(1)}>Reset everything</button>

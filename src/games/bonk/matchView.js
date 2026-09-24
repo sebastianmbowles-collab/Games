@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { CX, CY, H, HAMMERS, TILE, W } from './data'
 import { animateMaterials, buildDuck, buildGiantDuck, buildPet, disposeScene, mat, poseDuck, setBalloons, setHammer } from './duck'
 import { radiusOf } from './engine'
+import { loadSave } from './save'
 
 // Engine (x, y, z) → three.js (X, Y, Z) = (x - CX, z, y - CY)
 const v3 = (x, y, z = 0) => new THREE.Vector3(x - CX, z, y - CY)
@@ -100,11 +101,17 @@ function questionTexture(text, bg, fg) {
   return t
 }
 
+export function comfortMode() {
+  return !!loadSave().settings?.comfort
+}
+
 export function createMatchView(renderer, w) {
   const scene = new THREE.Scene()
   scene.background = makeSky(w.night)
   addLights(scene, w.night)
-  const camera = new THREE.PerspectiveCamera(42, 16 / 9, 10, 5000)
+  // Sickness mode: a flat isometric camera that never shakes or zooms.
+  const comfort = comfortMode()
+  const camera = comfort ? new THREE.OrthographicCamera(-800, 800, 450, -450, 10, 8000) : new THREE.PerspectiveCamera(42, 16 / 9, 10, 5000)
 
   if (w.night) {
     const g = new THREE.BufferGeometry()
@@ -262,6 +269,14 @@ export function createMatchView(renderer, w) {
   view.focus = focus
 
   view.resize = (width, height) => {
+    if (comfort) {
+      const aspect = width / height
+      const half = Math.max((focus.h / 2) * 0.95, focus.w / 2 / aspect, 300)
+      Object.assign(camera, { left: -half * aspect, right: half * aspect, top: half, bottom: -half })
+      view.dist = 2500
+      camera.updateProjectionMatrix()
+      return
+    }
     camera.aspect = width / height
     const tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
     view.dist = Math.max(focus.w / 2 / tan / camera.aspect, focus.h / 2 / tan / 0.9, 520)
@@ -272,7 +287,7 @@ export function createMatchView(renderer, w) {
     const time = performance.now() / 1000
     animateMaterials(time)
     // camera with shake
-    const sh = w.shake
+    const sh = comfort ? 0 : w.shake
     const d = view.dist || 1000
     const tilt = 0.52
     const fx = focus.x - CX

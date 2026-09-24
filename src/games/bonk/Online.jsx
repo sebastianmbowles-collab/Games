@@ -1,34 +1,62 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { COSTUMES } from './costumes'
 import { DIFFICULTIES } from './data'
-import { hostRoom, joinRoom, makeCode } from './net'
+import { hostRoom, joinRoom, makeCode, nameProblem } from './net'
 import { loadSave } from './save'
 import { setOnlineName, stat } from './profile'
 
-// Names are picked, not typed, so nobody can write anything mean.
+// You can type your own username (letters, numbers and _), or roll a random one.
 const ADJ = ['Bouncy', 'Sneaky', 'Mighty', 'Fluffy', 'Speedy', 'Wobbly', 'Golden', 'Tiny', 'Giant', 'Sparkly', 'Brave', 'Silly']
 const NOUN = ['Duck', 'Quacker', 'Waddler', 'Bonker', 'Duckling', 'Feather', 'Beak', 'Puddle', 'Paddle', 'Honker']
 const randomName = () => `${ADJ[Math.floor(Math.random() * ADJ.length)]}${NOUN[Math.floor(Math.random() * NOUN.length)]}${Math.floor(Math.random() * 90 + 10)}`
 
-export default function Online({ onClose, onHostStart, onGuestJoined, onGuestMessage, onGuestClosed }) {
+export default function Online({ current, onClose, onHosted, onLeave, onHostStart, onGuestJoined, onGuestMessage, onGuestClosed }) {
   const save = loadSave()
-  const [mode, setMode] = useState('menu')
+  const [mode, setMode] = useState(() => (current?.kind === 'host' ? 'host' : current?.kind === 'guest' ? 'waiting' : 'menu'))
   const [name, setName] = useState(() => save.onlineName || randomName())
+  const [draft, setDraft] = useState(name)
+  const [nameMsg, setNameMsg] = useState('')
   const [code, setCode] = useState('')
   const [status, setStatus] = useState('')
-  const [guests, setGuests] = useState([])
+  const [guests, setGuests] = useState(() => (current?.kind === 'host' ? [...current.room.guests.values()] : []))
   const [ducks, setDucks] = useState(8)
   const [difficulty, setDifficulty] = useState('medium')
-  const [room, setRoom] = useState(null)
+  const [room, setRoom] = useState(() => (current?.kind === 'host' ? current.room : null))
   const guest = useRef(null)
+  useEffect(() => room?.on('onGuests', setGuests), [room])
 
   function rename() {
     const n = randomName()
     setName(n)
+    setDraft(n)
+    setNameMsg('')
     setOnlineName(n)
   }
 
+  function saveName() {
+    const n = draft.trim()
+    const problem = nameProblem(n)
+    if (problem) {
+      setNameMsg(`😕 ${problem}`)
+      return false
+    }
+    setName(n)
+    setOnlineName(n)
+    setNameMsg(n === name ? '' : '✅ Name saved!')
+    return n
+  }
+
+  // Use the typed name if it is okay, otherwise keep the old one.
+  function finalName() {
+    const n = draft.trim() === name ? name : saveName()
+    if (!n) return null
+    setOnlineName(n)
+    return n
+  }
+
   function host() {
+    const me = finalName()
+    if (!me) return
     stat('online')
     const c = makeCode()
     setMode('host')
@@ -39,21 +67,24 @@ export default function Online({ onClose, onHostStart, onGuestJoined, onGuestMes
       onGuests: (list) => setGuests(list),
     }
     const r = hostRoom(c, handlers)
-    r.handlers = handlers
+    r.myName = me
     setRoom(r)
+    onHosted(r)
   }
 
   function join() {
+    const me = finalName()
+    if (!me) return
     stat('online')
     const c = code.trim().toUpperCase()
     if (c.length !== 4) return setStatus('Room codes have 4 letters.')
     setMode('joining')
     setStatus(`Connecting to room ${c}…`)
-    guest.current = joinRoom(c, { name, costume: save.costume, pet: save.pet }, {
+    guest.current = joinRoom(c, { name: me, costume: save.costume, pet: save.pet }, {
       onJoined: (id) => {
         setMode('waiting')
         setStatus('')
-        onGuestJoined(guest.current, id)
+        onGuestJoined(guest.current, id, c, me)
       },
       onMessage: (msg) => {
         if (msg.t === 'full') setStatus('😕 That room is full (8 players).')
@@ -67,9 +98,14 @@ export default function Online({ onClose, onHostStart, onGuestJoined, onGuestMes
     })
   }
 
+  // ✕ keeps you in the room so you can hang out in the hub together.
   function cancel() {
-    room?.close()
-    guest.current?.close()
+    if (mode === 'joining') guest.current?.close()
+    onClose()
+  }
+
+  function leave() {
+    onLeave()
     onClose()
   }
 
@@ -84,9 +120,22 @@ export default function Online({ onClose, onHostStart, onGuestJoined, onGuestMes
           <section>
             <h4>Your name</h4>
             <div className="bonk-chip-row">
-              <span className="bonk-name">🦆 {name}</span>
-              <button onClick={rename}>🎲 New name</button>
+              <input
+                className="bonk-name-input"
+                value={draft}
+                maxLength={16}
+                placeholder="Type a username"
+                aria-label="Your username"
+                onChange={(e) => {
+                  setDraft(e.target.value.replace(/\s/g, ''))
+                  setNameMsg('')
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && saveName()}
+                onBlur={() => draft !== name && saveName()}
+              />
+              <button onClick={rename}>🎲 Random</button>
             </div>
+            {nameMsg && <p className="bonk-muted">{nameMsg}</p>}
           </section>
         )}
 
@@ -179,12 +228,22 @@ export default function Online({ onClose, onHostStart, onGuestJoined, onGuestMes
         {(mode === 'joining' || mode === 'waiting') && (
           <section className="bonk-center">
             <p className="bonk-waiting">{mode === 'waiting' ? '✅ You are in! Waiting for the host to start…' : '⏳ Connecting…'}</p>
+            {mode === 'waiting' && <p className="bonk-muted">Press ✕ to walk around the hub and chat while you wait. The match starts for everyone when the host presses START.</p>}
           </section>
+        )}
+
+        {(mode === 'waiting' || (mode === 'host' && room)) && (
+          <div className="bonk-chip-row center">
+            <button className="bonk-go" onClick={onClose}>
+              🏝️ Hang out in the hub
+            </button>
+            <button onClick={leave}>🚪 Leave room</button>
+          </div>
         )}
 
         {status && <p className="bonk-note">{status}</p>}
         <p className="bonk-muted">
-          Online play needs an internet connection. Players find each other through the free PeerJS service, then play directly. No chat, just quacks!
+          Online play needs an internet connection. Players find each other through the free PeerJS service, then play directly. Chat: press Enter (or 💬). Rude words turn into ####.
         </p>
       </div>
     </div>

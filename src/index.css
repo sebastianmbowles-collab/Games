@@ -2693,6 +2693,15 @@ button.bonk-pill:hover {
 }
 
 .bonk-root.is-mobile .bonk-chat {
+  top: 46px;
+  width: min(260px, 55%);
+}
+
+.bonk-root.is-mobile .bonk-chat div {
+  font-size: 11px;
+}
+
+.bonk-root.is-mobile .bonk-chat div:nth-last-child(n + 4) {
   display: none;
 }
 
@@ -2944,4 +2953,102 @@ button.bonk-pill:hover {
   font-weight: 900;
   text-align: center;
   border: 3px solid #ff7a00;
+}
+
+.bonk-set-note {
+  margin: -4px 0 10px;
+  font-size: 12px;
+}
+
+.bonk-name-input {
+  font-size: 16px;
+  font-weight: 800;
+  width: min(220px, 60vw);
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 3px solid #ffd23f;
+  background: #120a26;
+  color: #fff;
+}
+
+.bonk-chat-box {
+  position: absolute;
+  left: 8px;
+  bottom: 44px;
+  z-index: 60;
+  display: flex;
+  gap: 6px;
+  width: min(420px, calc(100% - 16px));
+}
+
+.bonk-chat-box input {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 3px solid #3aa0ff;
+  background: rgba(18, 10, 38, 0.92);
+  color: #fff;
+}
+
+.bonk-chat-box button {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 900;
+}
+
+.bonk-chat-btn {
+  position: absolute;
+  left: 8px;
+  bottom: 44px;
+  z-index: 55;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 2px solid #3aa0ff;
+  background: rgba(18, 10, 38, 0.8);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bonk-root.is-mobile .bonk-chat-btn,
+.bonk-root.is-mobile .bonk-chat-box {
+  top: 46px;
+  bottom: auto;
+  left: auto;
+  right: 8px;
+}
+
+.bonk-root.is-mobile .bonk-chat-box {
+  width: min(320px, calc(100% - 16px));
+}
+
+.bonk-online-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 44px;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  background: rgba(18, 10, 38, 0.85);
+  border: 2px solid #2bd96b;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.bonk-online-badge button {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.bonk-root.is-mobile .bonk-online-badge {
+  top: 90px;
+  bottom: auto;
 }

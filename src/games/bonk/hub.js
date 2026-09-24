@@ -2,8 +2,10 @@ import * as THREE from 'three'
 import { DUCK_NAMES, PLAYER_COLORS, SCHEMES } from './data'
 import { animateMaterials, buildDuck, buildPet, disposeScene, mat, poseDuck, setBalloons } from './duck'
 import { COSTUMES } from './costumes'
-import { addLights, makeClouds, makeSky } from './matchView'
+import { addLights, comfortMode, makeClouds, makeSky } from './matchView'
 import { sfx } from './sound'
+
+const pick = (list) => list[Math.floor(Math.random() * list.length)]
 
 // The hub is a small 3D world (y is up). Solids are boxes or discs the duck can
 // stand on; zones are trigger spheres that open menus, reward secrets, etc.
@@ -209,7 +211,10 @@ export function createHub(renderer, profile, callbacks) {
   scene.background = makeSky(false)
   addLights(scene, false)
   const clouds = makeClouds(scene, 20, -300, 3000)
-  const camera = new THREE.PerspectiveCamera(50, 16 / 9, 10, 12000)
+  // Sickness mode: flat isometric camera (no perspective, no swooping).
+  const comfort = comfortMode()
+  const ISO = 420
+  const camera = comfort ? new THREE.OrthographicCamera(-ISO * 1.6, ISO * 1.6, ISO, -ISO, 10, 12000) : new THREE.PerspectiveCamera(50, 16 / 9, 10, 12000)
   const world = buildWorld()
 
   // meshes
@@ -568,7 +573,75 @@ export function createHub(renderer, profile, callbacks) {
 
   const hub = { scene, camera, P, world, dist: 640 }
 
+  let myCostume = profile.costume
+  let myChat = null
+
+  // Real people from an online room, walking around the same hub.
+  const remotes = new Map() // id -> { d, name, color, costume, x, y, z, ... }
+  hub.setRemote = (id, name, color, s) => {
+    if (!s || typeof s.x !== 'number') return
+    let r = remotes.get(id)
+    const costume = COSTUMES[s.c] ? s.c : 'rookie'
+    if (r && r.costume !== costume) {
+      scene.remove(r.d.root)
+      r.d = buildDuck(costume, { hammer: false })
+      setBalloons(r.d, 1, color)
+      scene.add(r.d.root)
+      r.costume = costume
+    }
+    if (!r) {
+      const d = buildDuck(costume, { hammer: false })
+      setBalloons(d, 1, color)
+      scene.add(d.root)
+      r = { d, costume, x: s.x, y: s.y, z: s.z, facing: s.f || 0, chat: null }
+      remotes.set(id, r)
+    }
+    Object.assign(r, { name, color, s, seen: 0 })
+  }
+  hub.removeRemote = (id) => {
+    const r = remotes.get(id)
+    if (!r) return
+    scene.remove(r.d.root)
+    remotes.delete(id)
+  }
+  hub.clearRemotes = () => {
+    for (const id of [...remotes.keys()]) hub.removeRemote(id)
+  }
+  hub.remoteSay = (id, text) => {
+    const r = remotes.get(id)
+    if (r) r.chat = { text, t: 5 }
+  }
+  hub.say = (text) => {
+    myChat = { text, t: 5 }
+  }
+  // What other players need to draw my duck.
+  hub.pose = () => ({
+    x: Math.round(P.x),
+    y: Math.round(P.y),
+    z: Math.round(P.z),
+    f: +P.facing.toFixed(2),
+    w: +P.walk.toFixed(2),
+    e: P.emote,
+    fl: +P.flipT.toFixed(2),
+    a: !P.grounded,
+    c: myCostume,
+  })
+  // Bots sometimes answer when you chat (only when playing alone).
+  const REPLIES = ['lol', 'same', 'hi!!', 'gg', 'true', 'what', 'ok', 'nice', 'no u', 'haha', 'wanna play?', 'follow me!', 'cool', 'quack', 'fr', 'yes', 'nah']
+  hub.botReply = (text) => {
+    if (!wanderers.length || Math.random() < 0.35) return
+    const wd = wanderers[Math.floor(Math.random() * wanderers.length)]
+    const hello = /\b(hi|hey|hello|yo|sup)\b/i.test(text)
+    const reply = hello ? pick(['hi', 'hello!', 'hey', 'yo', 'hiii']) : pick(REPLIES)
+    setTimeout(() => {
+      if (!wanderers.includes(wd)) return
+      wd.chat = { text: reply, t: 3 }
+      callbacks.chat({ name: wd.name, color: wd.color, text: reply })
+    }, 800 + Math.random() * 1500)
+  }
+
   hub.setCostume = (key, petKey) => {
+    myCostume = key
     scene.remove(duck.root)
     duck = buildDuck(key, { hammer: false })
     scene.add(duck.root)
@@ -578,7 +651,8 @@ export function createHub(renderer, profile, callbacks) {
   }
 
   hub.resize = (w, h) => {
-    camera.aspect = w / h
+    if (comfort) Object.assign(camera, { left: (-ISO * w) / h, right: (ISO * w) / h, top: ISO, bottom: -ISO })
+    else camera.aspect = w / h
     camera.updateProjectionMatrix()
   }
 
@@ -931,6 +1005,18 @@ export function createHub(renderer, profile, callbacks) {
   function interact() {
     let best = null
     let bestD = Infinity
+    for (const r of remotes.values()) {
+      proj.set(r.x, r.y + 105, r.z).project(camera)
+      if (proj.z > 1) continue
+      const x = (proj.x * 0.5 + 0.5) * width
+      const y = (-proj.y * 0.5 + 0.5) * height
+      out.push({ text: `🌐 ${r.name}`, color: r.color, x, y, small: true })
+      if (r.chat) out.push({ text: r.chat.text, x, y: y - 26, bubble: true })
+    }
+    if (myChat) {
+      proj.set(P.x, P.y + 105, P.z).project(camera)
+      if (proj.z <= 1) out.push({ text: myChat.text, x: (proj.x * 0.5 + 0.5) * width, y: (-proj.y * 0.5 + 0.5) * height - 26, bubble: true })
+    }
     for (const z of world.zones) {
       if (!z.label) continue
       const d = Math.hypot(P.x - z.x, P.z - z.z)
@@ -1177,6 +1263,27 @@ export function createHub(renderer, profile, callbacks) {
       pet.lookAt(P.x, pet.position.y, P.z)
       pet.rotateY(-Math.PI / 2)
     }
+    for (const [id, r] of remotes) {
+      r.seen += dt
+      if (r.seen > 4) {
+        hub.removeRemote(id)
+        continue
+      }
+      const k = Math.min(1, dt * 12)
+      const s = r.s
+      if (Math.hypot(s.x - r.x, s.z - r.z) > 300) Object.assign(r, { x: s.x, y: s.y, z: s.z })
+      r.x += (s.x - r.x) * k
+      r.y += (s.y - r.y) * k
+      r.z += (s.z - r.z) * k
+      let df = (s.f || 0) - r.facing
+      df = Math.atan2(Math.sin(df), Math.cos(df))
+      r.facing += df * k
+      r.d.root.position.set(r.x, r.y, r.z)
+      r.d.root.rotation.y = -r.facing
+      poseDuck(r.d, { walk: s.w || 0, swing: 0, spin: 0, flip: s.fl > 0 ? 1 - s.fl / 0.6 : 0, emote: s.e || null, t, air: !!s.a })
+      if (r.chat && (r.chat.t -= dt) <= 0) r.chat = null
+    }
+    if (myChat && (myChat.t -= dt) <= 0) myChat = null
     portal.rotation.z = t
     fan.rotation.z = t * 20
     crank.rotation.z = t * 3
@@ -1185,9 +1292,16 @@ export function createHub(renderer, profile, callbacks) {
     screen.material.emissiveIntensity = 0.5 + Math.random() * 0.5
     // follow camera (bird's-eye, slightly behind)
     const target = new THREE.Vector3(P.x, P.y + 20, P.z)
-    const want = new THREE.Vector3(P.x, P.y + hub.dist * 0.85, P.z + hub.dist * 0.62)
-    camera.position.lerp(want, Math.min(1, dt * 6))
-    camera.lookAt(target)
+    if (comfort) {
+      // fixed angle, glides gently, never wobbles
+      const want = new THREE.Vector3(P.x, P.y + 2000 * 0.85, P.z + 2000 * 0.62)
+      camera.position.lerp(want, Math.min(1, dt * 3))
+      camera.lookAt(camera.position.x, camera.position.y - 2000 * 0.85, camera.position.z - 2000 * 0.62)
+    } else {
+      const want = new THREE.Vector3(P.x, P.y + hub.dist * 0.85, P.z + hub.dist * 0.62)
+      camera.position.lerp(want, Math.min(1, dt * 6))
+      camera.lookAt(target)
+    }
     renderer2.render(scene, camera)
   }
 
@@ -1201,6 +1315,18 @@ export function createHub(renderer, profile, callbacks) {
       const y = (-proj.y * 0.5 + 0.5) * height
       out.push({ text: wd.name, color: '#ffffff', x, y, small: true })
       if (wd.chat) out.push({ text: wd.chat.text, x, y: y - 26, bubble: true })
+    }
+    for (const r of remotes.values()) {
+      proj.set(r.x, r.y + 105, r.z).project(camera)
+      if (proj.z > 1) continue
+      const x = (proj.x * 0.5 + 0.5) * width
+      const y = (-proj.y * 0.5 + 0.5) * height
+      out.push({ text: `🌐 ${r.name}`, color: r.color, x, y, small: true })
+      if (r.chat) out.push({ text: r.chat.text, x, y: y - 26, bubble: true })
+    }
+    if (myChat) {
+      proj.set(P.x, P.y + 105, P.z).project(camera)
+      if (proj.z <= 1) out.push({ text: myChat.text, x: (proj.x * 0.5 + 0.5) * width, y: (-proj.y * 0.5 + 0.5) * height - 26, bubble: true })
     }
     for (const z of world.zones) {
       if (!z.label) continue

@@ -5,7 +5,7 @@ import Achievements from './bonk/Achievements'
 import { nearestSafe } from './bonk/arena'
 import { EMOTE_ALT, EMOTE_KEYS, EMOTES, GAME_KEYS } from './bonk/data'
 import { bonkLaunch, createMatch, dropRemote, forceEvent, quitMatch, snapshot, step } from './bonk/engine'
-import { applySnapshot, arenaInfo, buildMirror, makeSnapshot, smoothPlayers } from './bonk/net'
+import { BAN_MS, SWEAR_LIMIT, applySnapshot, arenaInfo, buildMirror, cleanText, colorFor, isRude, makeSnapshot, smoothPlayers } from './bonk/net'
 import Online from './bonk/Online'
 import { createHub } from './bonk/hub'
 import { createInput, readCommand } from './bonk/input'
@@ -184,12 +184,21 @@ export default function Bonk({ onExit, standalone = false }) {
   const guestRef = useRef(null)
   const [myId, setMyId] = useState(null)
   const [online, setOnline] = useState(null)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatText, setChatText] = useState('')
+  const lastChat = useRef(0)
+  const matchLeave = useRef(null)
+  const [roomCode, setRoomCode] = useState('')
+  const [hostedRoom, setHostedRoom] = useState(null)
   const save = loadSave()
   const mobile = device === 'mobile'
 
   useEffect(() => {
     overlayOpen.current = overlay
   }, [overlay])
+
+  const addChat = useCallback((msg) => setChat((list) => [...list.slice(-5), { ...msg, id: Math.random() }]), [])
+  const hubNow = () => (ctrlRef.current?.type === 'hub' ? ctrlRef.current.hub : null)
   useEffect(() => onSaveChange(() => setTick((n) => n + 1)), [])
   useEffect(
     () =>
@@ -302,7 +311,7 @@ export default function Bonk({ onExit, standalone = false }) {
       },
       obbyDone: (level, reward, time, falls) => obbyFinished(level, reward, time, falls),
       devpc: () => setOverlay('devpc'),
-      chat: (msg) => setChat((list) => [...list.slice(-5), { ...msg, id: Math.random() }]),
+      chat: addChat,
       reward: (n, text) => {
         const s = loadSave()
         if (s.bb + n < 0) return false
@@ -331,6 +340,8 @@ export default function Bonk({ onExit, standalone = false }) {
     })
     if (import.meta.env.DEV) window.__hub = hub
     let obbyShown = false
+    let netT = 0
+    matchLeave.current = null
     playMusic('hub')
     setController({
       type: 'hub',
@@ -344,6 +355,14 @@ export default function Bonk({ onExit, standalone = false }) {
           hub.step(dt, input.keys, input.stick)
         }
         input.clearPressed()
+        // tell the others in the room where my duck is (10 times a second)
+        netT += dt
+        if (netT > 0.1 && (roomRef.current || guestRef.current)) {
+          netT = 0
+          const pose = hub.pose()
+          if (roomRef.current) roomRef.current.broadcast({ t: 'hub', id: 'host', name: roomRef.current.myName, s: pose })
+          else guestRef.current.conn.send({ t: 'hub', s: pose })
+        }
         hub.render(renderer, dt)
         if (!!hub.P.obby !== obbyShown) {
           obbyShown = !!hub.P.obby
@@ -355,18 +374,26 @@ export default function Bonk({ onExit, standalone = false }) {
       },
     })
     stat('welcome')
-    setChat([{ system: true, text: '🦆 Welcome to BONK! Walk into the pink portal to play.', id: 1 }])
+    setChat([
+      {
+        system: true,
+        text: roomRef.current || guestRef.current ? '🌐 You are in an online room. Your friends can see you here!' : '🦆 Welcome to BONK! Walk into the pink portal to play.',
+        id: 1,
+      },
+    ])
     setScreen('hub')
     setOverlay(null)
     setResults(null)
     setHud(null)
     flush(true)
-  }, [input, setController])
+  }, [input, setController, addChat])
 
   // ---------------------------------------------------------------- match
 
   const startMatch = useCallback(
-    (config, room = null) => {
+    (config, room0 = null) => {
+      // if you're in an online room, your friends come too
+      const room = room0 || roomRef.current
       unlockAudio()
       if (room) {
         // (re)build the guest list from whoever is in the room right now
@@ -376,7 +403,7 @@ export default function Bonk({ onExit, standalone = false }) {
         }
       }
       roomRef.current = room
-      setOnline(room ? 'host' : null)
+      setOnline(room ? 'host' : guestRef.current ? 'guest' : null)
       setMyId(0)
       lastConfig.current = config
       setOverlay(null)
@@ -408,7 +435,7 @@ export default function Bonk({ onExit, standalone = false }) {
       const w = createMatch({ ...config, hooks: netHooks })
       const sounds = []
       if (room) {
-        room.handlers.onLeave = (id) => dropRemote(w, id)
+        matchLeave.current = (id) => dropRemote(w, id)
         room.broadcast({
           t: 'start',
           arena: arenaInfo(w.arena),
@@ -550,20 +577,108 @@ export default function Bonk({ onExit, standalone = false }) {
       if (!g) return
       if (msg.t === 'start') guestStart(msg)
       else if (msg.t === 'snap') g.onSnap?.(msg)
+      else if (msg.t === 'hub') {
+        if (msg.id !== g.peerId) hubNow()?.setRemote(msg.id, String(msg.name).slice(0, 16), colorFor(msg.id), msg.s)
+      } else if (msg.t === 'bye') hubNow()?.removeRemote(msg.id)
+      else if (msg.t === 'chat') {
+        const text = cleanText(msg.text)
+        if (!text) return
+        if (msg.sys) addChat({ system: true, text })
+        else {
+          addChat({ name: String(msg.name).slice(0, 16), color: colorFor(msg.id), text })
+          hubNow()?.remoteSay(msg.id, text)
+        }
+      }
       else if (msg.t === 'stats') {
         for (const [k, n] of Object.entries(msg.add || {})) stat(k, n)
         for (const [k, v] of Object.entries(msg.max || {})) max(k, v)
       }
     },
-    [guestStart],
+    [guestStart, addChat],
   )
 
   function leaveOnline() {
+    const was = roomRef.current || guestRef.current
     guestRef.current?.conn.close()
     guestRef.current = null
     roomRef.current?.close()
     roomRef.current = null
     setOnline(null)
+    setHostedRoom(null)
+    setRoomCode('')
+    hubNow()?.clearRemotes()
+    if (was) addChat({ system: true, text: '👋 You left the online room.' })
+  }
+
+  // The host passes everyone's hub moves and chat on to everyone else.
+  function hosted(room) {
+    roomRef.current = room
+    setOnline('host')
+    setHostedRoom(room)
+    setRoomCode(room.code)
+    room.on('onJoin', (g) => {
+      const text = `🌐 ${g.name} joined the room!`
+      addChat({ system: true, text })
+      room.broadcast({ t: 'chat', sys: true, text })
+      sfx.win?.()
+    })
+    room.on('onHub', (id, pose) => {
+      const g = room.guests.get(id)
+      if (!g) return
+      hubNow()?.setRemote(id, g.name, colorFor(id), pose)
+      room.broadcast({ t: 'hub', id, name: g.name, s: pose }, id)
+    })
+    room.on('onChat', (id, name, text) => {
+      addChat({ name, color: colorFor(id), text })
+      hubNow()?.remoteSay(id, text)
+      room.broadcast({ t: 'chat', id, name, text }, id)
+    })
+    room.on('onLeave', (id, name) => {
+      matchLeave.current?.(id)
+      hubNow()?.removeRemote(id)
+      const text = `👋 ${name || 'A duck'} left the room`
+      addChat({ system: true, text })
+      room.broadcast({ t: 'bye', id })
+      room.broadcast({ t: 'chat', sys: true, text })
+    })
+  }
+
+  function sendChat() {
+    const raw = chatText
+    const text = cleanText(raw)
+    setChatText('')
+    setChatOpen(false)
+    if (!text) return
+    const s = loadSave()
+    const left = (s.chatBanUntil || 0) - Date.now()
+    if (left > 0) return addChat({ system: true, text: `🔇 You're banned from chat for swearing. Try again in ${Math.ceil(left / 60000)} min.` })
+    const now = performance.now()
+    if (now - lastChat.current < 1000) return addChat({ system: true, text: '⏳ Slow down! One message a second.' })
+    lastChat.current = now
+    let banned = false
+    if (isRude(raw)) {
+      s.chatStrikes = (s.chatStrikes || 0) + 1
+      if (s.chatStrikes >= SWEAR_LIMIT) {
+        s.chatStrikes = 0
+        s.chatBanUntil = Date.now() + BAN_MS
+        banned = true
+      }
+    } else s.chatStrikes = 0
+    persist()
+    const name = s.onlineName || 'You'
+    addChat({ name, color: online === 'guest' ? colorFor(guestRef.current?.peerId) : online ? colorFor('host') : '#ffd23f', text })
+    stat('chats')
+    const hub = hubNow()
+    hub?.say(text)
+    if (roomRef.current) roomRef.current.broadcast({ t: 'chat', id: 'host', name: roomRef.current.myName || name, text })
+    else if (guestRef.current) guestRef.current.conn.send({ t: 'chat', text })
+    else hub?.botReply(text)
+    // secret words work in chat too (try BOO or DUCK)
+    if (hub) for (const ch of text.toUpperCase().replace(/[^A-Z]/g, '').slice(-8)) hub.typeKey(`Key${ch}`)
+    if (banned) {
+      addChat({ system: true, text: `🔇 BANNED from chat for ${BAN_MS / 60000} minutes: you swore ${SWEAR_LIMIT} times in a row!` })
+      sfx.fall?.()
+    } else if (s.chatStrikes > 0) addChat({ system: true, text: `⚠️ No swearing! Strike ${s.chatStrikes}/${SWEAR_LIMIT}. ${SWEAR_LIMIT} in a row = chat ban.` })
   }
 
   // ---------------------------------------------------------------- renderer + loop
@@ -675,8 +790,16 @@ export default function Bonk({ onExit, standalone = false }) {
   useEffect(() => {
     const k = input.keys
     const down = (e) => {
+      const tag = e.target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (overlayOpen.current) {
         if (e.code === 'Escape') setOverlay(null)
+        return
+      }
+      if ((e.code === 'Enter' || e.code === 'Slash') && (screen === 'hub' || (screen === 'match' && online))) {
+        e.preventDefault()
+        k.down.clear()
+        setChatOpen(true)
         return
       }
       if (screen === 'hub' || screen === 'match') {
@@ -701,7 +824,7 @@ export default function Bonk({ onExit, standalone = false }) {
       window.removeEventListener('blur', blur)
       document.removeEventListener('visibilitychange', vis)
     }
-  }, [screen, input])
+  }, [screen, input, online])
 
   function onClickAnything(e) {
     if (e.target.closest('button')) {
@@ -875,7 +998,7 @@ export default function Bonk({ onExit, standalone = false }) {
           </div>
         )}
 
-        {screen === 'hub' && (
+        {(screen === 'hub' || (screen === 'match' && online)) && (
           <div className="bonk-chat">
             {chat.map((m) => (
               <div key={m.id} className={m.system ? 'sys' : ''}>
@@ -888,6 +1011,54 @@ export default function Bonk({ onExit, standalone = false }) {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {(screen === 'hub' || (screen === 'match' && online)) && !overlay && !results && !chatOpen && (
+          <button
+            className="bonk-chat-btn"
+            onClick={() => {
+              input.keys.down.clear()
+              setChatOpen(true)
+            }}
+          >
+            💬 {mobile ? 'Chat' : 'Chat (Enter)'}
+          </button>
+        )}
+
+        {chatOpen && !overlay && (
+          <form
+            className="bonk-chat-box"
+            onSubmit={(e) => {
+              e.preventDefault()
+              sendChat()
+            }}
+          >
+            <input
+              autoFocus
+              value={chatText}
+              maxLength={80}
+              placeholder={online ? 'Say something nice…' : 'Chat with the bots…'}
+              aria-label="Chat message"
+              onChange={(e) => setChatText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setChatOpen(false)
+                  setChatText('')
+                }
+              }}
+            />
+            <button type="submit" className="is-on">
+              Send
+            </button>
+          </form>
+        )}
+
+        {screen === 'hub' && online && !overlay && (
+          <div className="bonk-online-badge">
+            🌐 Room {roomCode}
+            <button onClick={() => setOverlay('online')}>Room</button>
+            <button onClick={() => leaveOnline()}>Leave</button>
           </div>
         )}
 
@@ -970,14 +1141,17 @@ export default function Bonk({ onExit, standalone = false }) {
                     {online === 'host' ? 'Next Round' : 'Play Again'}
                   </button>
                 )}
-                <button
-                  onClick={() => {
-                    leaveOnline()
-                    goHub()
-                  }}
-                >
-                  {online ? 'Leave & Back to Hub' : 'Back to Hub'}
-                </button>
+                <button onClick={() => goHub()}>{online ? 'Back to Hub (stay in room)' : 'Back to Hub'}</button>
+                {online && (
+                  <button
+                    onClick={() => {
+                      leaveOnline()
+                      goHub()
+                    }}
+                  >
+                    Leave room
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -986,18 +1160,25 @@ export default function Bonk({ onExit, standalone = false }) {
         {overlay === 'play' && <Lobby input={input} onStart={(c) => startMatch(c)} onOnline={() => setOverlay('online')} onClose={() => setOverlay(null)} />}
         {overlay === 'online' && (
           <Online
+            current={online === 'host' && hostedRoom ? { kind: 'host', room: hostedRoom } : online === 'guest' ? { kind: 'guest' } : null}
             onClose={() => setOverlay(null)}
+            onHosted={hosted}
+            onLeave={leaveOnline}
             onHostStart={(room, config) => startMatch(config, room)}
-            onGuestJoined={(conn, peerId) => {
-              guestRef.current = { conn, peerId }
+            onGuestJoined={(conn, peerId, code) => {
+              guestRef.current = { conn, peerId, code }
               setOnline('guest')
+              setRoomCode(code)
+              addChat({ system: true, text: `🌐 You joined room ${code}! Say hi 👋` })
             }}
             onGuestMessage={guestMessage}
             onGuestClosed={() => {
               if (!guestRef.current) return
               guestRef.current = null
               setOnline(null)
+              setRoomCode('')
               toast('📡 The host left the room.', 'info')
+              hubNow()?.clearRemotes()
               goHub()
             }}
           />
@@ -1013,7 +1194,18 @@ export default function Bonk({ onExit, standalone = false }) {
           />
         )}
         {overlay === 'trophy' && <Achievements onClose={() => setOverlay(null)} />}
-        {overlay === 'settings' && <Settings onClose={() => setOverlay(null)} onDevice={chooseDevice} onShadows={setShadows} />}
+        {overlay === 'settings' && (
+          <Settings
+            onClose={() => setOverlay(null)}
+            onDevice={chooseDevice}
+            onShadows={setShadows}
+            onComfort={() => {
+              // rebuild the 3D scene so the new camera kicks in right away
+              if (screen === 'hub') goHub()
+              else if (screen === 'title') goTitle()
+            }}
+          />
+        )}
         {overlay === 'howto' && <HowToPlay onClose={() => setOverlay(null)} />}
         {overlay === 'devpc' && (
           <div className="bonk-modal" onClick={() => setOverlay(null)}>

@@ -14,6 +14,63 @@ function peerOptions() {
   return { host, port: Number(port) || 9000, path: '/', secure: false, debug: 0 }
 }
 
+// ---------------------------------------------------------------- chat safety
+
+// A small word filter, Roblox style: rude words turn into ####.
+const RUDE = ['fuck', 'fuk', 'shit', 'bitch', 'bastard', 'dick', 'cunt', 'piss', 'crap', 'damn', 'asshole', 'arse', 'wanker', 'slut', 'whore', 'nigg', 'fag', 'retard', 'stupid', 'idiot', 'dumb', 'kill yourself', 'kys', 'hate you', 'shut up']
+// Anything that looks like a phone number, email or address gets hidden too.
+const PRIVATE = [/\d[\d\s-]{5,}\d/g, /\S+@\S+/g, /https?:\/\/\S+/gi, /www\.\S+/gi]
+
+export function cleanText(text, max = 80) {
+  let t = [...String(text ?? '')].filter((c) => c.charCodeAt(0) >= 32).join('').trim().slice(0, max)
+  for (const re of PRIVATE) t = t.replace(re, (m) => '#'.repeat(Math.min(m.length, 8)))
+  const lower = t.toLowerCase()
+  const hide = []
+  for (const w of RUDE) {
+    let i = lower.indexOf(w)
+    while (i >= 0) {
+      // only at the start of a word, so "scrap" and "parse" are fine
+      if (i === 0 || !/[a-z]/.test(lower[i - 1])) hide.push([i, i + w.length])
+      i = lower.indexOf(w, i + 1)
+    }
+  }
+  if (hide.length) t = [...t].map((c, i) => (c !== ' ' && hide.some(([a, b]) => i >= a && i < b) ? '#' : c)).join('')
+  return t
+}
+
+// Did this message have a rude word in it? (phone numbers etc. don't count)
+export function isRude(text) {
+  let t = String(text ?? '')
+  for (const re of PRIVATE) t = t.replace(re, '')
+  return cleanText(t, 1000) !== t.trim().slice(0, 1000)
+}
+
+// Swear 3 times in a row and chat is switched off for a while.
+export const SWEAR_LIMIT = 3
+export const BAN_MS = 5 * 60 * 1000
+
+// Usernames: letters, numbers and _ only, 3-16 long, and no rude words.
+export function cleanName(name) {
+  const n = String(name ?? '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 16)
+  if (n.length < 3 || cleanText(n) !== n) return 'Duck' + Math.floor(Math.random() * 9000 + 1000)
+  return n
+}
+
+export function nameProblem(name) {
+  if (/[^A-Za-z0-9_]/.test(name)) return 'Only letters, numbers and _ (no spaces).'
+  if (name.length < 3) return 'At least 3 letters.'
+  if (name.length > 16) return '16 letters max.'
+  if (cleanText(name) !== name) return 'That name is not allowed. Try another!'
+  return ''
+}
+
+// A duck colour that stays the same for each online player.
+export function colorFor(id) {
+  let h = 0
+  for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return `hsl(${h % 360}, 85%, 62%)`
+}
+
 export function makeCode() {
   return Array.from({ length: 4 }, () => LETTERS[Math.floor(Math.random() * LETTERS.length)]).join('')
 }
@@ -32,27 +89,52 @@ export function hostRoom(code, handlers) {
           conn.send({ t: 'full' })
           return
         }
-        guests.set(conn.peer, { conn, id: conn.peer, name: String(msg.name).slice(0, 20), costume: msg.costume, pet: msg.pet, cmd: null })
+        const g = { conn, id: conn.peer, name: cleanName(msg.name), costume: msg.costume, pet: msg.pet, cmd: null }
+        guests.set(conn.peer, g)
         handlers.onGuests?.([...guests.values()])
+        handlers.onJoin?.(g)
       } else if (msg.t === 'input') {
         const g = guests.get(conn.peer)
         if (!g) return
         // One-shot buttons stay pressed until the game reads them once.
         const prev = g.cmd
         g.cmd = { ...msg.cmd, jump: msg.cmd.jump || !!prev?.jump, dash: msg.cmd.dash || !!prev?.dash, shield: msg.cmd.shield || !!prev?.shield, emote: msg.cmd.emote >= 0 ? msg.cmd.emote : prev?.emote ?? -1 }
-      } else if (msg.t === 'stats') {
-        // guests never send stats; ignore anything unexpected
+      } else if (msg.t === 'hub') {
+        if (guests.has(conn.peer)) handlers.onHub?.(conn.peer, msg.s)
+      } else if (msg.t === 'chat') {
+        const g = guests.get(conn.peer)
+        const now = performance.now()
+        // at most one message a second each, so nobody can spam
+        if (!g || now - (g.lastChat || 0) < 1000) return
+        g.lastChat = now
+        if ((g.bannedUntil || 0) > now) return
+        if (isRude(msg.text)) {
+          g.strikes = (g.strikes || 0) + 1
+          if (g.strikes >= SWEAR_LIMIT) {
+            g.strikes = 0
+            g.bannedUntil = now + BAN_MS
+          }
+        } else g.strikes = 0
+        const text = cleanText(msg.text)
+        if (text) handlers.onChat?.(conn.peer, g.name, text)
       }
     })
     conn.on('close', () => {
+      const g = guests.get(conn.peer)
+      if (!g) return
       guests.delete(conn.peer)
       handlers.onGuests?.([...guests.values()])
-      handlers.onLeave?.(conn.peer)
+      handlers.onLeave?.(conn.peer, g.name)
     })
   })
   return {
     code,
     guests,
+    handlers,
+    // set what happens when something arrives (onJoin, onHub, onChat, onLeave…)
+    on(key, fn) {
+      handlers[key] = fn
+    },
     // Read (and use up) a guest's latest controls.
     readGuest(id) {
       const g = guests.get(id)
@@ -65,8 +147,8 @@ export function hostRoom(code, handlers) {
       const g = guests.get(id)
       if (g?.conn.open) g.conn.send(msg)
     },
-    broadcast(msg) {
-      for (const g of guests.values()) if (g.conn.open) g.conn.send(msg)
+    broadcast(msg, except) {
+      for (const g of guests.values()) if (g.id !== except && g.conn.open) g.conn.send(msg)
     },
     close() {
       peer.destroy()
@@ -92,6 +174,9 @@ export function joinRoom(code, me, handlers) {
   return {
     sendInput(cmd) {
       if (conn?.open) conn.send({ t: 'input', cmd })
+    },
+    send(msg) {
+      if (conn?.open) conn.send(msg)
     },
     close() {
       peer.destroy()
