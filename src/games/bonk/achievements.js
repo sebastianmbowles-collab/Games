@@ -842,15 +842,61 @@ for (let n = 801; n <= 999; n++) LIST.push(n === 900 ? ['900 ACHIEVEMENTS?!', 'U
 LIST.push(['ONE THOUSAND!', 'Quack 1,000 times.', 'quacks', 1000])
 LIST.push(['THE ULTIMATE BONK', 'Unlock every other achievement. 🏆💥', 'ach', 1000])
 
-export const ACHIEVEMENTS = LIST.map(([name, desc, stat, n, hidden], i) => ({
-  id: i + 1,
-  name,
-  desc,
-  stat,
-  n,
-  hidden: !!hidden,
-  reward: n >= 1000 || stat === 'ach' ? 100 : 25,
-}))
+// Harder mode: "do this lots of times" goals are raised. Achievements whose
+// name has a number in it keep their number so the name still makes sense.
+const HARDER = new Set([
+  'jumps', 'kos', 'wins', 'matches', 'matchesStarted', 'dodges', 'falls', 'hitsTaken', 'distance', 'dashes', 'swings',
+  'balloonsPopped', 'flaps', 'bounces', 'rides', 'checkpoints', 'spins', 'circles', 'landings', 'airtime', 'playtime',
+  'idle', 'grass', 'buttons', 'menus', 'lookAway', 'eventsSeen', 'launched', 'spaced', 'offscreen', 'hubJumps',
+  'hubDistance', 'hubDashes', 'hubFalls', 'redButton', 'airSwings', 'shields', 'blocks', 'jumpDodges', 'dashDodges',
+  'airKos', 'jumpKos', 'revengeKos', 'spaceKos', 'yeets', 'lastBalloons', 'outs', 'flops', 'wallBumps', 'roofTop',
+  'edgeTime', 'edgeStand', 'edgeLandings', 'luckyLandings', 'chWon', 'chStarted', 'chKos', 'chPlaytime', 'comebacks',
+  'winsFlawless', 'winsLastBalloon', 'winsKo1', 'winsKo5', 'winsFast', 'winsAir', 'winsJumpy', 'winsNoJump',
+  'winsBig', 'winsBig8', 'noHitMatches', 'rareEvents', 'skyHits', 'zigzags', 'loadings', 'achViews', 'settings',
+  'costumeChanges', 'nightMatches', 'soundMatches', 'blobs', 'again', 'perfectMatches', 'winsAs_potato', 'points',
+  'quacks',
+])
+const NUMBER_WORDS = /\d|\b(one|two|three|four|five|ten|fifteen|twenty|thirty|fifty|hundred|thousand)\b/i
+const fmt = (n) => (n >= 1000 ? n.toLocaleString('en-US') : String(n))
+
+function duration(sec) {
+  if (sec < 3600) {
+    const m = Math.round(sec / 60)
+    return m === 1 ? '1 minute' : `${m} minutes`
+  }
+  const h = Math.round(sec / 3600)
+  return h === 1 ? '1 hour' : `${h} hours`
+}
+
+const TIME_TEXT = {
+  playtime: (d) => `Play for ${d} in total.`,
+  idle: (d) => `Stand still for ${d} in total.`,
+  grass: (d) => `Spend ${d} on the grass.`,
+  edgeTime: (d) => `Spend ${d} near the edge.`,
+  airtime: (d) => `Spend ${d} in the air in total.`,
+  chPlaytime: (d) => `Play challenges for ${d}.`,
+}
+
+function harder(name, desc, stat, n) {
+  if (n <= 1 || !HARDER.has(stat) || NUMBER_WORDS.test(name)) return [desc, n]
+  const m = n < 1000 ? n * 3 : n * 2
+  if (TIME_TEXT[stat]) return [TIME_TEXT[stat](duration(m)), m]
+  const newDesc = desc.includes(fmt(n)) ? desc.replace(fmt(n), fmt(m)) : `${desc} (${fmt(m)} times)`
+  return [newDesc, m]
+}
+
+export const ACHIEVEMENTS = LIST.map(([name, desc0, stat, n0, hidden], i) => {
+  const [desc, n] = harder(name, desc0, stat, n0)
+  return {
+    id: i + 1,
+    name,
+    desc,
+    stat,
+    n,
+    hidden: !!hidden,
+    reward: n >= 1000 || stat === 'ach' ? 100 : 25,
+  }
+})
 
 export const ACH_CATEGORIES = [
   ['🌱 Beginner', 1, 50],

@@ -194,8 +194,8 @@ export default function Bonk({ onExit, standalone = false }) {
   useEffect(
     () =>
       onToast((t) => {
-        setToasts((list) => [...list.slice(-3), t])
-        setTimeout(() => setToasts((list) => list.filter((x) => x.id !== t.id)), 3500)
+        setToasts((list) => [...list.slice(-4), t])
+        setTimeout(() => setToasts((list) => list.filter((x) => x.id !== t.id)), t.kind === 'secret' ? 6000 : 4500)
       }),
     [],
   )
