@@ -162,6 +162,13 @@ function buildWorld() {
   solids.push(box(-630, 40, -230, 60, 80, 8, '#f9c74f'))
   solids.push(box(-600, 84, -280, 128, 8, 108, '#f3722c'))
   zones.push({ key: 'secret_room', x: -600, y: 10, z: -280, r: 35 })
+  // easter eggs
+  solids.push({ t: 'disc', x: -380, z: 190, r: 34, top: 55, h: 55, color: '#2bbf3a', pipe: true })
+  solids.push(box(-60, 150, -140, 40, 40, 40, '#ffb300', { qblock: true }))
+  zones.push({ key: 'vent', x: 320, y: 5, z: 420, r: 26 })
+  solids.push(box(470, 25, 530, 40, 50, 40, '#4caf50', { creeper: true }))
+  zones.push({ key: 'creeper', x: 470, y: 10, z: 530, r: 55, repeat: true })
+  zones.push({ key: 'cake', x: -140, y: -1990, z: -120, r: 50, sign: '🎂 The cake is a lie.' })
   // dev room far below (reached through the well)
   solids.push(box(0, -2020, 0, 400, 40, 400, '#222233'))
   solids.push(box(0, -1960, -150, 80, 60, 30, '#111111'))
@@ -223,6 +230,26 @@ export function createHub(renderer, profile, callbacks) {
     scene.add(m)
   }
 
+  const qTex = (() => {
+    const c = document.createElement('canvas')
+    c.width = c.height = 64
+    const g = c.getContext('2d')
+    g.fillStyle = '#ffb300'
+    g.fillRect(0, 0, 64, 64)
+    g.strokeStyle = '#8a5a00'
+    g.lineWidth = 5
+    g.strokeRect(3, 3, 58, 58)
+    g.fillStyle = '#fff'
+    g.font = 'bold 44px sans-serif'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText('?', 32, 35)
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  })()
+  for (const sd of world.solids) if (sd.qblock) sd.mesh.material = new THREE.MeshStandardMaterial({ map: qTex, emissive: '#553300', emissiveIntensity: 0.3 })
+
   // decorations: flowers, fountain, portal rings, signs
   const deco = new THREE.Group()
   scene.add(deco)
@@ -280,6 +307,34 @@ export function createHub(renderer, profile, callbacks) {
     pad.position.set(z.x, 4, z.z)
     deco.add(pad)
   }
+  // easter egg decorations
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(40, 40, 14, 24), mat('#1f9a2d'))
+  rim.position.set(-380, 50, 190)
+  deco.add(rim)
+  const vent = new THREE.Mesh(new THREE.BoxGeometry(50, 3, 40), mat('#607d8b', 'metal'))
+  vent.position.set(320, 1, 420)
+  deco.add(vent)
+  for (let i = 0; i < 4; i++) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(44, 4, 3), mat('#263238'))
+    bar.position.set(320, 3, 406 + i * 9)
+    deco.add(bar)
+  }
+  for (const [x, y, w, h] of [[-9, 36, 8, 8], [9, 36, 8, 8], [0, 24, 6, 10], [-6, 18, 5, 8], [6, 18, 5, 8]]) {
+    const f = new THREE.Mesh(new THREE.BoxGeometry(w, h, 2), mat('#1b1b1b'))
+    f.position.set(470 + x, y, 551)
+    deco.add(f)
+  }
+  const cake = new THREE.Group()
+  const sponge = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, 20, 20), mat('#6d3b1f'))
+  const icing = new THREE.Mesh(new THREE.CylinderGeometry(23, 23, 5, 20), mat('#ffffff'))
+  icing.position.y = 12
+  const candle = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 14, 8), mat('#ff5d8f'))
+  candle.position.y = 20
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 6), mat('#ffb300', 'glow'))
+  flame.position.y = 29
+  cake.add(sponge, icing, candle, flame)
+  cake.position.set(-140, -1990, -120)
+  scene.add(cake)
   // a door that leads nowhere
   const door = new THREE.Mesh(new THREE.BoxGeometry(40, 70, 6), mat('#6a4c93'))
   door.position.set(300, 35, -330)
@@ -320,6 +375,10 @@ export function createHub(renderer, profile, callbacks) {
     'quack', 'lol', 'this game is so fun', 'who wants to race the hard obby', 'nice costume', 'brb',
     'the giant duck scared me', 'i have 3 balloons left lol', 'follow me', 'jump on the green pad!!',
     'im buying the dragon costume', 'wait for me', 'omg', 'i got bonked so far', 'lets gooo', 'ez',
+    'oof', 'gg ez', 'i am speed', 'the cake is a lie', 'creeper? aw man', 'that duck is kinda sus',
+    'do a barrel roll!', 'git gud', '1v1 me bro', 'its over 9000!!', 'hello there', 'press F to pay respects',
+    'all your bonk are belong to us', 'its-a me, duckio', 'the ? block gives free BB', 'try the green pipe',
+    'up up down down left right left right B A', 'noob', 'not the bees!', 'hmm yes the floor here is made of floor',
   ]
   const SPOTS = [[0, 200], [-150, 300], [150, 300], [0, 380], [-220, 420], [220, 420], [0, -250], [-100, -150], [60, 60], [-250, 150], [280, 250], [200, 150]]
   const wanderers = []
@@ -534,6 +593,7 @@ export function createHub(renderer, profile, callbacks) {
         P.standOn = sd
       } else if (P.vy > 0 && sd.t !== 'disc' && P.y + HEIGHT > sd.y - sd.h / 2 && P.y < sd.y - sd.h / 2 + 10) {
         P.vy = 0
+        if (sd.qblock) hitQBlock(sd)
       }
     }
 
@@ -553,6 +613,12 @@ export function createHub(renderer, profile, callbacks) {
       }
       P.flight = null
       const sd = P.standOn
+      if (sd.pipe) {
+        sfx.pickup()
+        callbacks.toast('🍄 Warp pipe! Wheee!')
+        teleport(560, 430, -420)
+        return
+      }
       if (sd.roof) {
         callbacks.stat('roofTop', 1)
         P.onRoof = true
@@ -707,8 +773,38 @@ export function createHub(renderer, profile, callbacks) {
     }
   }
 
+  let qCd = 0
+  function hitQBlock(sd) {
+    if (performance.now() < qCd) return
+    qCd = performance.now() + 4000
+    sfx.coin()
+    sd.mesh.position.y = sd.y + 10
+    setTimeout(() => (sd.mesh.position.y = sd.y), 150)
+    callbacks.reward(10, '🪙 +10 BB from the ? block!')
+  }
+
   function onZone(key) {
     const z = world.zones.find((q) => q.key === key)
+    if (key === 'vent') {
+      const [x, zz] = [[-150, 300], [0, -250], [250, 250], [-250, 100]][Math.floor(Math.random() * 4)]
+      teleport(x, 20, zz)
+      callbacks.toast('🚨 You vented! Kinda sus...')
+      callbacks.chat({ name: 'duckdash_pro', color: '#ff4d6d', text: 'i saw that duck vent. SUS' })
+      return
+    }
+    if (key === 'creeper') {
+      callbacks.toast('💚 sssssssss...')
+      setTimeout(() => {
+        if (Math.hypot(P.x - 470, P.z - 530) < 90) {
+          sfx.mega()
+          P.vy = 950
+          P.vx = -300
+          callbacks.toast('💥 Aww man!')
+        }
+      }, 1500)
+      return
+    }
+    if (key === 'cake') return callbacks.toast(z.sign)
     if (key === 'play' || key === 'shop' || key === 'trophy') return callbacks.open(key)
     if (key.startsWith('obby_')) return startObby(key.slice(5))
     if (key === 'redbutton') {
@@ -774,10 +870,27 @@ export function createHub(renderer, profile, callbacks) {
     }
   }
 
+  const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA']
+  let codes = []
   hub.typeKey = (code) => {
     const ch = code.startsWith('Key') ? code.slice(3) : ''
     P.typed = (P.typed + ch).slice(-4)
     if (P.typed === 'BONK') callbacks.stat('secret_typed', 1)
+    if (P.typed.endsWith('OOF')) {
+      sfx.fall()
+      callbacks.toast('OOF!')
+      P.typed = ''
+    }
+    codes = [...codes, code].slice(-KONAMI.length)
+    if (codes.join() === KONAMI.join()) {
+      codes = []
+      callbacks.konami()
+      for (const wd of wanderers) {
+        wd.vy = 700
+        wd.emote = 'flip'
+        wd.emoteT = 1.2
+      }
+    }
   }
 
   hub.render = (renderer2, dt) => {

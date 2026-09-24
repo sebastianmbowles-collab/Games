@@ -134,6 +134,22 @@ export const COSTUME_CATEGORIES = [
     ],
   },
   {
+    key: 'refs',
+    name: '🥚 Easter Eggs',
+    items: [
+      c('noob', 'Classic Noob', 100, '#ffd23f', ['suit'], { accColor: '#1e88e5' }),
+      c('jellybean', 'Crowned Jellybean', 3000, '#ff9ecf', ['crown']),
+      c('plumber', 'Jumpy Plumber', 3500, '#ffd23f', ['cap', 'mustache', 'suit'], { accColor: '#e53935' }),
+      c('hedgehog', 'Speedy Hedgehog', 4000, '#1e63d6', ['spikes'], { accColor: '#1e63d6', beak: '#f5d0a9' }),
+      c('crewmate', 'Sus Crewmate', 2500, '#e53935', ['visor', 'backpack'], { accColor: '#b71c1c' }),
+      c('blockbuilder', 'Block Builder', 2500, '#3fa7d6', ['pixelHair'], { mat: 'pixel' }),
+      c('creeper', 'Sssneaky Block', 3000, '#4caf50', ['bigEyes'], { mat: 'pixel', beak: '#2e7d32' }),
+      c('pizzabear', 'Pizzeria Bear', 4500, '#8d5a2b', ['tophat', 'bowtie', 'dogEars'], { accColor: '#5d3a1a' }),
+      c('tunic', 'Green Tunic Hero', 4000, '#ffd23f', ['wizardHat', 'pixelSword'], { accColor: '#2e7d32' }),
+      c('portalduck', 'Test Subject', 3500, '#eceff1', ['goggles', 'backpack'], { accColor: '#ff9800' }),
+    ],
+  },
+  {
     key: 'secret',
     name: '💀 SECRET',
     items: [

@@ -242,6 +242,21 @@ export default function Bonk({ onExit }) {
       obbyDone: (level, reward, time, falls) => obbyFinished(level, reward, time, falls),
       devpc: () => setOverlay('devpc'),
       chat: (msg) => setChat((list) => [...list.slice(-5), { ...msg, id: Math.random() }]),
+      reward: (n, text) => {
+        loadSave().bb += n
+        persist()
+        toast(text, 'ach')
+      },
+      konami: () => {
+        const s = loadSave()
+        if (!s.stats.konami) {
+          s.stats.konami = 1
+          s.bb += 100
+          persist()
+          toast('🎮 KONAMI CODE! +30 lives! (jk, +100 BB)', 'ach')
+        } else toast('🎮 Konami code! The ducks salute you.', 'secret')
+        sfx.win()
+      },
     })
     if (import.meta.env.DEV) window.__hub = hub
     let obbyShown = false
@@ -699,7 +714,7 @@ export default function Bonk({ onExit }) {
                   ? 'Nobody has any balloons left!'
                   : results.humanWon
                     ? results.winner.name === 'You'
-                      ? '👑 YOU WIN! 👑'
+                      ? ['👑 YOU WIN! 👑', '🍗 WINNER WINNER, DUCK DINNER!', '👑 GG EZ! 👑'][Math.floor(results.duration) % 3]
                       : `👑 ${results.winner.name} WINS! 👑`
                     : `${results.winner.name} wins!`}
               </h3>

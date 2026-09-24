@@ -691,6 +691,18 @@ const ACC = {
     const s = add(b, geo('suit', () => new THREE.CylinderGeometry(1, 1.05, 1, 20, 1, true)), mat(c), 0, 0, 0, 17.5, 26, 17.5)
     s.material.side = THREE.DoubleSide
   },
+  cap: (h, b, c) => {
+    sph(h, mat(c), 0, 6, 0, 11.8, 7, 11.8)
+    box(h, mat(c), 12, 6, 0, 9, 1.2, 10)
+    sph(h, WHITE(), 8, 9, 0, 2.5, 2.5, 1)
+  },
+  mustache: (h) => {
+    for (const s of [-1, 1]) sph(h, mat('#2b1b0e'), 14, -0.5, s * 3, 3.2, 1.6, 2.6)
+  },
+  visor: (h) => {
+    sph(h, mat('#9fe6ff', 'glass'), 9, 3, 0, 5, 4, 8)
+    sph(h, mat('#ffffff', 'glow'), 12, 5, 3, 1.2)
+  },
   glasses: (h) => {
     for (const s of [-1, 1]) {
       const t = tor(h, BLACK(), 10.5, 3, s * 4.5, 3, 0.12, 0)

@@ -791,7 +791,7 @@ function doHit(w, a) {
       stat(w, a, 'yeets')
       w.hitstop = 0.12
       w.shake = 20
-      popup(w, t.x, t.y, pick(['YEEEET!', 'BYE BYE!', 'TO THE MOON!', 'WHEEEE!']), '#ff7ad9', 24, 1.4, 110)
+      popup(w, t.x, t.y, pick(['YEEEET!', 'BYE BYE!', 'TO THE MOON!', 'WHEEEE!', 'BLASTING OFF AGAIN!', 'FALCON BONK!']), '#ff7ad9', 24, 1.4, 110)
       sfx.yeet()
       continue
     }
@@ -1447,7 +1447,7 @@ function startFall(w, p) {
   p.swinging = false
   p.ms.falls += 1
   sfx.fall()
-  popup(w, p.x, p.y, pick(['AAAAH!', 'NOOOO!', 'BYEEE!', 'WAAAH!', 'QUAAACK!']), '#fff', 16, 1, 40)
+  popup(w, p.x, p.y, pick(['AAAAH!', 'NOOOO!', 'BYEEE!', 'WAAAH!', 'QUAAACK!', 'OOF!', 'OOF!']), '#fff', 16, 1, 40)
   stat(w, p, 'falls')
   const t = tileUnder(w.arena, p.x, p.y)
   if (t && t.state === 'falling') stat(w, p, 'tileFalls')
@@ -1535,6 +1535,7 @@ function doEmote(w, p, idx) {
     }
     if (e.key === 'flip') {
       p.flipT = 0.6
+      if (Math.random() < 0.2) popup(w, p.x, p.y, 'DO A BARREL ROLL!', '#7cf', 14, 1, 70)
       stat(w, p, 'emote_flip')
     }
     if (e.key === 'flop') stat(w, p, 'flops')
@@ -1558,7 +1559,7 @@ function finishMatch(w, winner) {
   w.winner = winner
   if (winner) {
     winner.ms.score += 1000
-    popup(w, winner.x, winner.y, '👑 WINNER!', '#ffd23f', 30, 3, 140)
+    popup(w, winner.x, winner.y, pick(['👑 WINNER!', '👑 WINNER WINNER DUCK DINNER!', '👑 VICTORY ROYALE!', '👑 FLAWLESS... ish']), '#ffd23f', 26, 3, 140)
     sfx.win()
     sfx.cheer()
   } else sfx.lose()
