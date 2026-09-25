@@ -3052,3 +3052,12 @@ button.bonk-pill:hover {
   top: 90px;
   bottom: auto;
 }
+
+.bonk-canvas {
+  touch-action: none;
+  cursor: grab;
+}
+
+.bonk-canvas:active {
+  cursor: grabbing;
+}

@@ -34,6 +34,14 @@ export function createInput() {
   }
 }
 
+// Turn a move so it follows the draggable camera ("up" = into the screen).
+export function turnCommand(c, yaw) {
+  if (!yaw || (!c.mx && !c.my)) return c
+  const co = Math.cos(yaw)
+  const sn = Math.sin(yaw)
+  return { ...c, mx: c.mx * co + c.my * sn, my: -c.mx * sn + c.my * co }
+}
+
 export function readCommand(input, src) {
   if (src.type === 'pad') {
     const p = input.pads[src.index]

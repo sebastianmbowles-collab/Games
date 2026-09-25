@@ -571,7 +571,8 @@ export function createHub(renderer, profile, callbacks) {
   if (pet) scene.add(pet)
   const P = { x: 0, y: 0, z: 200, vx: 0, vy: 0, vz: 0, facing: -Math.PI / 2, grounded: true, airJumps: 0, walk: 0, emote: null, emoteT: 0, flipT: 0, standOn: null, spawn: [0, 5, 200], obby: null, obbyT: 0, obbyFalls: 0, idle: 0, grassIdle: 0, wallT: 0, flight: null, lastZone: new Set(), typed: '' }
 
-  const hub = { scene, camera, P, world, dist: 640 }
+  // cam: the draggable camera (yaw = turn around, pitch = tilt, zoom)
+  const hub = { scene, camera, P, world, dist: 640, cam: { yaw: 0, pitch: 0, zoom: 1 } }
 
   let myCostume = profile.costume
   let myChat = null
@@ -708,6 +709,12 @@ export function createHub(renderer, profile, callbacks) {
     if (stick && (stick.x || stick.y)) {
       mx = stick.x
       mz = stick.y
+    }
+    // turn the controls with the camera, so W always walks "into the screen"
+    if (hub.cam.yaw) {
+      const c = Math.cos(hub.cam.yaw)
+      const sn = Math.sin(hub.cam.yaw)
+      ;[mx, mz] = [mx * c + mz * sn, -mx * sn + mz * c]
     }
     if (keys.pressed.has('KeyE') || keys.pressed.has('KeyI')) interact()
     const len = Math.min(1, Math.hypot(mx, mz))
@@ -1292,13 +1299,21 @@ export function createHub(renderer, profile, callbacks) {
     screen.material.emissiveIntensity = 0.5 + Math.random() * 0.5
     // follow camera (bird's-eye, slightly behind)
     const target = new THREE.Vector3(P.x, P.y + 20, P.z)
+    const { yaw, pitch, zoom } = hub.cam
+    const up = 0.94 + pitch // how high above the duck the camera sits (radians)
+    const off = (dist) => new THREE.Vector3(Math.sin(yaw) * Math.cos(up) * dist, Math.sin(up) * dist, Math.cos(yaw) * Math.cos(up) * dist)
     if (comfort) {
-      // fixed angle, glides gently, never wobbles
-      const want = new THREE.Vector3(P.x, P.y + 2000 * 0.85, P.z + 2000 * 0.62)
+      // one angle at a time, glides gently, never wobbles
+      const o = off(2100)
+      const want = new THREE.Vector3(P.x, P.y, P.z).add(o)
       camera.position.lerp(want, Math.min(1, dt * 3))
-      camera.lookAt(camera.position.x, camera.position.y - 2000 * 0.85, camera.position.z - 2000 * 0.62)
+      camera.lookAt(camera.position.x - o.x, camera.position.y - o.y, camera.position.z - o.z)
+      if (camera.zoom !== zoom) {
+        camera.zoom = zoom
+        camera.updateProjectionMatrix()
+      }
     } else {
-      const want = new THREE.Vector3(P.x, P.y + hub.dist * 0.85, P.z + hub.dist * 0.62)
+      const want = new THREE.Vector3(P.x, P.y, P.z).add(off(hub.dist * 1.05 * (1 / zoom)))
       camera.position.lerp(want, Math.min(1, dt * 6))
       camera.lookAt(target)
     }

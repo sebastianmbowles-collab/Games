@@ -246,7 +246,7 @@ export function createMatchView(renderer, w) {
   const partMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 5), new THREE.MeshBasicMaterial(), MAXP)
   scene.add(partMesh)
 
-  const view = { scene, camera, w, shakeX: 0, shakeY: 0 }
+  const view = { scene, camera, w, shakeX: 0, shakeY: 0, cam: { yaw: 0, pitch: 0, zoom: 1 } }
 
   // Frame the arena itself (tiles plus where moving platforms travel).
   let minX = Infinity
@@ -288,12 +288,18 @@ export function createMatchView(renderer, w) {
     animateMaterials(time)
     // camera with shake
     const sh = comfort ? 0 : w.shake
-    const d = view.dist || 1000
-    const tilt = 0.52
+    const { yaw, pitch, zoom } = view.cam
+    const d = (view.dist || 1000) / (comfort ? 1 : zoom)
+    const tilt = Math.min(1.05, Math.max(0.05, 0.52 - pitch))
     const fx = focus.x - CX
     const fz = focus.y - CY
-    camera.position.set(fx + (Math.random() - 0.5) * sh, d * Math.cos(tilt), fz + d * Math.sin(tilt) + (Math.random() - 0.5) * sh)
-    camera.lookAt(fx, 0, fz + 25)
+    const back = d * Math.sin(tilt)
+    camera.position.set(fx + Math.sin(yaw) * back + (Math.random() - 0.5) * sh, d * Math.cos(tilt), fz + Math.cos(yaw) * back + (Math.random() - 0.5) * sh)
+    camera.lookAt(fx + Math.sin(yaw) * 25, 0, fz + Math.cos(yaw) * 25)
+    if (comfort && camera.zoom !== zoom) {
+      camera.zoom = zoom
+      camera.updateProjectionMatrix()
+    }
 
     for (const c of clouds) {
       c.position.x += c.userData.v * dt

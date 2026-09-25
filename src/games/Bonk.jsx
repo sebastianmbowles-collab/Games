@@ -8,7 +8,7 @@ import { bonkLaunch, createMatch, dropRemote, forceEvent, quitMatch, snapshot, s
 import { BAN_MS, SWEAR_LIMIT, applySnapshot, arenaInfo, buildMirror, cleanText, colorFor, isRude, makeSnapshot, smoothPlayers } from './bonk/net'
 import Online from './bonk/Online'
 import { createHub } from './bonk/hub'
-import { createInput, readCommand } from './bonk/input'
+import { createInput, readCommand, turnCommand } from './bonk/input'
 import LoadingChase from './bonk/LoadingChase'
 import Lobby from './bonk/Lobby'
 import { createMatchView, drawOverlay } from './bonk/matchView'
@@ -187,6 +187,9 @@ export default function Bonk({ onExit, standalone = false }) {
   const [chatOpen, setChatOpen] = useState(false)
   const [chatText, setChatText] = useState('')
   const lastChat = useRef(0)
+  // the draggable camera, shared by the hub and matches
+  const camRef = useRef({ yaw: 0, pitch: 0, zoom: 1 })
+  const drag = useRef(null)
   const matchLeave = useRef(null)
   const [roomCode, setRoomCode] = useState('')
   const [hostedRoom, setHostedRoom] = useState(null)
@@ -338,6 +341,7 @@ export default function Bonk({ onExit, standalone = false }) {
         sfx.win()
       },
     })
+    hub.cam = camRef.current
     if (import.meta.env.DEV) window.__hub = hub
     let obbyShown = false
     let netT = 0
@@ -448,6 +452,7 @@ export default function Bonk({ onExit, standalone = false }) {
       if (import.meta.env.DEV) window.__bonk = { w, forceEvent: (key) => forceEvent(w, key) }
       matchStarted(config)
       const view = createMatchView(rendererRef.current, w)
+      view.cam = camRef.current
       let acc = 0
       let hudT = 0
       let done = false
@@ -463,7 +468,7 @@ export default function Bonk({ onExit, standalone = false }) {
           let first = true
           if (room) setSoundRecorder((name) => sounds.length < 12 && sounds.push(name))
           while (acc >= STEP) {
-            step(w, STEP, (src) => (src.type === 'remote' ? room.readGuest(src.id) : readCommand(input, src)))
+            step(w, STEP, (src) => (src.type === 'remote' ? room.readGuest(src.id) : turnCommand(readCommand(input, src), camRef.current.yaw)))
             if (first) input.clearPressed()
             first = false
             acc -= STEP
@@ -526,6 +531,7 @@ export default function Bonk({ onExit, standalone = false }) {
       setMyId(mine ? mine.id : null)
       matchStarted({ challenge: 'none', humans: mine ? [{ costume: mine.costume }] : [] })
       const view = createMatchView(rendererRef.current, w)
+      view.cam = camRef.current
       let acc = null
       let sendT = 0
       let done = false
@@ -549,7 +555,7 @@ export default function Bonk({ onExit, standalone = false }) {
         dispose: () => view.dispose(),
         frame(dt, ctx, width, height) {
           input.pollPads()
-          const c = readCommand(input, { type: 'keys', scheme: 'solo' })
+          const c = turnCommand(readCommand(input, { type: 'keys', scheme: 'solo' }), camRef.current.yaw)
           input.clearPressed()
           acc = acc
             ? { ...c, jump: c.jump || acc.jump, dash: c.dash || acc.dash, shield: c.shield || acc.shield, emote: acc.emote >= 0 ? acc.emote : c.emote }
@@ -874,7 +880,32 @@ export default function Bonk({ onExit, standalone = false }) {
   return (
     <div className={`bonk-root ${mobile ? 'is-mobile' : ''}`} onClick={onClickAnything}>
       <div className="bonk-stage" ref={stageRef}>
-        <canvas ref={canvasRef} className="bonk-canvas" />
+        <canvas
+          ref={canvasRef}
+          className="bonk-canvas"
+          onPointerDown={(e) => {
+            if (!inGame || overlay || results) return
+            drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
+            e.currentTarget.setPointerCapture?.(e.pointerId)
+          }}
+          onPointerMove={(e) => {
+            const d = drag.current
+            if (!d || d.id !== e.pointerId) return
+            const cam = camRef.current
+            cam.yaw -= (e.clientX - d.x) * 0.008
+            cam.pitch = Math.min(0.45, Math.max(-0.35, cam.pitch + (e.clientY - d.y) * 0.004))
+            d.x = e.clientX
+            d.y = e.clientY
+          }}
+          onPointerUp={() => (drag.current = null)}
+          onPointerCancel={() => (drag.current = null)}
+          onWheel={(e) => {
+            if (!inGame) return
+            const cam = camRef.current
+            cam.zoom = Math.min(1.8, Math.max(0.6, cam.zoom * Math.exp(-e.deltaY * 0.001)))
+          }}
+          onDoubleClick={() => Object.assign(camRef.current, { yaw: 0, pitch: 0, zoom: 1 })}
+        />
         <canvas ref={overlayRef} className="bonk-overlay-canvas" />
 
         {screen === 'device' && (
@@ -1063,7 +1094,7 @@ export default function Bonk({ onExit, standalone = false }) {
         )}
 
         {screen === 'hub' && !overlay && !mobile && (
-          <div className="bonk-hint">WASD move · Space jump (twice!) · Shift dash · E interact · 1 wave · 2 spin · Q quack · 4 flip · 5 flop</div>
+          <div className="bonk-hint">WASD move · Space jump (twice!) · Shift dash · E interact · 1-5 emotes · 🖱 drag to turn camera, scroll to zoom, double-click to reset</div>
         )}
 
         {inGame && mobile && !overlay && !results && (
