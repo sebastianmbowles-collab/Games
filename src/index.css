@@ -1538,9 +1538,32 @@ body {
   border-color: #2b9ce0;
 }
 
-.brawl-pick-emoji {
-  font-size: 42px;
-  line-height: 1.1;
+.pixel-head {
+  image-rendering: pixelated;
+  display: block;
+}
+
+.brawl-pick-card {
+  position: relative;
+}
+
+.brawl-pick-mark {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  background: #2b9ce0;
+  color: #0d0d16;
+  padding: 3px 4px;
+  border-radius: 3px;
+}
+
+.brawl-pick-card strong {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  line-height: 1.4;
+  margin-top: 4px;
 }
 
 .brawl-pick-pun {
@@ -1577,12 +1600,94 @@ body {
   display: block;
   width: 100%;
   height: auto;
+  aspect-ratio: 16 / 9;
+  image-rendering: pixelated;
   touch-action: none;
 }
 
-.brawl-winner-emoji {
-  font-size: 64px;
+.brawl-logo-heads {
+  display: flex;
+  gap: 10px;
+}
+
+.brawl-logo-heads canvas:nth-child(odd) {
+  animation: intro-bob 1.4s ease-in-out infinite;
+}
+
+.brawl-logo-heads canvas:nth-child(even) {
+  animation: intro-bob 1.4s ease-in-out -0.7s infinite;
+}
+
+.brawl-result-title {
+  font-family: 'Press Start 2P', monospace;
+}
+
+.game-overlay .pixel-head {
   animation: intro-bob 1.2s ease-in-out infinite;
+}
+
+.brawl-big-btn.is-online {
+  background: #2bb673;
+  box-shadow: 0 5px 0 #146040;
+}
+
+.brawl-join {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.brawl-join input {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  text-align: center;
+  letter-spacing: 6px;
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid #3a3a52;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.brawl-join .brawl-big-btn {
+  width: auto;
+}
+
+.brawl-room-code {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 40px;
+  letter-spacing: 10px;
+  color: #2bd673;
+  background: var(--panel);
+  border: 3px dashed #2bd673;
+  border-radius: 12px;
+  padding: 16px 20px 16px 30px;
+}
+
+.brawl-waiting {
+  color: var(--text);
+  animation: brawl-blink 1.2s steps(2, jump-none) infinite;
+}
+
+@keyframes brawl-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.brawl-error {
+  color: #ff8a8a;
+  text-align: center;
+  margin: 0;
+}
+
+.brawl-hint {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  margin: 0;
 }
 
 .brawl-pad {
@@ -1603,6 +1708,7 @@ body {
 }
 
 .brawl-pad-btn {
+  font-family: 'Press Start 2P', monospace;
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -1669,8 +1775,8 @@ body {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   }
 
-  .brawl-pick-emoji {
-    font-size: 34px;
+  .brawl-room-code {
+    font-size: 28px;
   }
 
   .brawl-pick-stats {

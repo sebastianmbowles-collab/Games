@@ -1,8 +1,9 @@
 // Fight simulation: pure game state + a step function. No React, no drawing.
 
-export const W = 800
-export const H = 450
-export const GROUND = 395
+// World units. The screen is drawn at 1/3 scale (256x144) for chunky 8-bit pixels.
+export const W = 768
+export const H = 432
+export const GROUND = 378
 export const ROUND_TIME = 60
 export const WINS_NEEDED = 2
 export const SPECIAL_COST = 50
@@ -66,6 +67,8 @@ export function createMatch(defs) {
     matchWinner: null,
     shake: 0,
     clock: 0,
+    // Things that happened this frame (hits, jumps, KOs...) for sounds and voices to react to.
+    events: [],
   }
 }
 
@@ -80,14 +83,15 @@ function resetRound(m) {
   m.timer = ROUND_TIME
   m.phase = 'intro'
   m.phaseT = 0
-  m.banner = `ROUND ${m.round}`
+  m.banner = m.wins[0] === WINS_NEEDED - 1 && m.wins[1] === WINS_NEEDED - 1 ? 'FINAL ROUND' : `ROUND ${m.round}`
   m.roundWinner = null
+  m.announced = false
 }
 
 const grounded = (f) => f.y >= GROUND
 
-function spark(m, x, y, text, size = 40, life = 0.45) {
-  m.sparks.push({ x, y, text, size, life, max: life })
+function spark(m, x, y, kind, life = 0.45) {
+  m.sparks.push({ x, y, kind, life, max: life })
 }
 
 function hurtbox(f) {
@@ -114,20 +118,22 @@ function applyHit(m, att, def, { dmg, kbx, kby = 0, stun, heavy = false, fromX =
     damage = Math.max(1, Math.ceil(damage * 0.15))
     def.vx = dir * kbx * 0.5
     def.action = { type: 'hurt', t: 0, dur: 0.14, blocked: true }
-    spark(m, def.x - dir * 20, def.y - 90, '🛡️', 34, 0.3)
+    spark(m, def.x - dir * 20, def.y - 90, 'block', 0.3)
   } else {
     def.vx = dir * kbx
     if (kby) def.vy = kby
     def.action = { type: 'hurt', t: 0, dur: stun }
     def.flash = 0.18
-    spark(m, def.x - dir * 18, def.y - 85, heavy ? '💥' : '✨', heavy ? 56 : 38)
+    spark(m, def.x - dir * 18, def.y - 85, heavy ? 'heavy' : 'hit', heavy ? 0.4 : 0.3)
     if (heavy) m.shake = 0.25
   }
   def.hp = Math.max(0, def.hp - damage)
-  m.sparks.push({ x: def.x, y: def.y - 140, text: `-${damage}`, size: 22, life: 0.7, max: 0.7, number: true })
+  m.sparks.push({ x: def.x, y: def.y - 160, kind: 'number', text: `-${damage}`, life: 0.7, max: 0.7 })
+  m.events.push({ type: 'hit', side: def.side, heavy, blocked })
   att.meter = Math.min(100, att.meter + (blocked ? 4 : 10))
   def.meter = Math.min(100, def.meter + 6)
   if (def.hp <= 0) {
+    m.events.push({ type: 'ko', side: def.side })
     def.action = { type: 'ko', t: 0 }
     def.vx = dir * 380
     def.vy = -520
@@ -135,14 +141,16 @@ function applyHit(m, att, def, { dmg, kbx, kby = 0, stun, heavy = false, fromX =
   }
 }
 
-function startMove(f, name) {
+function startMove(f, name, m) {
   f.action = { type: 'attack', move: MOVES[name], name, t: 0, hit: false }
+  m.events.push({ type: 'swing', side: f.side, name })
 }
 
 function startSpecial(f, m) {
   const sp = f.def.special
   if (sp.type === 'projectile' && m.projectiles.some((p) => p.owner === f.side)) return false
   f.meter -= SPECIAL_COST
+  m.events.push({ type: 'special', side: f.side })
   f.action = { type: 'special', t: 0, hit: false, fired: false, landed: false }
   if (sp.type === 'uppercut') {
     f.vy = -950 * Math.min(1.1, f.def.jump)
@@ -172,6 +180,7 @@ function runSpecial(f, opp, m) {
           size: sp.size,
           spin: 0,
         })
+        m.events.push({ type: 'throw', side: f.side })
       }
       return a.t >= 0.45
     case 'dash':
@@ -196,8 +205,9 @@ function runSpecial(f, opp, m) {
       if (!a.landed && a.t > 0.12 && grounded(f)) {
         a.landed = true
         m.shake = 0.3
-        spark(m, f.x - 90, GROUND - 20, '💨', 44, 0.5)
-        spark(m, f.x + 90, GROUND - 20, '💨', 44, 0.5)
+        spark(m, f.x - 90, GROUND - 20, 'dust', 0.5)
+        spark(m, f.x + 90, GROUND - 20, 'dust', 0.5)
+        m.events.push({ type: 'slam', side: f.side })
         if (grounded(opp) && Math.abs(opp.x - f.x) < sp.radius) {
           applyHit(m, f, opp, { dmg: sp.dmg, kbx: 360, kby: -420, stun: 0.6, heavy: true, fromX: f.x })
         }
@@ -231,17 +241,20 @@ function updateFighter(f, opp, inp, dt, m) {
     if (grounded(f)) {
       const dir = (inp.right ? 1 : 0) - (inp.left ? 1 : 0)
       f.vx = f.blocking ? 0 : dir * WALK * f.def.speed
-      if (inp.up && !f.blocking) f.vy = -JUMP_V * f.def.jump
+      if (inp.up && !f.blocking) {
+        f.vy = -JUMP_V * f.def.jump
+        m.events.push({ type: 'jump', side: f.side })
+      }
     }
     if (inp.buf.special > 0 && f.meter >= SPECIAL_COST) {
       inp.buf.special = 0
       startSpecial(f, m)
     } else if (inp.buf.punch > 0) {
       inp.buf.punch = 0
-      startMove(f, 'punch')
+      startMove(f, 'punch', m)
     } else if (inp.buf.kick > 0) {
       inp.buf.kick = 0
-      startMove(f, 'kick')
+      startMove(f, 'kick', m)
     }
   }
   if (!f.action && grounded(f)) f.facing = Math.sign(opp.x - f.x) || f.facing
@@ -296,7 +309,8 @@ function updateProjectiles(m, dt) {
   const [a, b] = [m.projectiles.find((p) => p.owner === 0 && !p.dead), m.projectiles.find((p) => p.owner === 1 && !p.dead)]
   if (a && b && Math.abs(a.x - b.x) < (a.size + b.size) / 2) {
     a.dead = b.dead = true
-    spark(m, (a.x + b.x) / 2, a.y, '💥', 60)
+    spark(m, (a.x + b.x) / 2, a.y, 'heavy', 0.5)
+    m.events.push({ type: 'clash' })
   }
   m.projectiles = m.projectiles.filter((p) => !p.dead && p.x > -60 && p.x < W + 60)
 }
@@ -389,7 +403,14 @@ export function step(m, inputs, dt) {
   }
 
   if (m.phase === 'intro') {
-    if (m.phaseT > 1.2) m.banner = 'FIGHT!'
+    if (!m.announced) {
+      m.announced = true
+      m.events.push({ type: 'round', n: m.round, final: m.wins[0] === WINS_NEEDED - 1 && m.wins[1] === WINS_NEEDED - 1 })
+    }
+    if (m.phaseT > 1.2 && m.banner !== 'FIGHT!') {
+      m.banner = 'FIGHT!'
+      m.events.push({ type: 'fight' })
+    }
     if (m.phaseT > 1.8) {
       m.phase = 'fight'
       m.phaseT = 0
@@ -399,16 +420,20 @@ export function step(m, inputs, dt) {
     m.timer = Math.max(0, m.timer - dt)
     const koed = p0.hp <= 0 || p1.hp <= 0
     if (koed || m.timer <= 0) {
+      m.announced = false
       m.phase = 'ko'
       m.phaseT = 0
       m.banner = koed ? 'K.O.!' : 'TIME!'
+      if (!koed) m.events.push({ type: 'time' })
       m.roundWinner = p0.hp === p1.hp ? null : p0.hp > p1.hp ? 0 : 1
       m.projectiles = []
     }
   } else if (m.phase === 'ko') {
-    if (m.phaseT > 1.4 && m.banner !== null) {
+    if (m.phaseT > 1.4 && !m.announced) {
+      m.announced = true
       const w = m.roundWinner
       m.banner = w === null ? 'DRAW' : `${m.fighters[w].def.name.toUpperCase()} WINS`
+      m.events.push({ type: 'roundWin', side: w })
     }
     if (m.phaseT > 3) {
       if (m.roundWinner !== null) m.wins[m.roundWinner] += 1
@@ -417,10 +442,20 @@ export function step(m, inputs, dt) {
         m.phase = 'over'
         m.matchWinner = champ
         m.banner = null
+        m.events.push({ type: 'matchWin', side: champ })
       } else {
         m.round += 1
         resetRound(m)
       }
     }
   }
+}
+
+// Online play: the host sends snapshots, the guest turns them back into a match to draw.
+export function snapshot(m, events) {
+  return { ...m, fighters: m.fighters.map((f) => ({ ...f, def: f.def.key })), events }
+}
+
+export function hydrate(s, roster) {
+  return { ...s, fighters: s.fighters.map((f) => ({ ...f, def: roster.find((d) => d.key === f.def) })) }
 }
