@@ -21,6 +21,7 @@ import PrizeCorner from './games/PrizeCorner'
 import ClawMachine from './games/ClawMachine'
 import SecurityPuppet from './games/SecurityPuppet'
 import FazbearDelivery from './games/FazbearDelivery'
+import AnimalBrawl from './games/AnimalBrawl'
 
 const PLAYABLE_COMPONENTS = {
   'guitar-hero': GuitarHero,
@@ -40,6 +41,7 @@ const PLAYABLE_COMPONENTS = {
   'claw-machine': ClawMachine,
   'security-puppet': SecurityPuppet,
   delivery: FazbearDelivery,
+  'animal-brawl': AnimalBrawl,
 }
 
 export default function App() {
