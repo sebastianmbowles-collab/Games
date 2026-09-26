@@ -5,7 +5,8 @@ import { FIGHTERS } from './brawl/fighters'
 import { DIFFICULTY, createInput, createMatch, cpuThink, pressButton, step, snapshot, hydrate } from './brawl/engine'
 import { drawMatch, LW, LH } from './brawl/draw'
 import { stillCanvas } from './brawl/look'
-import { playEvents, sfx, say, isMuted, setMuted, stopVoices, onMuteChange } from './brawl/sound'
+import { playEvents, sfx, say, isMuted, setMuted, stopVoices, audioContext } from './brawl/sound'
+import { playMusic, stopMusic } from './brawl/music'
 import { hostRoom, joinRoom } from './brawl/net'
 
 // Keyboard layouts. When one person plays on this computer, both layouts work.
@@ -355,7 +356,7 @@ function OnlineLobby({ onConnected, onBack }) {
   )
 }
 
-function BrawlScreens({ game, onExit }) {
+export default function AnimalBrawl({ game, onExit }) {
   const [screen, setScreen] = useState('menu') // menu | online | select | fight
   const [mode, setMode] = useState('cpu') // cpu | versus | online
   const [difficulty, setDifficulty] = useState('normal')
@@ -369,8 +370,26 @@ function BrawlScreens({ game, onExit }) {
   const [notice, setNotice] = useState(null)
   const [touch] = useState(() => !!window.matchMedia?.('(pointer: coarse)').matches)
 
-  // Stop talking when leaving the game.
-  useEffect(() => () => stopVoices(), [])
+  // Browsers only allow sound after a click or key press, so wake the audio on the first one.
+  // Stop the music and voices when leaving the game.
+  useEffect(() => {
+    const wake = () => audioContext()
+    window.addEventListener('pointerdown', wake)
+    window.addEventListener('keydown', wake)
+    return () => {
+      window.removeEventListener('pointerdown', wake)
+      window.removeEventListener('keydown', wake)
+      stopMusic()
+      stopVoices()
+    }
+  }, [])
+
+  // Menu theme on the menus, fight theme during a fight, silence for the victory fanfare.
+  useEffect(() => {
+    if (screen !== 'fight') playMusic('menu')
+    else if (result) stopMusic()
+    else playMusic('fight')
+  }, [screen, result])
 
   function startFight(pair) {
     setPicks(pair)
@@ -657,80 +676,6 @@ function Controls({ mode }) {
         row('Controls', ['A D / ← →', 'W / ↑', 'S / ↓', 'F / J', 'G / K', 'H / L'])
       )}
       <span className="brawl-controls-tip">Hits fill your special bar. When it flashes gold, press Special!</span>
-    </div>
-  )
-}
-
-// Background music: "Year Songs" on YouTube, streamed through YouTube's official embedded player.
-// The song isn't copied into the game; YouTube's rules also require the player to stay visible
-// and at least 200x200, so it sits in a "Now playing" card.
-const MUSIC = {
-  videoId: 'Q5RSL3p4HBA',
-  artist: 'Year Songs',
-  link: 'https://music.youtube.com/watch?v=Q5RSL3p4HBA',
-}
-
-function MusicPlayer() {
-  const frame = useRef(null)
-  const started = useRef(false)
-
-  useEffect(() => {
-    const command = (func, args = []) =>
-      frame.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*')
-    // Browsers only allow sound after a click or key press, so start on the first one.
-    const start = () => {
-      if (started.current || isMuted()) return
-      started.current = true
-      command('setVolume', [35])
-      command('playVideo')
-    }
-    const offMute = onMuteChange((muted) => {
-      if (muted) command('pauseVideo')
-      else {
-        started.current = false
-        start()
-      }
-    })
-    window.addEventListener('pointerdown', start)
-    window.addEventListener('keydown', start)
-    return () => {
-      offMute()
-      window.removeEventListener('pointerdown', start)
-      window.removeEventListener('keydown', start)
-    }
-  }, [])
-
-  const src = `https://www.youtube-nocookie.com/embed/${MUSIC.videoId}?enablejsapi=1&loop=1&playlist=${MUSIC.videoId}&playsinline=1&rel=0`
-  return (
-    <aside className="brawl-music" aria-label="Background music">
-      <iframe
-        ref={frame}
-        className="brawl-music-player"
-        src={src}
-        title={`Background music by ${MUSIC.artist}`}
-        width="256"
-        height="200"
-        allow="autoplay; encrypted-media"
-      />
-      <div className="brawl-music-credit">
-        <span className="brawl-music-label">NOW PLAYING</span>
-        <span>
-          Music by <strong>{MUSIC.artist}</strong>
-        </span>
-        <a href={MUSIC.link} target="_blank" rel="noreferrer">
-          Listen on YouTube Music ↗
-        </a>
-        <span className="brawl-music-note">Use the 🔊 button to mute.</span>
-      </div>
-    </aside>
-  )
-}
-
-export default function AnimalBrawl(props) {
-  return (
-    <div className="brawl-root">
-      <BrawlScreens {...props} />
-      <MusicPlayer />
     </div>
   )
 }

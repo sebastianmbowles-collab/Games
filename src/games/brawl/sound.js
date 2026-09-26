@@ -34,8 +34,8 @@ export function setMuted(value) {
   muteListeners.forEach((fn) => fn(value))
 }
 
-function audio() {
-  if (muted) return null
+// The one shared audio "speaker" for sound effects and music.
+export function audioContext() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext
     if (!AC) return null
@@ -43,6 +43,10 @@ function audio() {
   }
   if (ctx.state === 'suspended') ctx.resume()
   return ctx
+}
+
+function audio() {
+  return muted ? null : audioContext()
 }
 
 // A square/triangle/saw "beep" that slides from f0 to f1.
