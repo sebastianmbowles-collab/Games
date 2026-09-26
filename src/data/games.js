@@ -145,10 +145,9 @@ export const GAMES = [
   {
     key: 'animal-brawl',
     title: 'Animal Brawl',
-    blurb: 'Pick an animal and battle it out, one move at a time.',
+    blurb: 'Street-fighter style showdown between 18 punny animals.',
     color: '#e05a2b',
     icon: '🥊',
-    spriteKey: 'roxy',
     playable: true,
   },
   {
