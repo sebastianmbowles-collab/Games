@@ -15,6 +15,14 @@ export function isMuted() {
   return muted
 }
 
+const muteListeners = new Set()
+
+// Lets other parts (like the background music) follow the mute button.
+export function onMuteChange(fn) {
+  muteListeners.add(fn)
+  return () => muteListeners.delete(fn)
+}
+
 export function setMuted(value) {
   muted = value
   try {
@@ -23,10 +31,11 @@ export function setMuted(value) {
     // not saved, that's fine
   }
   if (value) window.speechSynthesis?.cancel()
+  muteListeners.forEach((fn) => fn(value))
 }
 
-function audio() {
-  if (muted) return null
+// The one shared audio "speaker" for sound effects and music.
+export function audioContext() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext
     if (!AC) return null
@@ -34,6 +43,10 @@ function audio() {
   }
   if (ctx.state === 'suspended') ctx.resume()
   return ctx
+}
+
+function audio() {
+  return muted ? null : audioContext()
 }
 
 // A square/triangle/saw "beep" that slides from f0 to f1.
@@ -163,6 +176,35 @@ export function stopVoices() {
   window.speechSynthesis?.cancel()
 }
 
+const pick = (list) => list[Math.floor(Math.random() * list.length)]
+
+// The announcer has a sense of humor.
+const LINES = {
+  fight: ['Fight!', "Let's get ready to RUMBLE!", 'Claws out! Fight!', 'Fur will fly! Fight!', 'No biting! Just kidding. Fight!'],
+  finalFight: ['Final round! Make it count!', 'This is it! Fight!'],
+  ko: ['K. O.!', 'Knocked out cold!', 'Down goes the animal!', 'That one is going on the highlight reel!'],
+  time: ["Time's up!", 'Time! Somebody check the scoreboard!'],
+  perfect: ['Perfect! Not even a scratch!', 'PERFECT! Somebody call animal control!'],
+  combo: ['Combo!', 'C-C-C-COMBO!', 'What a combo!', 'Somebody stop them!'],
+  dizzy: ['Seeing stars!', 'Dizzy! Birdies everywhere!', 'Lights on, nobody home!'],
+  super: ['SUPER!', 'Here comes the big one!', "Oh, it's SUPER time!"],
+  draw: ['Draw! Everybody loses! Or wins?'],
+}
+
+// A crowd cheer: a swell of filtered noise, bigger for bigger moments.
+function crowd(size = 1) {
+  noise({ dur: 0.9 * size, vol: 0.09 * size, f0: 700, f1: 1400, type: 'bandpass' })
+  noise({ dur: 1.1 * size, vol: 0.06 * size, f0: 1600, f1: 900, type: 'bandpass', delay: 0.1 })
+}
+sfx.crowd = crowd
+sfx.ooh = () => noise({ dur: 0.7, vol: 0.08, f0: 500, f1: 300, type: 'bandpass' })
+sfx.dodge = () => noise({ dur: 0.18, vol: 0.12, f0: 400, f1: 2500, type: 'bandpass' })
+sfx.dizzy = () => notes([880, 660, 880, 660, 880], { len: 0.06, type: 'triangle', vol: 0.08 })
+sfx.super = () => {
+  notes([262, 330, 392, 523, 659, 784, 1047], { len: 0.05, vol: 0.1 })
+  noise({ dur: 0.6, vol: 0.2, f0: 300, f1: 5000, type: 'bandpass' })
+}
+
 // Turn a frame's game events into sounds and voice lines.
 export function playEvents(events, match, youSide = null) {
   for (const e of events) {
@@ -179,9 +221,31 @@ export function playEvents(events, match, youSide = null) {
       case 'jump':
         sfx.jump()
         break
+      case 'dodge':
+        sfx.dodge()
+        break
       case 'special':
         sfx.special()
         say(`${f.def.special.name}!`, { ...f.def.voice, interrupt: true })
+        break
+      case 'super':
+        sfx.super()
+        crowd(1.3)
+        say(`${f.def.superName}!`, { ...f.def.voice, interrupt: true })
+        break
+      case 'superHit':
+        sfx.heavy()
+        break
+      case 'combo':
+        if (e.n === 3 || e.n === 5 || e.n === 8) {
+          announce(e.n >= 5 ? pick(LINES.combo) : `${e.n} hit combo!`)
+          crowd(0.8)
+        }
+        break
+      case 'dizzy':
+        sfx.dizzy()
+        sfx.ooh()
+        announce(pick(LINES.dizzy))
         break
       case 'throw':
         sfx.throw()
@@ -191,6 +255,7 @@ export function playEvents(events, match, youSide = null) {
         break
       case 'clash':
         sfx.clash()
+        sfx.ooh()
         break
       case 'round':
         sfx.round()
@@ -198,24 +263,27 @@ export function playEvents(events, match, youSide = null) {
         break
       case 'fight':
         sfx.fight()
-        announce('Fight!')
+        announce(e.round === 1 ? pick(LINES.fight) : 'Fight!')
         break
       case 'ko':
         sfx.ko()
-        announce('K. O.!')
+        crowd(1.5)
+        announce(pick(LINES.ko))
         break
       case 'time':
         sfx.ko()
-        announce('Time!')
+        announce(pick(LINES.time))
         break
       case 'roundWin':
-        announce(f ? `${f.def.say} wins!` : 'Draw!')
+        if (e.perfect) announce(pick(LINES.perfect))
+        else announce(f ? `${f.def.say} wins!` : pick(LINES.draw))
         break
       case 'matchWin':
         if (youSide === null || youSide === e.side) sfx.win()
         else sfx.lose()
-        // Let the fanfare play, then the champion says their line.
-        setTimeout(() => say(f.def.win, { ...f.def.voice, interrupt: true }), 700)
+        crowd(1.5)
+        // Let the fanfare play, then the champion says their ridiculous line.
+        setTimeout(() => say(f.def.quotes[e.quote ?? 0], { ...f.def.voice, interrupt: true }), 800)
         break
       default:
     }
