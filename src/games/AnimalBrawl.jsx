@@ -235,7 +235,7 @@ export default function AnimalBrawl({ game, onExit }) {
     const fresh = items.map((t) => ({ ...t, id: Math.random() }))
     if (!fresh.length) return
     setToasts((prev) => [...prev, ...fresh])
-    sfx.win()
+    sfx.select()
     setTimeout(() => setToasts((prev) => prev.filter((t) => !fresh.includes(t))), 4500)
   }
 

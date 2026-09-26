@@ -74,7 +74,9 @@ function drawFighter(ctx, f, clock, costume) {
   const flashing = f.flash > 0 && Math.floor(f.flash * 30) % 2 === 0
 
   ctx.save()
-  ctx.translate(fx, fy)
+  // The fighter who just got hit shudders during hit-stop.
+  const jolt = f.shakeT > 0 ? (Math.floor(clock * 60) % 2 ? 1 : -1) : 0
+  ctx.translate(fx + jolt, fy)
   ctx.scale(f.facing, 1)
   if (ko) ctx.rotate(-Math.min(Math.PI / 2, Math.floor(f.action.t * 8) * (Math.PI / 8)))
   // A dodge roll makes you see-through for a moment (you can't be hit).

@@ -86,6 +86,7 @@ export function createMatch(defs, opts = {}) {
     shake: 0,
     hype: 0,
     freeze: 0,
+    hitstop: 0,
     superSide: null,
     clock: 0,
     gravity: opts.gravity ?? 1,
@@ -138,7 +139,7 @@ function hitsBox(att, box, reach, top, bottom) {
 
 // Deal a hit from `att` to `def`. `fromX` decides which way the defender must face to block.
 // Returns 'hit', 'blocked' or 'miss'.
-function applyHit(m, att, def, { dmg, kbx, kby = 0, stun, heavy = false, fromX = att.x, unblockable = false }) {
+function applyHit(m, att, def, { dmg, kbx, kby = 0, stun, heavy = false, fromX = att.x, unblockable = false, sparkY = 85 }) {
   if (def.action?.type === 'ko') return 'miss'
   if (dodging(def)) {
     if (!def.action.dodged) {
@@ -160,8 +161,9 @@ function applyHit(m, att, def, { dmg, kbx, kby = 0, stun, heavy = false, fromX =
     def.vx = dir * kbx * 0.5
     def.action = { type: 'hurt', t: 0, dur: 0.14, blocked: true }
     def.stats.blocks += 1
-    spark(m, def.x - dir * 20, def.y - 90, 'block', 0.3)
+    spark(m, def.x - dir * 20, def.y - sparkY, 'block', 0.3)
     att.combo = 0
+    m.hitstop = Math.max(m.hitstop, 0.035)
   } else {
     // Combo: this hit landed while they were still reeling from the last one.
     const reeling = (def.action?.type === 'hurt' && !def.action.blocked) || dizzy || (def.action?.type === 'hurt' && !grounded(def))
@@ -185,8 +187,11 @@ function applyHit(m, att, def, { dmg, kbx, kby = 0, stun, heavy = false, fromX =
       def.action.dur -= 0.25
     }
     def.flash = 0.18
-    spark(m, def.x - dir * 18, def.y - 85, heavy ? 'heavy' : 'hit', heavy ? 0.4 : 0.3)
-    if (heavy) m.shake = Math.max(m.shake, 0.25)
+    spark(m, def.x - dir * 18, def.y - sparkY, heavy ? 'heavy' : 'hit', heavy ? 0.4 : 0.3)
+    if (heavy) m.shake = Math.max(m.shake, 0.2)
+    // Hit-stop: a split-second freeze makes every hit land with a crunch.
+    m.hitstop = Math.max(m.hitstop, heavy ? 0.09 : 0.055)
+    def.shakeT = heavy ? 0.12 : 0.07
     m.hype = Math.min(1, m.hype + (heavy ? 0.3 : 0.12))
     att.stats.hits += 1
     // Stun meter: too many hits and you get dizzy.
@@ -220,6 +225,10 @@ function applyHit(m, att, def, { dmg, kbx, kby = 0, stun, heavy = false, fromX =
     m.shake = 0.4
     m.hype = 1
   }
+  // Pinned against a wall? The attacker slides back instead, so fights don't jam in a corner.
+  if (def.action?.type !== 'ko' && (def.x < BODY_HALF + 40 || def.x > W - BODY_HALF - 40) && grounded(att)) {
+    att.vx = -dir * kbx * 0.6
+  }
   return blocked ? 'blocked' : 'hit'
 }
 
@@ -236,7 +245,13 @@ function scaledMove(f, name) {
   }
 }
 
+function faceFoe(f, m) {
+  const opp = m.fighters[1 - f.side]
+  if (grounded(f)) f.facing = Math.sign(opp.x - f.x) || f.facing
+}
+
 function startMove(f, name, m) {
+  faceFoe(f, m)
   f.action = { type: 'attack', move: scaledMove(f, name), name, t: 0, hit: false }
   m.events.push({ type: 'swing', side: f.side, name })
 }
@@ -244,6 +259,7 @@ function startMove(f, name, m) {
 function startSpecial(f, m) {
   const sp = f.def.special
   if (sp.type === 'projectile' && m.projectiles.some((p) => p.owner === f.side)) return false
+  faceFoe(f, m)
   f.meter -= SPECIAL_COST
   m.events.push({ type: 'special', side: f.side })
   f.action = { type: 'special', t: 0, hit: false, fired: false, landed: false }
@@ -259,6 +275,7 @@ function startSpecial(f, m) {
 }
 
 function startSuper(f, m) {
+  faceFoe(f, m)
   f.meter = 0
   f.stats.supers += 1
   f.action = { type: 'super', t: 0, hits: 0, connected: false, stage: 'rush' }
@@ -389,6 +406,7 @@ function runSuper(f, opp, m) {
 
 function updateFighter(f, opp, inp, dt, m) {
   f.flash = Math.max(0, f.flash - dt)
+  f.shakeT = Math.max(0, (f.shakeT ?? 0) - dt)
   f.hpShown += (f.hp - f.hpShown) * Math.min(1, dt * 3)
   f.comboT = Math.max(0, f.comboT - dt)
   f.stunCool -= dt
@@ -407,7 +425,7 @@ function updateFighter(f, opp, inp, dt, m) {
     const mv = a.move
     if (!a.hit && a.t >= mv.on && a.t <= mv.off && hitsBox(f, hurtbox(opp), mv.reach, mv.top, mv.bottom)) {
       a.hit = true
-      a.landed = applyHit(m, f, opp, { dmg: mv.dmg, kbx: mv.kb, stun: mv.stun, heavy: a.name === 'kick' }) === 'hit'
+      a.landed = applyHit(m, f, opp, { dmg: mv.dmg, kbx: mv.kb, stun: mv.stun, heavy: a.name === 'kick', sparkY: (mv.top + mv.bottom) / 2 }) === 'hit'
     }
     // Chain: once a hit lands you can cancel the rest of the move into another attack.
     canCancel = a.landed && a.t > mv.off
@@ -591,6 +609,11 @@ export function step(m, inputs, dt) {
   m.hype = Math.max(0, m.hype - dt * 0.4)
   for (const inp of inputs) {
     for (const k of Object.keys(inp.buf)) inp.buf[k] = Math.max(0, inp.buf[k] - dt)
+  }
+  if (m.hitstop > 0) {
+    m.hitstop = Math.max(0, m.hitstop - dt)
+    for (const f of m.fighters) f.shakeT = Math.max(0, (f.shakeT ?? 0) - dt)
+    return
   }
   // Super freeze: everything holds still while the super flash plays.
   if (m.freeze > 0) {
