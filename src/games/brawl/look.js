@@ -60,6 +60,16 @@ function eye(b, x, y, kind, e, iris = 0x2a1a0d) {
       }
       b.line(x - 1, y - 2, x + 1, y - 2, INK)
       break
+    case 'sleepy':
+      // Half-closed, always sleepy
+      b.line(x - 1, y - 1, x + 1, y - 1, INK)
+      b.dots([[x, y], [x + 1, y]], INK)
+      break
+    case 'angry':
+      b.dots([[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]], INK)
+      b.dot(x, y, 0xff5a5a)
+      b.line(x - 2, y - 3, x + 2, y - 1, INK)
+      break
     case 'panda':
       b.dots([[x, y], [x + 1, y], [x, y - 1], [x + 1, y - 1]], WHITE)
       b.dots([[x + 1, y], [x + 1, y - 1]], INK)
@@ -398,6 +408,91 @@ const LOOKS = {
       b.dots([[-2, -1], [3, 0], [-7, 0]], L.spots)
     },
   },
+  chimpchamp: {
+    plan: 'biped', torso: 'chest', tw: 8, legs: 'plant', hand: 'paw', foot: 'paw', arm: 3.5, longArms: true, hunch: 2, tail: null,
+    fur: 0x5a3a24, light: 0xd8b890, handColor: 0xc8a078, mouth: [6, 6], faceY: -55,
+    head(b, L, e) {
+      const ears = b.part()
+      b.ellipse(-9, -1, 3.5, 3.5, L.fur, ears)
+      b.ellipse(8, -3, 3, 3.2, L.fur, ears)
+      b.dots([[-9, -1], [8, -3]], L.light)
+      const h = b.part()
+      b.ellipse(-1, -2, 8.5, 8.5, L.fur, h)
+      b.ellipse(3, 1, 6.5, 6, L.light, h)
+      b.ellipse(5, 4, 5.5, 3.5, L.light, h)
+      b.line(-2, -4, 8, -4, 0x3a2414)
+      eye(b, 1, -2, 'dot', e)
+      eye(b, 6, -2, 'dot', e)
+      b.dots([[7, 2], [9, 2]], 0x5a3a24)
+      if (!e.shout) b.line(3, 6, 9, 6, 0x5a3a24)
+    },
+  },
+  kangaroo: {
+    plan: 'biped', torso: 'chest', tw: 8, legs: 'digi', hand: 'glove', foot: 'bigfoot', arm: 3.5, leg: 4.5, tail: 'kanga', pouch: true,
+    fur: 0xc08a52, light: 0xe8c8a0, mouth: [11, 5], faceY: -60,
+    head(b, L, e) {
+      const ears = b.part()
+      b.poly([[-7, -4], [-10, -17], [-3, -6]], L.fur, ears)
+      b.poly([[-2, -6], [-1, -18], [3, -6]], L.fur, ears)
+      b.dots([[-8, -11], [-7, -9], [0, -13], [0, -11]], PINK)
+      const h = b.part()
+      b.ellipse(-1, -1, 7, 7, L.fur, h)
+      b.poly([[2, -4], [15, 1], [14, 5], [2, 5]], L.fur, h)
+      b.ellipse(12, 3, 3.5, 2.5, L.light, h)
+      eye(b, 2, -2, 'round', e)
+      b.dots([[14, 1], [15, 1], [15, 2]], INK)
+      if (!e.shout) b.line(9, 5, 13, 5, 0x7a5030)
+    },
+  },
+  shellshock: {
+    plan: 'biped', torso: 'round', tw: 10, legs: 'stump', hand: 'paw', foot: 'stump', arm: 4, tail: null, shellBody: true,
+    fur: 0x7ab85a, light: 0xe8d890, shellColor: 0x6a5a2a, plate: 0x8a7a3a, mouth: [7, 3], faceY: -54,
+    head(b, L, e) {
+      const h = b.part()
+      b.ellipse(0, 0, 7.5, 7, L.fur, h)
+      b.ellipse(6, 2, 5.5, 4, L.fur, h)
+      eye(b, 3, -2, 'round', e)
+      b.dots([[10, 0]], 0x3a6a2a)
+      if (!e.shout) b.dots([[6, 4], [7, 5], [8, 5], [9, 4]], 0x3a6a2a)
+      b.dots([[-4, -3], [-2, -5], [-5, 1]], 0x5a9a3a)
+    },
+  },
+  slothmo: {
+    plan: 'biped', torso: 'round', tw: 10, legs: 'plant', hand: 'longclaw', foot: 'paw', arm: 4, hunch: 1, tail: null,
+    fur: 0x9a8468, light: 0xd8c8a8, mouth: [4, 5], faceY: -55,
+    head(b, L, e) {
+      const h = b.part()
+      b.ellipse(0, 0, 9, 8.5, L.fur, h)
+      b.ellipse(2, 1, 7, 6, L.light, h)
+      // Dark eye stripes that droop down the face
+      b.poly([[-5, -3], [-1, -3], [-2, 3], [-5, 1]], 0x4a3a2a, h)
+      b.poly([[3, -3], [7, -3], [7, 1], [4, 3]], 0x4a3a2a, h)
+      eye(b, -3, -1, e.ko || e.hurt ? 'dot' : 'sleepy', e)
+      eye(b, 5, -1, e.ko || e.hurt ? 'dot' : 'sleepy', e)
+      b.dots([[1, 2], [2, 2], [3, 2]], INK)
+      if (!e.shout) b.dots([[0, 5], [1, 6], [2, 6], [3, 6], [4, 5]], 0x4a3a2a)
+    },
+  },
+  moosclebeast: {
+    plan: 'biped', torso: 'barrel', tw: 13, legs: 'stump', hand: 'hoof', foot: 'hoof', arm: 5.5, leg: 5.5, tail: 'thin', cowSpots: true,
+    fur: 0xf4f4f4, light: 0xf4d8e0, bell: true, mouth: [8, 7], faceY: -58,
+    head(b, L, e) {
+      const horns = b.part()
+      b.capsule(-4, -7, -10, -14, 2, 1.3, 0xefe6d0, horns)
+      b.capsule(3, -8, 6, -16, 2, 1.3, 0xefe6d0, horns)
+      const ears = b.part()
+      b.ellipse(-10, -3, 4, 2, L.fur, ears)
+      const h = b.part()
+      b.ellipse(-1, -2, 9, 8, L.fur, h)
+      b.ellipse(-4, -5, 4, 3, 0x2a2a34, h)
+      b.ellipse(6, 4, 7.5, 5, 0xf0a8b8, h)
+      eye(b, 0, -2, 'angry', e)
+      eye(b, 5, -3, 'angry', e)
+      b.dots([[5, 3], [6, 3], [9, 3], [10, 3]], 0x8a3a4a)
+      if (!e.shout) b.line(4, 7, 10, 7, 0x8a3a4a)
+      b.dots([[8, 9], [9, 9], [8, 10]], 0xf2c40c)
+    },
+  },
 }
 
 // ---------- Limb helpers ----------
@@ -453,6 +548,10 @@ function foot(b, L, type, fx, fy, color) {
     case 'claw':
       b.ellipse(fx + 1, fy - 1.5, 4.5, 2, color, f)
       b.dots([[fx + 5, fy - 1], [fx + 6, fy], [fx + 3, fy]], CLAW)
+      break
+    case 'bigfoot':
+      b.ellipse(fx + 3, fy - 1.5, 7, 2.2, color, f)
+      b.dots([[fx + 9, fy - 1], [fx + 8, fy]], 0x3a2a3a)
       break
     case 'toepad':
       b.ellipse(fx + 1, fy - 1.5, 3.5, 1.8, color, f)
@@ -515,6 +614,15 @@ function hand(b, L, type, hx, hy, ang, color) {
       b.ellipse(hx + cx, hy + cy, 2.8, 2.8, color, g)
       b.dots([[hx + cx * 4 - cy * 2, hy + cy * 4 + cx * 2], [hx + cx * 4 + cy * 2, hy + cy * 4 - cx * 2], [hx + cx * 5, hy + cy * 5]], L.light)
       break
+    case 'glove':
+      b.ellipse(hx + cx, hy + cy, 4.5, 4.2, 0xe0393e, g)
+      b.capsule(hx - cx * 3, hy - cy * 3, hx - cx * 2, hy - cy * 2, 2.2, 2.2, 0xf4f0e0, g)
+      b.dot(hx + cx - 1, hy + cy - 2, 0xffb0b0)
+      break
+    case 'longclaw':
+      b.ellipse(hx + cx, hy + cy, 3.5, 3.2, color, g)
+      for (let i = -1; i <= 1; i++) b.line(hx + cx * 3 - cy * i * 2, hy + cy * 3 + cx * i * 2, hx + cx * 7 - cy * i * 2 + 1, hy + cy * 7 + cx * i * 2 + 2, CLAW)
+      break
     case 'knuckle':
       b.ellipse(hx + cx, hy + cy, 5, 4.5, 0x2a2a30, g)
       b.dots([[hx + cx * 4, hy + cy * 4 - 2], [hx + cx * 4, hy + cy * 4], [hx + cx * 4, hy + cy * 4 + 2]], 0x6a6a74)
@@ -543,7 +651,7 @@ function arm(b, L, shoulder, target, color) {
   b.capsule(shoulder[0], shoulder[1], ex, ey, w + 0.5, w, armColor, r)
   b.capsule(ex, ey, hx, hy, w, w - 0.8, armColor, r)
   if (L.silver) b.dots([[shoulder[0] - 1, shoulder[1] - 1]], L.silver)
-  hand(b, L, L.hand, hx, hy, Math.atan2(hy - ey, hx - ex), color)
+  hand(b, L, L.hand, hx, hy, Math.atan2(hy - ey, hx - ex), L.handColor ?? color)
 }
 
 function tail(b, L, clock, base) {
@@ -580,6 +688,9 @@ function tail(b, L, clock, base) {
     case 'horse':
       curve(b, [[tx, ty - 2], [tx - 9, ty + 4], [tx - 7 + wag * 0.5, ty + 18]], 2.5, 3.5, L.mane, r)
       break
+    case 'kanga':
+      curve(b, [[tx + 2, ty], [tx - 12, ty + 10], [tx - 22, ty + 19]], 4.5, 1.8, L.fur, r)
+      break
     case 'duck':
       b.poly([[tx + 2, ty - 3], [tx - 7, ty - 8], [tx - 6, ty + 1]], L.fur, r)
       b.dots([[tx - 5, ty - 6], [tx - 4, ty - 3]], 0x2a2a34)
@@ -603,7 +714,26 @@ function biped(b, L, p, clock) {
   const shB = [chestX - 5, chestY - 4]
   const shF = [chestX + 4, chestY - 4]
 
+  // Shell-Shock hides completely inside its shell to block or spin.
+  if (L.shellBody && p.hide) {
+    const sh = b.part()
+    b.ellipse(0, -12, 20, 13, L.shellColor, sh)
+    b.rect(-20, -12, 41, 12, L.shellColor, sh)
+    const spin = Math.floor(clock * 20) % 3
+    for (const [x, y] of [[-10, -14], [0, -18], [10, -14], [-4, -8], [6, -8]]) b.ellipse(x + (p.spinning ? spin * 2 - 2 : 0), y, 3.5, 2.5, L.plate, sh)
+    b.rect(-20, -3, 41, 3, L.light, sh)
+    if (!p.spinning) {
+      b.dots([[15, -6], [16, -6]], 0x140c1c)
+      if (!p.expr.closed) b.dots([[15, -6]], WHITE)
+    }
+    return
+  }
   tail(b, L, clock, [-tw + 2, hipY - 3])
+  if (L.shellBody) {
+    const sh = b.part()
+    b.ellipse(chestX - 6, (hipY + chestY) / 2 - 2, tw + 2, tw + 7, L.shellColor, sh)
+    for (const [x, y] of [[-10, -3], [-8, 5], [-11, -10]]) b.ellipse(chestX + x, (hipY + chestY) / 2 + y, 3, 3, L.plate, sh)
+  }
   leg(b, L, hipB, p.feet[0], limb)
   arm(b, L, shB, p.hands[0], limb)
 
@@ -623,6 +753,12 @@ function biped(b, L, p, clock) {
     b.line(-3, hipY - 1, -6, hipY - 7, 0x62626e)
   }
   if (L.spots) b.dots([[chestX - 4, chestY + 2], [chestX - 2, chestY + 8], [-3, hipY - 4]], L.spots)
+  if (L.cowSpots) {
+    b.ellipse(chestX - 6, chestY + 4, 4, 3, 0x2a2a34, t)
+    b.ellipse(-4, hipY - 6, 3.5, 2.5, 0x2a2a34, t)
+  }
+  if (L.shellBody) for (let y = hipY - 4; y > chestY - 2; y -= 4) b.line(chestX - 2, y, chestX + 7, y, 0xb8a860)
+  if (L.pouch) b.line(1, hipY - 5, 8, hipY - 5, 0xa87040)
 
   leg(b, L, hipF, p.feet[1], limb)
 
@@ -654,6 +790,7 @@ function biped(b, L, p, clock) {
     if (Math.sin(clock * 20) > 0) b.dot(dx + 3, hipY - 9, 0xffe27a)
   }
   if (L.silver) b.line(-tw + 2, hipY - 6, -tw + 4, chestY + 2, 0xc8c8d0)
+  if (L.bell) b.dots([[chestX + 3, chestY - 6], [chestX + 4, chestY - 6], [chestX + 3, chestY - 5], [chestX + 4, chestY - 5], [chestX + 2, chestY - 4], [chestX + 5, chestY - 4]], 0xf2c40c)
 }
 
 function snake(b, L, p, clock) {
@@ -926,6 +1063,42 @@ export function pose(f, clock) {
       if (a.landed) p.lean = 3
     }
   }
+  if (a?.type === 'dizzy') {
+    p.lean = Math.round(Math.sin(clock * 6) * 2)
+    p.hands = [[-3, -30], [7, -31]]
+    p.expr.closed = Math.floor(clock * 4) % 2 === 0
+    p.expr.hurt = !p.expr.closed
+  }
+  if (a?.type === 'dodge') {
+    p.lean = 5
+    p.bob = 4
+    p.feet = [[-5, -3], [7, -5]]
+    p.hands = [[5, -32], [10, -34]]
+  }
+  if (a?.type === 'super') {
+    p.expr.shout = true
+    p.lean = 5
+    p.hands = a.stage === 'flurry' && Math.floor(a.t * 20) % 2 ? [[32, -44], [6, -38]] : [[-6, -38], [33, -46]]
+    p.feet = [[-14, 0], [12, 0]]
+  }
+  if (f.pose === 'victory' && !a) {
+    const pump = Math.floor(clock * 4) % 2
+    p.hands = [[-4, pump ? -72 : -66], [12, pump ? -66 : -74]]
+    p.expr.shout = pump === 1
+    p.bob = pump ? -2 : 0
+    p.lean = 0
+  }
+  if (f.pose === 'defeat' && !a) {
+    p.hands = [[-3, -28], [5, -27]]
+    p.lean = -1
+    p.bob = 2
+    p.expr.closed = true
+  }
+  // Shell-Shock ducks into its shell to block, spin, or super
+  if (f.def.gimmick?.shell && (f.blocking || a?.blocked || (a?.type === 'special' && a.t > 0.05) || a?.type === 'super' || a?.type === 'dodge')) {
+    p.hide = true
+    p.spinning = a?.type === 'special' || a?.type === 'super' || a?.type === 'dodge'
+  }
   if (a?.type === 'ko') {
     p.expr = { ko: true }
     p.bob = 0
@@ -937,12 +1110,33 @@ export function pose(f, clock) {
 
 // ---------- Put it all together ----------
 
-export function paintFighter(b, def, p, clock) {
+export function paintFighter(b, def, p, clock, costume = 'classic') {
   const L = LOOKS[def.key]
   b.clear()
   b.origin(FOOT_X, FOOT_Y)
   PLANS[L.plan ?? 'biped'](b, L, p, clock)
-  return b.finish()
+  return b.finish(COSTUME_TINTS[costume])
+}
+
+// Costumes recolor the body (eyes and small details keep their colors).
+const lum = (c) => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
+const COSTUME_TINTS = {
+  classic: null,
+  // Swap the color channels around; grays (which have no color to swap) get a cool blue tint.
+  retro: (c) => {
+    const sat = Math.max(...c) - Math.min(...c)
+    if (sat > 40) return [c[1], c[2], c[0]]
+    const l = lum(c)
+    return [l * 0.55 + 20, l * 0.85 + 25, Math.min(255, l * 1.05 + 45)]
+  },
+  golden: (c) => {
+    const l = lum(c)
+    return [Math.min(255, l * 1.15 + 50), Math.min(255, l * 0.95 + 25), l * 0.3]
+  },
+  shadow: (c) => {
+    const l = lum(c)
+    return [l * 0.35 + 18, l * 0.2 + 8, l * 0.55 + 28]
+  },
 }
 
 export function faceY(def) {
@@ -951,12 +1145,12 @@ export function faceY(def) {
 
 // Cached still images for menus: full-body idle and head close-ups.
 const stills = new Map()
-export function stillCanvas(def, kind = 'body', expr = {}) {
-  const key = `${def.key}:${kind}:${JSON.stringify(expr)}`
+export function stillCanvas(def, kind = 'body', expr = {}, costume = 'classic') {
+  const key = `${def.key}:${kind}:${JSON.stringify(expr)}:${costume}`
   if (stills.has(key)) return stills.get(key)
   const b = new PixelBuf(SPRITE_W, SPRITE_H)
   const p = { feet: [[-7, 0], [8, 0]], hands: [[9, -37], [16, -43]], lean: 0, bob: 0, expr }
-  const src = paintFighter(b, def, p, 0.5)
+  const src = paintFighter(b, def, p, 0.5, costume)
   const c = document.createElement('canvas')
   const fy = FOOT_Y + faceY(def)
   const [x, y, w, h] = kind === 'head' ? [FOOT_X - 18, fy - 18, 40, 36] : [FOOT_X - 32, FOOT_Y - 84, 64, 88]

@@ -134,7 +134,8 @@ export class PixelBuf {
     for (let i = 0; i <= steps; i++) this.dot(Math.round(x0 + ((x1 - x0) * i) / steps), Math.round(y0 + ((y1 - y0) * i) / steps), c)
   }
 
-  finish() {
+  // `tint` optionally recolors every body pixel, e.g. for costumes.
+  finish(tint = null) {
     const { w, h, col, reg, flag } = this
     const out = this.image.data
     out.fill(0)
@@ -170,6 +171,7 @@ export class PixelBuf {
           if (ni < 0) continue
           c = mix(scale(rgb(col[ni]), 0.3), OUTLINE, 0.55)
         }
+        if (tint) c = tint(c)
         const o = i * 4
         out[o] = c[0]
         out[o + 1] = c[1]
