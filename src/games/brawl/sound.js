@@ -15,6 +15,14 @@ export function isMuted() {
   return muted
 }
 
+const muteListeners = new Set()
+
+// Lets other parts (like the background music) follow the mute button.
+export function onMuteChange(fn) {
+  muteListeners.add(fn)
+  return () => muteListeners.delete(fn)
+}
+
 export function setMuted(value) {
   muted = value
   try {
@@ -23,6 +31,7 @@ export function setMuted(value) {
     // not saved, that's fine
   }
   if (value) window.speechSynthesis?.cancel()
+  muteListeners.forEach((fn) => fn(value))
 }
 
 function audio() {

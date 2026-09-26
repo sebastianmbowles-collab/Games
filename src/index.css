@@ -1767,6 +1767,65 @@ body {
   font-family: monospace;
 }
 
+.brawl-root {
+  min-height: 100vh;
+}
+
+/* The music card follows the game directly instead of sitting below a full-height screen. */
+.brawl-root > .game-screen {
+  min-height: 0;
+}
+
+/* Background music card. YouTube requires its player to stay visible and at least 200x200. */
+.brawl-music {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 0 auto 32px;
+  padding: 12px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  background: var(--panel);
+  border: 2px solid #3a3a52;
+  border-radius: 10px;
+}
+
+.brawl-music-player {
+  display: block;
+  width: 256px;
+  height: 200px;
+  max-width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: #000;
+}
+
+.brawl-music-credit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.brawl-music-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #2bd673;
+}
+
+.brawl-music-credit a {
+  color: #7fd4ff;
+}
+
+.brawl-music-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 @media (max-width: 520px) {
   .brawl-logo-heads canvas:nth-child(n + 4) {
     display: none;
