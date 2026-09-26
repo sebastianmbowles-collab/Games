@@ -1,32 +1,15 @@
-// Pixel-art renderer. Everything is drawn at 256x144 with whole-pixel rectangles
-// and the canvas is scaled up with `image-rendering: pixelated`, like an 8-bit console.
-import { W, GROUND, SPECIAL_COST, WINS_NEEDED } from './engine'
-import { HEADS, PROJECTILES, spriteCanvas, drawText, textWidth } from './sprites'
+// Pixel-art renderer. The scene is drawn at 320x180 with whole pixels and the canvas is scaled up
+// with `image-rendering: pixelated`, like a 16-bit console.
+import { W, H, GROUND, SPECIAL_COST, WINS_NEEDED } from './engine'
+import { drawText, textWidth } from './sprites'
+import { PixelBuf } from './pixelbuf'
+import { paintFighter, pose, stillCanvas, SPRITE_W, SPRITE_H, FOOT_X, FOOT_Y } from './look'
 
-export const SCALE = 3
-export const LW = W / SCALE
-export const LH = 144
-const LGROUND = GROUND / SCALE
+export const SCALE = 2.4 // world units per screen pixel
+export const LW = Math.round(W / SCALE)
+export const LH = Math.round(H / SCALE)
+const LGROUND = Math.round(GROUND / SCALE)
 const OUTLINE = '#140c1c'
-const GLOVE = '#e0393e'
-const GLOVE_LIGHT = '#ff8a8a'
-
-const PROJECTILE_ART = {
-  '🔥': 'fire',
-  '⚡': 'bolt',
-  '🌊': 'wave',
-  '🥚': 'egg',
-  '🟢': 'venom',
-  '⚫': 'ink',
-}
-
-function shade(hex, amt) {
-  const n = parseInt(hex.slice(1), 16)
-  const c = (v) => Math.max(0, Math.min(255, Math.round(v + amt)))
-  return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`
-}
-
-// ---------- Pixel primitives (integer coordinates only, so nothing gets blurry) ----------
 
 function rect(ctx, x, y, w, h, color) {
   ctx.fillStyle = color
@@ -43,19 +26,11 @@ function disc(ctx, cx, cy, r, color) {
   }
 }
 
-// Thick line made of square stamps.
-function line(ctx, x0, y0, x1, y1, size, color) {
+function line(ctx, x0, y0, x1, y1, color) {
   ctx.fillStyle = color
-  x0 = Math.round(x0)
-  y0 = Math.round(y0)
-  x1 = Math.round(x1)
-  y1 = Math.round(y1)
   const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1)
-  const off = Math.floor(size / 2)
   for (let i = 0; i <= steps; i++) {
-    const x = Math.round(x0 + ((x1 - x0) * i) / steps)
-    const y = Math.round(y0 + ((y1 - y0) * i) / steps)
-    ctx.fillRect(x - off, y - off, size, size)
+    ctx.fillRect(Math.round(x0 + ((x1 - x0) * i) / steps), Math.round(y0 + ((y1 - y0) * i) / steps), 1, 1)
   }
 }
 
@@ -68,172 +43,106 @@ function background() {
   c.width = LW
   c.height = LH
   const ctx = c.getContext('2d')
-  const bands = ['#1a1030', '#26143d', '#3a1a48', '#55204c', '#7a2a4a', '#a33c45', '#cc5a3c', '#e8803a']
-  const bandH = Math.ceil(LGROUND / bands.length)
+  const bands = ['#140c28', '#1c1034', '#28143e', '#3a1a48', '#55204c', '#7a2a4a', '#a33c45', '#cc5a3c', '#e8803a']
+  const top = LGROUND - 40
+  const bandH = Math.ceil(top / bands.length)
   bands.forEach((color, i) => {
     rect(ctx, 0, i * bandH, LW, bandH, color)
-    // Checkerboard dither where two bands meet, the classic 8-bit gradient trick.
+    // Checkerboard dither where two bands meet: the classic pixel-art gradient trick.
     if (i > 0) {
       ctx.fillStyle = bands[i - 1]
-      for (let x = 0; x < LW; x++) if (x % 2 === 0) ctx.fillRect(x, i * bandH, 1, 1)
+      for (let x = 0; x < LW; x++) {
+        if (x % 2 === 0) ctx.fillRect(x, i * bandH, 1, 1)
+        if (x % 4 === 0) ctx.fillRect(x + 1, i * bandH + 1, 1, 1)
+      }
     }
   })
-  // Stars
-  ctx.fillStyle = '#f4f4f4'
-  for (let i = 0; i < 40; i++) ctx.fillRect((i * 97) % LW, 26 + ((i * 53) % 34), 1, 1)
-  // Striped sunset sun
-  const sunY = LGROUND - 26
-  for (let dy = -30; dy <= 30; dy++) {
-    const y = sunY + dy
-    if (dy > 4 && dy % 5 < 2) continue
-    const half = Math.round(Math.sqrt(30 * 30 - dy * dy))
-    rect(ctx, LW / 2 - half, y, half * 2, 1, dy < -10 ? '#ffe27a' : dy < 5 ? '#f2b90c' : '#f28a2a')
+  rect(ctx, 0, bands.length * bandH, LW, LH, bands[bands.length - 1])
+  // Twinkly stars
+  for (let i = 0; i < 60; i++) {
+    const x = (i * 97) % LW
+    const y = 32 + ((i * 53) % 36)
+    rect(ctx, x, y, 1, 1, i % 7 === 0 ? '#ffe27a' : '#f4f4f4')
+    if (i % 11 === 0) {
+      rect(ctx, x - 1, y, 3, 1, '#f4f4f488')
+      rect(ctx, x, y - 1, 1, 3, '#f4f4f488')
+    }
   }
-  // Floor
-  const floor = ['#6b4a2e', '#5a3d25', '#4a321e', '#3a2717', '#2e1f14']
+  // Big striped sunset sun
+  const sunY = LGROUND - 46
+  for (let dy = -38; dy <= 38; dy++) {
+    if (dy > 4 && dy % 7 < 2 + Math.floor(dy / 14)) continue
+    const half = Math.round(Math.sqrt(38 * 38 - dy * dy))
+    rect(ctx, LW / 2 - half, sunY + dy, half * 2, 1, dy < -20 ? '#fff0a0' : dy < -6 ? '#ffd84a' : dy < 10 ? '#f7a82a' : '#f07a2a')
+  }
+  // Two layers of mountains
+  for (const [color, h, freq, off] of [['#3a1a3a', 34, 0.035, 0], ['#26122a', 22, 0.06, 2]]) {
+    ctx.fillStyle = color
+    for (let x = 0; x < LW; x++) {
+      const y = Math.round(LGROUND - 40 - h * (0.5 + 0.35 * Math.sin(x * freq + off) + 0.15 * Math.sin(x * freq * 3.1 + off)))
+      ctx.fillRect(x, y, 1, LGROUND - y)
+    }
+  }
+  // Fence the crowd leans on
+  rect(ctx, 0, LGROUND - 16, LW, 2, '#6a3a22')
+  rect(ctx, 0, LGROUND - 14, LW, 1, '#3a1e12')
+  for (let x = 4; x < LW; x += 24) rect(ctx, x, LGROUND - 16, 2, 16, '#4a2a18')
+  // Wooden floor: planks in perspective, with a mat in the middle
+  const floor = ['#8a5a32', '#7a4e2b', '#6b4426', '#5c3a20', '#4a2f1a', '#3a2515']
   const fh = Math.ceil((LH - LGROUND) / floor.length)
   floor.forEach((color, i) => rect(ctx, 0, LGROUND + i * fh, LW, fh, color))
-  rect(ctx, 0, LGROUND, LW, 1, '#8a6a48')
-  for (let i = -8; i <= 8; i++) line(ctx, LW / 2 + i * 20, LGROUND + 1, LW / 2 + i * 46, LH, 1, '#00000040')
+  rect(ctx, 0, LGROUND, LW, 1, '#b07a48')
+  for (let i = -12; i <= 12; i++) line(ctx, LW / 2 + i * 22, LGROUND + 1, LW / 2 + i * 44, LH, '#00000030')
+  ctx.fillStyle = '#e0393e30'
+  for (let y = LGROUND + 3; y < LH - 2; y++) {
+    const half = 90 + (y - LGROUND) * 1.6
+    ctx.fillRect(Math.round(LW / 2 - half), y, Math.round(half * 2), 1)
+  }
   bgCache = c
   return c
 }
 
-function drawCrowd(ctx, clock) {
-  for (let row = 0; row < 2; row++) {
-    const color = row ? '#2a1428' : '#1c0f1f'
-    for (let i = 0; i < 24; i++) {
-      const x = i * 11 + (row ? 5 : 0)
-      const bob = Math.sin(clock * 6 + i * 1.7 + row) > 0.3 ? 1 : 0
-      const y = LGROUND - 24 + row * 9 - bob
+const CROWD_COLORS = ['#2a1428', '#3a1a3a', '#1c0f1f', '#44203a', '#301830']
+function drawCrowd(ctx, clock, excitement) {
+  for (let row = 0; row < 3; row++) {
+    for (let i = 0; i < 28; i++) {
+      const x = i * 12 + (row % 2 ? 6 : 0) + 3
+      const seed = i * 7 + row * 13
+      const color = CROWD_COLORS[seed % CROWD_COLORS.length]
+      const hop = Math.sin(clock * (6 + excitement * 6) + seed) > 0.4 - excitement * 0.5 ? 1 + Math.round(excitement) : 0
+      const y = LGROUND - 30 + row * 6 - hop
       disc(ctx, x, y, 3, color)
-      rect(ctx, x - 4, y + 3, 9, 16, color)
-      // Some fans wave their arms
-      if ((i + row) % 5 === 0 && bob) rect(ctx, x + 4, y - 4, 1, 6, color)
+      rect(ctx, x - 4, y + 3, 9, 14, color)
+      if ((seed % 4 === 0 && hop) || (excitement > 0.5 && seed % 3 === 0)) {
+        rect(ctx, x - 5, y - 5, 1, 7, color)
+        rect(ctx, x + 5, y - 6, 1, 8, color)
+      }
+      // A few fans hold up signs
+      if (row === 2 && seed % 9 === 0) {
+        rect(ctx, x - 5, y - 10 - hop, 11, 6, '#f4f0e0')
+        rect(ctx, x - 4, y - 8 - hop, 9, 1, seed % 2 ? '#e0393e' : '#2b7de0')
+        rect(ctx, x, y - 4 - hop, 1, 4, '#6a4a2a')
+      }
     }
   }
 }
 
 // ---------- Fighters ----------
 
-// Where hands and feet go for the current action (world units, facing right).
-function pose(f) {
-  const a = f.action
-  const air = f.y < GROUND
-  const swing = Math.sin(f.walkT) * 0.9
-  const p = {
-    back: [-6 + swing * -10, 0],
-    front: [10 + swing * 10, 0],
-    handBack: [20, -80],
-    handFront: [32, -92],
-    lean: 0,
-  }
-  if (air) {
-    p.back = [-14, -14]
-    p.front = [18, -18]
-  }
-  if (f.blocking || a?.blocked) {
-    p.handBack = [30, -104]
-    p.handFront = [34, -80]
-  }
-  if (a?.type === 'attack') {
-    const mv = a.move
-    const out = a.t >= mv.on * 0.6 && a.t <= mv.off + 0.05
-    if (a.name === 'punch' && out) p.handFront = [72, -96]
-    if (a.name === 'kick' && out) {
-      p.front = [82, air ? -30 : -52]
-      p.lean = -1
-    }
-  }
-  if (a?.type === 'hurt' && !a.blocked) {
-    p.handBack = [-26, -104]
-    p.handFront = [-14, -112]
-    p.lean = -2
-  }
-  if (a?.type === 'special') {
-    const t = f.def.special.type
-    if (t === 'projectile') {
-      p.handBack = [52, -90]
-      p.handFront = [58, -78]
-    } else if (t === 'dash') {
-      p.handFront = [70, -86]
-      p.lean = 2
-    } else if (t === 'uppercut') {
-      p.handFront = [22, -160]
-    } else if (t === 'slam') {
-      p.handBack = [-10, -150]
-      p.handFront = [16, -152]
-    }
-  }
-  return p
-}
-
-// Each fighter is drawn into its own small canvas, then outlined and stamped onto the screen.
-const SPR_W = 64
-const SPR_H = 72
-const FOOT_X = 32
-const FOOT_Y = 68
-const work = {}
-function scratch(name) {
-  if (!work[name]) {
-    work[name] = document.createElement('canvas')
-    work[name].width = SPR_W
-    work[name].height = SPR_H
-  }
-  return work[name]
-}
-
-function renderBody(f, p) {
-  const c = scratch('body')
-  const ctx = c.getContext('2d')
-  ctx.clearRect(0, 0, SPR_W, SPR_H)
-  const col = f.def.color
-  const dark = shade(col, -55)
-  const light = shade(col, 40)
-  const X = (wx) => FOOT_X + wx / SCALE
-  const Y = (wy) => FOOT_Y + wy / SCALE
-  const up = p.lean // shifts the upper body forward/back by a pixel or two
-
-  // Legs + feet
-  line(ctx, X(-8), Y(-46), X(p.back[0]), Y(p.back[1]) - 1, 4, dark)
-  line(ctx, X(8), Y(-46), X(p.front[0]), Y(p.front[1]) - 1, 4, dark)
-  rect(ctx, X(p.back[0]) - 2, Y(p.back[1]) - 2, 5, 2, OUTLINE)
-  rect(ctx, X(p.front[0]) - 1, Y(p.front[1]) - 2, 5, 2, OUTLINE)
-  // Back arm
-  line(ctx, X(-2) + up, Y(-88), X(p.handBack[0]) + up, Y(p.handBack[1]), 3, dark)
-  disc(ctx, X(p.handBack[0]) + up, Y(p.handBack[1]), 2, GLOVE)
-  // Torso with rounded corners, belly and belt
-  const tx = Math.round(X(-24)) + up
-  const ty = Math.round(Y(-104))
-  rect(ctx, tx + 1, ty, 14, 21, col)
-  rect(ctx, tx, ty + 1, 16, 19, col)
-  rect(ctx, tx, ty + 2, 2, 14, shade(col, -30))
-  rect(ctx, tx + 6, ty + 5, 6, 9, light)
-  rect(ctx, tx, ty + 16, 16, 3, '#f2b90c')
-  rect(ctx, tx + 7, ty + 16, 2, 3, '#fff4b0')
-  // Front arm + glove
-  line(ctx, X(18) + up, Y(-92), X(p.handFront[0]) + up, Y(p.handFront[1]), 3, dark)
-  const gx = X(p.handFront[0]) + up
-  const gy = Y(p.handFront[1])
-  disc(ctx, gx, gy, 3, GLOVE)
-  rect(ctx, gx - 1, gy - 2, 1, 1, GLOVE_LIGHT)
-  // Head
-  const head = HEADS[f.def.key]
-  if (head) ctx.drawImage(spriteCanvas(head), Math.round(X(4)) - 8 + up, Math.round(Y(-126)) - 8)
-  return c
-}
-
-function silhouette(src, color) {
-  const c = scratch('sil' + color)
-  const ctx = c.getContext('2d')
-  ctx.globalCompositeOperation = 'source-over'
-  ctx.clearRect(0, 0, SPR_W, SPR_H)
-  ctx.drawImage(src, 0, 0)
-  ctx.globalCompositeOperation = 'source-in'
-  ctx.fillStyle = color
-  ctx.fillRect(0, 0, SPR_W, SPR_H)
-  ctx.globalCompositeOperation = 'source-over'
-  return c
+const bufs = [new PixelBuf(SPRITE_W, SPRITE_H), new PixelBuf(SPRITE_W, SPRITE_H)]
+const tint = document.createElement('canvas')
+tint.width = SPRITE_W
+tint.height = SPRITE_H
+function whiteFlash(src) {
+  const t = tint.getContext('2d')
+  t.globalCompositeOperation = 'source-over'
+  t.clearRect(0, 0, SPRITE_W, SPRITE_H)
+  t.drawImage(src, 0, 0)
+  t.globalCompositeOperation = 'source-in'
+  t.fillStyle = '#ffffff'
+  t.fillRect(0, 0, SPRITE_W, SPRITE_H)
+  t.globalCompositeOperation = 'source-over'
+  return tint
 }
 
 function drawFighter(ctx, f, clock) {
@@ -243,44 +152,132 @@ function drawFighter(ctx, f, clock) {
 
   // Shadow shrinks as you jump
   const lift = LGROUND - fy
-  const sw = Math.max(6, 12 - Math.floor(lift / 6))
-  rect(ctx, fx - sw, LGROUND, sw * 2, 2, '#00000066')
-  rect(ctx, fx - sw + 2, LGROUND + 2, sw * 2 - 4, 1, '#00000044')
+  const sw = Math.max(8, 16 - Math.floor(lift / 6))
+  rect(ctx, fx - sw, LGROUND - 1, sw * 2, 2, '#00000066')
+  rect(ctx, fx - sw + 3, LGROUND + 1, sw * 2 - 6, 1, '#00000044')
 
-  const p = ko ? pose({ ...f, action: null, blocking: false }) : pose(f)
-  const body = renderBody(f, p)
-  const outline = silhouette(body, OUTLINE)
+  const p = pose(f, clock)
+  if (ko) {
+    p.feet = [[-7, 0], [8, 0]]
+    p.hands = [[-4, -52], [4, -56]]
+    p.lean = 0
+  }
+  const sprite = paintFighter(bufs[f.side], f.def, p, clock)
   const flashing = f.flash > 0 && Math.floor(f.flash * 30) % 2 === 0
 
   ctx.save()
   ctx.translate(fx, fy)
   ctx.scale(f.facing, 1)
-  if (ko) {
-    // Topple over backwards in 90° steps' worth of chunky rotation
-    const angle = -Math.min(Math.PI / 2, Math.floor(f.action.t * 8) * (Math.PI / 8))
-    ctx.rotate(angle)
-  }
-  for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.drawImage(outline, -FOOT_X + ox, -FOOT_Y + oy)
-  ctx.drawImage(flashing ? silhouette(body, '#ffffff') : body, -FOOT_X, -FOOT_Y)
+  if (ko) ctx.rotate(-Math.min(Math.PI / 2, Math.floor(f.action.t * 8) * (Math.PI / 8)))
+  ctx.drawImage(flashing ? whiteFlash(sprite) : sprite, -FOOT_X, -FOOT_Y)
   if (f.blocking && Math.floor(clock * 12) % 2 === 0) {
-    for (let y = -34; y <= -10; y += 2) rect(ctx, 16 - Math.round(Math.abs(y + 22) / 6), y, 1, 1, '#9fe0ff')
+    for (let y = -62; y <= -14; y += 2) rect(ctx, 24 - Math.round(Math.abs(y + 38) / 5), y, 1, 1, '#9fe0ff')
+  }
+  // Speed lines behind a dash or a punch
+  const a = f.action
+  if (a?.type === 'special' && f.def.special.type === 'dash' && a.t < 0.46) {
+    for (let i = 0; i < 5; i++) rect(ctx, -30 - ((i * 7 + Math.floor(clock * 60)) % 14), -50 + i * 9, 12, 1, '#ffffffaa')
+  }
+  if (a?.type === 'attack' && a.t >= a.move.on && a.t <= a.move.off) {
+    const kick = a.name === 'kick'
+    for (let i = 0; i < 3; i++) rect(ctx, (kick ? 14 : 18) + i * 2, (kick ? -34 : -50) + i * 3, 8 - i * 2, 1, '#ffffffcc')
   }
   ctx.restore()
 }
 
+// ---------- Projectiles (painted and shaded like the fighters) ----------
+
+const projBuf = new PixelBuf(48, 36)
+const PROJ_KIND = { '🔥': 'fire', '⚡': 'bolt', '🌊': 'wave', '🥚': 'egg', '🟢': 'venom', '⚫': 'ink', '🐺': 'wolf' }
+
+function paintProjectile(kind, t) {
+  const b = projBuf
+  b.clear()
+  b.origin(24, 18)
+  const flick = Math.floor(t * 20) % 2
+  switch (kind) {
+    case 'fire': {
+      const r = b.part()
+      b.poly([[-4, -6], [-18 - flick * 3, -3], [-12, 0], [-20 + flick * 2, 3], [-4, 6]], 0xe0393e, r)
+      b.ellipse(0, 0, 8, 7, 0xe0393e, r)
+      const m = b.part()
+      b.poly([[-2, -4], [-12 + flick * 2, -1], [-2, 4]], 0xf7a82a, m)
+      b.ellipse(1, 0, 5.5, 5, 0xf7a82a, m)
+      b.ellipse(2, -1, 3, 2.5, 0xfff0a0, b.part())
+      break
+    }
+    case 'bolt': {
+      const r = b.part()
+      b.poly([[6, -12], [-3, 1], [2, 1], [-6, 13], [8, -2], [2, -2], [8, -12]], 0xf2e60c, r)
+      b.line(5, -10, 0, -1, 0xffffff)
+      b.line(4, 0, -3, 9, 0xffffff)
+      break
+    }
+    case 'wave': {
+      const r = b.part()
+      b.ellipse(0, 2, 12, 10, 0x2b7de0, r)
+      b.ellipse(-4, 6, 12, 6, 0x1a5ab0, r)
+      const foam = b.part()
+      b.capsule(-8, -6, 4, -9, 2.5, 3, 0x8fd0ff, foam)
+      b.capsule(4, -9, 10, -3 + flick, 3, 1.5, 0xeaf6ff, foam)
+      b.dots([[-12, -2], [-14, 1], [13, 4]], 0xffffff)
+      break
+    }
+    case 'egg':
+      b.ellipse(0, 0, 5, 6.5, 0xf4f0e0, b.part())
+      b.dots([[-2, -2], [1, 2], [2, -3]], 0xc9c0a8)
+      break
+    case 'venom': {
+      const r = b.part()
+      b.ellipse(2, 0, 6, 5, 0x4ae04a, r)
+      b.poly([[-2, -4], [-12, 0 + flick], [-2, 4]], 0x4ae04a, r)
+      b.dots([[-6, 5], [-9, 6 - flick]], 0x4ae04a)
+      break
+    }
+    case 'ink': {
+      const r = b.part()
+      b.ellipse(1, 0, 7, 6, 0x3a2a5a, r)
+      b.ellipse(-6, 3, 4, 3, 0x3a2a5a, r)
+      b.dots([[-10, 5], [-12, 2 + flick], [-4, 8]], 0x3a2a5a)
+      break
+    }
+    case 'wolf': {
+      // A little running wolf from the pack
+      const body = b.part()
+      b.capsule(-12, 2, 0, 1, 5, 5, 0x7a8494, body)
+      const legs = b.part()
+      const s = flick ? 3 : -3
+      b.capsule(-9, 5, -11 + s, 12, 1.8, 1.5, 0x6a7484, legs)
+      b.capsule(-2, 5, s, 12, 1.8, 1.5, 0x6a7484, legs)
+      b.capsule(-16, 0, -22, -4 - flick, 2.5, 3.5, 0x7a8494, b.part())
+      b.origin(30, 12)
+      const L = { fur: 0x7a8494, light: 0xd4d8e0 }
+      // A pup-sized version of Wolf Pack's head
+      const ears = b.part()
+      b.poly([[-5, -3], [-4, -10], [-1, -5]], L.fur, ears)
+      b.poly([[0, -5], [2, -10], [4, -3]], L.fur, ears)
+      const h = b.part()
+      b.ellipse(-1, 0, 6, 5.5, L.fur, h)
+      b.ellipse(5, 2, 5, 2.5, L.fur, h)
+      b.ellipse(4, 3, 4, 2, L.light, h)
+      b.dots([[2, -2], [3, -2]], 0xf2d23a)
+      b.dots([[9, 1], [9, 2]], 0x140c1c)
+      break
+    }
+    default:
+  }
+  return b.finish()
+}
+
 function drawProjectile(ctx, p) {
-  const art = PROJECTILE_ART[p.emoji] ? PROJECTILES[PROJECTILE_ART[p.emoji]] : HEADS.wolfpack
-  const img = spriteCanvas(art)
+  const img = paintProjectile(PROJ_KIND[p.emoji] || 'fire', p.spin)
   const x = Math.round(p.x / SCALE)
   const y = Math.round(p.y / SCALE) + (Math.floor(p.spin * 10) % 2)
   ctx.save()
   ctx.translate(x, y)
   ctx.scale(p.vx > 0 ? 1 : -1, 1)
-  ctx.drawImage(img, -Math.floor(img.width / 2), -Math.floor(img.height / 2))
+  ctx.drawImage(img, -24, -18)
   ctx.restore()
-  // Little speed-line trail
-  const dir = Math.sign(p.vx)
-  for (let i = 1; i <= 3; i++) rect(ctx, x - dir * (img.width / 2 + i * 3), y - 1 + (i % 2) * 2, 2, 1, '#ffffff88')
 }
 
 function drawSparks(ctx, sparks) {
@@ -292,23 +289,26 @@ function drawSparks(ctx, sparks) {
       drawText(ctx, s.text, x - Math.floor(textWidth(s.text) / 2), y, '#ffd84a', 1, OUTLINE)
     } else if (s.kind === 'hit' || s.kind === 'heavy') {
       const big = s.kind === 'heavy'
-      const r = Math.round((big ? 4 : 2) + k * (big ? 10 : 6))
+      const r = Math.round((big ? 6 : 3) + k * (big ? 16 : 9))
       const color = k < 0.3 ? '#ffffff' : k < 0.6 ? '#ffe27a' : '#f28a2a'
-      for (let i = 0; i < 8; i++) {
-        const ang = (i / 8) * Math.PI * 2
-        rect(ctx, x + Math.round(Math.cos(ang) * r), y + Math.round(Math.sin(ang) * r), 2, 2, color)
-      }
-      if (k < 0.4) disc(ctx, x, y, big ? 3 : 2, '#ffffff')
-    } else if (s.kind === 'block') {
-      const r = Math.round(3 + k * 5)
       for (let i = 0; i < 10; i++) {
-        const ang = (i / 10) * Math.PI * 2
+        const ang = (i / 10) * Math.PI * 2 + (big ? 0.3 : 0)
+        const len = i % 2 ? r : Math.round(r * 0.6)
+        line(ctx, x + Math.round(Math.cos(ang) * len * 0.4), y + Math.round(Math.sin(ang) * len * 0.4), x + Math.round(Math.cos(ang) * len), y + Math.round(Math.sin(ang) * len), color)
+      }
+      if (k < 0.45) disc(ctx, x, y, big ? 5 : 3, '#ffffff')
+      if (big && k < 0.25) disc(ctx, x, y, 9, '#ffffff66')
+    } else if (s.kind === 'block') {
+      const r = Math.round(4 + k * 7)
+      for (let i = 0; i < 14; i++) {
+        const ang = (i / 14) * Math.PI * 2
         rect(ctx, x + Math.round(Math.cos(ang) * r), y + Math.round(Math.sin(ang) * r), 1, 1, '#9fe0ff')
       }
     } else if (s.kind === 'dust') {
-      const r = Math.round(2 + k * 5)
-      disc(ctx, x - 3, y - Math.round(k * 4), r, '#c8b8a0aa')
-      disc(ctx, x + 4, y - Math.round(k * 6), r - 1, '#c8b8a088')
+      const r = Math.round(3 + k * 7)
+      disc(ctx, x - 5, y - Math.round(k * 6), r, '#d8c8b0aa')
+      disc(ctx, x + 6, y - Math.round(k * 8), r - 1, '#d8c8b088')
+      disc(ctx, x, y - Math.round(k * 10), r - 2, '#e8dcc888')
     }
   }
 }
@@ -316,73 +316,93 @@ function drawSparks(ctx, sparks) {
 // ---------- HUD ----------
 
 function drawHud(ctx, m) {
-  const barW = 100
+  const barW = 110
   m.fighters.forEach((f, i) => {
-    const x = i === 0 ? 6 : LW - 6 - barW
-    const y = 5
-    rect(ctx, x - 1, y - 1, barW + 2, 7, OUTLINE)
-    rect(ctx, x, y, barW, 5, '#3a1a1a')
+    const left = i === 0
+    const x = left ? 34 : LW - 34 - barW
+    const y = 6
+    // Portrait that winces when hit
+    const hurt = f.action?.type === 'hurt' || f.action?.type === 'ko'
+    const face = stillCanvas(f.def, 'head', hurt ? (f.action.type === 'ko' ? { ko: true } : { hurt: true }) : {})
+    const px = left ? 2 : LW - 32
+    rect(ctx, px - 1, 3, 32, 26, OUTLINE)
+    rect(ctx, px, 4, 30, 24, left ? '#1c3a5a' : '#5a1c2a')
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(px, 4, 30, 24)
+    ctx.clip()
+    if (left) ctx.drawImage(face, px - 2, 2)
+    else {
+      ctx.translate(px + 30, 0)
+      ctx.scale(-1, 1)
+      ctx.drawImage(face, -2, 2)
+    }
+    ctx.restore()
+
+    rect(ctx, x - 1, y - 1, barW + 2, 9, OUTLINE)
+    rect(ctx, x, y, barW, 7, '#3a1a1a')
     const trail = Math.round((f.hpShown / f.def.hp) * barW)
     const now = Math.round((f.hp / f.def.hp) * barW)
     const pct = f.hp / f.def.hp
-    // Bars drain toward the outer edge so full bars meet at the timer.
-    const from = (w) => (i === 0 ? x + barW - w : x)
-    rect(ctx, from(trail), y, trail, 5, '#f4f4f4')
+    const from = (w) => (left ? x + barW - w : x)
+    rect(ctx, from(trail), y, trail, 7, '#f4f4f4')
     const col = pct > 0.5 ? '#2bd673' : pct > 0.25 ? '#f2c40c' : '#e0393e'
-    rect(ctx, from(now), y, now, 5, col)
-    rect(ctx, from(now), y, now, 1, '#ffffff66')
+    rect(ctx, from(now), y, now, 7, col)
+    rect(ctx, from(now), y, now, 2, '#ffffff55')
+    rect(ctx, from(now), y + 6, now, 1, '#00000044')
 
     const name = f.def.name
-    const nx = i === 0 ? x : x + barW - textWidth(name)
-    drawText(ctx, name, nx, y + 8, '#f4f4f4', 1, OUTLINE)
+    drawText(ctx, name, left ? x : x + barW - textWidth(name), y + 11, '#f4f4f4', 1, OUTLINE)
 
-    // Round-win markers
     for (let s = 0; s < WINS_NEEDED; s++) {
-      const sx = i === 0 ? x + barW - 5 - s * 7 : x + s * 7
-      rect(ctx, sx, y + 8, 5, 5, OUTLINE)
-      rect(ctx, sx + 1, y + 9, 3, 3, s < m.wins[i] ? '#f2b90c' : '#3a3a52')
+      const sx = left ? x + barW - 7 - s * 9 : x + s * 9
+      rect(ctx, sx, y + 11, 7, 7, OUTLINE)
+      rect(ctx, sx + 1, y + 12, 5, 5, s < m.wins[i] ? '#f2b90c' : '#3a3a52')
+      if (s < m.wins[i]) rect(ctx, sx + 1, y + 12, 2, 2, '#fff4b0')
     }
 
     // Special meter
-    const mw = 60
-    const mx = i === 0 ? 6 : LW - 6 - mw
-    const my = LH - 6
+    const mw = 80
+    const mx = left ? 6 : LW - 6 - mw
+    const my = LH - 8
     const ready = f.meter >= SPECIAL_COST
-    rect(ctx, mx - 1, my - 1, mw + 2, 4, OUTLINE)
+    rect(ctx, mx - 1, my - 1, mw + 2, 5, OUTLINE)
+    rect(ctx, mx, my, mw, 3, '#1c1c2e')
     const mfill = Math.round((f.meter / 100) * mw)
     const mcol = ready ? (Math.floor(m.clock * 8) % 2 ? '#f2b90c' : '#fff4b0') : '#2b9ce0'
-    rect(ctx, i === 0 ? mx : mx + mw - mfill, my, mfill, 2, mcol)
-    rect(ctx, mx + mw * (SPECIAL_COST / 100), my - 1, 1, 4, '#f4f4f4')
+    rect(ctx, left ? mx : mx + mw - mfill, my, mfill, 3, mcol)
+    rect(ctx, mx + mw * (SPECIAL_COST / 100), my - 1, 1, 5, '#f4f4f4')
     const label = ready ? `* ${f.def.special.name}!` : 'SPECIAL'
-    const lx = i === 0 ? mx : mx + mw - textWidth(label)
-    drawText(ctx, label, lx, my - 8, ready ? '#f2b90c' : '#9b9bb0', 1, OUTLINE)
+    drawText(ctx, label, left ? mx : mx + mw - textWidth(label), my - 8, ready ? '#f2b90c' : '#9b9bb0', 1, OUTLINE)
   })
 
-  // Timer
-  rect(ctx, LW / 2 - 11, 2, 22, 15, OUTLINE)
-  rect(ctx, LW / 2 - 10, 3, 20, 13, '#26143d')
+  rect(ctx, LW / 2 - 13, 2, 26, 19, OUTLINE)
+  rect(ctx, LW / 2 - 12, 3, 24, 17, '#26143d')
+  rect(ctx, LW / 2 - 12, 3, 24, 1, '#4a2a6a')
   const t = String(Math.ceil(m.timer)).padStart(2, '0')
-  drawText(ctx, t, Math.round(LW / 2 - textWidth(t, 2) / 2), 5, m.timer <= 10 ? '#e0393e' : '#f2b90c', 2)
+  drawText(ctx, t, Math.round(LW / 2 - textWidth(t, 2) / 2), 7, m.timer <= 10 ? '#e0393e' : '#f2b90c', 2)
 }
 
 function drawBanner(ctx, text, t) {
-  const scale = textWidth(text, 3) <= LW - 20 ? 3 : 2
-  // Pop in: start one size smaller for a moment
+  const scale = textWidth(text, 4) <= LW - 20 ? 4 : textWidth(text, 3) <= LW - 20 ? 3 : 2
   const s = t < 0.08 ? Math.max(1, scale - 1) : scale
   const w = textWidth(text, s)
-  drawText(ctx, text, Math.round(LW / 2 - w / 2), Math.round(LH / 2 - 16), '#f2b90c', s, '#3a0a0a')
+  const x = Math.round(LW / 2 - w / 2)
+  const y = Math.round(LH / 2 - 26)
+  drawText(ctx, text, x + s, y + s, '#3a0a0a', s)
+  drawText(ctx, text, x, y, '#f2b90c', s, '#3a0a0a')
 }
 
 export function drawMatch(ctx, m) {
   ctx.imageSmoothingEnabled = false
   ctx.save()
   if (m.shake > 0) {
-    const amt = Math.ceil(m.shake * 8)
+    const amt = Math.ceil(m.shake * 10)
     ctx.translate(Math.round((Math.random() - 0.5) * amt), Math.round((Math.random() - 0.5) * amt))
   }
   ctx.drawImage(background(), 0, 0)
-  drawCrowd(ctx, m.clock)
-  // Whoever is attacking is drawn on top.
+  const excitement = m.phase === 'ko' ? 1 : Math.min(1, m.shake * 3)
+  drawCrowd(ctx, m.clock, excitement)
   const order = [...m.fighters].sort((a, b) => (a.action ? 1 : 0) - (b.action ? 1 : 0))
   order.forEach((f) => drawFighter(ctx, f, m.clock))
   m.projectiles.forEach((p) => drawProjectile(ctx, p))

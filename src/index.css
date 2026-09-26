@@ -1607,7 +1607,8 @@ body {
 
 .brawl-logo-heads {
   display: flex;
-  gap: 10px;
+  gap: 6px;
+  margin: -10px 0 -6px;
 }
 
 .brawl-logo-heads canvas:nth-child(odd) {
@@ -1767,6 +1768,10 @@ body {
 }
 
 @media (max-width: 520px) {
+  .brawl-logo-heads canvas:nth-child(n + 4) {
+    display: none;
+  }
+
   .brawl-logo {
     font-size: 30px;
   }

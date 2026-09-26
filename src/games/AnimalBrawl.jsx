@@ -4,7 +4,7 @@ import { addTokens, getTokens } from '../utils/tokens'
 import { FIGHTERS } from './brawl/fighters'
 import { DIFFICULTY, createInput, createMatch, cpuThink, pressButton, step, snapshot, hydrate } from './brawl/engine'
 import { drawMatch, LW, LH } from './brawl/draw'
-import { HEADS, spriteCanvas } from './brawl/sprites'
+import { stillCanvas } from './brawl/look'
 import { playEvents, sfx, say, isMuted, setMuted, stopVoices } from './brawl/sound'
 import { hostRoom, joinRoom } from './brawl/net'
 
@@ -38,14 +38,25 @@ function keyMapsFor(mode) {
   return [both, null]
 }
 
-function PixelHead({ fighterKey, size = 48 }) {
+// A still pixel-art picture of a fighter: 'head' close-up or full 'body', scaled up crisply.
+function PixelArt({ fighterKey, kind = 'head', zoom = 2 }) {
   const ref = useRef(null)
+  const def = byKey(fighterKey)
+  const src = stillCanvas(def, kind)
   useEffect(() => {
     const ctx = ref.current.getContext('2d')
-    ctx.clearRect(0, 0, 16, 16)
-    ctx.drawImage(spriteCanvas(HEADS[fighterKey]), 0, 0)
-  }, [fighterKey])
-  return <canvas ref={ref} width={16} height={16} className="pixel-head" style={{ width: size, height: size }} />
+    ctx.clearRect(0, 0, src.width, src.height)
+    ctx.drawImage(src, 0, 0)
+  }, [src])
+  return (
+    <canvas
+      ref={ref}
+      width={src.width}
+      height={src.height}
+      className="pixel-head"
+      style={{ width: src.width * zoom, height: src.height * zoom }}
+    />
+  )
 }
 
 function statPips(value, lo, hi) {
@@ -57,7 +68,7 @@ function FighterCard({ f, onPick, mark }) {
   return (
     <button className={`brawl-pick-card ${mark ? 'is-taken' : ''}`} onClick={() => onPick(f)} style={{ '--fighter': f.color }}>
       {mark && <span className="brawl-pick-mark">{mark}</span>}
-      <PixelHead fighterKey={f.key} size={48} />
+      <PixelArt fighterKey={f.key} kind="body" zoom={2} />
       <strong>{f.name}</strong>
       <span className="brawl-pick-pun">{f.pun}</span>
       <span className="brawl-pick-stats">
@@ -475,8 +486,8 @@ export default function AnimalBrawl({ game, onExit }) {
             BRAWL
           </div>
           <div className="brawl-logo-heads">
-            {['lionheart', 'gorillawarfare', 'sharkitecture', 'beestmode', 'rhinomite'].map((k) => (
-              <PixelHead key={k} fighterKey={k} size={40} />
+            {['lionheart', 'gorillawarfare', 'sharkitecture', 'rhinomite'].map((k) => (
+              <PixelArt key={k} fighterKey={k} kind="body" zoom={2} />
             ))}
           </div>
           {notice && <p className="brawl-error">{notice}</p>}
@@ -586,7 +597,7 @@ export default function AnimalBrawl({ game, onExit }) {
       >
         {result && (
           <div className="game-overlay" style={{ '--card-color': game.color }}>
-            <PixelHead fighterKey={picks[result.winner].key} size={80} />
+            <PixelArt fighterKey={picks[result.winner].key} kind="head" zoom={3} />
             <h3 className="brawl-result-title">{title}</h3>
             <p>
               {picks[result.winner].name}: “{picks[result.winner].win}”
