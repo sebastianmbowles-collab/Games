@@ -143,6 +143,15 @@ export const GAMES = [
     playable: true,
   },
   {
+    key: 'animal-brawl',
+    title: 'Animal Brawl',
+    blurb: 'Pick an animal and battle it out, one move at a time.',
+    color: '#e05a2b',
+    icon: '🥊',
+    spriteKey: 'roxy',
+    playable: true,
+  },
+  {
     key: 'delivery',
     title: 'Fazbear Delivery',
     blurb: 'Deliver pizzas to the right tables before they get cold.',
