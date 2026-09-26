@@ -331,11 +331,12 @@ function drawHud(ctx, m) {
     ctx.beginPath()
     ctx.rect(px, 4, 30, 24)
     ctx.clip()
-    if (left) ctx.drawImage(face, px - 2, 2)
+    // The close-up is 40x36; center it in the 30x24 frame.
+    if (left) ctx.drawImage(face, px - 5, -2)
     else {
       ctx.translate(px + 30, 0)
       ctx.scale(-1, 1)
-      ctx.drawImage(face, -2, 2)
+      ctx.drawImage(face, -5, -2)
     }
     ctx.restore()
 

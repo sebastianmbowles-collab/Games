@@ -1,25 +1,21 @@
-// How every fighter looks: heads, bodies, tails, costumes and poses.
-// All coordinates are in screen pixels with (0, 0) at the fighter's feet, facing right.
+// How every fighter looks. Each animal has a real animal body: the snake coils and strikes with
+// its head, the octopus stands on tentacles, the crab scuttles on six legs, the shark stands on its
+// tail fin, the bee hovers, the duck has wings, and hoofed animals have hooves and backward ankles.
+// Coordinates are screen pixels with (0, 0) at the fighter's feet, facing right.
 import { PixelBuf, FLAT } from './pixelbuf'
 import { GROUND } from './engine'
 
 const INK = 0x140c1c
 const WHITE = 0xffffff
-const GLOVE = 0xe0393e
 const PINK = 0xf08aa8
+const CLAW = 0xf4efe0
 
-export const SPRITE_W = 108
-export const SPRITE_H = 110
-export const FOOT_X = 54
-export const FOOT_Y = 104
+export const SPRITE_W = 128
+export const SPRITE_H = 124
+export const FOOT_X = 64
+export const FOOT_Y = 118
 
-const BUILDS = {
-  slim: { tw: 7, arm: 3, leg: 3.5, glove: 3.5 },
-  normal: { tw: 9, arm: 3.5, leg: 4, glove: 4 },
-  bulky: { tw: 11, arm: 4.5, leg: 5, glove: 5 },
-}
-
-// ---------- Eyes and mouths (drawn on top as crisp detail pixels) ----------
+// ---------- Eyes and mouths (crisp detail pixels drawn on top) ----------
 
 function eye(b, x, y, kind, e, iris = 0x2a1a0d) {
   if (e.ko) {
@@ -44,6 +40,11 @@ function eye(b, x, y, kind, e, iris = 0x2a1a0d) {
       b.dots([[x + 1, y - 1], [x + 2, y - 1], [x + 1, y], [x + 2, y], [x + 1, y + 1], [x + 2, y + 1]], INK)
       b.dot(x + 1, y - 1, WHITE)
       b.line(x - 1, y - 3, x + 2, y - 3, INK)
+      break
+    case 'gecko':
+      for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) if (Math.abs(i) + Math.abs(j) < 4) b.dot(x + i, y + j, 0xe8c040)
+      b.dots([[x, y - 2], [x, y - 1], [x, y], [x, y + 1], [x, y + 2]], INK)
+      b.dots([[x - 1, y - 1], [x + 1, y - 2]], 0xfff4b0)
       break
     case 'slit':
       for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) b.dot(x + i, y + j, iris)
@@ -77,315 +78,331 @@ function mouth(b, [x, y], e) {
   b.dots([[x, y + 1], [x + 1, y + 1]], 0xc0304a)
 }
 
-// ---------- The 18 heads. (0, 0) is the middle of the head. ----------
+// ---------- The animals ----------
+// plan: which body blueprint to use. torso: 'barrel' (round belly), 'chest' (broad chest, slim
+// waist), 'slim', 'round'. legs: 'plant' (flat-footed), 'digi' (walks on toes, backward ankle),
+// 'stump', 'bird', 'frog'. hand/foot: what's at the end of each limb.
 
 const LOOKS = {
   hitopotamus: {
-    fur: 0x8d7aa8, light: 0xc9a8cc, trunks: 0x2b7de0, build: 'bulky', feet: 'paw', tail: 'nub', mouth: [9, 6],
+    plan: 'biped', torso: 'barrel', tw: 12, legs: 'stump', hand: 'paw', foot: 'stump', arm: 5, tail: 'thin',
+    fur: 0x8d7aa8, light: 0xd9aec8, mouth: [12, 6], faceY: -56,
     head(b, L, e) {
       const ears = b.part()
-      b.ellipse(-6, -9, 2.5, 2.5, L.fur, ears)
-      b.ellipse(1, -10, 2.5, 2.5, L.fur, ears)
+      b.ellipse(-8, -9, 2.5, 3, L.fur, ears)
       const h = b.part()
-      b.ellipse(-1, -2, 9, 8, L.fur, h)
-      b.ellipse(6, 4, 8.5, 6, L.light, h)
-      b.dots([[-6, -9], [1, -10]], PINK)
-      eye(b, -2, -4, 'round', e)
-      eye(b, 4, -5, 'round', e)
-      b.dots([[9, 1], [10, 1], [12, 2], [13, 2]], 0x5e4d78)
-      if (!e.shout) b.dots([[7, 9], [11, 9]], WHITE)
+      b.ellipse(-3, -3, 8.5, 8, L.fur, h)
+      b.ellipse(-1, -9, 3.5, 3, L.fur, h)
+      b.ellipse(8, 3, 10, 7.5, L.fur, h)
+      b.ellipse(13, -2, 3, 2.5, L.fur, h)
+      b.ellipse(8, 8, 9, 2.5, L.light, h)
+      b.dots([[-8, -9], [-8, -8]], PINK)
+      eye(b, 0, -9, 'round', e)
+      b.dots([[12, -3], [13, -3], [15, -2], [16, -2]], 0x4a3a60)
+      b.dots([[3, 3], [4, 4], [5, 3]], 0xb07aa8)
+      if (!e.shout) {
+        b.line(2, 6, 17, 4, 0x5e4d78)
+        b.dots([[15, 5], [15, 6], [7, 6], [7, 7]], WHITE)
+      }
     },
   },
   geckow: {
-    fur: 0x5cc24a, light: 0xc8e880, trunks: 0xe0393e, build: 'slim', feet: 'claw', tail: 'lizard', mouth: [9, 3],
+    plan: 'biped', torso: 'slim', tw: 6, legs: 'digi', hand: 'toepad', foot: 'toepad', arm: 3, leg: 3, tail: 'lizard',
+    fur: 0x5cc24a, light: 0xc8e880, spots: 0x3a8a30, mouth: [11, 3], faceY: -58,
     head(b, L, e) {
       const bump = b.part()
-      b.ellipse(0, -5, 4.5, 4.5, L.fur, bump)
+      b.ellipse(1, -6, 5.5, 5.5, L.fur, bump)
       const h = b.part()
-      b.ellipse(0, 1, 9, 6, L.fur, h)
-      b.ellipse(7, 1, 6.5, 4.5, L.fur, h)
-      b.ellipse(4, 4, 8, 2.5, L.light, h)
-      eye(b, 0, -5, 'big', e)
-      if (!e.shout) b.line(3, 3, 12, 2, 0x2a6a20)
-      b.dots([[-5, -1], [-3, 2], [-6, 3], [-7, 0], [13, 0]], 0x3a8a30)
+      b.ellipse(0, 1, 9.5, 6.5, L.fur, h)
+      b.ellipse(9, 1, 7, 5, L.fur, h)
+      b.ellipse(6, 4, 9, 2.5, L.light, h)
+      eye(b, 1, -6, 'gecko', e)
+      if (!e.shout) b.line(4, 3, 16, 2, 0x2a6a20)
+      b.dots([[-5, -1], [-3, 2], [-6, 3], [-8, 0], [16, 0], [2, 0]], L.spots)
     },
   },
   pandamonium: {
-    fur: 0xf2f2f2, light: 0xffffff, limbs: 0x2a2a34, trunks: 0x2bb673, build: 'bulky', feet: 'paw', tail: 'nub', mouth: [3, 5],
+    plan: 'biped', torso: 'barrel', tw: 11, legs: 'plant', hand: 'paw', foot: 'paw', arm: 4.5, tail: 'nub',
+    fur: 0xf2f2f2, light: 0xffffff, limbs: 0x2a2a34, band: 0x2a2a34, mouth: [4, 5], faceY: -57,
     head(b, L, e) {
       const ears = b.part()
-      b.ellipse(-7, -8, 3.5, 3.5, 0x2a2a34, ears)
-      b.ellipse(5, -9, 3.5, 3.5, 0x2a2a34, ears)
+      b.ellipse(-8, -9, 4, 4, 0x2a2a34, ears)
+      b.ellipse(6, -10, 4, 4, 0x2a2a34, ears)
       const h = b.part()
-      b.ellipse(0, 0, 10, 9, L.fur, h)
-      b.ellipse(-3, -1, 3, 3.5, 0x2a2a34, h)
-      b.ellipse(6, -1, 3, 3.5, 0x2a2a34, h)
-      eye(b, -3, -1, 'panda', e)
-      eye(b, 5, -1, 'panda', e)
-      b.dots([[2, 3], [3, 3], [4, 3], [3, 4]], INK)
-      if (!e.shout) b.dots([[2, 6], [4, 6], [3, 5]], INK)
+      b.ellipse(0, -1, 11, 9.5, L.fur, h)
+      b.ellipse(5, 4, 5.5, 3.5, L.light, h)
+      b.poly([[-7, -5], [-2, -6], [-1, 1], [-4, 2], [-7, -1]], 0x2a2a34, h)
+      b.poly([[3, -6], [8, -5], [8, -1], [6, 2], [3, 1]], 0x2a2a34, h)
+      eye(b, -4, -2, 'panda', e)
+      eye(b, 5, -2, 'panda', e)
+      b.dots([[4, 2], [5, 2], [6, 2], [5, 3]], INK)
+      if (!e.shout) b.dots([[3, 5], [4, 6], [5, 5], [6, 6], [7, 5]], INK)
     },
   },
   crocadial: {
-    fur: 0x3f8a4a, light: 0xd0dc98, trunks: 0x8a3ddb, build: 'bulky', feet: 'claw', tail: 'croc', mouth: [8, 2],
+    plan: 'biped', torso: 'chest', tw: 10, legs: 'plant', hand: 'claw', foot: 'claw', arm: 4.5, leg: 5, tail: 'croc',
+    fur: 0x3f8a4a, light: 0xd0dc98, scutes: true, mouth: [10, 2], faceY: -56,
     head(b, L, e) {
       const bump = b.part()
-      b.ellipse(-2, -6, 3.5, 3.5, L.fur, bump)
+      b.ellipse(-3, -7, 4, 3.5, L.fur, bump)
       const h = b.part()
-      b.ellipse(-3, -1, 7, 6.5, L.fur, h)
-      b.poly([[-4, -6], [13, -3], [15, 1], [-4, 1]], L.fur, h)
-      b.poly([[-6, 1], [14, 1], [12, 4], [-4, 6]], L.light, h)
-      for (let x = 0; x <= 12; x += 3) b.dots([[x, 1], [x + 1, 2]], WHITE)
-      eye(b, -2, -6, 'slit', e, 0xf2d23a)
-      b.dots([[13, -3], [2, -4], [5, -3], [8, -3]], 0x2a5e32)
+      b.ellipse(-4, -1, 8, 7, L.fur, h)
+      b.poly([[-5, -6], [17, -3], [18, 1], [-5, 1]], L.fur, h)
+      b.poly([[-7, 1], [17, 1], [15, 5], [-5, 7]], L.light, h)
+      b.ellipse(16, -3, 2, 1.8, L.fur, h)
+      for (let x = 0; x <= 15; x += 3) b.dots([[x, 1], [x + 1, 2], [x + 2, 0]], WHITE)
+      eye(b, -3, -7, 'slit', e, 0xf2d23a)
+      b.dots([[16, -4], [2, -4], [5, -3], [8, -3], [11, -3]], 0x2a5e32)
     },
   },
   lionheart: {
-    fur: 0xf2b43a, light: 0xfbe4a8, mane: 0xb8582a, trunks: 0xe0393e, build: 'normal', feet: 'paw', tail: 'lion', mouth: [5, 6],
-    chest: 'fluff',
+    plan: 'biped', torso: 'chest', tw: 9, legs: 'digi', hand: 'paw', foot: 'paw', arm: 4, tail: 'lion',
+    fur: 0xe8a838, light: 0xfbe4a8, mane: 0xa84a20, mouth: [6, 6], faceY: -57,
     head(b, L, e) {
       const mane = b.part()
-      b.ellipse(-2, 0, 12, 12, L.mane, mane)
-      for (const [x, y] of [[-11, -7], [-12, 3], [-5, -11], [-4, 11], [5, -11], [4, 11], [-12, -2]]) b.ellipse(x, y, 3.5, 3.5, L.mane, mane)
+      b.ellipse(-3, 0, 12.5, 13, L.mane, mane)
+      for (const [x, y] of [[-12, -8], [-14, 2], [-6, -12], [-8, 11], [3, -12], [-13, 8], [2, 12]]) b.ellipse(x, y, 4, 4, L.mane, mane)
       const ears = b.part()
-      b.ellipse(-3, -8, 2.5, 2.5, L.fur, ears)
-      b.ellipse(6, -8, 2.5, 2.5, L.fur, ears)
+      b.ellipse(-3, -9, 2.5, 2.5, L.fur, ears)
+      b.ellipse(6, -9, 2.5, 2.5, L.fur, ears)
       const h = b.part()
-      b.ellipse(2, 1, 8, 8, L.fur, h)
-      b.ellipse(5, 5, 5, 3.5, L.light, h)
-      eye(b, 0, -1, 'round', e)
-      eye(b, 6, -1, 'round', e)
-      b.dots([[4, 3], [5, 3], [6, 3], [5, 4]], 0x7a3a1a)
-      if (!e.shout) b.dots([[4, 6], [6, 6], [5, 5]], 0x7a3a1a)
+      b.ellipse(2, 1, 8.5, 8.5, L.fur, h)
+      b.ellipse(7, 5, 6, 4, L.light, h)
+      eye(b, 0, -2, 'round', e, 0xc08020)
+      eye(b, 6, -2, 'round', e, 0xc08020)
+      b.dots([[6, 3], [7, 3], [8, 3], [7, 4]], 0x7a3a1a)
+      b.dots([[4, 5], [3, 6], [10, 5]], 0xc08040)
+      if (!e.shout) b.dots([[6, 6], [8, 6], [7, 5]], 0x7a3a1a)
     },
   },
   bearknuckle: {
-    fur: 0x8a5a32, light: 0xd8b080, trunks: 0x2b7de0, build: 'bulky', feet: 'paw', tail: 'nub', mouth: [7, 5],
+    plan: 'biped', torso: 'barrel', tw: 11, legs: 'plant', hand: 'paw', foot: 'paw', arm: 5, leg: 5, tail: 'nub',
+    fur: 0x8a5a32, light: 0xd8b080, clawHands: true, mouth: [8, 5], faceY: -57,
     head(b, L, e) {
       const ears = b.part()
-      b.ellipse(-6, -8, 3.5, 3.5, L.fur, ears)
-      b.ellipse(4, -9, 3.5, 3.5, L.fur, ears)
+      b.ellipse(-7, -8, 3.5, 3.5, L.fur, ears)
+      b.ellipse(4, -10, 3.5, 3.5, L.fur, ears)
       const h = b.part()
-      b.ellipse(0, 0, 10, 9, L.fur, h)
-      b.ellipse(5, 4, 5.5, 3.5, L.light, h)
-      b.dots([[-6, -8], [4, -9]], L.light)
-      eye(b, -1, -2, 'dot', e)
+      b.ellipse(-1, -1, 10, 9, L.fur, h)
+      b.ellipse(7, 3, 6.5, 4.5, L.fur, h)
+      b.ellipse(8, 4, 5, 3, L.light, h)
+      b.dots([[-7, -8], [4, -10]], L.light)
+      eye(b, 0, -3, 'dot', e)
       eye(b, 5, -3, 'dot', e)
-      b.dots([[7, 2], [8, 2], [9, 2], [8, 3]], INK)
-      if (!e.shout) b.dots([[6, 6], [7, 6], [8, 5]], INK)
-      // Brawler's bandage
+      b.dots([[11, 1], [12, 1], [13, 1], [12, 2]], INK)
+      if (!e.shout) b.dots([[9, 6], [10, 6], [11, 5]], INK)
       b.dots([[-5, 2], [-4, 3], [-3, 4], [-5, 4], [-3, 2]], WHITE)
     },
   },
   beestmode: {
-    fur: 0xf2c40c, light: 0xffe27a, limbs: 0x2a2a34, trunks: 0x2a2a34, build: 'slim', feet: 'claw', tail: 'bee', mouth: [6, 5],
-    chest: 'stripes',
+    plan: 'bee', fur: 0xf2c40c, light: 0xffe27a, fuzz: 0xd89a10, mouth: [7, 5], faceY: -60,
     head(b, L, e) {
       const h = b.part()
-      b.ellipse(0, 0, 8.5, 8.5, L.fur, h)
-      const eyeP = b.part()
-      b.ellipse(4.5, -1, 3.5, 4.5, 0x2a2a34, eyeP)
-      b.ellipse(-2, -2, 2, 2.5, 0x2a2a34, eyeP)
-      if (e.ko) b.dots([[3, -2], [5, -2], [4, -1], [3, 0], [5, 0]], WHITE)
-      else if (e.hurt) b.dots([[3, -2], [4, -1], [3, 0]], WHITE)
-      else if (!e.closed) b.dots([[4, -4], [5, -4], [4, -3], [-2, -3]], WHITE)
-      b.line(-2, -8, -5, -14, INK)
-      b.line(2, -8, 4, -15, INK)
-      b.dots([[-6, -15], [-5, -15], [-6, -14], [4, -16], [5, -16], [5, -15]], INK)
-      if (!e.shout) b.dots([[4, 5], [5, 6], [6, 6], [7, 5]], INK)
+      b.ellipse(0, 0, 9, 9, 0x2a2a34, h)
+      b.ellipse(3, 2, 6, 6, L.fur, h)
+      const eyes = b.part()
+      b.ellipse(5, -2, 3.5, 5, 0x3a2a44, eyes)
+      b.ellipse(-4, -2, 3, 4.5, 0x3a2a44, eyes)
+      if (e.ko) b.dots([[4, -3], [6, -3], [5, -2], [4, -1], [6, -1]], WHITE)
+      else if (e.hurt) b.dots([[4, -3], [5, -2], [4, -1]], WHITE)
+      else if (!e.closed) b.dots([[5, -5], [6, -5], [5, -4], [-4, -4], [-3, -4]], WHITE)
+      b.line(-1, -8, -4, -15, INK)
+      b.line(3, -8, 6, -15, INK)
+      b.dots([[-5, -16], [-4, -16], [-5, -15], [6, -16], [7, -16], [7, -15]], INK)
+      if (!e.shout) b.dots([[5, 6], [6, 7], [7, 7], [8, 6]], INK)
     },
   },
   kickahorse: {
-    fur: 0xa86a3d, light: 0xdcae80, mane: 0x3a2010, trunks: 0xf2b90c, build: 'normal', feet: 'hoof', tail: 'horse', mouth: [10, 6],
+    plan: 'biped', torso: 'chest', tw: 9, legs: 'digi', hand: 'hoof', foot: 'hoof', arm: 4, tail: 'horse', longNeck: true,
+    fur: 0xa86a3d, light: 0xdcae80, mane: 0x3a2010, mouth: [13, 7], faceY: -60,
     head(b, L, e) {
-      const mane = b.part()
-      b.poly([[-9, -10], [-1, -12], [-5, 4], [-11, 8], [-11, -2]], L.mane, mane)
       const ear = b.part()
-      b.poly([[-3, -8], [-1, -16], [2, -8]], L.fur, ear)
+      b.poly([[-4, -8], [-2, -16], [1, -8]], L.fur, ear)
       const h = b.part()
-      b.ellipse(-1, -2, 7, 7, L.fur, h)
-      b.ellipse(7, 2, 7.5, 5, L.fur, h)
-      b.ellipse(11, 3, 4, 4, L.light, h)
+      b.ellipse(-2, -3, 7, 7, L.fur, h)
+      b.poly([[-4, -8], [4, -6], [16, 3], [15, 9], [8, 9], [-4, 3]], L.fur, h)
+      b.ellipse(13, 6, 4.5, 4, L.light, h)
       const tuft = b.part()
-      b.poly([[-3, -9], [4, -8], [1, -4]], L.mane, tuft)
+      b.poly([[-5, -9], [3, -8], [0, -3]], L.mane, tuft)
       eye(b, 1, -3, 'round', e)
-      b.dots([[13, 1], [13, 2]], INK)
-      if (!e.shout) b.line(9, 6, 13, 6, 0x5a3418)
+      b.dots([[15, 4], [15, 5], [2, 1], [5, 3]], 0x5a3418)
+      if (!e.shout) b.line(11, 9, 15, 9, 0x5a3418)
     },
   },
   sharkitecture: {
-    fur: 0x5a8ab8, light: 0xe8eef4, trunks: 0xe0393e, build: 'normal', feet: 'claw', tail: 'shark', mouth: [8, 3],
+    plan: 'fish', fur: 0x5a8ab8, light: 0xeef2f6, mouth: [10, 4], faceY: -58,
     head(b, L, e) {
       const h = b.part()
-      b.ellipse(0, 1, 10, 8, L.fur, h)
-      b.ellipse(6, 0, 7, 6, L.fur, h)
-      b.ellipse(4, 5, 8, 3.5, L.light, h)
-      // Hard hat — it's an architect!
+      b.poly([[-10, -7], [2, -9], [12, -4], [17, 1], [14, 5], [-10, 8]], L.fur, h)
+      b.poly([[-10, 3], [15, 3], [13, 6], [-10, 8]], L.light, h)
       const hat = b.part()
-      b.ellipse(-1, -6, 8, 4.5, 0xf2c40c, hat)
-      b.rect(-10, -4, 20, 2, 0xf2c40c, hat)
-      b.dots([[-1, -10], [-1, -9], [-1, -8]], 0xc98a0c)
+      b.ellipse(-1, -9, 8, 4.5, 0xf2c40c, hat)
+      b.rect(-10, -7, 20, 2, 0xf2c40c, hat)
+      b.dots([[-1, -13], [-1, -12], [-1, -11]], 0xc98a0c)
       if (!e.shout) {
-        b.line(3, 4, 12, 4, INK)
-        for (let x = 4; x <= 11; x += 2) b.dot(x, 5, WHITE)
-        for (let x = 5; x <= 12; x += 2) b.dot(x, 3, WHITE)
+        b.line(3, 3, 14, 3, INK)
+        for (let x = 4; x <= 13; x += 2) b.dot(x, 4, WHITE)
+        for (let x = 5; x <= 13; x += 2) b.dot(x, 2, WHITE)
       }
-      b.dots([[-6, 0], [-6, 1], [-4, 0], [-4, 1], [-2, 1], [-2, 2]], 0x3a5e88)
-      eye(b, 5, -2, 'dot', e)
+      eye(b, 6, -2, 'dot', e)
     },
   },
   duckandcover: {
-    fur: 0x8a5a32, light: 0xe8dcc8, neck: 0x2a8a4a, trunks: 0x2b7de0, build: 'normal', feet: 'webbed', tail: 'duck', mouth: [10, 2],
+    plan: 'biped', torso: 'round', tw: 10, legs: 'bird', hand: 'wing', foot: 'webbed', arm: 4, tail: 'duck', neck: 0x2a8a4a,
+    fur: 0x9a9aa0, light: 0x8a5a32, chestColor: 0x8a5a32, wingColor: 0x6a6a74, mouth: [11, 2], faceY: -57,
     head(b, L, e) {
       const h = b.part()
-      b.ellipse(0, 0, 8, 8, 0x2a8a4a, h)
+      b.ellipse(0, 0, 8.5, 8, 0x2a8a4a, h)
       const beak = b.part()
-      b.ellipse(9, 2, 6, 2.5, 0xf29a1a, beak)
-      if (!e.shout) b.line(5, 2, 14, 2, 0xb8600a)
-      // Army helmet: take cover!
+      b.poly([[5, -1], [15, 0], [17, 3], [15, 4], [5, 4]], 0xf29a1a, beak)
+      if (!e.shout) b.line(6, 2, 16, 2, 0xb8600a)
+      b.dots([[13, 0]], 0xb8600a)
       const helmet = b.part()
-      b.ellipse(-1, -5, 9, 5.5, 0x5a6a2a, helmet)
-      b.rect(-11, -3, 21, 2, 0x5a6a2a, helmet)
+      b.ellipse(-1, -5, 9.5, 5.5, 0x5a6a2a, helmet)
+      b.rect(-12, -3, 22, 2, 0x5a6a2a, helmet)
       b.dots([[-5, -8], [0, -7], [3, -9], [-3, -5]], 0x3a4a1a)
-      b.line(-4, 7, 4, 7, WHITE)
+      b.line(-5, 7, 4, 7, WHITE)
       eye(b, 3, -1, 'round', e)
     },
   },
   hissterical: {
-    fur: 0x4aa84a, light: 0xe0d070, trunks: 0x8a3ddb, build: 'slim', feet: 'claw', tail: 'snake', mouth: [9, 2],
+    plan: 'snake', fur: 0x4aa84a, light: 0xe8d870, pattern: 0x2e7a2e, mouth: [10, 2], faceY: -56,
     head(b, L, e) {
-      const hood = b.part()
-      b.ellipse(-4, 3, 7, 10, 0x3a8a3a, hood)
-      b.dots([[-6, 0], [-5, 1], [-6, 2], [-7, 1], [-6, 6], [-5, 7], [-6, 8], [-7, 7]], L.light)
       const h = b.part()
       b.ellipse(1, 0, 9, 5.5, L.fur, h)
-      b.ellipse(7, 1, 5, 4, L.fur, h)
-      b.ellipse(4, 3, 7, 2, L.light, h)
+      b.ellipse(8, 1, 6, 4, L.fur, h)
+      b.ellipse(5, 3, 8, 2, L.light, h)
       eye(b, 4, -2, 'slit', e, 0xf2d23a)
-      b.dots([[-2, -3], [0, -4], [2, -4], [-4, -2]], 0x2e7a2e)
-      if (e.tongue && !e.ko && !e.shout) b.dots([[12, 2], [13, 2], [14, 2], [15, 1], [15, 3]], 0xe0393e)
+      b.dots([[-2, -3], [0, -4], [2, -4], [-4, -2], [-6, 0]], L.pattern)
+      b.dots([[13, 0]], INK)
+      if (e.tongue && !e.ko && !e.shout) b.dots([[14, 2], [15, 2], [16, 2], [17, 1], [17, 3]], 0xe0393e)
     },
   },
   crabbat: {
-    fur: 0xe0503a, light: 0xf5a888, trunks: 0x2a2a34, build: 'normal', feet: 'claw', tail: 'crablegs', glove: 'pincer', mouth: [3, 4],
+    plan: 'crab', fur: 0xe0503a, light: 0xf5a888, mouth: [11, 2], faceY: -46,
     head(b, L, e) {
+      // Only the eyes on stalks — the crab's "head" is the front of its shell.
       const stalks = b.part()
-      b.capsule(-3, -3, -4, -9, 1, 1, L.fur, stalks)
-      b.capsule(4, -3, 5, -10, 1, 1, L.fur, stalks)
-      const h = b.part()
-      b.ellipse(0, 1, 11, 7, L.fur, h)
-      b.dots([[-6, 0], [-3, -2], [7, 2], [-7, 4]], L.light)
-      eye(b, -4, -10, 'round', e)
-      eye(b, 5, -11, 'round', e)
-      if (!e.shout) b.dots([[2, 4], [3, 5], [4, 5], [5, 4]], INK)
+      b.capsule(-2, 6, -3, -3, 1.2, 1.2, L.fur, stalks)
+      b.capsule(5, 6, 6, -4, 1.2, 1.2, L.fur, stalks)
+      b.ellipse(-3, -4, 2.8, 2.8, L.fur, stalks)
+      b.ellipse(6, -5, 2.8, 2.8, L.fur, stalks)
+      eye(b, -3, -4, 'round', e)
+      eye(b, 6, -5, 'round', e)
     },
   },
   octopunch: {
-    fur: 0xd0508a, light: 0xf5a0c8, trunks: 0xf2b90c, build: 'normal', feet: 'tentacle', tail: 'tentacles', mouth: [2, 6],
+    plan: 'octopus', fur: 0xd0508a, light: 0xf5a0c8, mouth: [3, 8], faceY: -52,
     head(b, L, e) {
       const h = b.part()
-      b.ellipse(0, -3, 10, 11, L.fur, h)
-      b.dots([[-5, -9], [-3, -11], [-7, -4], [2, -10], [-6, -8]], L.light)
-      eye(b, -1, 1, 'round', e)
-      eye(b, 5, 1, 'round', e)
-      if (!e.shout) b.dots([[2, 5], [3, 5], [2, 6], [3, 6]], 0x7a1a4a)
-      b.dots([[-3, 4], [8, 4]], PINK)
+      b.ellipse(-1, -6, 11, 13, L.fur, h)
+      b.ellipse(2, 4, 9, 6, L.fur, h)
+      b.dots([[-6, -12], [-3, -15], [-8, -6], [1, -13], [-5, -9], [-9, -1]], L.light)
+      eye(b, -1, 3, 'round', e)
+      eye(b, 6, 3, 'round', e)
+      if (!e.shout) b.dots([[3, 8], [4, 8], [3, 9], [4, 9]], 0x7a1a4a)
+      b.dots([[-4, 6], [9, 6]], PINK)
     },
   },
   gorillawarfare: {
-    fur: 0x4a4a55, light: 0x9a8a80, trunks: 0x4a6a2a, build: 'bulky', feet: 'paw', tail: null, mouth: [4, 5],
-    chest: 'strap',
+    plan: 'biped', torso: 'chest', tw: 12, legs: 'plant', hand: 'knuckle', foot: 'paw', arm: 5.5, leg: 5, longArms: true,
+    hunch: 3, tail: null, fur: 0x3a3a44, light: 0x6a6a74, silver: 0xa8a8b4, mouth: [5, 5], faceY: -54,
     head(b, L, e) {
       const tails = b.part()
-      b.poly([[-8, -7], [-16, -4], [-15, -2], [-8, -4]], 0xe0393e, tails)
-      b.poly([[-8, -6], [-14, 0], [-12, 1], [-7, -4]], 0xe0393e, tails)
+      b.poly([[-8, -8], [-16, -5], [-15, -3], [-8, -5]], 0xe0393e, tails)
+      b.poly([[-8, -7], [-14, -1], [-12, 0], [-7, -5]], 0xe0393e, tails)
       const h = b.part()
-      b.ellipse(0, -1, 9, 9, L.fur, h)
-      b.ellipse(3, 2, 7, 6, L.light, h)
-      b.ellipse(3, -3, 7, 1.8, 0x3a3a44, h)
+      b.ellipse(-1, -2, 9.5, 9.5, L.fur, h)
+      b.poly([[-6, -9], [-1, -14], [4, -9]], L.fur, h)
+      b.ellipse(4, 2, 7.5, 6.5, 0x8a7a70, h)
+      b.ellipse(4, -3, 7.5, 2, 0x2a2a30, h)
       const band = b.part()
-      b.rect(-9, -8, 18, 3, 0xe0393e, band)
-      eye(b, 1, -1, 'dot', e)
-      eye(b, 6, -1, 'dot', e)
-      b.dots([[4, 2], [6, 2]], INK)
-      if (!e.shout) b.line(1, 5, 7, 5, 0x3a3a44)
+      b.rect(-10, -9, 19, 3, 0xe0393e, band)
+      eye(b, 2, -1, 'dot', e)
+      eye(b, 7, -1, 'dot', e)
+      b.dots([[6, 2], [8, 2], [5, 1], [9, 1]], 0x3a2a24)
+      if (!e.shout) b.line(2, 5, 9, 5, 0x3a2a24)
     },
   },
   goatnglory: {
-    fur: 0xefe6d0, light: 0xffffff, trunks: 0x8a3ddb, build: 'normal', feet: 'hoof', tail: 'nub', mouth: [7, 5],
-    chest: 'medal',
+    plan: 'biped', torso: 'chest', tw: 8, legs: 'digi', hand: 'hoof', foot: 'hoof', arm: 3.5, tail: 'goat', longNeck: true,
+    fur: 0xefe6d0, light: 0xffffff, medal: true, mouth: [9, 5], faceY: -60,
     head(b, L, e) {
       const horns = b.part()
-      b.capsule(-2, -6, -7, -12, 2, 1.6, 0x8a6a48, horns)
-      b.capsule(-7, -12, -12, -10, 1.6, 0.8, 0x8a6a48, horns)
-      b.capsule(1, -7, -3, -14, 2, 1.4, 0x9a7a58, horns)
-      b.capsule(-3, -14, -7, -14, 1.4, 0.8, 0x9a7a58, horns)
+      b.capsule(-2, -6, -8, -13, 2.2, 1.7, 0x8a6a48, horns)
+      b.capsule(-8, -13, -14, -10, 1.7, 0.8, 0x8a6a48, horns)
+      b.capsule(1, -7, -3, -15, 2.2, 1.5, 0x9a7a58, horns)
+      b.capsule(-3, -15, -8, -15, 1.5, 0.8, 0x9a7a58, horns)
+      b.dots([[-5, -10], [-7, -12], [-1, -11]], 0x5a4228)
       const ear = b.part()
-      b.ellipse(-6, -2, 3.5, 1.6, L.fur, ear)
+      b.ellipse(-7, -2, 4, 1.8, L.fur, ear)
       const h = b.part()
-      b.ellipse(-1, -1, 7, 7, L.fur, h)
-      b.ellipse(6, 2, 5.5, 4, L.fur, h)
+      b.ellipse(-1, -2, 7, 7, L.fur, h)
+      b.poly([[1, -6], [13, 1], [12, 6], [2, 5]], L.fur, h)
       const beard = b.part()
-      b.poly([[3, 5], [8, 5], [5, 12]], 0xcfc0a0, beard)
+      b.poly([[4, 5], [10, 5], [6, 13]], 0xcfc0a0, beard)
       eye(b, 2, -2, 'goat', e)
-      b.dots([[10, 1], [10, 2]], PINK)
-      b.dots([[-6, -2], [-5, -2]], PINK)
+      b.dots([[12, 1], [12, 2]], PINK)
+      b.dots([[-7, -2], [-6, -2]], PINK)
     },
   },
   wolfpack: {
-    fur: 0x7a8494, light: 0xd4d8e0, trunks: 0x2a2a34, build: 'normal', feet: 'paw', tail: 'bushy', mouth: [9, 5],
+    plan: 'biped', torso: 'chest', tw: 8, legs: 'digi', hand: 'paw', foot: 'paw', arm: 3.5, tail: 'bushy',
+    fur: 0x7a8494, light: 0xd4d8e0, mouth: [11, 5], faceY: -58,
     head(b, L, e) {
       const ears = b.part()
-      b.poly([[-7, -5], [-5, -15], [-1, -7]], L.fur, ears)
-      b.poly([[0, -7], [3, -15], [5, -5]], L.fur, ears)
-      b.dots([[-5, -11], [-4, -9], [3, -11], [3, -9]], 0x4a5260)
+      b.poly([[-8, -5], [-6, -16], [-1, -7]], L.fur, ears)
+      b.poly([[-1, -7], [2, -16], [5, -5]], L.fur, ears)
+      b.dots([[-6, -12], [-5, -10], [2, -12], [2, -10]], 0x4a5260)
       const h = b.part()
       b.ellipse(-1, -1, 8, 8, L.fur, h)
-      b.ellipse(7, 3, 6.5, 3.5, L.fur, h)
-      b.ellipse(5, 4, 6, 3, L.light, h)
-      b.ellipse(-4, 4, 4, 3, L.light, h)
+      b.poly([[3, -3], [16, 1], [16, 4], [4, 6]], L.fur, h)
+      b.ellipse(7, 4, 7, 2.5, L.light, h)
+      b.ellipse(-4, 4, 4.5, 3.5, L.light, h)
       eye(b, 3, -3, 'slit', e, 0xf2d23a)
-      b.dots([[12, 1], [13, 1], [12, 2], [13, 2]], INK)
-      if (!e.shout) b.line(8, 6, 12, 5, 0x4a5260)
+      b.dots([[15, 0], [16, 0], [15, 1], [16, 1]], INK)
+      if (!e.shout) b.line(9, 6, 15, 4, 0x4a5260)
     },
   },
   rhinomite: {
-    fur: 0x8f8f9c, light: 0xb8b8c4, trunks: 0xe0393e, build: 'bulky', feet: 'hoof', tail: 'nub', mouth: [9, 6],
-    chest: 'dynamite',
+    plan: 'biped', torso: 'barrel', tw: 12, legs: 'stump', hand: 'stump', foot: 'stump', arm: 5, tail: 'thin', folds: true,
+    fur: 0x8f8f9c, light: 0xa8a8b4, dynamite: true, mouth: [11, 6], faceY: -56,
     head(b, L, e) {
       const ear = b.part()
-      b.ellipse(-5, -8, 2, 3.5, L.fur, ear)
+      b.ellipse(-6, -9, 2, 4, L.fur, ear)
       const h = b.part()
-      b.ellipse(-2, -1, 8, 8, L.fur, h)
-      b.ellipse(6, 3, 7, 6, L.fur, h)
+      b.ellipse(-3, -1, 8, 8, L.fur, h)
+      b.ellipse(7, 2, 8, 6.5, L.fur, h)
       const horn = b.part()
-      b.poly([[7, -2], [15, -13], [12, -1]], 0xefe6d0, horn)
-      b.poly([[3, -5], [6, -10], [7, -4]], 0xefe6d0, horn)
-      eye(b, 1, -3, 'dot', e)
-      b.dots([[12, 3], [-4, 2], [-3, 3], [-2, 2]], 0x62626e)
-      if (!e.shout) b.line(7, 7, 12, 6, 0x62626e)
+      b.poly([[9, -3], [17, -15], [14, -1]], 0xe8e0c8, horn)
+      b.poly([[3, -5], [7, -11], [8, -4]], 0xe8e0c8, horn)
+      eye(b, 0, -3, 'dot', e)
+      b.dots([[13, 2], [-5, 2], [-4, 3], [-3, 2], [2, 4], [3, 5]], 0x62626e)
+      if (!e.shout) b.line(8, 7, 14, 6, 0x62626e)
     },
   },
   frogment: {
-    fur: 0x6cc24a, light: 0xd0f4a8, trunks: 0xe0393e, build: 'slim', feet: 'webbed', tail: null, mouth: [2, 4],
+    plan: 'biped', torso: 'round', tw: 9, legs: 'frog', hand: 'toepad', foot: 'webbed', arm: 3, tail: null,
+    fur: 0x6cc24a, light: 0xd8f4b0, spots: 0x3a8a30, mouth: [3, 4], faceY: -54,
     head(b, L, e) {
       const bumps = b.part()
-      b.ellipse(-4, -5, 4, 4, L.fur, bumps)
-      b.ellipse(5, -6, 4, 4, L.fur, bumps)
+      b.ellipse(-4, -5, 4.5, 4.5, L.fur, bumps)
+      b.ellipse(6, -6, 4.5, 4.5, L.fur, bumps)
       const h = b.part()
-      b.ellipse(1, 2, 11, 6.5, L.fur, h)
-      b.ellipse(2, 6, 8, 2.5, L.light, h)
+      b.ellipse(1, 2, 12, 7, L.fur, h)
+      b.ellipse(2, 6, 9, 2.5, L.light, h)
       eye(b, -4, -5, 'big', e)
-      eye(b, 5, -6, 'big', e)
-      if (!e.shout) b.dots([[-7, 2], [-6, 3], [-5, 4], [-4, 4], [-3, 4], [-2, 4], [-1, 4], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4], [7, 4], [8, 4], [9, 3], [10, 2]], 0x2a6a20)
-      b.dots([[-6, 5], [9, 5]], PINK)
+      eye(b, 6, -6, 'big', e)
+      if (!e.shout) b.dots([[-8, 2], [-7, 3], [-6, 4], [-5, 4], [-4, 4], [-3, 4], [-2, 4], [-1, 4], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4], [7, 4], [8, 4], [9, 4], [10, 3], [11, 2]], 0x2a6a20)
+      b.dots([[-7, 5], [10, 5]], PINK)
+      b.dots([[-2, -1], [3, 0], [-7, 0]], L.spots)
     },
   },
 }
 
-// ---------- Body parts ----------
+// ---------- Limb helpers ----------
 
-// Two-bone "inverse kinematics": where does the elbow/knee go so the hand/foot reaches the target?
+// Two-bone "inverse kinematics": where the elbow/knee goes so the hand/foot reaches the target.
 function ik(ax, ay, bx, by, l1, l2, bend) {
   let dx = bx - ax
   let dy = by - ay
@@ -403,124 +420,438 @@ function ik(ax, ay, bx, by, l1, l2, bend) {
   return [ax + Math.cos(ang) * l1, ay + Math.sin(ang) * l1, bx, by]
 }
 
-function leg(b, L, B, hip, foot, color) {
-  const [kx, ky, fx, fy] = ik(hip[0], hip[1], foot[0], foot[1], 10, 10, -1)
-  const r = b.part()
-  b.capsule(hip[0], hip[1], kx, ky, B.leg, B.leg - 0.5, color, r)
-  b.capsule(kx, ky, fx, fy - 1, B.leg - 0.5, B.leg - 1, color, r)
+// A bendy limb (tentacle, snake body) through a middle point, as a chain of tapering capsules.
+function curve(b, pts, r0, r1, color, part) {
+  const n = 8
+  let [px, py] = pts[0]
+  for (let i = 1; i <= n; i++) {
+    const t = i / n
+    const u = 1 - t
+    const x = u * u * pts[0][0] + 2 * u * t * pts[1][0] + t * t * pts[2][0]
+    const y = u * u * pts[0][1] + 2 * u * t * pts[1][1] + t * t * pts[2][1]
+    b.capsule(px, py, x, y, r0 + (r1 - r0) * ((i - 1) / n), r0 + (r1 - r0) * t, color, part)
+    px = x
+    py = y
+  }
+}
+
+function foot(b, L, type, fx, fy, color) {
   const f = b.part()
-  switch (L.feet) {
+  switch (type) {
     case 'hoof':
-      b.rect(fx - 3, fy - 3, 6, 3, 0x3a2418, f)
+      b.rect(fx - 2, fy - 4, 6, 4, 0x2e1c12, f)
+      b.dots([[fx + 1, fy - 1]], 0x4a2e1e)
+      break
+    case 'stump':
+      b.ellipse(fx + 1, fy - 2.5, 5.5, 2.8, color, f)
+      b.dots([[fx + 3, fy - 1], [fx + 5, fy - 2], [fx + 1, fy - 1]], CLAW)
       break
     case 'webbed':
-      b.poly([[fx - 2, fy - 3], [fx + 6, fy - 1], [fx + 6, fy], [fx - 3, fy]], L.key === 'frogment' ? L.fur : 0xf29a1a, f)
+      b.poly([[fx - 3, fy - 3], [fx + 7, fy - 1], [fx + 7, fy], [fx - 4, fy]], L.plan === 'biped' && L.legs === 'frog' ? L.fur : 0xf29a1a, f)
+      b.dots([[fx + 2, fy - 1], [fx + 5, fy - 1]], 0x3a2a3a)
       break
     case 'claw':
-      b.ellipse(fx + 1, fy - 1.5, 4, 2, color, f)
-      b.dots([[fx + 4, fy - 1], [fx + 5, fy], [fx + 2, fy]], 0xf4f0e0)
+      b.ellipse(fx + 1, fy - 1.5, 4.5, 2, color, f)
+      b.dots([[fx + 5, fy - 1], [fx + 6, fy], [fx + 3, fy]], CLAW)
       break
-    case 'tentacle':
-      b.capsule(fx, fy - 2, fx + 5, fy - 1, 2.5, 1.2, color, f)
-      b.dots([[fx + 1, fy - 1], [fx + 3, fy - 1]], L.light)
+    case 'toepad':
+      b.ellipse(fx + 1, fy - 1.5, 3.5, 1.8, color, f)
+      b.dots([[fx + 5, fy - 2], [fx + 5, fy], [fx + 3, fy]], L.light)
       break
-    default:
-      b.ellipse(fx + 1.5, fy - 1.5, 4.5, 2.2, color, f)
+    default: // paw
+      b.ellipse(fx + 1.5, fy - 2, 4.5, 2.4, color, f)
+      b.dots([[fx + 4, fy - 1], [fx + 2, fy - 1]], 0x3a2a3a)
   }
 }
 
-function arm(b, L, B, shoulder, hand, color) {
-  const [ex, ey, hx, hy] = ik(shoulder[0], shoulder[1], hand[0], hand[1], 10, 10, 1)
+function leg(b, L, hip, target, color) {
+  const w = L.leg ?? (L.tw >= 11 ? 5 : L.tw <= 6 ? 3 : 4)
   const r = b.part()
-  b.capsule(shoulder[0], shoulder[1], ex, ey, B.arm + 0.5, B.arm, color, r)
-  b.capsule(ex, ey, hx, hy, B.arm, B.arm - 0.5, color, r)
-  const g = b.part()
-  if (L.glove === 'pincer') {
-    const ang = Math.atan2(hy - ey, hx - ex)
-    const cx = hx + Math.cos(ang) * 2
-    const cy = hy + Math.sin(ang) * 2
-    b.ellipse(cx, cy, B.glove + 1, B.glove, L.fur, g)
-    const g2 = b.part()
-    b.ellipse(cx + Math.cos(ang) * 4 - 1, cy + Math.sin(ang) * 4 - 2, 3, 2, L.fur, g2)
-    b.ellipse(cx + Math.cos(ang) * 4, cy + Math.sin(ang) * 4 + 2, 3, 1.6, L.fur, g2)
+  const [tx, ty] = target
+  if (L.legs === 'digi' || L.legs === 'bird') {
+    // Walks on its toes: the "backward knee" is really the ankle.
+    const thin = L.legs === 'bird'
+    const ankle = [tx - 3, ty - 6]
+    const [kx, ky, ax, ay] = ik(hip[0], hip[1], ankle[0], ankle[1], 9, 8, -1)
+    const lw = thin ? 1.3 : w
+    const legColor = thin ? 0xf29a1a : color
+    if (!thin) b.capsule(hip[0], hip[1], kx, ky, w + 0.5, w - 0.5, color, r)
+    else b.capsule(hip[0], hip[1], kx, ky, 3.5, 2, L.fur, r)
+    b.capsule(kx, ky, ax, ay, thin ? 1.3 : w - 0.5, lw - 0.5, legColor, r)
+    b.capsule(ax, ay, tx, ty - 1, thin ? 1.2 : w - 1, thin ? 1.2 : w - 1.5, legColor, r)
+  } else if (L.legs === 'frog') {
+    // Big folded frog legs: fat thigh, knee sticks out forward.
+    const [kx, ky, fx, fy] = ik(hip[0], hip[1] + 3, tx, ty, 11, 11, -1)
+    b.capsule(hip[0], hip[1] + 3, kx, ky, 5.5, 4, color, r)
+    b.capsule(kx, ky, fx, fy - 1, 3.5, 2, color, r)
+    b.dots([[kx - 2, ky - 1], [hip[0] + 1, hip[1] + 4]], L.spots)
   } else {
-    b.ellipse(hx, hy, B.glove + 0.5, B.glove, L.glove || GLOVE, g)
-    b.capsule(hx - Math.cos(Math.atan2(hy - ey, hx - ex)) * B.glove, hy - Math.sin(Math.atan2(hy - ey, hx - ex)) * B.glove, hx - Math.cos(Math.atan2(hy - ey, hx - ex)) * (B.glove - 1), hy - Math.sin(Math.atan2(hy - ey, hx - ex)) * (B.glove - 1), 2, 2, 0xf4f0e0, g)
-    b.dot(hx - 1, hy - B.glove + 1, 0xffb0b0)
+    const stump = L.legs === 'stump'
+    const len = stump ? 8.5 : 10
+    const [kx, ky, fx, fy] = ik(hip[0], hip[1], tx, ty, len, len, -1)
+    b.capsule(hip[0], hip[1], kx, ky, w + (stump ? 1.5 : 0.5), w + (stump ? 1 : 0), color, r)
+    b.capsule(kx, ky, fx, fy - 1, w + (stump ? 1 : 0), w - (stump ? 0 : 1), color, r)
+  }
+  foot(b, L, L.foot, tx, ty, color)
+}
+
+function hand(b, L, type, hx, hy, ang, color) {
+  const g = b.part()
+  const cx = Math.cos(ang)
+  const cy = Math.sin(ang)
+  switch (type) {
+    case 'hoof':
+      b.capsule(hx - cx, hy - cy, hx + cx * 2, hy + cy * 2, 3, 3, 0x2e1c12, g)
+      break
+    case 'stump':
+      b.ellipse(hx + cx, hy + cy, 4.5, 4.5, color, g)
+      b.dots([[hx + cx * 4, hy + cy * 4 - 1], [hx + cx * 4, hy + cy * 4 + 1]], CLAW)
+      break
+    case 'claw':
+      b.ellipse(hx + cx, hy + cy, 3.5, 3.2, color, g)
+      b.dots([[hx + cx * 5, hy + cy * 5 - 1], [hx + cx * 5, hy + cy * 5 + 1], [hx + cx * 4 + 1, hy + cy * 4 + 2]], CLAW)
+      break
+    case 'toepad':
+      b.ellipse(hx + cx, hy + cy, 2.8, 2.8, color, g)
+      b.dots([[hx + cx * 4 - cy * 2, hy + cy * 4 + cx * 2], [hx + cx * 4 + cy * 2, hy + cy * 4 - cx * 2], [hx + cx * 5, hy + cy * 5]], L.light)
+      break
+    case 'knuckle':
+      b.ellipse(hx + cx, hy + cy, 5, 4.5, 0x2a2a30, g)
+      b.dots([[hx + cx * 4, hy + cy * 4 - 2], [hx + cx * 4, hy + cy * 4], [hx + cx * 4, hy + cy * 4 + 2]], 0x6a6a74)
+      break
+    case 'fin':
+      b.poly([[hx - cx * 6 - cy * 3, hy - cy * 6 + cx * 3], [hx + cx * 4, hy + cy * 4], [hx - cx * 6 + cy * 3, hy - cy * 6 - cx * 3], [hx - cx * 3 + cy * 7, hy - cy * 3 - cx * 7]], color, g)
+      break
+    case 'wing':
+      // Feather tips fanned out at the end of the wing
+      for (let i = -1; i <= 1; i++) b.capsule(hx - cx * 2, hy - cy * 2, hx + cx * 5 - cy * i * 3, hy + cy * 5 + cx * i * 3, 2, 1, i === 0 ? L.wingColor : 0x4a4a54, g)
+      b.dots([[hx - cx * 3, hy - cy * 3 + 1]], 0x3a8ae0)
+      break
+    default: // paw
+      b.ellipse(hx + cx, hy + cy, 4, 3.8, color, g)
+      b.dots([[hx + cx * 3 - cy, hy + cy * 3 + cx], [hx + cx * 3 + cy, hy + cy * 3 - cx]], 0x3a2a3a)
+      if (L.clawHands) b.dots([[hx + cx * 5, hy + cy * 5 - 1], [hx + cx * 5, hy + cy * 5 + 1]], CLAW)
   }
 }
 
-function tail(b, L, B, clock) {
-  const tx = -B.tw + 1
+function arm(b, L, shoulder, target, color) {
+  const w = L.arm ?? 4
+  const len = L.longArms ? 12.5 : 10
+  const [ex, ey, hx, hy] = ik(shoulder[0], shoulder[1], target[0], target[1], len, len, 1)
+  const r = b.part()
+  const armColor = L.hand === 'wing' ? L.wingColor : color
+  b.capsule(shoulder[0], shoulder[1], ex, ey, w + 0.5, w, armColor, r)
+  b.capsule(ex, ey, hx, hy, w, w - 0.8, armColor, r)
+  if (L.silver) b.dots([[shoulder[0] - 1, shoulder[1] - 1]], L.silver)
+  hand(b, L, L.hand, hx, hy, Math.atan2(hy - ey, hx - ex), color)
+}
+
+function tail(b, L, clock, base) {
+  const [tx, ty] = base
   const wag = Math.sin(clock * 5) * 2
   const r = b.part()
   switch (L.tail) {
     case 'nub':
-      b.ellipse(tx - 1, -22, 2.5, 2.5, L.fur, r)
+      b.ellipse(tx - 1, ty, 2.5, 2.5, L.fur, r)
+      break
+    case 'thin':
+      b.capsule(tx, ty, tx - 5, ty + 6 + wag * 0.5, 1.4, 1, L.fur, r)
+      b.ellipse(tx - 5, ty + 7 + wag * 0.5, 1.8, 2.2, 0x4a3a50, b.part())
+      break
+    case 'goat':
+      b.poly([[tx + 1, ty - 1], [tx - 4, ty - 7 + wag * 0.3], [tx - 1, ty + 2]], L.fur, r)
       break
     case 'lion':
-      b.capsule(tx, -22, tx - 7, -15, 1.5, 1.3, L.fur, r)
-      b.capsule(tx - 7, -15, tx - 12, -25 + wag, 1.3, 1.2, L.fur, r)
-      b.ellipse(tx - 12, -26 + wag, 3, 3, L.mane, b.part())
+      curve(b, [[tx, ty], [tx - 10, ty + 8], [tx - 13, ty - 5 + wag]], 1.6, 1.2, L.fur, r)
+      b.ellipse(tx - 13, ty - 6 + wag, 3, 3.5, L.mane, b.part())
       break
     case 'lizard':
     case 'croc': {
-      const big = L.tail === 'croc' ? 1.5 : 0
-      b.capsule(tx + 2, -20, tx - 9, -8, 4 + big, 3 + big, L.fur, r)
-      b.capsule(tx - 9, -8, tx - 19, -2 + wag * 0.3, 3 + big, 1, L.fur, r)
-      if (big) b.dots([[tx - 4, -19], [tx - 8, -14], [tx - 12, -8], [tx - 16, -5]], 0x2a5e32)
+      const big = L.tail === 'croc' ? 1.8 : 0
+      curve(b, [[tx + 2, ty + 1], [tx - 12, ty + 14], [tx - 22, ty + 20 + wag * 0.3]], 4 + big, 0.8, L.fur, r)
+      if (big) b.dots([[tx - 3, ty], [tx - 7, ty + 5], [tx - 11, ty + 9], [tx - 15, ty + 13], [tx - 19, ty + 16]], 0x2a5e32)
+      else b.dots([[tx - 6, ty + 6], [tx - 13, ty + 12]], L.spots)
       break
     }
     case 'bushy':
-      b.capsule(tx, -23, tx - 8, -19 + wag, 3, 5, L.fur, r)
-      b.ellipse(tx - 12, -20 + wag, 4, 3.5, L.light, r)
+      curve(b, [[tx, ty], [tx - 9, ty + 1], [tx - 13, ty + 6 + wag]], 2.5, 4.5, L.fur, r)
+      b.ellipse(tx - 14, ty + 8 + wag, 3.5, 3, L.light, r)
       break
     case 'horse':
-      b.capsule(tx, -25, tx - 6, -16, 2.5, 3.5, L.mane, r)
-      b.capsule(tx - 6, -16, tx - 5 + wag * 0.5, -4, 3.5, 2, L.mane, r)
-      break
-    case 'shark':
-      b.capsule(tx + 1, -22, tx - 7, -18, 4, 2, L.fur, r)
-      b.poly([[tx - 7, -18], [tx - 13, -29], [tx - 10, -18], [tx - 13, -9]], L.fur, r)
+      curve(b, [[tx, ty - 2], [tx - 9, ty + 4], [tx - 7 + wag * 0.5, ty + 18]], 2.5, 3.5, L.mane, r)
       break
     case 'duck':
-      b.poly([[tx + 1, -24], [tx - 7, -28], [tx - 5, -20]], L.fur, r)
-      break
-    case 'snake':
-      b.capsule(tx + 2, -18, tx - 6, -4, 4, 3.5, L.fur, r)
-      b.capsule(tx - 6, -4, tx - 17, -2, 3.5, 2.5, L.fur, r)
-      b.capsule(tx - 17, -2, tx - 22, -7 + wag * 0.5, 2.5, 1, L.fur, r)
-      b.dots([[tx - 3, -12], [tx - 8, -4], [tx - 13, -3], [tx - 18, -3]], L.light)
-      break
-    case 'tentacles':
-      for (const [sx, dir] of [[-4, -1], [3, 1]]) {
-        const w = Math.sin(clock * 4 + sx) * 2
-        b.capsule(sx, -20, sx + dir * 6, -9 + w, 3, 2.2, L.fur, r)
-        b.capsule(sx + dir * 6, -9 + w, sx + dir * 11, -3, 2.2, 1, L.fur, r)
-      }
-      break
-    case 'crablegs':
-      for (const s of [-1, 1]) {
-        b.capsule(s * B.tw, -26, s * (B.tw + 6), -20, 1.6, 1.4, L.fur, r)
-        b.capsule(s * (B.tw + 6), -20, s * (B.tw + 7), -13, 1.4, 1, L.fur, r)
-      }
-      break
-    case 'bee':
-      b.ellipse(tx - 4, -26, 6.5, 5, L.fur, r)
-      b.rect(tx - 7, -31, 2, 10, 0x2a2a34, r)
-      b.rect(tx - 3, -31, 2, 10, 0x2a2a34, r)
-      b.poly([[tx - 10, -27], [tx - 14, -24], [tx - 9, -24]], INK, r)
+      b.poly([[tx + 2, ty - 3], [tx - 7, ty - 8], [tx - 6, ty + 1]], L.fur, r)
+      b.dots([[tx - 5, ty - 6], [tx - 4, ty - 3]], 0x2a2a34)
       break
     default:
   }
 }
 
-function wings(b, lean, bob, clock) {
-  const flap = Math.sin(clock * 30) > 0 ? 1 : 0
-  const w = b.part()
-  b.ellipse(-8 + lean, -48 + bob - flap * 2, 7, 3.5 + flap, 0xd8ecff, w, FLAT)
-  b.ellipse(-4 + lean, -52 + bob - flap * 2, 5, 3 + flap, 0xeef6ff, w, FLAT)
+// ---------- Body blueprints ----------
+
+function biped(b, L, p, clock) {
+  const { lean, bob } = p
+  const tw = L.tw
+  const limb = L.limbs ?? L.fur
+  const hunch = L.hunch ?? 0
+  const hipY = L.legs === 'stump' ? -16 : L.legs === 'frog' ? -14 : -19
+  const hipB = [-3, hipY]
+  const hipF = [4, hipY]
+  const chestX = 1 + lean * 0.8 + hunch
+  const chestY = -36 + bob + (L.legs === 'frog' ? 3 : 0) + (L.torso === 'barrel' ? 1 : 0)
+  const shB = [chestX - 5, chestY - 4]
+  const shF = [chestX + 4, chestY - 4]
+
+  tail(b, L, clock, [-tw + 2, hipY - 3])
+  leg(b, L, hipB, p.feet[0], limb)
+  arm(b, L, shB, p.hands[0], limb)
+
+  // Torso shape depends on the animal's build
+  const t = b.part()
+  const [r0, r1] = { barrel: [tw + 2, tw - 1], chest: [tw - 2, tw + 2], round: [tw + 1, tw], slim: [tw, tw] }[L.torso]
+  b.capsule(0, hipY - 4, chestX, chestY, r0, r1, L.fur, t)
+  if (L.torso === 'round') b.ellipse(1 + lean * 0.4, (hipY + chestY) / 2, tw + 2, tw + 3, L.fur, t)
+  // Belly / chest colors
+  if (L.chestColor) b.ellipse(chestX + 3, chestY + 3, tw - 2, tw - 3, L.chestColor, t)
+  else b.capsule(3, hipY - 4, chestX + 2, chestY + 2, r0 - 4, r1 - 4, L.light, t)
+  if (L.band) b.capsule(chestX - tw, chestY - 3, chestX + tw, chestY - 3, 3.5, 3.5, L.band, t)
+  if (L.silver) b.capsule(chestX - tw + 1, chestY - 2, -tw + 3, hipY - 2, 3, 2.5, L.silver, t)
+  if (L.scutes) for (let y = hipY - 2; y > chestY; y -= 3) b.line(chestX - 1, y, chestX + 5, y, 0xa8b870)
+  if (L.folds) {
+    b.line(chestX - 4, chestY - 2, chestX - 6, chestY + 6, 0x62626e)
+    b.line(-3, hipY - 1, -6, hipY - 7, 0x62626e)
+  }
+  if (L.spots) b.dots([[chestX - 4, chestY + 2], [chestX - 2, chestY + 8], [-3, hipY - 4]], L.spots)
+
+  leg(b, L, hipF, p.feet[1], limb)
+
+  // Neck (and mane)
+  const headX = 2 + lean * 1.2 + hunch + (L.longNeck ? 3 : 0)
+  const headY = -56 + bob + (L.legs === 'frog' ? 3 : 0) + (hunch ? 2 : 0) - (L.longNeck ? 3 : 0)
+  if (L.mane && L.tail === 'lion') b.ellipse(chestX - 1, chestY - 6, tw + 3, 8, L.mane, b.part())
+  const neck = b.part()
+  b.capsule(chestX + 1, chestY - 6, headX - 1, headY + 5, tw * 0.5, tw * 0.4, L.neck ?? L.fur, neck)
+  if (L.tail === 'horse') b.capsule(chestX - 3, chestY - 4, headX - 5, headY - 3, 2.5, 3, L.mane, neck)
+
+  b.origin(FOOT_X + headX, FOOT_Y + headY)
+  L.head(b, L, p.expr)
+  mouth(b, L.mouth, p.expr)
+  b.origin(FOOT_X, FOOT_Y)
+
+  arm(b, L, shF, p.hands[1], limb)
+
+  if (L.medal) {
+    b.line(chestX - 3, chestY - 5, chestX + 1, chestY + 1, 0x2b7de0)
+    b.line(chestX + 5, chestY - 5, chestX + 2, chestY + 1, 0xe0393e)
+    b.dots([[chestX + 1, chestY + 2], [chestX + 2, chestY + 2], [chestX + 1, chestY + 3], [chestX + 2, chestY + 3], [chestX, chestY + 3], [chestX + 3, chestY + 3], [chestX + 1, chestY + 4], [chestX + 2, chestY + 4]], 0xf2c40c)
+    b.dot(chestX + 1, chestY + 2, 0xfff4b0)
+  }
+  if (L.dynamite) {
+    const dx = tw - 3
+    for (let y = hipY - 6; y <= hipY - 2; y++) b.dots([[dx, y], [dx + 1, y]], 0xe0393e)
+    b.dots([[dx + 1, hipY - 7], [dx + 2, hipY - 8]], 0x6a4a2a)
+    if (Math.sin(clock * 20) > 0) b.dot(dx + 3, hipY - 9, 0xffe27a)
+  }
+  if (L.silver) b.line(-tw + 2, hipY - 6, -tw + 4, chestY + 2, 0xc8c8d0)
 }
+
+function snake(b, L, p, clock) {
+  const { lean, bob } = p
+  const sway = Math.sin(clock * 3) * 1.5
+  // Coil on the ground
+  const coil = b.part()
+  b.ellipse(-1, -5, 14, 5.5, L.fur, coil)
+  b.dots([[-10, -6], [-4, -8], [3, -8], [9, -6]], L.pattern)
+  const coil2 = b.part()
+  b.ellipse(0, -11, 10, 4.5, L.fur, coil2)
+  b.dots([[-6, -12], [0, -14], [5, -12]], L.pattern)
+  // Tail tip: whips forward for a kick
+  const kicking = p.feet[1][1] < -8
+  if (kicking) curve(b, [[10, -7], [22, -6], p.feet[1]], 3, 1.2, L.fur, b.part())
+  else curve(b, [[-12, -6], [-19, -5], [-20, -11 + sway]], 2.5, 0.8, L.fur, b.part())
+  // Head position: strikes forward on a punch
+  const striking = p.hands[1][0] > 24
+  const headX = striking ? p.hands[1][0] - 8 : 4 + lean * 1.5
+  const headY = striking ? p.hands[1][1] - 8 : -56 + bob + (p.expr.hurt ? 2 : 0)
+  // Hood behind the head (cobra!)
+  const body = b.part()
+  const mid = [-3 + sway + lean * 0.5, -28 + bob]
+  curve(b, [[-2, -13], mid, [headX - 4, headY + 6]], 6, 4.5, L.fur, body)
+  b.ellipse(headX - 4, headY + 4, 7, 10, 0x3a8a3a, body)
+  b.dots([[headX - 6, headY + 1], [headX - 5, headY + 2], [headX - 7, headY + 2], [headX - 6, headY + 7], [headX - 5, headY + 8], [headX - 7, headY + 8]], L.light)
+  // Belly scales down the front
+  for (let i = 0; i < 7; i++) {
+    const t = i / 7
+    const x = (1 - t) * (1 - t) * -2 + 2 * (1 - t) * t * mid[0] + t * t * (headX - 4)
+    const y = (1 - t) * (1 - t) * -13 + 2 * (1 - t) * t * mid[1] + t * t * (headY + 6)
+    b.line(x + 2, y, x + 4, y, L.light)
+  }
+  b.origin(FOOT_X + headX, FOOT_Y + headY)
+  L.head(b, L, p.expr)
+  mouth(b, L.mouth, p.expr)
+  b.origin(FOOT_X, FOOT_Y)
+}
+
+function octopus(b, L, p, clock) {
+  const { lean, bob } = p
+  const bx = 1 + lean
+  const by = -40 + bob
+  const tentacle = (from, to, ph, part) => {
+    const w = Math.sin(clock * 4 + ph) * 3
+    curve(b, [from, [(from[0] + to[0]) / 2 + w, (from[1] + to[1]) / 2 + 2], to], 3.5, 1.2, L.fur, part)
+    b.dots([[(from[0] + to[0]) / 2 + w + 1, (from[1] + to[1]) / 2 + 4], [to[0] - 2, to[1] - 1]], L.light)
+  }
+  // Arm tentacle ending in a curled "fist"
+  const armT = (from, to, part) => {
+    const [ex, ey] = ik(from[0], from[1], to[0], to[1], 11, 11, 1)
+    curve(b, [from, [ex, ey], to], 3.2, 2.4, L.fur, part)
+    b.ellipse(to[0], to[1], 3.5, 3.2, L.fur, b.part())
+    b.dots([[to[0] - 1, to[1] + 1], [to[0] + 1, to[1] + 2]], L.light)
+  }
+  const back = b.part()
+  tentacle([bx - 6, by + 2], [-15, -1], 0, back)
+  tentacle([bx + 6, by + 2], [17, -1], 2, back)
+  armT([bx - 5, by - 2], p.hands[0], b.part())
+  const legs = b.part()
+  tentacle([bx - 3, by + 3], p.feet[0], 1, legs)
+  tentacle([bx + 3, by + 3], p.feet[1], 3, legs)
+  tentacle([bx, by + 4], [2, 0], 4, legs)
+  b.origin(FOOT_X + bx, FOOT_Y + by - 8)
+  L.head(b, L, p.expr)
+  mouth(b, L.mouth, p.expr)
+  b.origin(FOOT_X, FOOT_Y)
+  armT([bx + 5, by - 1], p.hands[1], b.part())
+}
+
+function crab(b, L, p, clock) {
+  const { lean, bob } = p
+  const sx = lean * 0.6
+  const sy = -24 + bob
+  // Three bent legs per side, splayed out like a real crab's
+  const legSet = (side, target, rest, part) => {
+    const shift = (target[0] - rest) * 0.5
+    for (let i = 0; i < 3; i++) {
+      const root = [sx + side * (7 + i * 3), sy + 2]
+      const kick = target[1] < -4 && i === 0
+      const lift = Math.sin(clock * 12 + i * 2 + side) > 0.6 && Math.abs(shift) > 1 ? -2 : 0
+      const knee = [root[0] + side * (7 + i * 2), sy - 9 + i * 2]
+      const foot = kick ? target : [root[0] + side * (13 + i * 3) + shift, lift]
+      b.capsule(root[0], root[1], knee[0], knee[1], 2, 1.6, L.fur, part)
+      b.capsule(knee[0], knee[1], foot[0], foot[1], 1.6, 0.8, L.fur, part)
+      b.dot(knee[0], knee[1] - 1, L.light)
+    }
+  }
+  legSet(-1, p.feet[0], -7, b.part())
+  // Claws
+  const claw = (shoulder, target) => {
+    const [ex, ey, hx, hy] = ik(shoulder[0], shoulder[1], target[0], target[1], 10, 10, 1)
+    const r = b.part()
+    b.capsule(shoulder[0], shoulder[1], ex, ey, 2.2, 2, L.fur, r)
+    b.capsule(ex, ey, hx, hy, 2, 2.2, L.fur, r)
+    const ang = Math.atan2(hy - ey, hx - ex)
+    const cx = hx + Math.cos(ang) * 3
+    const cy = hy + Math.sin(ang) * 3
+    b.ellipse(cx, cy, 5.5, 4.5, L.fur, b.part())
+    const tips = b.part()
+    b.capsule(cx + Math.cos(ang) * 3, cy + Math.sin(ang) * 3 - 2, cx + Math.cos(ang) * 8, cy + Math.sin(ang) * 8 - 3, 2.2, 1, L.fur, tips)
+    b.capsule(cx + Math.cos(ang) * 3, cy + Math.sin(ang) * 3 + 2, cx + Math.cos(ang) * 7, cy + Math.sin(ang) * 7 + 3, 1.8, 0.8, L.fur, tips)
+  }
+  claw([sx - 4, sy - 2], p.hands[0])
+  // Shell
+  const shell = b.part()
+  b.ellipse(sx, sy, 16, 9, L.fur, shell)
+  b.ellipse(sx + 2, sy - 3, 11, 4, L.light, shell)
+  b.dots([[sx - 8, sy - 2], [sx - 4, sy - 4], [sx + 6, sy - 5], [sx + 10, sy - 1], [sx - 11, sy + 2]], 0xfff0e0)
+  b.line(sx - 12, sy + 5, sx + 12, sy + 5, 0xb03a2a)
+  if (!p.expr.shout) b.dots([[sx + 12, sy + 1], [sx + 13, sy + 2], [sx + 11, sy + 2]], INK)
+  else b.dots([[sx + 11, sy + 1], [sx + 12, sy + 1], [sx + 11, sy + 2], [sx + 12, sy + 2], [sx + 13, sy + 2]], INK)
+  legSet(1, p.feet[1], 8, b.part())
+  b.origin(FOOT_X + sx + 4, FOOT_Y + sy - 12)
+  L.head(b, L, p.expr)
+  b.origin(FOOT_X, FOOT_Y)
+  claw([sx + 8, sy - 2], p.hands[1])
+}
+
+function fish(b, L, p) {
+  const { lean, bob } = p
+  const topX = 2 + lean
+  const topY = -46 + bob
+  // Stands on its tail fin; the fin swings forward for a kick.
+  const kicking = p.feet[1][1] < -8
+  const baseX = kicking ? 2 : 0
+  const tailEnd = kicking ? p.feet[1] : [0, -3]
+  const t = b.part()
+  b.capsule(baseX, -12, tailEnd[0], tailEnd[1], 5, 3, L.fur, t)
+  const fin = b.part()
+  const [fx, fy] = tailEnd
+  if (kicking) b.poly([[fx - 1, fy - 2], [fx + 9, fy - 10], [fx + 5, fy], [fx + 9, fy + 9], [fx - 1, fy + 2]], L.fur, fin)
+  else b.poly([[fx - 1, fy - 3], [fx - 14, fy + 3], [fx - 5, fy + 2], [fx, fy - 1], [fx + 5, fy + 2], [fx + 14, fy + 3], [fx + 1, fy - 3]], L.fur, fin)
+  arm(b, { ...L, hand: 'fin', arm: 2.5 }, [topX - 5, topY + 10], p.hands[0], L.fur)
+  // Dorsal fin
+  b.poly([[topX - 6, topY + 2], [topX - 16, topY - 6], [topX - 10, topY + 8]], L.fur, b.part())
+  // Body: dark on top, white belly (like a real shark)
+  const body = b.part()
+  b.capsule(baseX, -12, topX, topY, 6, 10.5, L.fur, body)
+  b.capsule(baseX + 3, -13, topX + 4, topY + 2, 3, 7, L.light, body)
+  b.dots([[topX - 3, topY + 4], [topX - 3, topY + 6], [topX - 1, topY + 5], [topX - 1, topY + 7], [topX + 1, topY + 6], [topX + 1, topY + 8]], 0x3a5e88)
+  b.origin(FOOT_X + topX + 1, FOOT_Y + topY - 8)
+  L.head(b, L, p.expr)
+  mouth(b, L.mouth, p.expr)
+  b.origin(FOOT_X, FOOT_Y)
+  arm(b, { ...L, hand: 'fin', arm: 2.5 }, [topX + 3, topY + 10], p.hands[1], L.fur)
+}
+
+function bee(b, L, p, clock) {
+  const hover = -6 + Math.round(Math.sin(clock * 6) * 1.5)
+  const { lean, bob } = p
+  const tx = 1 + lean
+  const ty = -38 + bob + hover
+  const flap = Math.sin(clock * 30) > 0 ? 1 : 0
+  // Wings
+  const w = b.part()
+  b.ellipse(tx - 8, ty - 9 - flap * 2, 8, 3.5 + flap, 0xd8ecff, w, FLAT)
+  b.ellipse(tx - 5, ty - 13 - flap * 2, 6, 3 + flap, 0xeef6ff, w, FLAT)
+  b.line(tx - 14, ty - 9 - flap * 2, tx - 3, ty - 9 - flap * 2, 0xa8c8e8)
+  // Striped abdomen with stinger, hanging behind
+  const ab = b.part()
+  b.capsule(tx - 3, ty + 2, tx - 11, ty + 12, 6.5, 4.5, L.fur, ab)
+  b.capsule(tx - 6, ty + 1, tx - 3, ty + 9, 1.5, 1.5, 0x2a2a34, ab)
+  b.capsule(tx - 10, ty + 4, tx - 7, ty + 13, 1.5, 1.5, 0x2a2a34, ab)
+  b.poly([[tx - 13, ty + 14], [tx - 17, ty + 20], [tx - 10, ty + 16]], INK, ab)
+  // Thin insect legs dangle while it hovers (and kick out for a kick)
+  const legs = (target, part) => {
+    const kicking = target[1] < -12
+    const fx = kicking ? target[0] : tx + target[0] * 0.5
+    const fy = kicking ? target[1] + hover : ty + 17 + Math.sin(clock * 6 + target[0]) * 1.5
+    const [kx, ky] = ik(tx, ty + 5, fx, fy, 8, 9, -1)
+    b.capsule(tx, ty + 5, kx, ky, 1.4, 1.1, 0x2a2a34, part)
+    b.capsule(kx, ky, fx, fy, 1.1, 0.9, 0x2a2a34, part)
+    b.capsule(fx, fy, fx + 3, fy + 1, 1, 0.8, 0x2a2a34, part)
+  }
+  legs(p.feet[0], b.part())
+  const armP = (sh, target) => {
+    const [ex, ey, hx, hy] = ik(sh[0], sh[1], target[0], target[1], 10, 10, 1)
+    const r = b.part()
+    b.capsule(sh[0], sh[1], ex, ey, 1.6, 1.3, 0x2a2a34, r)
+    b.capsule(ex, ey, hx, hy, 1.3, 1.1, 0x2a2a34, r)
+    b.ellipse(hx, hy, 2.2, 2.2, 0x2a2a34, b.part())
+  }
+  armP([tx - 3, ty - 3], p.hands[0])
+  // Fuzzy thorax
+  const th = b.part()
+  b.ellipse(tx, ty, 8, 8, L.fuzz, th)
+  b.ellipse(tx + 2, ty - 1, 5, 5, L.fur, th)
+  for (const [x, y] of [[-8, -2], [-7, 3], [-5, -6], [6, -6], [8, 1], [3, 7], [-2, 7]]) b.dot(tx + x, ty + y, L.light)
+  legs(p.feet[1], b.part())
+  b.origin(FOOT_X + tx + 3 + lean * 0.3, FOOT_Y + ty - 14)
+  L.head(b, L, p.expr)
+  mouth(b, L.mouth, p.expr)
+  b.origin(FOOT_X, FOOT_Y)
+  armP([tx + 4, ty - 3], p.hands[1])
+}
+
+const PLANS = { biped, snake, octopus, crab, fish, bee }
 
 // ---------- Poses ----------
 
@@ -608,72 +939,14 @@ export function pose(f, clock) {
 
 export function paintFighter(b, def, p, clock) {
   const L = LOOKS[def.key]
-  L.key = def.key
-  const B = BUILDS[L.build]
-  const limb = L.limbs ?? L.fur
-  const { lean, bob } = p
   b.clear()
   b.origin(FOOT_X, FOOT_Y)
-
-  tail(b, L, B, clock)
-  if (L.tail === 'bee') wings(b, lean, bob, clock)
-  if (L.tail === 'shark') b.poly([[-3 + lean, -40 + bob], [-12 + lean, -52 + bob], [-7 + lean, -36 + bob]], L.fur, b.part())
-
-  const hipB = [-3, -19]
-  const hipF = [4, -19]
-  const shB = [-4 + lean, -40 + bob]
-  const shF = [5 + lean, -40 + bob]
-
-  leg(b, L, B, hipB, p.feet[0], limb)
-  arm(b, L, B, shB, p.hands[0], limb)
-
-  // Torso: a capsule from hips to chest, so leaning just tilts it
-  const t = b.part()
-  const chestX = 1 + lean * 0.8
-  const chestY = -36 + bob
-  b.capsule(0, -24, chestX, chestY, B.tw, B.tw + 1, L.fur, t)
-  b.capsule(2, -25, chestX + 2, chestY + 1, B.tw - 4, B.tw - 3, L.light, t)
-  if (L.chest === 'stripes') {
-    b.rect(chestX - B.tw, chestY - 1, B.tw * 2 + 2, 2, 0x2a2a34, t)
-    b.rect(chestX - B.tw, chestY + 5, B.tw * 2 + 2, 2, 0x2a2a34, t)
-  }
-
-  leg(b, L, B, hipF, p.feet[1], limb)
-
-  // Boxing shorts with a waistband
-  const tr = b.part()
-  b.ellipse(0.5, -20, B.tw + 1, 5, L.trunks, tr)
-  b.capsule(hipB[0], hipB[1], hipB[0] + (p.feet[0][0] - hipB[0]) * 0.25, hipB[1] + 4, B.leg + 1, B.leg + 0.5, L.trunks, tr)
-  b.capsule(hipF[0], hipF[1], hipF[0] + (p.feet[1][0] - hipF[0]) * 0.25, hipF[1] + 4, B.leg + 1, B.leg + 0.5, L.trunks, tr)
-  b.rect(-B.tw, -25, B.tw * 2 + 2, 2, 0xf4f0e0, tr)
-  b.dots([[B.tw - 3, -20], [B.tw - 3, -19], [B.tw - 2, -19]], 0xffffff)
-
-  // Costume bits on the chest
-  if (L.chest === 'medal') {
-    b.line(chestX - 3, chestY - 5, chestX + 1, chestY + 1, 0x2b7de0)
-    b.line(chestX + 5, chestY - 5, chestX + 2, chestY + 1, 0xe0393e)
-    b.dots([[chestX + 1, chestY + 2], [chestX + 2, chestY + 2], [chestX + 1, chestY + 3], [chestX + 2, chestY + 3], [chestX, chestY + 3], [chestX + 3, chestY + 3], [chestX + 1, chestY + 4], [chestX + 2, chestY + 4]], 0xf2c40c)
-    b.dot(chestX + 1, chestY + 2, 0xfff4b0)
-  }
-  if (L.chest === 'strap') b.line(chestX - B.tw + 1, chestY - 5, chestX + B.tw - 1, chestY + 9, 0x6a5a2a)
-  if (L.chest === 'fluff') b.dots([[chestX + 1, chestY - 4], [chestX + 3, chestY - 3], [chestX + 2, chestY - 5], [chestX + 4, chestY - 5]], L.mane)
-  if (L.chest === 'dynamite') {
-    b.dots([[B.tw - 2, -24], [B.tw - 1, -24], [B.tw - 2, -23], [B.tw - 1, -23], [B.tw - 2, -22], [B.tw - 1, -22], [B.tw - 2, -21], [B.tw - 1, -21]], 0xe0393e)
-    b.dots([[B.tw - 1, -25], [B.tw, -26]], 0x6a4a2a)
-    if (Math.sin(clock * 20) > 0) b.dot(B.tw + 1, -27, 0xffe27a)
-  }
-
-  // Neck, then head
-  const headX = 2 + lean * 1.2
-  const headY = -56 + bob
-  b.capsule(chestX + 1, chestY - 6, headX, headY + 4, B.tw * 0.45, B.tw * 0.4, L.neck ?? L.fur, b.part())
-  b.origin(FOOT_X + headX, FOOT_Y + headY)
-  L.head(b, L, p.expr)
-  mouth(b, L.mouth, p.expr)
-  b.origin(FOOT_X, FOOT_Y)
-
-  arm(b, L, B, shF, p.hands[1], limb)
+  PLANS[L.plan ?? 'biped'](b, L, p, clock)
   return b.finish()
+}
+
+export function faceY(def) {
+  return LOOKS[def.key].faceY ?? -56
 }
 
 // Cached still images for menus: full-body idle and head close-ups.
@@ -685,7 +958,8 @@ export function stillCanvas(def, kind = 'body', expr = {}) {
   const p = { feet: [[-7, 0], [8, 0]], hands: [[9, -37], [16, -43]], lean: 0, bob: 0, expr }
   const src = paintFighter(b, def, p, 0.5)
   const c = document.createElement('canvas')
-  const [x, y, w, h] = kind === 'head' ? [FOOT_X - 16, FOOT_Y - 74, 34, 32] : [FOOT_X - 28, FOOT_Y - 76, 56, 80]
+  const fy = FOOT_Y + faceY(def)
+  const [x, y, w, h] = kind === 'head' ? [FOOT_X - 18, fy - 18, 40, 36] : [FOOT_X - 32, FOOT_Y - 84, 64, 88]
   c.width = w
   c.height = h
   c.getContext('2d').drawImage(src, x, y, w, h, 0, 0, w, h)
