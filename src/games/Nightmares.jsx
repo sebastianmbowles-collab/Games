@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './nightmares/nightmares.css'
 import { DREAMS, MONSTERS, ITEMS, BEDTIME_TALK, WAKE_LINES } from './nightmares/dreams'
-import { W, H, drawScene, drawHud, drawScare, drawLeon } from './nightmares/room'
+import { W, H } from './nightmares/hotspots'
+import { createRoom } from './nightmares/scene3d'
+import { drawHud, drawScare, drawBlanketView, drawFearVignette, drawHallucination } from './nightmares/hud'
+import { makeCanvas } from './nightmares/textures'
 import { createDream, step, HOUR_LENGTH, BATTERY_SECONDS } from './nightmares/engine'
 import { sfx, startDrone, stopDrone, setDanger, stopVoices, isMuted, setMuted } from './nightmares/sound'
 
 const PROGRESS_KEY = 'nightmaresProgress'
 const SCARE_TIME = 2.2
-const FALL_ASLEEP_TIME = 2.6
+const FALL_ASLEEP_TIME = 3
 
 function loadProgress() {
   try {
@@ -26,20 +29,28 @@ function saveProgress(n) {
   }
 }
 
-// A still picture of Leon's face for the talking scenes.
-function LeonFace({ fear = 0.3, mode = 'awake', size = 96 }) {
-  const ref = useRef(null)
-  useEffect(() => {
-    const ctx = ref.current.getContext('2d')
-    ctx.clearRect(0, 0, size, size)
-    drawLeon(ctx, size / 2, size * 0.42, size * 0.32, fear, 0, mode)
-  }, [fear, mode, size])
-  return <canvas ref={ref} width={size} height={size} className="nm-face" />
+// Film grain, made once and slid around by CSS (like The Wicked Side).
+let grainUrl = null
+function getGrain() {
+  if (!grainUrl) {
+    grainUrl = makeCanvas(256, 256, (g, w, h) => {
+      const img = g.createImageData(w, h)
+      for (let i = 0; i < img.data.length; i += 4) {
+        const v = Math.random() * 255
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = v
+        img.data[i + 3] = 255
+      }
+      g.putImageData(img, 0, 0)
+    }).toDataURL()
+  }
+  return grainUrl
 }
 
 // Works on its own, or inside an arcade that passes onExit to leave the game.
 export default function Nightmares({ onExit }) {
-  const canvasRef = useRef(null)
+  const glRef = useRef(null)
+  const hudRef = useRef(null)
+  const stageRef = useRef(null)
   const [phase, setPhaseState] = useState('title')
   const phaseRef = useRef('title')
   const [dreamIndex, setDreamIndex] = useState(0)
@@ -48,10 +59,11 @@ export default function Nightmares({ onExit }) {
   const [scarer, setScarer] = useState(null)
   const [muted, setMutedState] = useState(isMuted)
   const [held, setHeld] = useState({ hide: false, left: false, right: false })
+  const [noGL, setNoGL] = useState(false)
 
   const dreamRef = useRef(null)
   const phaseStart = useRef(0)
-  const input = useRef({ down: false, aim: { x: 480, y: 300 }, keys: {}, btns: {}, clicks: [] })
+  const input = useRef({ down: false, aim: { x: W / 2, y: H / 2 }, keys: {}, btns: {}, clicks: [] })
 
   const setPhase = useCallback((p) => {
     phaseRef.current = p
@@ -95,9 +107,27 @@ export default function Nightmares({ onExit }) {
     dreamIndexRef.current = dreamIndex
   }, [dreamIndex])
 
+  // The 3D room (made once).
+  const roomRef = useRef(null)
+  useEffect(() => {
+    try {
+      roomRef.current = createRoom(glRef.current)
+    } catch {
+      setNoGL(true)
+      return
+    }
+    const onResize = () => roomRef.current?.resize()
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      roomRef.current?.dispose()
+      roomRef.current = null
+    }
+  }, [])
+
   // The animation loop: runs the dream and draws whatever scene we're on.
   useEffect(() => {
-    const ctx = canvasRef.current.getContext('2d')
+    const ctx = hudRef.current.getContext('2d')
     let raf
     let last = performance.now()
     const frame = (now) => {
@@ -107,6 +137,7 @@ export default function Nightmares({ onExit }) {
       const since = (now - phaseStart.current) / 1000
       const p = phaseRef.current
       const inp = input.current
+      const room = roomRef.current
       ctx.clearRect(0, 0, W, H)
 
       if (p === 'playing' && dreamRef.current) {
@@ -122,24 +153,34 @@ export default function Nightmares({ onExit }) {
         inp.clicks = []
         for (const e of s.events) sfx[e.name]?.(e.key)
         setDanger(s.danger)
-        drawScene(ctx, { ...s, mode: 'dream', tint: s.dream.tint })
-        if (!s.hiding) drawHud(ctx, { ...s, title: s.dream.title, hourLength: HOUR_LENGTH, batterySeconds: BATTERY_SECONDS })
+        room?.update({ ...s, mode: 'dream', tint: s.dream.tint })
+        if (s.hiding) {
+          drawBlanketView(ctx, s.t, s.danger)
+        } else {
+          drawFearVignette(ctx, s.fear, s.t)
+          drawHud(ctx, { ...s, title: s.dream.title, hourLength: HOUR_LENGTH, batterySeconds: BATTERY_SECONDS })
+        }
+        if (s.hallu) drawHallucination(ctx, s.hallu.kind, s.t)
         if (s.over) finishDream(s)
       } else if (p === 'scare') {
         drawScare(ctx, dreamRef.current?.scarer ?? 'fear', since / SCARE_TIME, t)
         if (since >= SCARE_TIME) setPhase('woke')
       } else if (p === 'title' || p === 'dreamIntro') {
         const tint = DREAMS[p === 'title' ? 0 : dreamIndexRef.current].tint
-        const peek = p === 'title' ? { leftDoor: { stage: 1 }, rightDoor: { stage: 1 } } : {}
-        drawScene(ctx, { mode: 'dream', t, threats: peek, curtain: 0, aim: { x: -500, y: -500 }, lightOn: false, battery: 100, flash: 0, tint })
+        const peek = p === 'title' ? { leftDoor: { stage: 1 }, rightDoor: { stage: 2 } } : {}
+        room?.update({ mode: 'dream', t, threats: peek, curtain: 0, aim: inp.aim, lightOn: false, battery: 100, flash: 0, tint, fear: 0, danger: 0 })
       } else if (p === 'falling') {
-        drawScene(ctx, { mode: 'bedtime', t, curtain: 0, aim: inp.aim })
+        room?.update({ mode: 'bedtime', t, curtain: 0, aim: inp.aim })
         ctx.fillStyle = `rgba(0,0,0,${Math.min(1, since / FALL_ASLEEP_TIME)})`
         ctx.fillRect(0, 0, W, H)
-        drawLeon(ctx, W / 2, H / 2, 70, 0, t, 'sleep')
-        if (since >= FALL_ASLEEP_TIME + 0.6) setPhase('dreamIntro')
+        ctx.textAlign = 'center'
+        ctx.font = 'italic 26px "IM Fell English", Georgia, serif'
+        ctx.fillStyle = `rgba(228,220,203,${Math.min(1, since / 1.5) * (1 - Math.max(0, since - FALL_ASLEEP_TIME))})`
+        ctx.fillText('Leon closes his eyes...', W / 2, H / 2)
+        ctx.textAlign = 'left'
+        if (since >= FALL_ASLEEP_TIME + 0.8) setPhase('dreamIntro')
       } else {
-        drawScene(ctx, { mode: p === 'morning' || p === 'ending' ? 'morning' : 'bedtime', t, curtain: 0, aim: inp.aim })
+        room?.update({ mode: p === 'morning' || p === 'ending' ? 'morning' : 'bedtime', t, curtain: 0, aim: inp.aim })
       }
       raf = requestAnimationFrame(frame)
     }
@@ -170,19 +211,21 @@ export default function Nightmares({ onExit }) {
     }
   }, [])
 
-  function toCanvas(e) {
-    const r = canvasRef.current.getBoundingClientRect()
+  function toStage(e) {
+    const r = stageRef.current.getBoundingClientRect()
     return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H }
   }
   function onPointerDown(e) {
-    const pt = toCanvas(e)
+    // Clicks on menu buttons shouldn't turn on the flashlight.
+    if (e.target.closest('button')) return
+    const pt = toStage(e)
     input.current.aim = pt
     input.current.down = true
     input.current.clicks.push(pt)
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }
   function onPointerMove(e) {
-    input.current.aim = toCanvas(e)
+    input.current.aim = toStage(e)
   }
   function onPointerUp() {
     input.current.down = false
@@ -230,49 +273,54 @@ export default function Nightmares({ onExit }) {
   const dream = DREAMS[dreamIndex]
 
   return (
-    <div className="game-screen nm-screen">
-      <div className="game-topbar nm-topbar">
-        <h2 className="nm-title">🌙 Nightmares</h2>
+    <div className="nm-screen">
+      <div className="nm-topbar">
+        <div className="nm-title">Nightmares</div>
         <div className="nm-top-buttons">
-          <button className="exit-btn" onClick={toggleMute}>
-            {muted ? '🔇 Sound off' : '🔊 Sound on'}
+          <button className="nm-ghost" onClick={toggleMute}>
+            {muted ? 'Sound: off' : 'Sound: on'}
           </button>
-          <button className="exit-btn" onClick={quit}>
+          <button className="nm-ghost" onClick={quit}>
             {onExit ? 'Exit' : 'Menu'}
           </button>
         </div>
       </div>
 
-      <div className="nm-stage">
-        <canvas
-          ref={canvasRef}
-          width={W}
-          height={H}
-          className="nm-canvas"
-          style={{ cursor: phase === 'playing' ? 'crosshair' : 'default' }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onContextMenu={(e) => e.preventDefault()}
-        />
+      <div
+        className="nm-stage"
+        ref={stageRef}
+        style={{ cursor: phase === 'playing' ? 'crosshair' : 'default' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <canvas ref={glRef} className="nm-gl" />
+        <canvas ref={hudRef} width={W} height={H} className="nm-hud" />
+        <div className="nm-fx nm-grain" style={{ backgroundImage: `url(${getGrain()})` }} />
+        <div className="nm-fx nm-vignette" />
+
+        {noGL && (
+          <div className="nm-overlay">
+            <p className="nm-text">This computer can't draw 3D graphics (WebGL is turned off), so Nightmares can't run here.</p>
+          </div>
+        )}
 
         {phase === 'title' && (
-          <div className="nm-overlay">
-            <h1 className="nm-logo">NIGHTMARES</h1>
-            <LeonFace fear={0.75} />
+          <div className="nm-overlay nm-overlay-left">
+            <div className="nm-kicker">Leon's bedroom · 12:00 A.M.</div>
+            <h1 className="nm-logo">Nightmares</h1>
             <p className="nm-text">
-              You are <b>Leon</b>. You are 7 years old, and you are scared of the dark.
+              You are Leon. You are seven years old, and you are scared of the dark.
               <br />
               Every night you fall asleep... and wake up inside a bad dream.
               <br />
-              Keep the monsters away until the clock says <b>6 AM</b>!
+              Keep them away until the clock says <b>6:00</b>.
             </p>
             <div className="nm-items">
-              <div className="nm-kicker">Your items</div>
               {ITEMS.map((it) => (
                 <div key={it.name} className="nm-item">
-                  <span className="nm-item-icon">{it.icon}</span>
                   <b>{it.name}</b>
                   <span>{it.how}</span>
                 </div>
@@ -280,38 +328,33 @@ export default function Nightmares({ onExit }) {
             </div>
             <div className="nm-row">
               <button className="nm-btn" onClick={() => startBedtime(unlocked)}>
-                {unlocked > 0 ? `Continue: Dream ${unlocked + 1}` : 'Go to bed'}
+                {unlocked > 0 ? `Continue: dream ${unlocked + 1}` : 'Go to bed'}
               </button>
-            </div>
-            {unlocked > 0 && (
-              <div className="nm-row">
-                {DREAMS.slice(0, unlocked + 1).map((d, i) => (
-                  <button key={d.title} className="nm-chip" onClick={() => startBedtime(i)}>
+              {unlocked > 0 &&
+                DREAMS.slice(0, unlocked + 1).map((d, i) => (
+                  <button key={d.title} className="nm-ghost" onClick={() => startBedtime(i)}>
                     Dream {i + 1}
                   </button>
                 ))}
-              </div>
-            )}
+            </div>
+            <p className="nm-small">Best with headphones and the lights off.</p>
           </div>
         )}
 
         {phase === 'bedtime' && (
           <div className="nm-overlay nm-overlay-bottom">
             <div className="nm-talk">
-              {talk[talkLine][0] === 'Leon' ? <LeonFace fear={0.45} size={80} /> : <div className="nm-mom">👩</div>}
-              <div>
-                <div className="nm-speaker">{talk[talkLine][0]}</div>
-                <div className="nm-line">{talk[talkLine][1]}</div>
-              </div>
+              <div className="nm-speaker">{talk[talkLine][0]}</div>
+              <div className="nm-line">“{talk[talkLine][1]}”</div>
             </div>
             <div className="nm-row">
               {talkLine < talk.length - 1 ? (
                 <button className="nm-btn" onClick={() => setTalkLine((n) => n + 1)}>
-                  Next ▶
+                  Next
                 </button>
               ) : (
                 <button className="nm-btn" onClick={goToSleep}>
-                  Go to sleep 😴
+                  Go to sleep
                 </button>
               )}
             </div>
@@ -320,38 +363,39 @@ export default function Nightmares({ onExit }) {
 
         {phase === 'dreamIntro' && (
           <div className="nm-overlay">
-            <div className="nm-kicker">Dream {dreamIndex + 1} of {DREAMS.length}</div>
+            <div className="nm-kicker">
+              Dream {dreamIndex + 1} of {DREAMS.length}
+            </div>
             <h2 className="nm-dream-title">{dream.title}</h2>
             <p className="nm-text">{dream.intro}</p>
             <div className="nm-tips">
               {dream.newThreats.map((k) => (
                 <div key={k} className="nm-tip">
-                  <b>NEW: {MONSTERS[k].name}</b>
+                  <b>{MONSTERS[k].name}</b>
                   <span>{MONSTERS[k].how}</span>
                 </div>
               ))}
             </div>
             <button className="nm-btn" onClick={beginDream}>
-              Wake up in the dream...
+              Open your eyes
             </button>
           </div>
         )}
 
         {phase === 'woke' && (
           <div className="nm-overlay">
-            <h2 className="nm-dream-title">AAAAH!</h2>
-            <LeonFace fear={1} />
+            <h2 className="nm-dream-title nm-blood">You woke up screaming.</h2>
             <p className="nm-text">
               {WAKE_LINES[scarer] ?? WAKE_LINES.fear}
               <br />
-              Leon woke up screaming. Mom came running: "It was just a bad dream, Leon."
+              Mom came running. “It was just a bad dream, Leon.”
             </p>
             <div className="nm-row">
               <button className="nm-btn" onClick={() => startBedtime(dreamIndex)}>
                 Try again
               </button>
-              <button className="nm-chip" onClick={() => setPhase('title')}>
-                Menu
+              <button className="nm-ghost" onClick={() => setPhase('title')}>
+                Title
               </button>
             </div>
           </div>
@@ -359,31 +403,29 @@ export default function Nightmares({ onExit }) {
 
         {phase === 'morning' && (
           <div className="nm-overlay nm-overlay-light">
-            <h2 className="nm-dream-title">6 AM — Good morning!</h2>
-            <LeonFace fear={0} mode="happy" />
+            <div className="nm-kicker">6:00 A.M.</div>
+            <h2 className="nm-dream-title">Morning.</h2>
             <p className="nm-text">
-              Leon made it through <b>{dream.title}</b>!
+              Leon made it through <i>{dream.title}</i>.
             </p>
             <button className="nm-btn" onClick={() => startBedtime(dreamIndex + 1)}>
-              Next night ▶
+              Next night
             </button>
           </div>
         )}
 
         {phase === 'ending' && (
           <div className="nm-overlay nm-overlay-light">
-            <h2 className="nm-dream-title">Leon beat every nightmare!</h2>
-            <LeonFace fear={0} mode="happy" />
+            <div className="nm-kicker">6:00 A.M.</div>
+            <h2 className="nm-dream-title">The last nightmare is over.</h2>
             <p className="nm-text">
               The sun is up and the monsters are gone.
               <br />
-              Leon isn't scared of the dark anymore. (Well... only a little bit.)
+              Leon isn't scared of the dark anymore. Well... only a little bit.
             </p>
-            <div className="nm-row">
-              <button className="nm-btn" onClick={() => setPhase('title')}>
-                Back to menu
-              </button>
-            </div>
+            <button className="nm-btn" onClick={() => setPhase('title')}>
+              Title
+            </button>
           </div>
         )}
       </div>
@@ -391,14 +433,13 @@ export default function Nightmares({ onExit }) {
       {phase === 'playing' && (
         <div className="nm-controls">
           <div className="nm-hold-row">
-            <button {...holdProps('left')}>⬅ 🚪 Hold left door (A)</button>
-            <button {...holdProps('hide')}>🛏️ Hide (SPACE)</button>
-            <button {...holdProps('right')}>Hold right door (D) 🚪 ➡</button>
+            <button {...holdProps('left')}>Hold left door (A)</button>
+            <button {...holdProps('hide')}>Hide (Space)</button>
+            <button {...holdProps('right')}>Hold right door (D)</button>
           </div>
           <p className="nm-help">
-            <b>Hold the mouse</b> to shine your flashlight (only 1 minute of battery!) · <b>Hold A / D</b> to hold a
-            door shut (no flashlight while your hands are busy) · <b>Click the window</b> to close the curtains ·{' '}
-            <b>Click the computer</b> to switch it off · <b>Hold SPACE</b> to hide under the blanket
+            Hold the mouse: flashlight (1 minute of battery) · A / D: hold a door shut (no flashlight while you do) ·
+            click the window: curtains · click the computer: switch it off · Space: hide under the blanket
           </p>
         </div>
       )}

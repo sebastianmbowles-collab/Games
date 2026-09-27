@@ -2,7 +2,7 @@
 // with his flashlight, the curtains, the computer switch and his blanket.
 
 import { DREAMS } from './dreams'
-import { inHotspot } from './room'
+import { inHotspot } from './hotspots'
 
 export const HOUR_LENGTH = 14 // seconds for each hour on the clock
 export const NIGHT_LENGTH = HOUR_LENGTH * 6 // 12 AM until 6 AM

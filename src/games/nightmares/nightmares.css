@@ -1,38 +1,37 @@
-/* ---------- Nightmares ---------- */
+/* ---------- Nightmares (gritty, like The Wicked Side) ---------- */
+
+.nm-screen {
+  --ink: #08070b;
+  --bone: #e4dccb;
+  --dim: #8f877b;
+  --candle: #f0b35e;
+  --blood: #c43a4c;
+  --display: 'IM Fell English SC', 'Iowan Old Style', Georgia, serif;
+  --body: 'IM Fell English', 'Iowan Old Style', Georgia, serif;
+  --type: 'Special Elite', 'Courier New', ui-monospace, monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px 40px;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--body);
+}
 
 .nm-topbar {
-  max-width: 960px;
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
 .nm-title {
-  margin: 0;
-  color: #a99cff;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 16px;
-}
-
-.nm-items {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 560px;
-  background: rgba(15, 15, 35, 0.8);
-  border: 1px solid rgba(122, 92, 255, 0.5);
-  border-radius: 10px;
-  padding: 8px 14px;
-  text-align: left;
-  font-size: 13px;
-}
-
-.nm-item {
-  display: grid;
-  grid-template-columns: 22px 150px 1fr;
-  gap: 8px;
-  align-items: baseline;
-}
-
-.nm-item-icon {
-  font-size: 16px;
+  font-family: var(--display);
+  font-size: 22px;
+  color: var(--bone);
 }
 
 .nm-top-buttons {
@@ -43,20 +42,63 @@
 .nm-stage {
   position: relative;
   width: 100%;
-  max-width: 960px;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 0 40px rgba(122, 92, 255, 0.25);
-}
-
-.nm-canvas {
-  display: block;
-  width: 100%;
-  height: auto;
+  max-width: 1100px;
   aspect-ratio: 16 / 9;
   background: #000;
+  overflow: hidden;
+  border: 1px solid #1c1a20;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+}
+
+.nm-gl,
+.nm-hud {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.nm-gl {
+  filter: contrast(1.12) saturate(0.7) sepia(0.12);
+}
+
+.nm-hud,
+.nm-fx {
+  pointer-events: none;
+}
+
+.nm-fx {
+  position: absolute;
+}
+
+.nm-grain {
+  inset: -50%;
+  opacity: 0.1;
+  mix-blend-mode: screen;
+  animation: nm-grain 0.9s steps(6) infinite;
+}
+
+@keyframes nm-grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-7%, 4%); }
+  40% { transform: translate(5%, -6%); }
+  60% { transform: translate(-3%, 8%); }
+  80% { transform: translate(8%, 2%); }
+  100% { transform: translate(-5%, -4%); }
+}
+
+.nm-vignette {
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.8) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nm-grain {
+    animation: none;
+  }
 }
 
 .nm-overlay {
@@ -66,157 +108,177 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 14px;
+  padding: 24px 32px;
   text-align: center;
-  background: rgba(5, 5, 14, 0.72);
-  color: #e8e6ff;
+  background: rgba(4, 3, 6, 0.72);
   overflow-y: auto;
+}
+
+.nm-overlay-left {
+  align-items: flex-start;
+  text-align: left;
+  background: linear-gradient(90deg, rgba(4, 3, 6, 0.92) 0%, rgba(4, 3, 6, 0.6) 55%, rgba(4, 3, 6, 0.1) 100%);
 }
 
 .nm-overlay-bottom {
   justify-content: flex-end;
-  background: linear-gradient(transparent 45%, rgba(5, 5, 14, 0.85));
+  background: linear-gradient(transparent 50%, rgba(4, 3, 6, 0.9));
 }
 
 .nm-overlay-light {
-  background: rgba(40, 30, 10, 0.45);
+  background: rgba(30, 22, 12, 0.45);
+}
+
+.nm-kicker {
+  font-family: var(--type);
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--candle);
 }
 
 .nm-logo {
   margin: 0;
-  font-family: 'Press Start 2P', monospace;
-  font-size: clamp(22px, 6vw, 52px);
-  color: #d9d4ff;
-  letter-spacing: 4px;
-  text-shadow: 0 0 18px #7a5cff, 0 4px 0 #2a1a5a;
-  animation: nm-flicker 4s infinite;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(40px, 8vw, 84px);
+  line-height: 1;
+  color: var(--bone);
+  text-shadow: 0 0 24px rgba(196, 58, 76, 0.35);
+  animation: nm-flicker 5s infinite;
 }
 
 @keyframes nm-flicker {
-  0%, 92%, 100% { opacity: 1; }
-  93% { opacity: 0.3; }
-  95% { opacity: 0.9; }
-  96% { opacity: 0.2; }
-}
-
-.nm-kicker {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 10px;
-  color: #a99cff;
+  0%, 90%, 100% { opacity: 1; }
+  91% { opacity: 0.35; }
+  93% { opacity: 0.9; }
+  94% { opacity: 0.2; }
+  96% { opacity: 1; }
 }
 
 .nm-dream-title {
   margin: 0;
-  font-family: 'Press Start 2P', monospace;
-  font-size: clamp(14px, 3vw, 24px);
-  color: #fff;
-  text-shadow: 0 0 12px #7a5cff;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(26px, 4vw, 44px);
+  color: var(--bone);
+}
+
+.nm-blood {
+  color: var(--blood);
 }
 
 .nm-text {
-  max-width: 560px;
+  max-width: 580px;
   margin: 0;
-  line-height: 1.6;
-  font-size: 15px;
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.nm-small {
+  margin: 0;
+  font-family: var(--type);
+  font-size: 12px;
+  color: var(--dim);
 }
 
 .nm-row {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.nm-overlay:not(.nm-overlay-left) .nm-row {
   justify-content: center;
 }
 
 .nm-btn {
-  background: #7a5cff;
-  color: #fff;
+  background: var(--candle);
+  color: #1a1206;
   border: none;
-  border-radius: 8px;
-  padding: 12px 22px;
-  font-weight: 700;
+  padding: 11px 20px;
+  font-family: var(--type);
   font-size: 15px;
   cursor: pointer;
-  box-shadow: 0 4px 0 #3d2a99;
 }
 
 .nm-btn:hover {
-  background: #8d73ff;
+  filter: brightness(1.1);
 }
 
-.nm-chip {
+.nm-ghost {
   background: transparent;
-  color: #d9d4ff;
-  border: 1px solid #7a5cff;
-  border-radius: 20px;
-  padding: 6px 14px;
+  color: var(--bone);
+  border: 1px solid #4a4540;
+  padding: 9px 16px;
+  font-family: var(--type);
+  font-size: 13px;
   cursor: pointer;
 }
 
-.nm-face {
-  width: 96px;
-  height: 96px;
+.nm-ghost:hover {
+  border-color: var(--bone);
 }
 
-.nm-talk {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  max-width: 640px;
-  width: 100%;
-  background: rgba(15, 15, 35, 0.92);
-  border: 2px solid #7a5cff;
-  border-radius: 12px;
-  padding: 12px 16px;
-  text-align: left;
-}
-
-.nm-talk .nm-face {
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
-}
-
-.nm-mom {
-  font-size: 52px;
-  width: 72px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.nm-speaker {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 11px;
-  color: #a99cff;
-  margin-bottom: 6px;
-}
-
-.nm-line {
-  font-size: 16px;
-  line-height: 1.5;
-}
-
+.nm-items,
 .nm-tips {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-width: 600px;
+  gap: 6px;
+  max-width: 580px;
+  font-family: var(--type);
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.nm-item {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 10px;
+}
+
+.nm-item b,
+.nm-tip b {
+  color: var(--bone);
+  font-weight: 400;
 }
 
 .nm-tip {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  background: rgba(122, 92, 255, 0.15);
-  border: 1px solid rgba(122, 92, 255, 0.5);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
+  gap: 3px;
+  border-left: 2px solid var(--blood);
+  padding: 4px 12px;
+  text-align: left;
+}
+
+.nm-talk {
+  max-width: 680px;
+  width: 100%;
+  background: rgba(8, 7, 11, 0.9);
+  border: 1px solid #2c2830;
+  padding: 14px 20px;
+  text-align: left;
+}
+
+.nm-speaker {
+  font-family: var(--type);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--candle);
+  margin-bottom: 6px;
+}
+
+.nm-line {
+  font-size: 20px;
+  line-height: 1.45;
 }
 
 .nm-controls {
   width: 100%;
-  max-width: 960px;
+  max-width: 1100px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -232,12 +294,12 @@
 }
 
 .nm-hold-btn {
-  background: #1d2a5c;
-  color: #fff;
-  border: 2px solid #3f64c8;
-  border-radius: 10px;
-  padding: 12px 16px;
-  font-weight: 700;
+  background: transparent;
+  color: var(--bone);
+  border: 1px solid #4a4540;
+  padding: 11px 16px;
+  font-family: var(--type);
+  font-size: 14px;
   cursor: pointer;
   touch-action: none;
   user-select: none;
@@ -245,15 +307,16 @@
 }
 
 .nm-hold-btn.is-on {
-  background: #ffd24a;
-  border-color: #ffd24a;
-  color: #1d1400;
+  background: var(--candle);
+  border-color: var(--candle);
+  color: #1a1206;
 }
 
 .nm-help {
   margin: 0;
   text-align: center;
-  color: #9b9bb0;
-  font-size: 13px;
-  line-height: 1.5;
+  font-family: var(--type);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dim);
 }
