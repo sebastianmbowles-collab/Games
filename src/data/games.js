@@ -158,4 +158,12 @@ export const GAMES = [
     icon: '🍕',
     playable: true,
   },
+  {
+    key: 'jam',
+    title: 'Jam',
+    blurb: 'Toss in fruit, stir the pot and fill jars. No winning, just jam!',
+    color: '#e8394f',
+    icon: '🍓',
+    playable: true,
+  },
 ]
