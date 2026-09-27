@@ -44,7 +44,7 @@ export default function Jam({ game, onExit }) {
       </div>
       <p className="jam-help">
         Tap fruit bowls to throw fruit in the pot. Turn on the stove, stir with the spoon, add sugar if you like, then tap the
-        jar. Tap a jar on the shelf to eat it on toast!
+        jar. Tap a jar on the shelf to eat it on toast! Watch out for the cat: tap it to shoo it away before it steals your jam.
       </p>
     </div>
   )

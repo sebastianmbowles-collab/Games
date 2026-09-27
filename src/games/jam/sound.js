@@ -103,5 +103,17 @@ export const sfx = {
   },
   bzz: () => tone('sawtooth', 220, 180, 0.4, 0.05),
   nope: () => tone('triangle', 300, 200, 0.2, 0.12),
+  meow: () => {
+    tone('triangle', 520, 880, 0.18, 0.14)
+    tone('triangle', 880, 460, 0.35, 0.14, 0.17)
+  },
+  hiss: () => {
+    noise(0.55, 0.18, 'highpass', 3000)
+    tone('sawtooth', 700, 300, 0.25, 0.06)
+  },
+  purr: () => {
+    for (let i = 0; i < 8; i++) noise(0.11, 0.12, 'lowpass', 180, i * 0.14)
+  },
+  tiptoe: () => tone('sine', 1400 + Math.random() * 300, 1200, 0.04, 0.035),
   tick: () => tone('triangle', 2000, 1900, 0.03, 0.04),
 }

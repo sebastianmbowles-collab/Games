@@ -3,6 +3,7 @@
 
 import { FRUITS, fruitByKey, INK, rrect, fillStroke, circle, drawFace, drawFruit, hexToRgb, rgbToHex, mix } from './fruits'
 import { sfx, wakeAudio } from './sound'
+import { Cat } from './cat'
 
 export const W = 960
 export const H = 600
@@ -141,6 +142,9 @@ export class JamKitchen {
 
     this.shelf = loadShelf().map((j) => ({ ...j, jiggle: new Spring() }))
     this.hint = { text: '', t: 0 }
+    this.maxShelf = MAX_SHELF
+    this.slotPos = slotPos
+    this.cat = new Cat(this)
 
     this.toastCanvas = document.createElement('canvas')
     this.toastCanvas.width = 120
@@ -346,6 +350,11 @@ export class JamKitchen {
     sfx.whoosh()
   }
 
+  shelfChanged() {
+    saveShelf(this.shelf)
+    this.onShelfChange?.(this.shelf.length)
+  }
+
   resetPot() {
     this.pieces = []
     this.sugar = 0
@@ -375,6 +384,7 @@ export class JamKitchen {
   }
 
   hitTest(p) {
+    if (this.cat.hit(p)) return { kind: 'cat' }
     const b = this.bee
     if (Math.hypot(p.x - b.x, p.y - b.y) < 26) return { kind: 'bee' }
     if (Math.hypot(p.x - 100, p.y - 100) < 38) return { kind: 'sun' }
@@ -404,7 +414,8 @@ export class JamKitchen {
     this.pointer = p
     const hit = this.hitTest(p)
     if (!hit) return
-    if (hit.kind === 'bee') {
+    if (hit.kind === 'cat') this.cat.tap()
+    else if (hit.kind === 'bee') {
       this.bee.loop = 1
       sfx.bzz()
       this.float('Bzzz!', this.bee.x, this.bee.y - 30, '#ffe066', 18)
@@ -597,6 +608,7 @@ export class JamKitchen {
     }
 
     this.updateBee(dt)
+    this.cat.update(dt)
     for (const c of this.clouds) {
       c.x += dt * 12 * c.s
       if (c.x > 320) c.x = -60
@@ -733,7 +745,8 @@ export class JamKitchen {
 
   updateHint(t, dt) {
     let text = ''
-    if (this.seq || this.toast || this.sugarAnim) text = ''
+    if (this.cat.sneaky && !this.seq) text = 'Uh oh! Tap the cat to shoo it away!'
+    else if (this.seq || this.toast || this.sugarAnim) text = ''
     else if (!this.pieces.length && !this.flying.length) {
       text = this.shelf.length && Math.floor(t / 6) % 2 ? 'Tap a jar on the shelf to eat it on toast!' : 'Tap a fruit bowl to throw fruit in me!'
     } else if (this.cooked >= 1) text = 'Jam is ready! Tap the empty jar!'
@@ -757,6 +770,7 @@ export class JamKitchen {
     this.drawWindow()
     this.drawClock()
     this.drawShelves()
+    this.cat.draw(this.ctx, this.time)
     this.drawCounter()
     this.drawStove()
     this.drawBowls()
