@@ -4,11 +4,11 @@
 export const MONSTERS = {
   leftDoor: {
     name: 'Shadow Twin (left door)',
-    how: 'Hold the mouse on the LEFT DOOR to shine your flashlight. Light makes shadows run away.',
+    how: 'HOLD THE LEFT DOOR SHUT (hold A) until it gives up, or shine your flashlight at it.',
   },
   rightDoor: {
     name: 'Shadow Twin (right door)',
-    how: 'Hold the mouse on the RIGHT DOOR to shine your flashlight. Light makes shadows run away.',
+    how: 'HOLD THE RIGHT DOOR SHUT (hold D) until it gives up, or shine your flashlight at it.',
   },
   window: {
     name: 'The Tall Man',
@@ -27,6 +27,13 @@ export const MONSTERS = {
     how: 'Shine your light at the END OF THE BED when claws creep up. It sneaks faster while you hide under the blanket!',
   },
 }
+
+// Leon's items. He has the same ones every night.
+export const ITEMS = [
+  { icon: '🔦', name: 'Flashlight', how: 'Hold the mouse to shine it. Only 1 minute of battery for the whole night!' },
+  { icon: '🚪', name: 'Hold left door shut', how: 'Hold A (or the button). Your hands are busy, so no flashlight.' },
+  { icon: '🚪', name: 'Hold right door shut', how: 'Hold D (or the button). Your hands are busy, so no flashlight.' },
+]
 
 export const DREAMS = [
   {

@@ -134,6 +134,10 @@ export const sfx = {
     tone({ type: 'sawtooth', f0: 180, f1: 320, dur: 0.9, vol: 0.03, pan: PAN[key], attack: 0.2 })
     tone({ type: 'sawtooth', f0: 190, f1: 260, dur: 0.7, vol: 0.02, delay: 0.3, pan: PAN[key], attack: 0.2 })
   },
+  bang: (key) => {
+    noise({ dur: 0.18, vol: 0.5, f0: 500, f1: 90, pan: PAN[key] })
+    tone({ type: 'triangle', f0: 90, f1: 45, dur: 0.2, vol: 0.2, pan: PAN[key] })
+  },
   tap: () => {
     for (let i = 0; i < 3; i++) noise({ dur: 0.05, vol: 0.4, f0: 2500, f1: 1500, type: 'bandpass', q: 4, delay: i * 0.22 })
   },

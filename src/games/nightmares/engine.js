@@ -7,9 +7,9 @@ import { inHotspot } from './room'
 export const HOUR_LENGTH = 14 // seconds for each hour on the clock
 export const NIGHT_LENGTH = HOUR_LENGTH * 6 // 12 AM until 6 AM
 
-const DRAIN = 2.4 // flashlight battery used per second
-const RECHARGE = 0.7 // battery that comes back per second while it's off
-const REVIVE = 20 // an empty battery works again once it reaches this
+export const BATTERY_SECONDS = 60 // the flashlight only has 1 minute of battery all night
+const DRAIN = 100 / BATTERY_SECONDS
+const HOLD_TO_SCARE = 2 // seconds holding a door shut until the shadow gives up
 const LIGHT_TO_SCARE = 0.9 // seconds of light that make a monster run away
 const HIDE_TO_CALM = 2.5 // seconds under the blanket that put the paintings to sleep
 const CURTAIN_TIME = 8 // seconds the curtains stay closed
@@ -22,7 +22,7 @@ export function createDream(index) {
   const threats = {}
   dream.threats.forEach((key, i) => {
     const timer = 4 + i * 1.3 + Math.random() * 4
-    threats[key] = { stage: 0, timer, timerMax: timer, light: 0, hide: 0, cooldown: 0 }
+    threats[key] = { stage: 0, timer, timerMax: timer, light: 0, hide: 0, held: 0, cooldown: 0 }
   })
   return {
     dreamIndex: index,
@@ -33,6 +33,7 @@ export function createDream(index) {
     fear: 0,
     lightOn: false,
     hiding: false,
+    holding: { leftDoor: false, rightDoor: false },
     aim: { x: 480, y: 300 },
     curtainTime: 0,
     curtain: 0,
@@ -78,7 +79,7 @@ function advance(s, key, th) {
   if (th.stage === 3 && key !== 'leftDoor' && key !== 'rightDoor') say('warn')
 }
 
-// input = { down, aim: {x, y}, hide, clicks: [{x, y}] }
+// input = { down, aim: {x, y}, hide, holdLeft, holdRight, clicks: [{x, y}] }
 export function step(s, dt, input) {
   if (s.over) return
   s.events = []
@@ -90,11 +91,13 @@ export function step(s, dt, input) {
   const hour = Math.floor(s.t / HOUR_LENGTH)
   s.hiding = input.hide
   s.aim = input.aim
+  // Leon can't hold a door shut from under the blanket.
+  s.holding = { leftDoor: input.holdLeft && !s.hiding, rightDoor: input.holdRight && !s.hiding }
+  const busyHands = s.holding.leftDoor || s.holding.rightDoor
 
-  // Flashlight.
+  // Flashlight. Its battery never comes back, so don't waste it!
   const wasOn = s.lightOn
-  if (s.batteryDead && s.battery >= REVIVE) s.batteryDead = false
-  s.lightOn = input.down && !s.hiding && !s.batteryDead
+  s.lightOn = input.down && !s.hiding && !busyHands && !s.batteryDead
   if (s.lightOn) {
     s.battery -= DRAIN * dt
     if (s.battery <= 0) {
@@ -102,8 +105,6 @@ export function step(s, dt, input) {
       s.batteryDead = true
       s.lightOn = false
     }
-  } else {
-    s.battery = Math.min(100, s.battery + RECHARGE * dt)
   }
   if (wasOn !== s.lightOn) s.events.push({ name: 'click' })
 
@@ -155,6 +156,24 @@ export function step(s, dt, input) {
         th.light = Math.max(0, th.light - dt * 0.5)
       }
       if (key === 'underBed' && s.hiding) speed = 2
+    }
+
+    if (s.holding[key]) {
+      // The door is held shut: the shadow can't get in, and soon gives up.
+      speed = 0
+      if (th.stage > 0) {
+        const before = th.held
+        th.held += dt
+        if (Math.floor(before / 0.7) !== Math.floor(th.held / 0.7)) s.events.push({ name: 'bang', key })
+        if (th.held >= HOLD_TO_SCARE) {
+          th.stage = 0
+          th.held = 0
+          resetTimer(s, th, 2)
+          s.events.push({ name: 'flee', key })
+        }
+      }
+    } else if (th.held) {
+      th.held = 0
     }
 
     if (key === 'window' && s.curtainTime > 0) speed = 0

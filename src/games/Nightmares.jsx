@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import GameTitle from '../components/GameTitle'
-import { addTokens } from '../utils/tokens'
-import { DREAMS, MONSTERS, BEDTIME_TALK, WAKE_LINES } from './nightmares/dreams'
+import './nightmares/nightmares.css'
+import { DREAMS, MONSTERS, ITEMS, BEDTIME_TALK, WAKE_LINES } from './nightmares/dreams'
 import { W, H, drawScene, drawHud, drawScare, drawLeon } from './nightmares/room'
-import { createDream, step, HOUR_LENGTH } from './nightmares/engine'
+import { createDream, step, HOUR_LENGTH, BATTERY_SECONDS } from './nightmares/engine'
 import { sfx, startDrone, stopDrone, isMuted, setMuted } from './nightmares/sound'
 
 const PROGRESS_KEY = 'nightmaresProgress'
@@ -38,7 +37,8 @@ function LeonFace({ fear = 0.3, mode = 'awake', size = 96 }) {
   return <canvas ref={ref} width={size} height={size} className="nm-face" />
 }
 
-export default function Nightmares({ game, onExit }) {
+// Works on its own, or inside an arcade that passes onExit to leave the game.
+export default function Nightmares({ onExit }) {
   const canvasRef = useRef(null)
   const [phase, setPhaseState] = useState('title')
   const phaseRef = useRef('title')
@@ -46,13 +46,12 @@ export default function Nightmares({ game, onExit }) {
   const [unlocked, setUnlocked] = useState(loadProgress)
   const [talkLine, setTalkLine] = useState(0)
   const [scarer, setScarer] = useState(null)
-  const [reward, setReward] = useState(0)
   const [muted, setMutedState] = useState(isMuted)
-  const [hideBtn, setHideBtn] = useState(false)
+  const [held, setHeld] = useState({ hide: false, left: false, right: false })
 
   const dreamRef = useRef(null)
   const phaseStart = useRef(0)
-  const input = useRef({ down: false, aim: { x: 480, y: 300 }, keyHide: false, btnHide: false, clicks: [] })
+  const input = useRef({ down: false, aim: { x: 480, y: 300 }, keys: {}, btns: {}, clicks: [] })
 
   const setPhase = useCallback((p) => {
     phaseRef.current = p
@@ -74,9 +73,6 @@ export default function Nightmares({ game, onExit }) {
       if (s.over === 'won') {
         sfx.alarm()
         sfx.win()
-        const amount = 10 * (s.dreamIndex + 1)
-        addTokens(amount)
-        setReward(amount)
         const next = Math.min(DREAMS.length - 1, s.dreamIndex + 1)
         if (next > unlocked) {
           setUnlocked(next)
@@ -117,13 +113,15 @@ export default function Nightmares({ game, onExit }) {
         step(s, dt, {
           down: inp.down,
           aim: inp.aim,
-          hide: inp.keyHide || inp.btnHide,
+          hide: !!(inp.keys.hide || inp.btns.hide),
+          holdLeft: !!(inp.keys.left || inp.btns.left),
+          holdRight: !!(inp.keys.right || inp.btns.right),
           clicks: inp.clicks,
         })
         inp.clicks = []
         for (const e of s.events) sfx[e.name]?.(e.key)
         drawScene(ctx, { ...s, mode: 'dream', tint: s.dream.tint })
-        if (!s.hiding) drawHud(ctx, { ...s, title: s.dream.title, hourLength: HOUR_LENGTH })
+        if (!s.hiding) drawHud(ctx, { ...s, title: s.dream.title, hourLength: HOUR_LENGTH, batterySeconds: BATTERY_SECONDS })
         if (s.over) finishDream(s)
       } else if (p === 'scare') {
         drawScare(ctx, dreamRef.current?.scarer ?? 'fear', since / SCARE_TIME, t)
@@ -147,16 +145,18 @@ export default function Nightmares({ game, onExit }) {
     return () => cancelAnimationFrame(raf)
   }, [finishDream, setPhase])
 
-  // SPACE = hide under the blanket.
+  // SPACE = hide under the blanket, A = hold the left door, D = hold the right door.
   useEffect(() => {
+    const KEYS = { Space: 'hide', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right' }
     const down = (e) => {
-      if (e.code === 'Space') {
-        if (phaseRef.current === 'playing') e.preventDefault()
-        input.current.keyHide = true
-      }
+      const k = KEYS[e.code]
+      if (!k) return
+      if (phaseRef.current === 'playing') e.preventDefault()
+      input.current.keys[k] = true
     }
     const up = (e) => {
-      if (e.code === 'Space') input.current.keyHide = false
+      const k = KEYS[e.code]
+      if (k) input.current.keys[k] = false
     }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -185,9 +185,19 @@ export default function Nightmares({ game, onExit }) {
     input.current.down = false
   }
 
-  function setHide(v) {
-    input.current.btnHide = v
-    setHideBtn(v)
+  // On-screen buttons you hold down (for touch screens, or if you like clicking).
+  function holdProps(which) {
+    const set = (v) => {
+      input.current.btns[which] = v
+      setHeld((h) => ({ ...h, [which]: v }))
+    }
+    return {
+      className: `nm-hold-btn ${held[which] ? 'is-on' : ''}`,
+      onPointerDown: () => set(true),
+      onPointerUp: () => set(false),
+      onPointerLeave: () => set(false),
+      onPointerCancel: () => set(false),
+    }
   }
 
   function startBedtime(index) {
@@ -208,7 +218,8 @@ export default function Nightmares({ game, onExit }) {
 
   function quit() {
     stopDrone()
-    onExit()
+    if (onExit) onExit()
+    else setPhase('title')
   }
 
   const talk = BEDTIME_TALK[dreamIndex]
@@ -217,13 +228,13 @@ export default function Nightmares({ game, onExit }) {
   return (
     <div className="game-screen nm-screen">
       <div className="game-topbar nm-topbar">
-        <GameTitle game={game} />
+        <h2 className="nm-title">🌙 Nightmares</h2>
         <div className="nm-top-buttons">
           <button className="exit-btn" onClick={toggleMute}>
             {muted ? '🔇 Sound off' : '🔊 Sound on'}
           </button>
           <button className="exit-btn" onClick={quit}>
-            Exit
+            {onExit ? 'Exit' : 'Menu'}
           </button>
         </div>
       </div>
@@ -253,6 +264,16 @@ export default function Nightmares({ game, onExit }) {
               <br />
               Keep the monsters away until the clock says <b>6 AM</b>!
             </p>
+            <div className="nm-items">
+              <div className="nm-kicker">Your items</div>
+              {ITEMS.map((it) => (
+                <div key={it.name} className="nm-item">
+                  <span className="nm-item-icon">{it.icon}</span>
+                  <b>{it.name}</b>
+                  <span>{it.how}</span>
+                </div>
+              ))}
+            </div>
             <div className="nm-row">
               <button className="nm-btn" onClick={() => startBedtime(unlocked)}>
                 {unlocked > 0 ? `Continue: Dream ${unlocked + 1}` : 'Go to bed'}
@@ -338,7 +359,6 @@ export default function Nightmares({ game, onExit }) {
             <LeonFace fear={0} mode="happy" />
             <p className="nm-text">
               Leon made it through <b>{dream.title}</b>!
-              <br />+{reward} Faz-Tokens
             </p>
             <button className="nm-btn" onClick={() => startBedtime(dreamIndex + 1)}>
               Next night ▶
@@ -354,7 +374,6 @@ export default function Nightmares({ game, onExit }) {
               The sun is up and the monsters are gone.
               <br />
               Leon isn't scared of the dark anymore. (Well... only a little bit.)
-              <br />+{reward} Faz-Tokens
             </p>
             <div className="nm-row">
               <button className="nm-btn" onClick={() => setPhase('title')}>
@@ -367,17 +386,14 @@ export default function Nightmares({ game, onExit }) {
 
       {phase === 'playing' && (
         <div className="nm-controls">
-          <button
-            className={`nm-hide-btn ${hideBtn ? 'is-on' : ''}`}
-            onPointerDown={() => setHide(true)}
-            onPointerUp={() => setHide(false)}
-            onPointerLeave={() => setHide(false)}
-            onPointerCancel={() => setHide(false)}
-          >
-            🛏️ Hold to hide
-          </button>
+          <div className="nm-hold-row">
+            <button {...holdProps('left')}>⬅ 🚪 Hold left door (A)</button>
+            <button {...holdProps('hide')}>🛏️ Hide (SPACE)</button>
+            <button {...holdProps('right')}>Hold right door (D) 🚪 ➡</button>
+          </div>
           <p className="nm-help">
-            <b>Hold the mouse</b> to shine your flashlight · <b>Click the window</b> to close the curtains ·{' '}
+            <b>Hold the mouse</b> to shine your flashlight (only 1 minute of battery!) · <b>Hold A / D</b> to hold a
+            door shut (no flashlight while your hands are busy) · <b>Click the window</b> to close the curtains ·{' '}
             <b>Click the computer</b> to switch it off · <b>Hold SPACE</b> to hide under the blanket
           </p>
         </div>

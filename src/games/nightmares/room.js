@@ -547,6 +547,24 @@ function drawDoor(ctx, side, stage, t, lit) {
   }
 }
 
+// Leon is holding this door shut. If something is behind it, the door shakes.
+function drawHeldDoor(ctx, side, stage, t, lit) {
+  ctx.save()
+  if (stage > 0) ctx.translate(Math.sin(t * 50) * 2, 0)
+  drawDoor(ctx, side, 0, t, lit)
+  const d = DOORS[side]
+  const mx = (d.outer + d.inner) / 2
+  ctx.strokeStyle = '#ffd24a'
+  ctx.lineWidth = 3
+  poly(ctx, wallQuad(side, d.outer, d.inner, DOOR_TOP, 1), null, '#ffd24a', 3)
+  // Leon's two hands pushing on the door.
+  for (const f of [0.5, 0.62]) {
+    const hx = mx + (side === 'left' ? -8 : 8)
+    ellipse(ctx, hx, wallY(side, hx, f), 10, 13, '#f1c9a0')
+  }
+  ctx.restore()
+}
+
 function drawDoorGlow(ctx, side, stage, t) {
   if (stage <= 0) return
   const d = DOORS[side]
@@ -769,8 +787,11 @@ export function drawScene(ctx, s) {
   drawDesk(ctx, scene)
   drawWindow(ctx, scene)
   drawPaintings(ctx, scene)
-  drawDoor(ctx, 'left', st('leftDoor'), s.t, lit)
-  drawDoor(ctx, 'right', st('rightDoor'), s.t, lit)
+  for (const side of ['left', 'right']) {
+    const key = `${side}Door`
+    if (s.holding?.[key]) drawHeldDoor(ctx, side, st(key), s.t, lit)
+    else drawDoor(ctx, side, st(key), s.t, lit)
+  }
   drawBed(ctx, scene)
 
   if (s.mode === 'dream') {
@@ -780,8 +801,8 @@ export function drawScene(ctx, s) {
     ctx.fillRect(0, 0, W, H)
     drawFlashlight(ctx, s)
     drawDarkness(ctx, scene)
-    drawDoorGlow(ctx, 'left', st('leftDoor'), s.t)
-    drawDoorGlow(ctx, 'right', st('rightDoor'), s.t + 1.7)
+    if (!s.holding?.leftDoor) drawDoorGlow(ctx, 'left', st('leftDoor'), s.t)
+    if (!s.holding?.rightDoor) drawDoorGlow(ctx, 'right', st('rightDoor'), s.t + 1.7)
     drawScreenGlow(ctx, st('computer'), s.t, s.computerProgress ?? 0)
     drawPaintingGlow(ctx, st('paintings'), s.aim)
     drawGrabberGlow(ctx, st('underBed'), s.t)
@@ -965,7 +986,8 @@ export function drawHud(ctx, s) {
   ctx.fillRect(bx + 3, by + 3, 88 * pct, 20)
   ctx.font = '8px "Press Start 2P", monospace'
   ctx.fillStyle = '#fff'
-  ctx.fillText(s.batteryDead ? 'EMPTY!' : 'FLASHLIGHT', bx + 4, by + 44)
+  const secs = Math.ceil((Math.max(0, s.battery) / 100) * s.batterySeconds)
+  ctx.fillText(s.batteryDead ? 'EMPTY!' : `FLASHLIGHT ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`, bx - 20, by + 44)
 
   // Leon and how scared he is.
   const fx = 18
