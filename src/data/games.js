@@ -158,4 +158,12 @@ export const GAMES = [
     icon: '🍕',
     playable: true,
   },
+  {
+    key: 'nightmares',
+    title: 'Nightmares',
+    blurb: 'You are Leon, 7, and scared of the dark. Survive 5 bad dreams until 6 AM.',
+    color: '#7a5cff',
+    icon: '🌙',
+    playable: true,
+  },
 ]
