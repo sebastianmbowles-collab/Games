@@ -725,24 +725,26 @@ function drawDarkness(ctx, s) {
   d.globalCompositeOperation = 'source-over'
   d.clearRect(0, 0, W, H)
   const flash = s.flash > 0 ? Math.min(1, s.flash * 3) : 0
-  d.fillStyle = `rgba(${Math.round(tr * 0.12)},${Math.round(tg * 0.12)},${Math.round(tb * 0.12)},${0.9 - flash * 0.75})`
+  d.fillStyle = `rgba(${Math.round(tr * 0.12)},${Math.round(tg * 0.12)},${Math.round(tb * 0.12)},${0.95 - flash * 0.8})`
   d.fillRect(0, 0, W, H)
   d.globalCompositeOperation = 'destination-out'
   const curtainOpen = 1 - (s.curtain ?? 0)
   if (curtainOpen > 0.05) {
-    punchLight(d, WIN.x + WIN.w / 2, WIN.y + WIN.h / 2, 150, 0.55 * curtainOpen)
-    punchLight(d, 480, 470, 260, 0.2 * curtainOpen)
+    punchLight(d, WIN.x + WIN.w / 2, WIN.y + WIN.h / 2, 150, 0.45 * curtainOpen)
+    punchLight(d, 480, 470, 260, 0.12 * curtainOpen)
   }
   if ((s.threats.computer?.stage ?? 0) > 0) punchLight(d, 316, 220, 90, 0.5)
   if (s.lightOn) {
-    const flicker = s.battery < 15 ? 0.7 + Math.random() * 0.3 : 1
+    // The flashlight flickers when the battery is low, or when something is very close.
+    const scared = s.danger >= 3 && Math.random() < 0.12
+    const flicker = scared ? 0.15 + Math.random() * 0.4 : s.battery < 15 ? 0.7 + Math.random() * 0.3 : 1
     // A soft cone from Leon's hands to the spot the flashlight is pointing at.
     const steps = 8
     for (let i = 1; i <= steps; i++) {
       const k = i / steps
       punchLight(d, 480 + (s.aim.x - 480) * k, 540 + (s.aim.y - 540) * k, 30 + 70 * k, 0.35 * flicker)
     }
-    punchLight(d, s.aim.x, s.aim.y, 120, 1 * flicker)
+    punchLight(d, s.aim.x, s.aim.y, 100, 1 * flicker)
   }
   ctx.drawImage(dark, 0, 0)
 
@@ -793,6 +795,7 @@ export function drawScene(ctx, s) {
     else drawDoor(ctx, side, st(key), s.t, lit)
   }
   drawBed(ctx, scene)
+  if (s.mode === 'dream' && s.walker) drawWalker(ctx, s.walker.p)
 
   if (s.mode === 'dream') {
     // Dream colors: every nightmare has its own creepy tint.
@@ -806,6 +809,15 @@ export function drawScene(ctx, s) {
     drawScreenGlow(ctx, st('computer'), s.t, s.computerProgress ?? 0)
     drawPaintingGlow(ctx, st('paintings'), s.aim)
     drawGrabberGlow(ctx, st('underBed'), s.t)
+    if (s.walker) drawWalkerGlow(ctx, s.walker.p)
+    // When Leon is very scared, his teddy bear stares back with red eyes.
+    if (s.fear > 50) {
+      glow(ctx, '#ff0000', 10, () => {
+        ellipse(ctx, 684, 483, 2.2, 2.2, '#ff2020')
+        ellipse(ctx, 696, 483, 2.2, 2.2, '#ff2020')
+      })
+    }
+    drawFearVignette(ctx, s.fear ?? 0, s.t)
     if (st('window') >= 1) {
       glow(ctx, '#fff', 6, () => {
         if (st('window') === 1) {
@@ -823,11 +835,69 @@ export function drawScene(ctx, s) {
   }
   ctx.restore()
 
-  if (s.hiding) drawBlanketView(ctx, s.t)
+  if (s.hiding) drawBlanketView(ctx, s.t, s.danger ?? 0)
+  // A monster face flashes up for a split second. Was it real?
+  if (s.mode === 'dream' && s.hallu) {
+    ctx.save()
+    ctx.globalAlpha = 0.55
+    drawScare(ctx, s.hallu.kind, 0.9, s.t)
+    ctx.restore()
+  }
+}
+
+// A tall, thin shadow that walks past the back wall and is gone.
+function walkerPos(p) {
+  return { x: 250 + p * 470, y: 150 }
+}
+
+function drawWalker(ctx, p) {
+  const { x, y } = walkerPos(p)
+  const step = Math.sin(p * 40) * 6
+  ctx.fillStyle = 'rgba(0,0,0,0.92)'
+  ellipse(ctx, x, y, 16, 20, 'rgba(0,0,0,0.92)')
+  ctx.beginPath()
+  ctx.moveTo(x - 22, y + 18)
+  ctx.lineTo(x + 22, y + 18)
+  ctx.lineTo(x + 16, y + 120)
+  ctx.lineTo(x - 16, y + 120)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(0,0,0,0.92)'
+  ctx.lineWidth = 7
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(x - 8, y + 115)
+  ctx.lineTo(x - 10 + step, y + 180)
+  ctx.moveTo(x + 8, y + 115)
+  ctx.lineTo(x + 10 - step, y + 180)
+  ctx.moveTo(x - 20, y + 25)
+  ctx.lineTo(x - 30 - step, y + 140)
+  ctx.moveTo(x + 20, y + 25)
+  ctx.lineTo(x + 30 + step, y + 140)
+  ctx.stroke()
+}
+
+function drawWalkerGlow(ctx, p) {
+  const { x, y } = walkerPos(p)
+  glow(ctx, '#ffffff', 8, () => {
+    ellipse(ctx, x - 6, y - 3, 2, 1.5, '#fff')
+    ellipse(ctx, x + 6, y - 3, 2, 1.5, '#fff')
+  })
+}
+
+// The edges of the screen go red and throb like a heartbeat when Leon is scared.
+function drawFearVignette(ctx, fear, t) {
+  if (fear < 45) return
+  const k = (fear - 45) / 55
+  const beat = 0.6 + 0.4 * Math.max(0, Math.sin(t * (4 + k * 6)))
+  const g = ctx.createRadialGradient(W / 2, H / 2, 180, W / 2, H / 2, 560)
+  g.addColorStop(0, 'rgba(120,0,0,0)')
+  g.addColorStop(1, `rgba(120,0,0,${0.55 * k * beat})`)
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, W, H)
 }
 
 // When Leon hides, the whole screen is the inside of his blanket.
-function drawBlanketView(ctx, t) {
+function drawBlanketView(ctx, t, danger) {
   const g = ctx.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, 600)
   g.addColorStop(0, '#1d2a5c')
   g.addColorStop(1, '#070a18')
@@ -843,10 +913,19 @@ function drawBlanketView(ctx, t) {
     ctx.quadraticCurveTo(W / 2, 40 + i * 110, W, 90 + i * 110 + Math.sin(t * 1.3 + i) * 6)
     ctx.stroke()
   }
+  if (danger >= 2) {
+    // Something outside is pressing its fingers into the blanket...
+    const px = W / 2 + Math.sin(t * 0.7) * 220
+    const py = H / 2 + Math.cos(t * 0.5) * 120
+    for (let f = -2; f <= 2; f++) {
+      ellipse(ctx, px + f * 26, py - Math.abs(f) * 10 + Math.sin(t * 3 + f) * 4, 11, 30, 'rgba(0,0,0,0.55)', f * 0.12)
+    }
+    ellipse(ctx, px, py + 55, 60, 40, 'rgba(0,0,0,0.45)')
+  }
   ctx.fillStyle = 'rgba(200,210,255,0.8)'
   ctx.font = '14px "Press Start 2P", monospace'
   ctx.textAlign = 'center'
-  ctx.fillText('Hiding under the blanket...', W / 2, H / 2 - 10)
+  ctx.fillText(danger >= 2 ? 'Something is touching the blanket...' : 'Hiding under the blanket...', W / 2, H / 2 - 10)
   ctx.font = '10px "Press Start 2P", monospace'
   ctx.fillStyle = 'rgba(200,210,255,0.55)'
   ctx.fillText('let go of SPACE to peek out', W / 2, H / 2 + 20)
@@ -1008,18 +1087,50 @@ export function drawHud(ctx, s) {
 
 // ---------- jumpscares ----------
 
-export function drawScare(ctx, kind, p, t) {
-  ctx.save()
-  rect(ctx, 0, 0, W, H, p < 0.12 ? '#400' : '#000')
-  const shake = 22 * (1 - p * 0.5)
-  ctx.translate(W / 2 + (Math.random() - 0.5) * shake, H / 2 + (Math.random() - 0.5) * shake)
-  const s = 0.75 + Math.min(1, p * 2.2) * 0.75
-  ctx.scale(s, s)
+function scareFace(ctx, kind, t) {
   if (kind === 'window') scareTallMan(ctx)
   else if (kind === 'computer') scareGlitch(ctx)
   else if (kind === 'paintings') scarePainted(ctx, t)
   else if (kind === 'underBed') scareGrabber(ctx)
   else scareShadow(ctx, t, kind === 'fear')
+}
+
+export function drawScare(ctx, kind, p, t) {
+  ctx.save()
+  // The screen strobes red and black while the monster lunges at you.
+  const strobe = Math.floor(t * 16) % 2 === 0
+  rect(ctx, 0, 0, W, H, p < 0.5 && strobe ? '#5a0000' : '#000')
+  const shake = 34 * (1 - p * 0.6)
+  const dx = (Math.random() - 0.5) * shake
+  const dy = (Math.random() - 0.5) * shake
+  // It rushes from far away to right in your face in a blink.
+  const lunge = Math.min(1, p / 0.12)
+  const s = 0.25 + lunge * 1.35 + Math.sin(t * 30) * 0.03
+  ctx.save()
+  ctx.translate(W / 2 + dx, H / 2 + dy)
+  ctx.scale(s, s)
+  scareFace(ctx, kind, t)
+  ctx.restore()
+  // A red ghost copy that jitters beside it.
+  ctx.save()
+  ctx.globalAlpha = 0.35
+  ctx.globalCompositeOperation = 'lighter'
+  ctx.translate(W / 2 + dx + 14 + Math.random() * 10, H / 2 + dy)
+  ctx.scale(s * 1.04, s * 1.04)
+  ctx.filter = 'sepia(1) saturate(8) hue-rotate(-50deg)'
+  scareFace(ctx, kind, t)
+  ctx.restore()
+  // TV static and torn lines.
+  for (let i = 0; i < 260; i++) {
+    const g = Math.random() * 255
+    ctx.fillStyle = `rgba(${g},${g},${g},0.35)`
+    ctx.fillRect(Math.random() * W, Math.random() * H, 3, 2)
+  }
+  for (let i = 0; i < 4; i++) {
+    const y = Math.random() * H
+    const slice = 6 + Math.random() * 20
+    ctx.drawImage(ctx.canvas, 0, y, W, slice, (Math.random() - 0.5) * 60, y, W, slice)
+  }
   ctx.restore()
 }
 

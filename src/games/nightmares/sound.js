@@ -23,7 +23,10 @@ export function setMuted(value) {
   } catch {
     // not saved, that's fine
   }
-  if (value) stopDrone()
+  if (value) {
+    stopDrone()
+    window.speechSynthesis?.cancel()
+  }
 }
 
 function audio() {
@@ -102,7 +105,48 @@ export function startDrone() {
     o.start()
     return o
   })
-  drone = { gain, oscs }
+  // A second, screechy layer that gets louder the closer the monsters are.
+  const danger = ac.createGain()
+  danger.gain.value = 0.0001
+  danger.connect(ac.destination)
+  const high = [311, 329.6, 622].map((f) => {
+    const o = ac.createOscillator()
+    o.type = 'sawtooth'
+    o.frequency.value = f
+    const lp = ac.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 1400
+    o.connect(lp).connect(danger)
+    o.start()
+    return o
+  })
+  drone = { gain, oscs: [...oscs, ...high], danger, level: 0 }
+}
+
+// 0 = nothing nearby, 3 = a monster is right next to Leon.
+export function setDanger(level) {
+  if (!drone || !ctx || drone.level === level) return
+  drone.level = level
+  const vol = [0.0001, 0.004, 0.012, 0.03][Math.min(3, level)]
+  drone.danger.gain.setTargetAtTime(vol, ctx.currentTime, 0.4)
+}
+
+// A deep, slow, creepy voice using the browser's speech.
+export function speak(text) {
+  if (muted || !window.speechSynthesis) return
+  const u = new SpeechSynthesisUtterance(text)
+  u.pitch = 0.1
+  u.rate = 0.6
+  u.volume = 1
+  const voices = window.speechSynthesis.getVoices()
+  const deep = voices.find((v) => /en/i.test(v.lang) && /male|daniel|fred|david|george/i.test(v.name))
+  if (deep) u.voice = deep
+  window.speechSynthesis.cancel()
+  window.speechSynthesis.speak(u)
+}
+
+export function stopVoices() {
+  window.speechSynthesis?.cancel()
 }
 
 export function stopDrone() {
@@ -180,10 +224,26 @@ export const sfx = {
     tone({ f0: 60, f1: 40, dur: 0.15, vol: 0.22, delay: 0.22 })
   },
   scream: () => {
-    noise({ dur: 1.4, vol: 0.55, f0: 4000, f1: 900, type: 'bandpass', q: 0.6 })
-    tone({ type: 'sawtooth', f0: 900, f1: 300, dur: 1.4, vol: 0.18 })
-    tone({ type: 'square', f0: 1200, f1: 500, dur: 1.2, vol: 0.08 })
+    noise({ dur: 2.2, vol: 0.8, f0: 4500, f1: 700, type: 'bandpass', q: 0.5 })
+    noise({ dur: 0.8, vol: 0.9, f0: 900, f1: 40 })
+    tone({ type: 'sawtooth', f0: 1100, f1: 260, dur: 2.1, vol: 0.25, attack: 0.001 })
+    tone({ type: 'sawtooth', f0: 1170, f1: 250, dur: 2.1, vol: 0.2, attack: 0.001 })
+    tone({ type: 'square', f0: 1500, f1: 420, dur: 1.8, vol: 0.12, attack: 0.001 })
+    tone({ type: 'sine', f0: 90, f1: 30, dur: 1.2, vol: 0.5, attack: 0.001 })
   },
+  sting: () => {
+    ;[880, 932, 988, 1046].forEach((f) => tone({ type: 'sawtooth', f0: f, f1: f * 0.94, dur: 0.5, vol: 0.06, attack: 0.001 }))
+    noise({ dur: 0.3, vol: 0.4, f0: 5000, f1: 1500, type: 'bandpass' })
+  },
+  screech: () => {
+    noise({ dur: 0.9, vol: 0.3, f0: 6000, f1: 2500, type: 'bandpass', q: 3 })
+    tone({ type: 'sawtooth', f0: 2200, f1: 1400, dur: 0.9, vol: 0.06 })
+  },
+  breath: () => {
+    noise({ dur: 1.0, vol: 0.25, f0: 500, f1: 800, type: 'bandpass', q: 2, pan: Math.random() - 0.5 })
+    noise({ dur: 1.2, vol: 0.2, f0: 700, f1: 400, type: 'bandpass', q: 2, delay: 1.1 })
+  },
+  voice: (text) => speak(text),
   sleep: () => {
     ;[392, 330, 262, 196].forEach((f, i) => tone({ type: 'triangle', f0: f, dur: 0.5, vol: 0.08, delay: i * 0.35, attack: 0.05 }))
   },

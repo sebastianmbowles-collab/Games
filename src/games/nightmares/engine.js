@@ -46,6 +46,13 @@ export function createDream(index) {
     nextThunder: rand(8, 20),
     nextWhisper: rand(8, 16),
     nextBeat: 0,
+    danger: 0,
+    walker: null,
+    nextWalker: rand(10, 22),
+    hallu: null,
+    nextHallu: rand(6, 12),
+    nextVoice: rand(9, 18),
+    nextBreath: 0,
   }
 }
 
@@ -77,7 +84,15 @@ function advance(s, key, th) {
   else if (key === 'paintings') say(th.stage === 3 ? 'angry' : 'paintings')
   else if (key === 'underBed') say('growl')
   if (th.stage === 3 && key !== 'leftDoor' && key !== 'rightDoor') say('warn')
+  if (th.stage === 3) {
+    say('screech')
+    if (Math.random() < 0.5) s.events.push({ name: 'voice', key: pick(CLOSE_LINES) })
+  }
 }
+
+const pick = (list) => list[Math.floor(Math.random() * list.length)]
+const WHISPERS = ['Leeeeon...', 'Leon... I can see you.', 'Why are you still awake, Leon?', 'Come and play with us, Leon.', "Don't look behind you.", 'The dark is where we live.']
+const CLOSE_LINES = ["I'm right here, Leon.", 'Found you.', "You can't hide from me."]
 
 // input = { down, aim: {x, y}, hide, holdLeft, holdRight, clicks: [{x, y}] }
 export function step(s, dt, input) {
@@ -210,6 +225,7 @@ export function step(s, dt, input) {
       }
     }
   }
+  s.danger = Math.max(0, ...Object.values(s.threats).map((th) => th.stage))
   const pc = s.threats.computer
   s.computerProgress = pc && pc.stage >= 2 ? 1 - Math.max(0, pc.timer) / pc.timerMax : 0
 
@@ -239,6 +255,44 @@ export function step(s, dt, input) {
   if (s.nextWhisper <= 0) {
     s.nextWhisper = rand(10, 20)
     s.events.push({ name: 'whisper' })
+  }
+  // A creepy voice calls Leon's name.
+  s.nextVoice -= dt
+  if (s.nextVoice <= 0) {
+    s.nextVoice = rand(14, 26)
+    s.events.push({ name: 'voice', key: pick(WHISPERS) })
+  }
+  // Something tall walks past the back wall...
+  if (s.walker) {
+    s.walker.p += dt / 2.2
+    if (s.walker.p >= 1) s.walker = null
+  } else {
+    s.nextWalker -= dt
+    if (s.nextWalker <= 0) {
+      s.nextWalker = rand(18, 32)
+      s.walker = { p: 0 }
+      s.events.push({ name: 'steps', key: 'window' })
+    }
+  }
+  // When Leon is really scared, he starts seeing things.
+  if (s.hallu) {
+    s.hallu.left -= dt
+    if (s.hallu.left <= 0) s.hallu = null
+  } else if (s.fear > 55) {
+    s.nextHallu -= dt
+    if (s.nextHallu <= 0) {
+      s.nextHallu = rand(6, 13)
+      s.hallu = { kind: pick([...Object.keys(s.threats), 'fear']), left: 0.13 }
+      s.events.push({ name: 'sting' })
+    }
+  }
+  // Heavy breathing right outside the blanket.
+  if (s.hiding && s.danger >= 2) {
+    s.nextBreath -= dt
+    if (s.nextBreath <= 0) {
+      s.nextBreath = 2.4
+      s.events.push({ name: 'breath' })
+    }
   }
   if (s.dream.thunder) {
     s.nextThunder -= dt

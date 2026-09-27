@@ -3,10 +3,10 @@ import './nightmares/nightmares.css'
 import { DREAMS, MONSTERS, ITEMS, BEDTIME_TALK, WAKE_LINES } from './nightmares/dreams'
 import { W, H, drawScene, drawHud, drawScare, drawLeon } from './nightmares/room'
 import { createDream, step, HOUR_LENGTH, BATTERY_SECONDS } from './nightmares/engine'
-import { sfx, startDrone, stopDrone, isMuted, setMuted } from './nightmares/sound'
+import { sfx, startDrone, stopDrone, setDanger, stopVoices, isMuted, setMuted } from './nightmares/sound'
 
 const PROGRESS_KEY = 'nightmaresProgress'
-const SCARE_TIME = 1.7
+const SCARE_TIME = 2.2
 const FALL_ASLEEP_TIME = 2.6
 
 function loadProgress() {
@@ -70,6 +70,7 @@ export default function Nightmares({ onExit }) {
   const finishDream = useCallback(
     (s) => {
       stopDrone()
+      stopVoices()
       if (s.over === 'won') {
         sfx.alarm()
         sfx.win()
@@ -120,6 +121,7 @@ export default function Nightmares({ onExit }) {
         })
         inp.clicks = []
         for (const e of s.events) sfx[e.name]?.(e.key)
+        setDanger(s.danger)
         drawScene(ctx, { ...s, mode: 'dream', tint: s.dream.tint })
         if (!s.hiding) drawHud(ctx, { ...s, title: s.dream.title, hourLength: HOUR_LENGTH, batterySeconds: BATTERY_SECONDS })
         if (s.over) finishDream(s)
@@ -164,6 +166,7 @@ export default function Nightmares({ onExit }) {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
       stopDrone()
+      stopVoices()
     }
   }, [])
 
@@ -218,6 +221,7 @@ export default function Nightmares({ onExit }) {
 
   function quit() {
     stopDrone()
+    stopVoices()
     if (onExit) onExit()
     else setPhase('title')
   }
