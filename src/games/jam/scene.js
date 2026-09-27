@@ -23,6 +23,9 @@ const SHELF_SLOTS = 6
 const MAX_SHELF = SHELF_Y.length * SHELF_SLOTS
 const STORE_KEY = 'jam-shelf-v1'
 const BOWL_COLORS = ['#ffd6e0', '#d6e4ff', '#ffe0f0', '#fff0cc', '#ecd9ff', '#ffe3d1']
+const PER_PAGE = 6
+const PAGES = Math.ceil(FRUITS.length / PER_PAGE)
+const MORE_BTN = { x: 205, y: 562, w: 210, h: 38 }
 const FUN_MIX_NAMES = ['Rainbow Jumble', 'Mega Mix', 'Fruit Salad', 'Everything', 'Mystery Muddle', 'Party']
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v))
@@ -123,8 +126,11 @@ export class JamKitchen {
     this.toast = null
     this.newJarT = 1
 
-    this.bowlSprings = FRUITS.map(() => new Spring())
+    this.bowlSprings = BOWL_COLORS.map(() => new Spring())
+    this.page = 0
+    this.pageSwap = null
     this.jarSpring = new Spring()
+    this.moreSpring = new Spring()
     this.sugarSpring = new Spring()
     this.toasterSpring = new Spring()
     this.stoveSpring = new Spring()
@@ -262,8 +268,29 @@ export class JamKitchen {
 
   // ------------------------------------------------------------------ actions
 
+  // Which fruit bowl j is showing right now (it switches half-way through the hop when changing pages).
+  bowlFruit(j) {
+    let page = this.page
+    if (this.pageSwap && this.bowlHop(j) < 0.5) page = this.pageSwap.from
+    return FRUITS[page * PER_PAGE + j]
+  }
+
+  bowlHop(j) {
+    return this.pageSwap ? clamp01((this.pageSwap.t - j * 0.06) / 0.5) : 1
+  }
+
+  nextPage() {
+    if (this.pageSwap) return
+    this.pageSwap = { t: 0, from: this.page }
+    this.page = (this.page + 1) % PAGES
+    this.moreSpring.kick(3)
+    sfx.whoosh()
+    sfx.boing()
+  }
+
   tossFruit(i) {
-    const f = FRUITS[i]
+    const f = this.bowlFruit(i)
+    if (!f) return
     const bx = 50 + i * 62
     this.bowlSprings[i].kick(3)
     if (this.seq) return
@@ -396,7 +423,8 @@ export class JamKitchen {
     if (Math.abs(p.x - TOASTER_X) < 52 && p.y > 370 && p.y < 455) return { kind: 'toaster' }
     if (Math.abs(p.x - JAR_X) < 36 && p.y > 350 && p.y < 460) return { kind: 'jar' }
     if (Math.abs(p.x - SUGAR_X) < 30 && p.y > 360 && p.y < 455) return { kind: 'sugar' }
-    for (let i = 0; i < FRUITS.length; i++) {
+    if (Math.abs(p.x - MORE_BTN.x) < MORE_BTN.w / 2 && Math.abs(p.y - MORE_BTN.y) < MORE_BTN.h / 2 + 4) return { kind: 'more' }
+    for (let i = 0; i < PER_PAGE; i++) {
       const bx = 50 + i * 62
       if (Math.abs(p.x - bx) < 31 && p.y > 378 && p.y < 492) return { kind: 'bowl', i }
     }
@@ -432,6 +460,7 @@ export class JamKitchen {
     else if (hit.kind === 'jar') this.startJar()
     else if (hit.kind === 'sugar') this.addSugar()
     else if (hit.kind === 'bowl') this.tossFruit(hit.i)
+    else if (hit.kind === 'more') this.nextPage()
     else if (hit.kind === 'stove') this.toggleHeat()
     else if (hit.kind === 'pot') {
       this.stirring = true
@@ -484,7 +513,7 @@ export class JamKitchen {
     this.time += dt
     const t = this.time
 
-    for (const s of [this.potSpring, this.jarSpring, this.sugarSpring, this.toasterSpring, this.stoveSpring, this.sunSpring, this.clockSpring, ...this.bowlSprings]) s.update(dt)
+    for (const s of [this.moreSpring, this.potSpring, this.jarSpring, this.sugarSpring, this.toasterSpring, this.stoveSpring, this.sunSpring, this.clockSpring, ...this.bowlSprings]) s.update(dt)
     for (const j of this.shelf) j.jiggle.update(dt)
     this.heatAnim = lerp(this.heatAnim, this.heat ? 1 : 0, 1 - Math.exp(-4 * dt))
     this.sunWink = Math.max(0, this.sunWink - dt)
@@ -607,6 +636,10 @@ export class JamKitchen {
       if (this.banner.t > 2.8) this.banner = null
     }
 
+    if (this.pageSwap) {
+      this.pageSwap.t += dt
+      if (this.pageSwap.t > 0.5 + PER_PAGE * 0.06) this.pageSwap = null
+    }
     this.updateBee(dt)
     this.cat.update(dt)
     for (const c of this.clouds) {
@@ -748,7 +781,9 @@ export class JamKitchen {
     if (this.cat.sneaky && !this.seq) text = 'Uh oh! Tap the cat to shoo it away!'
     else if (this.seq || this.toast || this.sugarAnim) text = ''
     else if (!this.pieces.length && !this.flying.length) {
-      text = this.shelf.length && Math.floor(t / 6) % 2 ? 'Tap a jar on the shelf to eat it on toast!' : 'Tap a fruit bowl to throw fruit in me!'
+      const tips = ['Tap a fruit bowl to throw fruit in me!', 'Tap "More fruit!" for more flavours!']
+      if (this.shelf.length) tips.push('Tap a jar on the shelf to eat it on toast!')
+      text = tips[Math.floor(t / 5) % tips.length]
     } else if (this.cooked >= 1) text = 'Jam is ready! Tap the empty jar!'
     else if (!this.heat) text = 'Turn on the stove to heat me up!'
     else if (this.sugar === 0 && this.cooked > 0.35 && Math.floor(t / 4) % 2) text = 'Want it sweet? Tap the sugar!'
@@ -1065,17 +1100,50 @@ export class JamKitchen {
     rrect(ctx, -10, COUNTER - 4, W + 20, 18, 6)
     fillStroke(ctx, '#f0b77a')
     // name tags under the bowls
-    FRUITS.forEach((f, i) => {
+    for (let i = 0; i < PER_PAGE; i++) {
+      const f = this.bowlFruit(i)
+      if (!f) continue
       const bx = 50 + i * 62
-      ctx.font = `bold 11px ${FONT}`
-      const w = ctx.measureText(f.name).width + 10
+      let size = 11
+      ctx.font = `bold ${size}px ${FONT}`
+      while (ctx.measureText(f.name).width > 50 && size > 8) ctx.font = `bold ${--size}px ${FONT}`
+      const w = ctx.measureText(f.name).width + 8
       rrect(ctx, bx - w / 2, COUNTER + 20, w, 18, 5)
       fillStroke(ctx, '#fffdf5', 2)
-      ctx.fillStyle = f.jam
+      ctx.fillStyle = mix(f.jam, '#000000', 0.3)
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(f.name, bx, COUNTER + 30)
-    })
+    }
+    this.drawMoreButton()
+  }
+
+  drawMoreButton() {
+    const { ctx, time } = this
+    const b = MORE_BTN
+    const sp = this.moreSpring.x
+    const hovered = this.hover?.kind === 'more'
+    ctx.save()
+    ctx.translate(b.x, b.y + (hovered ? -2 : 0))
+    ctx.scale(1 + sp * 0.1, 1 - sp * 0.1)
+    rrect(ctx, -b.w / 2, -b.h / 2 + 4, b.w, b.h, b.h / 2)
+    ctx.fillStyle = INK
+    ctx.fill()
+    rrect(ctx, -b.w / 2, -b.h / 2, b.w, b.h, b.h / 2)
+    fillStroke(ctx, '#ff7a59')
+    outlinedText(ctx, 'More fruit!', -22, 1, 17, '#fff', 4)
+    const nudge = Math.sin(time * 6) * 3
+    ctx.beginPath()
+    ctx.moveTo(48 + nudge, -9)
+    ctx.lineTo(62 + nudge, 0)
+    ctx.lineTo(48 + nudge, 9)
+    ctx.closePath()
+    fillStroke(ctx, '#fff', 2.5)
+    for (let k = 0; k < PAGES; k++) {
+      circle(ctx, 76 + k * 10 - (PAGES - 3) * 5, 0, k === this.page ? 4.5 : 3.2)
+      fillStroke(ctx, k === this.page ? '#ffe066' : '#b8432a', 1.5)
+    }
+    ctx.restore()
   }
 
   drawStove() {
@@ -1149,8 +1217,12 @@ export class JamKitchen {
 
   drawBowls() {
     const { ctx, time } = this
-    FRUITS.forEach((f, i) => {
+    BOWL_COLORS.forEach((_, i) => {
+      const f = this.bowlFruit(i)
+      if (!f) return
       const bx = 50 + i * 62
+      const hop = this.bowlHop(i)
+      const hopY = -Math.sin(hop * Math.PI) * 70
       const sp = this.bowlSprings[i].x
       const hovered = this.hover?.kind === 'bowl' && this.hover.i === i
       ctx.save()
@@ -1164,9 +1236,9 @@ export class JamKitchen {
       ]
       fruitSpots.forEach(([fx, fy, r], k) => {
         ctx.save()
-        ctx.translate(fx, fy)
-        ctx.rotate(Math.sin(time * 2 + i + k) * 0.06)
-        drawFruit(ctx, f.key, r, { blink: blinking(time, i * 3 + k), mood: hovered && k === 2 ? 'open' : 'smile', lookX: (this.pointer.x - bx) / 300, lookY: -0.3 })
+        ctx.translate(fx * (1 + Math.sin(hop * Math.PI) * 0.6), fy + hopY * (1 + k * 0.15))
+        ctx.rotate(Math.sin(time * 2 + i + k) * 0.06 + (hop < 1 ? hop * TAU * (k % 2 ? 1 : -1) : 0))
+        drawFruit(ctx, f.key, r, { blink: blinking(time, i * 3 + k), mood: hop < 1 ? 'open' : hovered && k === 2 ? 'open' : 'smile', lookX: (this.pointer.x - bx) / 300, lookY: -0.3 })
         ctx.restore()
       })
       ctx.beginPath()
