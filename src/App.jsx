@@ -22,6 +22,7 @@ import ClawMachine from './games/ClawMachine'
 import SecurityPuppet from './games/SecurityPuppet'
 import FazbearDelivery from './games/FazbearDelivery'
 import AnimalBrawl from './games/AnimalBrawl'
+import Jam from './games/Jam'
 
 const PLAYABLE_COMPONENTS = {
   'guitar-hero': GuitarHero,
@@ -42,6 +43,7 @@ const PLAYABLE_COMPONENTS = {
   'security-puppet': SecurityPuppet,
   delivery: FazbearDelivery,
   'animal-brawl': AnimalBrawl,
+  jam: Jam,
 }
 
 export default function App() {
