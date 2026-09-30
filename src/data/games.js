@@ -20,4 +20,11 @@ export const GAMES = [
     color: '#e8394f',
     icon: '🍓',
   },
+  {
+    key: 'tadc',
+    title: "Pomni's Big Escape",
+    blurb: 'An 8-bit Amazing Digital Circus side-scroller. Dodge Jax, Ragatha, Gangle, Kinger, Caine and Bubble!',
+    color: '#d82838',
+    icon: '🃏',
+  },
 ]

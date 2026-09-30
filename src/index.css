@@ -2293,3 +2293,89 @@ button.bonk-pill:hover {
 .bonk-canvas:active {
   cursor: grabbing;
 }
+
+/* ---------- Pomni's Big Escape ---------- */
+
+.tadc-topbar {
+  max-width: 960px;
+}
+
+.tadc-canvas {
+  width: 100%;
+  max-width: 960px;
+  aspect-ratio: 320 / 176;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 4px solid #d82838;
+  border-radius: 6px;
+  box-shadow: 0 0 0 4px #2c5ce0, 0 10px 0 4px rgba(0, 0, 0, 0.4);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tadc-pad {
+  width: 100%;
+  max-width: 960px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.tadc-pad-side {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tadc-touch,
+.tadc-small {
+  font-family: 'Press Start 2P', monospace;
+  background: #f4f4f4;
+  color: #140c1c;
+  border: 3px solid #140c1c;
+  box-shadow: 0 4px 0 #140c1c;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tadc-touch {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  font-size: 20px;
+}
+
+.tadc-touch:active,
+.tadc-small:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #140c1c;
+}
+
+.tadc-jump {
+  width: 96px;
+  background: #d82838;
+  color: #fff;
+  font-size: 14px;
+}
+
+.tadc-small {
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 10px;
+}
+
+.tadc-help {
+  max-width: 720px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}

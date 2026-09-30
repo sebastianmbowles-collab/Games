@@ -6,11 +6,13 @@ import ResetArcade from './components/ResetArcade'
 import AnimalBrawl from './games/AnimalBrawl'
 import Jam from './games/Jam'
 import Bonk from './games/Bonk'
+import TADC from './games/TADC'
 
 const GAME_COMPONENTS = {
   bonk: Bonk,
   'animal-brawl': AnimalBrawl,
   jam: Jam,
+  tadc: TADC,
 }
 
 export default function App() {
