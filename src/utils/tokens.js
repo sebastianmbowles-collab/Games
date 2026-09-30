@@ -29,11 +29,3 @@ export function addTokens(amount) {
   safeSet(next)
   return next
 }
-
-export function spendTokens(amount) {
-  const current = safeGet()
-  if (current < amount) return null
-  const next = current - amount
-  safeSet(next)
-  return next
-}

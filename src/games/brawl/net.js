@@ -2,7 +2,7 @@
 // PeerJS's free cloud server is only used to help them find each other with a room code.
 import { Peer } from 'peerjs'
 
-const PREFIX = 'faz-arcade-animal-brawl-'
+const PREFIX = 'seb-arcade-animal-brawl-'
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no 0/O or 1/I/L mix-ups
 
 function randomCode() {

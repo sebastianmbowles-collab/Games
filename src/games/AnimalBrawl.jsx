@@ -603,7 +603,7 @@ export default function AnimalBrawl({ game, onExit }) {
               {picks[result.winner].name}: “{picks[result.winner].win}”
               {result.reward > 0 && (
                 <>
-                  <br />+{result.reward} Faz-Tokens (you have {wallet})
+                  <br />+{result.reward} tokens (you have {wallet})
                 </>
               )}
             </p>
