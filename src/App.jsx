@@ -23,7 +23,6 @@ import SecurityPuppet from './games/SecurityPuppet'
 import FazbearDelivery from './games/FazbearDelivery'
 import AnimalBrawl from './games/AnimalBrawl'
 import Jam from './games/Jam'
-import DigitalCircus from './games/DigitalCircus'
 
 const PLAYABLE_COMPONENTS = {
   'guitar-hero': GuitarHero,
@@ -45,7 +44,6 @@ const PLAYABLE_COMPONENTS = {
   delivery: FazbearDelivery,
   'animal-brawl': AnimalBrawl,
   jam: Jam,
-  'digital-circus': DigitalCircus,
 }
 
 export default function App() {
