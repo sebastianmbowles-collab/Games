@@ -166,4 +166,12 @@ export const GAMES = [
     icon: '🍓',
     playable: true,
   },
+  {
+    key: 'digital-circus',
+    title: 'The Digital Circus',
+    blurb: 'Juggle, walk the wobbly wire and blast out of a cannon. Mind the glitches!',
+    color: '#c77dff',
+    icon: '🎪',
+    playable: true,
+  },
 ]
