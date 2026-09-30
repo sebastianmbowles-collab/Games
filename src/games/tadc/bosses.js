@@ -3,7 +3,7 @@
 // 'platform' (landing on top is safe, bumping the side = out), 'slip' (slippery floor), 'none'.
 
 import { SPR, drawSprite } from './sprites'
-import { GROUND_Y, TILE, VH } from './levels'
+import { GROUND_Y, TILE, VH, VW } from './levels'
 import { sfx } from './sound'
 
 const G = 520
@@ -316,14 +316,14 @@ class Boss {
     this.count = 0
     this.cool = 1
     this.throwT = 0
-    this.x = g.lv.arenaX + 266
+    this.x = g.lv.arenaX + VW - this.w - 8
     this.y = GROUND_Y - this.h
   }
   get w() {
-    return this.spr[0].length * 2
+    return this.spr[0].length
   }
   get h() {
-    return this.spr.length * 2
+    return this.spr.length
   }
   get speed() {
     return 1 + (3 - this.hp) * 0.3
@@ -335,10 +335,13 @@ class Boss {
     return this.state === 'attack' || this.state === 'winddown'
   }
   box() {
-    return { x: this.x + 4, y: this.y + 2, w: this.w - 8, h: this.h - 2 }
+    // Just the middle of the body, so arms and canes sticking out don't count.
+    const bw = Math.min(this.w - 4, 26)
+    const top = this.y + Math.max(3, this.h - 54)
+    return { x: this.x + this.spr.ax - bw / 2, y: top, w: bw, h: this.y + this.h - top }
   }
   hand() {
-    return { x: this.x + 2, y: this.y + this.h * 0.4 }
+    return { x: this.x + this.spr.ax - 10, y: this.y + this.h * 0.35 }
   }
   set(state) {
     this.state = state
@@ -402,12 +405,12 @@ class Boss {
       alpha = Math.max(0, 1 - this.t / 2)
     }
     const flash = (this.state === 'hurt' || this.state === 'dead') && Math.floor(t * 20) % 2 === 0
-    drawSprite(c, this.spr, x, y, { scale: 2, mode: flash ? 'white' : 'normal', alpha })
+    drawSprite(c, this.spr, x, y, { mode: flash ? 'white' : 'normal', alpha })
     if (this.state === 'tired') {
       for (let k = 0; k < 3; k++) {
         const a = t * 5 + k * 2.1
         c.fillStyle = '#f8c830'
-        c.fillRect(Math.round(x + this.w / 2 + Math.cos(a) * 12), Math.round(this.y - 5 + Math.sin(a) * 3), 2, 2)
+        c.fillRect(Math.round(x + this.spr.ax + Math.cos(a) * 12), Math.round(this.y - 5 + Math.sin(a) * 3), 2, 2)
       }
     }
   }
@@ -479,7 +482,7 @@ class Kinger extends Boss {
     const h = this.hand()
     const slide = -rand(55, 85) * this.speed
     if (Math.random() < 0.7) {
-      this.g.haz.push(new Pillow(this.x - 22, GROUND_Y - 10, slide, 0, slide))
+      this.g.haz.push(new Pillow(this.x - 16, GROUND_Y - 10, slide, 0, slide))
     } else {
       const v = aim(h.x - 10, h.y, clamp(this.target(), this.g.lv.arenaX + 20, this.x - 40), GROUND_Y, 1)
       this.g.haz.push(new Pillow(h.x - 10, h.y, v.vx, v.vy, -40))
@@ -507,7 +510,7 @@ class Caine extends Boss {
     if (this.pending) {
       this.pending.t -= dt
       if (this.pending.t <= 0) {
-        this.g.haz.push(new Cane(this.x, this.pending.y, 150 * this.speed, this.x + 10))
+        this.g.haz.push(new Cane(this.x + 10, this.pending.y, 150 * this.speed, this.x + 20))
         sfx.cane()
         this.pending = null
       }
@@ -516,14 +519,14 @@ class Caine extends Boss {
     // Bubble floats around the top of the tent and is sick everywhere.
     const b = this.bub
     b.t += dt
-    b.x = this.g.lv.arenaX + 130 + Math.sin(b.t * 0.7) * 105
+    b.x = this.g.lv.arenaX + 118 + Math.sin(b.t * 0.7) * 95
     b.y = 16 + Math.sin(b.t * 2.3) * 4
     if (this.state !== 'dead' && this.state !== 'intro') {
       b.cool -= dt
       if (b.cool <= 0) {
         b.cool = rand(2.2, 3.2)
         sfx.vomit()
-        for (let i = 0; i < 3; i++) this.g.haz.push(new Glob(b.x + 12, b.y + 26, rand(-40, 40)))
+        for (let i = 0; i < 3; i++) this.g.haz.push(new Glob(b.x + 16, b.y + 26, rand(-40, 40)))
       }
     }
   }
@@ -543,7 +546,7 @@ class Caine extends Boss {
       for (let x = this.g.lv.arenaX; x < this.x; x += 8) c.fillRect(Math.round(x - cam), this.pending.y, 4, 1)
     }
     super.draw(c, cam, t)
-    if (this.state !== 'dead') drawSprite(c, SPR.bubble, this.bub.x - cam, this.bub.y, { scale: 2 })
+    if (this.state !== 'dead') drawSprite(c, SPR.bubble, this.bub.x - cam, this.bub.y)
   }
 }
 

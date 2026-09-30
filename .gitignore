@@ -24,3 +24,4 @@ bonk-build
 *.njsproj
 *.sln
 *.sw?
+tools/tadc-sprites/sndump/target

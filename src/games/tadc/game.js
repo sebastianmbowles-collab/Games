@@ -160,7 +160,7 @@ export class TadcGame {
     this.starsTotal = this.ents.filter((e) => e.type === 'star').length
     this.starsGot = 0
     this.levelDeaths = 0
-    this.checkpoint = { x: 24, y: GROUND_Y - 20 }
+    this.checkpoint = { x: 24, y: GROUND_Y - 22 }
     this.p = this.newPlayer()
     this.camX = 0
     this.locked = false
@@ -176,7 +176,7 @@ export class TadcGame {
   }
 
   newPlayer() {
-    return { x: this.checkpoint.x, y: this.checkpoint.y, w: 10, h: 20, vx: 0, vy: 0, onGround: false, coyote: 0, jumpBuf: 0, face: 1, dead: 0, prevBottom: 0, anim: 0 }
+    return { x: this.checkpoint.x, y: this.checkpoint.y, w: 10, h: 22, vx: 0, vy: 0, onGround: false, coyote: 0, jumpBuf: 0, face: 1, dead: 0, prevBottom: 0, anim: 0 }
   }
 
   // ---------- Main loop ----------
@@ -467,7 +467,7 @@ export class TadcGame {
 
   lockArena() {
     this.locked = true
-    this.checkpoint = { x: this.lv.arenaX + 24, y: GROUND_Y - 20 }
+    this.checkpoint = { x: this.lv.arenaX + 24, y: GROUND_Y - 22 }
     this.boss = makeBoss(this.def.boss, this)
     this.music()
   }
@@ -629,7 +629,8 @@ export class TadcGame {
       let spr = SPR.pomniIdle
       if (!p.onGround) spr = SPR.pomniJump
       else if (Math.abs(p.vx) > 10) spr = Math.floor(p.anim / 10) % 2 ? SPR.pomniRun1 : SPR.pomniRun2
-      drawSprite(c, spr, p.x - 2 - cam, p.y - 1, { flip: p.face < 0 })
+      else if (this.t % 4 > 3) spr = SPR.pomniLook
+      this.drawPomni(c, spr, p.x + p.w / 2 - cam, p.y + p.h + 1, p.face < 0)
       if (this.slip && Math.floor(t * 8) % 2) drawText(c, '!', p.x + 3 - cam, p.y - 10, { color: '#68d8f8' })
     }
 
@@ -643,6 +644,13 @@ export class TadcGame {
     }
 
     this.drawHud(c)
+  }
+
+  // Draw a Pomni frame standing with her feet at (cx, bottom), keeping her body centred between frames.
+  drawPomni(c, spr, cx, bottom, flip = false, scale = 1) {
+    const w = spr[0].length * scale
+    const ax = spr.ax * scale
+    drawSprite(c, spr, Math.round(flip ? cx - (w - ax) : cx - ax), Math.round(bottom - spr.length * scale), { flip, scale })
   }
 
   drawHud(c) {
@@ -673,16 +681,19 @@ export class TadcGame {
     drawText(c, "POMNI'S", VW / 2, 16, { scale: 3, align: 'center', color: '#d82838' })
     drawText(c, 'BIG ESCAPE', VW / 2, 38, { scale: 3, align: 'center', color: '#2c5ce0' })
     drawText(c, 'AN AMAZING DIGITAL CIRCUS FAN GAME', VW / 2, 62, { align: 'center', color: '#f8c830' })
-    drawSprite(c, SPR.pomniIdle, VW / 2 - 21, 144 - 63 + Math.round(Math.sin(t * 3) * 2), { scale: 3 })
+    const look = Math.floor(t / 1.5) % 4
+    const pose = look === 1 ? SPR.pomniLook : look === 3 ? SPR.pomniWave : SPR.pomniIdle
+    this.drawPomni(c, pose, VW / 2, 145 + Math.round(Math.sin(t * 3)), look === 2, 2)
     const lineup = [
-      [SPR.jax, 14],
-      [SPR.ragatha, 50],
-      [SPR.gangle, 238],
-      [SPR.kinger, 274],
+      [SPR.jax, 6],
+      [SPR.ragatha, 44],
+      [SPR.gangle, 226],
+      [SPR.kinger, 258],
+      [SPR.zooble, 284],
     ]
-    for (const [s, x] of lineup) drawSprite(c, s, x, 144 - s.length * 2, { scale: 2 })
-    drawSprite(c, SPR.caine, 92, 78 + Math.round(Math.sin(t * 2) * 3))
-    drawSprite(c, SPR.bubble, 214, 80 + Math.round(Math.cos(t * 2) * 3))
+    for (const [s, x] of lineup) drawSprite(c, s, x, 145 - s.length)
+    drawSprite(c, SPR.iconCaine, 86, 76 + Math.round(Math.sin(t * 2) * 3))
+    drawSprite(c, SPR.iconBubble, 204, 82 + Math.round(Math.cos(t * 2) * 3))
     if (Math.floor(t * 2) % 2) drawText(c, 'PRESS JUMP TO START', VW / 2, 166, { align: 'center', color: '#f8c830' })
   }
 
@@ -692,7 +703,7 @@ export class TadcGame {
     drawText(c, 'PICK A SHOW', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
     c.fillStyle = '#f8c830'
     for (let x = this.nodeX(0); x < this.nodeX(LEVELS.length - 1); x += 6) c.fillRect(x, 104, 3, 1)
-    const icons = [SPR.jax, SPR.ragatha, SPR.gangle, SPR.kinger, SPR.caine]
+    const icons = [SPR.iconJax, SPR.iconRagatha, SPR.iconGangle, SPR.iconKinger, SPR.iconCaine]
     LEVELS.forEach((lv, i) => {
       const x = this.nodeX(i)
       const locked = i >= this.data.unlocked
@@ -702,19 +713,19 @@ export class TadcGame {
       c.fillRect(x - 12, 102, 24, 5)
       const s = icons[i]
       const bob = i === this.sel ? Math.round(Math.sin(t * 5) * 2) : 0
-      drawSprite(c, s, x - 8, 101 - s.length + bob, { mode: locked ? 'shadow' : 'normal' })
-      if (i === 4 && !locked) drawSprite(c, SPR.bubble, x + 6, 62 + bob, { scale: 1 })
+      drawSprite(c, s, x - s.ax, 102 - s.length + bob, { mode: locked ? 'shadow' : 'normal' })
+      if (i === 4 && !locked) drawSprite(c, SPR.iconBubble, x + 10, 56 + bob)
       if (locked) drawText(c, '?', x, 82, { align: 'center', color: '#8c8c9c' })
-      if (this.data.beaten.includes(i)) drawSprite(c, SPR.star, x - 3, 36)
+      if (this.data.beaten.includes(i)) drawSprite(c, SPR.star, x - 3, 30)
       if (i === this.sel) {
-        drawSprite(c, SPR.pomniIdle, x - 7, 112)
-        drawText(c, 'V', x, 44 + (Math.floor(t * 4) % 2), { align: 'center', color: '#f8c830' })
+        this.drawPomni(c, SPR.pomniIdle, x, 141)
+        drawText(c, 'V', x, 60 + (Math.floor(t * 4) % 2), { align: 'center', color: '#f8c830' })
       }
     })
     const lv = LEVELS[this.sel]
-    drawText(c, lv.title, VW / 2, 140, { align: 'center', scale: 1, color: '#f4f4f4' })
-    drawText(c, `BOSS: ${BOSS_NAMES[this.sel]}`, VW / 2, 150, { align: 'center', color: '#f8c830' })
-    if (Math.floor(t * 2) % 2) drawText(c, '< >  PICK      JUMP  PLAY', VW / 2, 164, { align: 'center', color: '#c8b8e0' })
+    drawText(c, lv.title, VW / 2, 147, { align: 'center', scale: 1, color: '#f4f4f4' })
+    drawText(c, `BOSS: ${BOSS_NAMES[this.sel]}`, VW / 2, 157, { align: 'center', color: '#f8c830' })
+    if (Math.floor(t * 2) % 2) drawText(c, '< >  PICK      JUMP  PLAY', VW / 2, 167, { align: 'center', color: '#c8b8e0' })
   }
 
   drawClear(c) {
@@ -724,7 +735,7 @@ export class TadcGame {
     drawText(c, `YOU BEAT ${BOSS_NAMES[this.levelIdx]}!`, VW / 2, 70, { scale: 1, align: 'center' })
     drawText(c, `STARS ${this.starsGot} / ${this.starsTotal}`, VW / 2, 90, { align: 'center', color: '#f8c830' })
     drawText(c, `OUCHES ${this.levelDeaths}`, VW / 2, 100, { align: 'center', color: '#c8b8e0' })
-    drawSprite(c, SPR.pomniJump, VW / 2 - 14, 112 + Math.round(Math.abs(Math.sin(this.t * 6)) * -6), { scale: 2 })
+    this.drawPomni(c, SPR.pomniJump, VW / 2, 150 - Math.round(Math.abs(Math.sin(this.t * 6)) * 6))
     if (this.stateT > 1 && Math.floor(this.t * 2) % 2) drawText(c, 'PRESS JUMP', VW / 2, 164, { align: 'center' })
   }
 
@@ -732,18 +743,18 @@ export class TadcGame {
     const t = this.t
     this.drawBackdrop(c, t * 30, LEVELS[4])
     this.drawFloorBand(c, 144)
-    drawText(c, 'YOU BEAT THE', VW / 2, 14, { scale: 2, align: 'center', color: '#f8c830' })
-    drawText(c, 'WHOLE CIRCUS!', VW / 2, 30, { scale: 2, align: 'center', color: '#f8c830' })
-    const cast = [SPR.jax, SPR.ragatha, SPR.gangle, SPR.pomniIdle, SPR.kinger, SPR.caine]
+    drawText(c, 'YOU BEAT THE WHOLE CIRCUS!', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
+    drawText(c, '...BUT WHERE IS THE EXIT?', VW / 2, 26, { align: 'center', color: '#c8b8e0' })
+    drawText(c, 'THANKS FOR PLAYING!', VW / 2, 36, { align: 'center' })
+    drawText(c, `TOTAL OUCHES: ${this.data.deaths}`, VW / 2, 46, { align: 'center', color: '#c8b8e0' })
+    const cast = [SPR.jax, SPR.ragatha, SPR.gangle, SPR.pomniWave, SPR.kinger, SPR.zooble, SPR.caine]
+    let x = 4
     cast.forEach((s, i) => {
-      const x = 28 + i * 48
-      const hop = Math.round(Math.abs(Math.sin(t * 4 + i)) * -6)
-      drawSprite(c, s, x, 144 - s.length * 2 + hop, { scale: 2 })
+      const hop = Math.round(Math.abs(Math.sin(t * 4 + i)) * -5)
+      drawSprite(c, s, x, 145 - s.length + hop)
+      x += s[0].length + 2
     })
-    drawSprite(c, SPR.bubble, 282, 50 + Math.round(Math.sin(t * 3) * 3), { scale: 2 })
-    drawText(c, '...BUT WHERE IS THE EXIT?', VW / 2, 50, { align: 'center', color: '#c8b8e0' })
-    drawText(c, 'THANKS FOR PLAYING!', VW / 2, 64, { align: 'center' })
-    drawText(c, `TOTAL OUCHES: ${this.data.deaths}`, VW / 2, 74, { align: 'center', color: '#c8b8e0' })
+    drawSprite(c, SPR.bubble, 280, 58 + Math.round(Math.sin(t * 3) * 3))
     if (this.stateT > 1.5 && Math.floor(t * 2) % 2) drawText(c, 'PRESS JUMP', VW / 2, 164, { align: 'center' })
   }
 

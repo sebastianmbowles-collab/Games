@@ -1,0 +1,93 @@
+<!doctype html><html><body style="margin:0;background:#556"><div id="out" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:8px"></div>
+<script src="snrender.js"></script>
+<script>
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+const cache = {}
+async function load(name) { return cache[name] ||= await (await fetch(`pack/${name}.json`)).json() }
+function posed(fig, deltas) {
+  if (!deltas) return fig
+  const f = JSON.parse(JSON.stringify(fig))
+  const walk = (n) => { if (deltas[n.draw_order_index] !== undefined) n.local_angle += deltas[n.draw_order_index]; n.children.forEach(walk) }
+  f.nodes.forEach(walk)
+  return f
+}
+// parts: [{ name, x, y, rot, flip, pose }]
+async function drawParts(c, parts, minWidth) {
+  for (const p of parts) {
+    const fig = posed(await load(p.name), p.pose)
+    c.save(); c.translate(p.x || 0, p.y || 0); if (p.rot) c.rotate(p.rot * Math.PI / 180); if (p.flip) c.scale(-1, 1)
+    snDraw(c, fig, { yUp: true, minWidth }); c.restore()
+  }
+}
+window.pixelize = async (spec) => {
+  const F = 8
+  const big = document.createElement('canvas'); big.width = 3000; big.height = 3000
+  const bc = big.getContext('2d')
+  // First pass: find the drawn area at a known scale.
+  bc.save(); bc.translate(1500, 1500); bc.scale(1, 1); await drawParts(bc, spec.parts); bc.restore()
+  let d = bc.getImageData(0, 0, 3000, 3000).data
+  let x0 = 3000, y0 = 3000, x1 = 0, y1 = 0
+  for (let y = 0; y < 3000; y++) for (let x = 0; x < 3000; x++) if (d[(y * 3000 + x) * 4 + 3] > 20) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+  const H = spec.h - 2
+  const S = (H * F) / (y1 - y0 + 1)
+  const W = Math.ceil(((x1 - x0 + 1) * S) / F)
+  const hi = document.createElement('canvas'); hi.width = W * F; hi.height = H * F
+  const hc = hi.getContext('2d')
+  hc.save(); hc.scale(S, S); hc.translate(-(x0 - 1500), -(y0 - 1500)); await drawParts(hc, spec.parts, (spec.minPx ?? 1) * F / S); hc.restore()
+  d = hc.getImageData(0, 0, W * F, H * F).data
+  const thr = spec.thr ?? 0.3
+  let grid = []
+  const counts = {}
+  for (let py = 0; py < H; py++) {
+    const row = []
+    for (let px = 0; px < W; px++) {
+      let cov = 0; const votes = {}
+      for (let sy = 0; sy < F; sy++) for (let sx = 0; sx < F; sx++) {
+        const i = ((py * F + sy) * W * F + px * F + sx) * 4
+        if (d[i + 3] > 128) { cov++; if (d[i + 3] > 230) { const k = ((d[i] >> 3) << 10) | ((d[i + 1] >> 3) << 5) | (d[i + 2] >> 3); votes[k] = (votes[k] || 0) + 1 } }
+      }
+      if (cov / (F * F) < thr) { row.push(null); continue }
+      let best = null, bn = 0
+      for (const k in votes) if (votes[k] > bn) { bn = votes[k]; best = +k }
+      if (best === null) { row.push(null); continue }
+      row.push(best); counts[best] = (counts[best] || 0) + 1
+    }
+    grid.push(row)
+  }
+  const rgb = (k) => [((k >> 10) & 31) * 8 + 4, ((k >> 5) & 31) * 8 + 4, (k & 31) * 8 + 4]
+  // Merge rare colors into their nearest neighbour until the palette is small.
+  const map = {}
+  let keys = Object.keys(counts).map(Number)
+  const maxC = spec.colors || 14
+  while (keys.length > maxC) {
+    keys.sort((a, b) => counts[a] - counts[b])
+    const k = keys.shift(), a = rgb(k)
+    let near = keys[0], nd = Infinity
+    for (const q of keys) { const b = rgb(q); const dd = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2; if (dd < nd) { nd = dd; near = q } }
+    counts[near] += counts[k]; map[k] = near
+    for (const m in map) if (map[m] === k) map[m] = near
+  }
+  grid = grid.map((r) => r.map((k) => (k === null ? null : map[k] ?? k)))
+  // Dark outline around the outside, like an old cartridge sprite.
+  const OW = W + 2, OH = H + 2
+  const out = Array.from({ length: OH }, (_, y) => Array.from({ length: OW }, (_, x) => (grid[y - 1] && grid[y - 1][x - 1] !== undefined ? grid[y - 1][x - 1] : null)))
+  const OUT = -1
+  const res = out.map((r) => r.slice())
+  if (spec.outline !== false) {
+    for (let y = 0; y < OH; y++) for (let x = 0; x < OW; x++) {
+      if (out[y][x] !== null) continue
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => out[y + dy] && out[y + dy][x + dx] !== null && out[y + dy][x + dx] !== undefined)) res[y][x] = OUT
+    }
+  }
+  const used = [...new Set(res.flat().filter((k) => k !== null))]
+  const pal = used.map((k) => (k === OUT ? '#140c1c' : '#' + rgb(k).map((v) => Math.min(255, v).toString(16).padStart(2, '0')).join('')))
+  const rows = res.map((r) => r.map((k) => (k === null ? '.' : CHARS[used.indexOf(k)])).join(''))
+  // preview
+  const cv = document.createElement('canvas'); const Z = 4; cv.width = OW * Z; cv.height = OH * Z
+  const pc = cv.getContext('2d')
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.') { pc.fillStyle = pal[CHARS.indexOf(ch)]; pc.fillRect(x * Z, y * Z, Z, Z) } }))
+  const wrap = document.createElement('div'); wrap.style.cssText = 'color:#fff;font:12px sans-serif;text-align:center'; wrap.append(cv, document.createElement('br'), spec.key + ' ' + OW + 'x' + OH)
+  document.getElementById('out').appendChild(wrap)
+  return { key: spec.key, pal, rows, ax: Math.round(((1500 - x0) * S) / F) + 1 }
+}
+</script></body></html>

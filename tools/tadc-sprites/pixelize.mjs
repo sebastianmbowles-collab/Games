@@ -1,0 +1,16 @@
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim() + '/playwright')
+const http = require('http'), fs = require('fs'), path = require('path')
+const root = process.cwd()
+const srv = http.createServer((q, s) => { const f = path.join(root, decodeURIComponent(q.url.split('?')[0])); fs.readFile(f, (e, d) => { if (e) { s.writeHead(404); s.end() } else { s.writeHead(200); s.end(d) } }) }).listen(5302)
+const b = await chromium.launch()
+const p = await b.newPage({ viewport: { width: 1800, height: 1200 } })
+p.on('pageerror', (e) => console.log('ERR', e.message))
+await p.goto('http://localhost:5302/pixelize.html')
+const specs = JSON.parse(fs.readFileSync('specs-final.json', 'utf8'))
+const out = []
+for (const s of specs) out.push(await p.evaluate((s) => window.pixelize(s), s))
+fs.writeFileSync('art.json', JSON.stringify(out))
+await p.screenshot({ path: 'preview.png', fullPage: true })
+await b.close(); srv.close()
