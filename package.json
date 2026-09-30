@@ -7,13 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "build:standalone": "vite build --config vite.config.standalone.js",
+    "build:bonk": "vite build --config vite.config.bonk.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
     "peerjs": "^1.5.5",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "three": "^0.186.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",

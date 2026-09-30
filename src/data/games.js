@@ -1,5 +1,12 @@
 export const GAMES = [
   {
+    key: 'bonk',
+    title: 'BONK!',
+    blurb: 'Rubber duck balloon brawl in 3D! Pop everyone’s balloons with a giant hammer.',
+    color: '#ff6b1a',
+    icon: '🔨',
+  },
+  {
     key: 'animal-brawl',
     title: 'Animal Brawl',
     blurb: 'Street-fighter style showdown between 18 punny animals.',

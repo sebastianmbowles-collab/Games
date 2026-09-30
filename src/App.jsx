@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { GAMES } from './data/games'
 import GameCard from './components/GameCard'
+import GameErrorBoundary from './components/GameErrorBoundary'
+import ResetArcade from './components/ResetArcade'
 import AnimalBrawl from './games/AnimalBrawl'
 import Jam from './games/Jam'
+import Bonk from './games/Bonk'
 
 const GAME_COMPONENTS = {
+  bonk: Bonk,
   'animal-brawl': AnimalBrawl,
   jam: Jam,
 }
@@ -14,7 +18,11 @@ export default function App() {
 
   if (activeGame) {
     const GameComponent = GAME_COMPONENTS[activeGame.key]
-    return <GameComponent game={activeGame} onExit={() => setActiveGame(null)} />
+    return (
+      <GameErrorBoundary onExit={() => setActiveGame(null)}>
+        <GameComponent game={activeGame} onExit={() => setActiveGame(null)} />
+      </GameErrorBoundary>
+    )
   }
 
   return (
@@ -28,6 +36,9 @@ export default function App() {
           <GameCard key={game.key} game={game} onPlay={setActiveGame} />
         ))}
       </div>
+      <footer className="arcade-footer">
+        <ResetArcade />
+      </footer>
     </div>
   )
 }

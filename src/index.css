@@ -654,3 +654,1642 @@ body {
   font-size: 14px;
   line-height: 1.5;
 }
+
+/* ---------- BONK! ---------- */
+
+.bonk-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.bonk-stage {
+  position: relative;
+  width: 100%;
+  max-width: 1280px;
+  aspect-ratio: 16 / 10;
+  max-height: calc(100vh - 24px);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #48b8ff;
+  box-shadow: 0 0 0 4px #ff6b1a, 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.bonk-canvas,
+.bonk-overlay-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.bonk-overlay-canvas {
+  pointer-events: none;
+}
+
+.bonk-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 5%;
+  gap: 8px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.bonk-title p {
+  margin: 0;
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 2px 2px 0 #3a1400;
+  font-size: 18px;
+}
+
+.bonk-logo {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(40px, 9vw, 96px);
+  margin: 0;
+  color: #ffd23f;
+  text-shadow:
+    5px 5px 0 #ff4d6d,
+    10px 10px 0 #3a1400;
+  animation: bonk-wobble 1.4s ease-in-out infinite;
+}
+
+@keyframes bonk-wobble {
+  0%,
+  100% {
+    transform: rotate(-3deg) scale(1);
+  }
+  50% {
+    transform: rotate(3deg) scale(1.06);
+  }
+}
+
+.bonk-loadbar {
+  position: absolute;
+  bottom: 8%;
+  width: min(420px, 70%);
+  height: 26px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 3px solid #fff;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.bonk-loadbar div {
+  height: 100%;
+  background: linear-gradient(90deg, #ff4d6d, #ffd23f, #2bd96b, #3aa0ff, #b36bff);
+  transition: width 0.12s;
+}
+
+.bonk-loadbar span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+}
+
+.bonk-go {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  background: #ff6b1a;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 22px;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #8a3000;
+  text-shadow: 2px 2px 0 #8a3000;
+}
+
+.bonk-go:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 #8a3000;
+}
+
+.bonk-title .bonk-go {
+  position: absolute;
+  bottom: 8%;
+}
+
+.pulse {
+  animation: bonk-pulse 1s ease-in-out infinite;
+}
+
+@keyframes bonk-pulse {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.bonk-topbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+
+.bonk-topbar > * {
+  pointer-events: auto;
+}
+
+.bonk-spacer {
+  flex: 1;
+}
+
+.bonk-pill {
+  background: rgba(20, 12, 40, 0.72);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+button.bonk-pill {
+  cursor: pointer;
+}
+
+button.bonk-pill:hover {
+  border-color: #ffd23f;
+}
+
+.bonk-event {
+  color: #ffd23f;
+}
+
+.bonk-players {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.bonk-pcard {
+  background: rgba(20, 12, 40, 0.72);
+  border: 2px solid var(--pc);
+  border-radius: 10px;
+  padding: 3px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 11px;
+  color: #fff;
+  min-width: 70px;
+}
+
+.bonk-pcard b {
+  color: var(--pc);
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bonk-pcard.is-human {
+  transform: scale(1.1);
+  box-shadow: 0 0 10px var(--pc);
+}
+
+.bonk-pcard.is-out {
+  opacity: 0.35;
+}
+
+.bonk-cds {
+  position: absolute;
+  top: 48px;
+  left: 8px;
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.bonk-cds span {
+  background: rgba(20, 12, 40, 0.72);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  opacity: 0.4;
+}
+
+.bonk-cds span.ready {
+  opacity: 1;
+}
+
+.bonk-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 12, 40, 0.65);
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.bonk-toasts {
+  position: absolute;
+  top: 52px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.bonk-toast {
+  background: rgba(20, 12, 40, 0.88);
+  color: #fff;
+  border-left: 5px solid #3aa0ff;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 800;
+  font-size: 13px;
+  animation: bonk-toast-in 0.3s ease-out;
+  max-width: 320px;
+}
+
+.bonk-toast.ach {
+  border-color: #ffd23f;
+}
+
+.bonk-toast.secret {
+  border-color: #b36bff;
+}
+
+@keyframes bonk-toast-in {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+}
+
+.bonk-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 5, 25, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 10;
+}
+
+.bonk-panel {
+  position: relative;
+  background: linear-gradient(160deg, #2a1650, #1a1033);
+  border: 3px solid #ffd23f;
+  border-radius: 18px;
+  color: #fff;
+  padding: 18px 20px;
+  width: min(760px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.bonk-panel h3 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  margin: 0 0 12px;
+  color: #ffd23f;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bonk-panel h4 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #ff9ecf;
+  margin: 12px 0 8px;
+}
+
+.bonk-panel button {
+  background: #3a2670;
+  color: #fff;
+  border: 2px solid #6b4fc4;
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bonk-panel button:hover:not(:disabled) {
+  border-color: #ffd23f;
+}
+
+.bonk-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bonk-panel button.is-on {
+  background: #ff6b1a;
+  border-color: #ffd23f;
+}
+
+.bonk-panel .bonk-go {
+  background: #ff6b1a;
+  border: none;
+  display: block;
+  margin: 16px auto 0;
+  font-size: 16px;
+}
+
+.bonk-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.bonk-bb {
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
+.bonk-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.bonk-chip-row.center {
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.bonk-chip-row.center .bonk-go {
+  margin: 0;
+}
+
+.bonk-muted {
+  color: #b8a9e0;
+  font-size: 12px;
+}
+
+.bonk-note {
+  background: rgba(255, 77, 109, 0.18);
+  border: 2px solid #ff4d6d;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.bonk-link {
+  background: none !important;
+  border: none !important;
+  color: #ff9ecf !important;
+  text-decoration: underline;
+  padding: 0 !important;
+}
+
+.bonk-player-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.bonk-slot {
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid #6b4fc4;
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 170px;
+  flex: 1;
+}
+
+.bonk-slot.is-you {
+  border-color: #ffd23f;
+}
+
+.bonk-slot small {
+  color: #b8a9e0;
+  font-size: 11px;
+}
+
+.bonk-challenges {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.bonk-challenges button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+}
+
+.bonk-challenges small {
+  font-weight: 500;
+  font-size: 11px;
+  color: #d9ccff;
+}
+
+.bonk-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.bonk-tabs button {
+  font-size: 12px;
+  padding: 5px 9px;
+}
+
+.bonk-tabs small {
+  opacity: 0.7;
+  font-size: 10px;
+}
+
+.bonk-shop {
+  width: min(960px, 100%);
+}
+
+.bonk-shop-body {
+  display: flex;
+  gap: 12px;
+}
+
+.bonk-shop-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 220px;
+}
+
+.bonk-preview {
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, #6ec3f4, #3a2670);
+  border-radius: 16px;
+}
+
+.bonk-shop-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.bonk-shop-info small {
+  color: #ff9ecf;
+  font-size: 11px;
+}
+
+.bonk-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 6px;
+  align-content: start;
+  max-height: 380px;
+  overflow: auto;
+}
+
+.bonk-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px !important;
+  font-size: 12px;
+}
+
+.bonk-item small {
+  font-weight: 600;
+  color: #ffd23f;
+}
+
+.bonk-item.is-owned small {
+  color: #2bd96b;
+}
+
+.bonk-item.is-sel {
+  border-color: #ffd23f !important;
+  background: #53389c !important;
+}
+
+.bonk-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+}
+
+.bonk-progress {
+  height: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.bonk-progress div {
+  height: 100%;
+  background: linear-gradient(90deg, #ffd23f, #ff6b1a);
+}
+
+.bonk-progress.small {
+  height: 5px;
+  margin: 4px 0 0;
+}
+
+.bonk-ach {
+  width: min(880px, 100%);
+}
+
+.bonk-ach-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.bonk-ach-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid #3a2670;
+  border-radius: 10px;
+  padding: 6px 8px;
+  opacity: 0.75;
+}
+
+.bonk-ach-item.is-done {
+  border-color: #ffd23f;
+  opacity: 1;
+}
+
+.bonk-ach-item > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.bonk-ach-item b {
+  font-size: 13px;
+}
+
+.bonk-ach-item small {
+  color: #cfc2f5;
+  font-size: 11px;
+}
+
+.bonk-ach-num {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: #ff9ecf;
+  min-width: 36px;
+}
+
+.bonk-ach-icon {
+  font-size: 20px;
+}
+
+.bonk-results {
+  text-align: center;
+  width: min(520px, 100%);
+}
+
+.bonk-results h3 {
+  justify-content: center;
+  line-height: 1.6;
+}
+
+.bonk-standings {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.bonk-earned {
+  font-family: 'Press Start 2P', monospace;
+  color: #ffd23f;
+  font-size: 13px;
+}
+
+.bonk-terminal pre {
+  font-family: 'Courier New', monospace;
+  color: #00ff66;
+  background: #000;
+  padding: 12px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+}
+
+.bonk-touch {
+  display: none;
+  width: 100%;
+  max-width: 1280px;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  user-select: none;
+  touch-action: none;
+}
+
+.bonk-touch.is-touch {
+  display: flex;
+}
+
+.bonk-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(3, 52px);
+  gap: 4px;
+}
+
+.bonk-dpad .up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.bonk-dpad .left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.bonk-dpad .right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.bonk-dpad .down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.bonk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 230px;
+}
+
+.bonk-touch-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 2px solid #6b4fc4;
+  background: #2a1650;
+  color: #fff;
+  font-size: 20px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bonk-touch-btn.jump {
+  background: #2bd96b;
+  border-color: #0c7a35;
+}
+
+.bonk-touch-btn.bonk {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #ff6b1a;
+  border-color: #8a3000;
+  font-size: 30px;
+}
+
+@media (max-width: 700px) {
+  .bonk-root {
+    padding: 4px;
+  }
+
+  .bonk-stage {
+    aspect-ratio: 4 / 5;
+  }
+
+  .bonk-hint {
+    display: none;
+  }
+
+  .bonk-pill {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .bonk-shop-body {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .bonk-panel h3 {
+    font-size: 13px;
+  }
+}
+
+/* ---------- BONK! title, menus, mobile ---------- */
+
+.bonk-device,
+.bonk-loading,
+.bonk-titlescreen {
+  position: absolute;
+  inset: 0;
+}
+
+.bonk-device {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: linear-gradient(160deg, #48b8ff, #b36bff 60%, #ff5d8f);
+  color: #fff;
+  text-align: center;
+  z-index: 3;
+}
+
+.bonk-device h2 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(20px, 4vw, 36px);
+  margin: 0;
+  text-shadow: 4px 4px 0 #3a1400;
+}
+
+.bonk-device-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.bonk-device-row button {
+  width: 170px;
+  height: 170px;
+  border-radius: 26px;
+  border: 5px solid #fff;
+  background: rgba(20, 12, 40, 0.55);
+  color: #fff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s;
+}
+
+.bonk-device-row button span {
+  font-size: 64px;
+}
+
+.bonk-device-row button:hover,
+.bonk-device-row button.is-last {
+  transform: translateY(-4px) scale(1.04);
+  border-color: #ffd23f;
+}
+
+.bonk-device p {
+  margin: 0;
+  font-weight: 800;
+}
+
+.bonk-device .bonk-link {
+  background: none;
+  border: none;
+  color: #fff;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.bonk-loading .bonk-loadbar {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* the round duck head (the O in BONK) */
+.bonk-duckhead {
+  position: relative;
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6b0, #ffd23f 45%, #f2a900);
+  box-shadow: inset -0.06em -0.08em 0 rgba(0, 0, 0, 0.15);
+  vertical-align: -0.08em;
+}
+
+.bonk-duckhead .eye {
+  position: absolute;
+  top: 28%;
+  width: 22%;
+  height: 26%;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.bonk-duckhead .eye.l {
+  left: 22%;
+}
+
+.bonk-duckhead .eye.r {
+  right: 22%;
+}
+
+.bonk-duckhead .eye i {
+  position: absolute;
+  width: 55%;
+  height: 55%;
+  left: 25%;
+  top: 30%;
+  background: #111;
+  border-radius: 50%;
+  animation: bonk-look 3s ease-in-out infinite;
+}
+
+@keyframes bonk-look {
+  0%,
+  40%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50%,
+  70% {
+    transform: translate(35%, 10%);
+  }
+  80% {
+    transform: translate(-35%, 5%);
+  }
+}
+
+.bonk-duckhead .beak {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 44%;
+  height: 20%;
+  transform: translateX(-50%);
+  background: #ff8f1f;
+  border-radius: 50%;
+}
+
+.bonk-titlescreen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 4%;
+  pointer-events: none;
+}
+
+.bonk-titlescreen > * {
+  pointer-events: auto;
+}
+
+.bonk-flyby {
+  position: absolute !important;
+  font-size: 90px;
+  left: 50%;
+  top: 60%;
+  z-index: 4;
+  opacity: 0;
+  animation: bonk-flyby 0.9s ease-in forwards;
+  pointer-events: none !important;
+}
+
+@keyframes bonk-flyby {
+  0% {
+    opacity: 1;
+    transform: translate(-400%, 200%) scale(0.2) rotate(0deg);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(150%, -150%) scale(9) rotate(540deg);
+  }
+}
+
+.bonk-logo2 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(48px, 10vw, 118px);
+  margin: 0;
+  color: #ffd23f;
+  display: flex;
+  align-items: center;
+  gap: 0.05em;
+  text-shadow:
+    5px 5px 0 #ff4d6d,
+    10px 10px 0 #3a1400;
+  animation: bonk-shake 0.4s 1.5s;
+}
+
+.bonk-logo2 > span {
+  display: inline-block;
+  opacity: 0;
+  animation: bonk-slam 0.35s cubic-bezier(0.3, 1.6, 0.6, 1) forwards;
+  animation-delay: calc(0.8s + var(--i) * 0.13s);
+}
+
+.bonk-logo2 .o .bonk-duckhead {
+  width: 0.95em;
+  height: 0.95em;
+  box-shadow:
+    5px 5px 0 #ff4d6d,
+    10px 10px 0 #3a1400;
+}
+
+@keyframes bonk-slam {
+  0% {
+    opacity: 0;
+    transform: translateY(-150%) scale(2.5) rotate(-20deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bonk-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translate(-8px, 4px) rotate(-2deg);
+  }
+  40% {
+    transform: translate(8px, -4px) rotate(2deg);
+  }
+  60% {
+    transform: translate(-6px, 2px);
+  }
+  80% {
+    transform: translate(4px, -2px);
+  }
+}
+
+.bonk-tagline2 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(11px, 1.8vw, 18px);
+  color: #fff;
+  text-shadow: 3px 3px 0 #3a1400;
+  margin: 14px 0 0;
+  opacity: 0;
+  animation: bonk-fadein 0.5s 1.8s forwards;
+}
+
+@keyframes bonk-fadein {
+  to {
+    opacity: 1;
+  }
+}
+
+.bonk-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2.5%;
+  opacity: 0;
+  animation: bonk-fadein 0.5s 2s forwards;
+}
+
+.bonk-menu button {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(11px, 1.4vw, 15px);
+  min-width: 250px;
+  padding: 11px 18px;
+  border-radius: 12px;
+  border: 3px solid #fff;
+  background: rgba(20, 12, 40, 0.72);
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+  transition: transform 0.08s;
+}
+
+.bonk-menu button:first-child {
+  background: #ff6b1a;
+  border-color: #ffd23f;
+  font-size: clamp(14px, 1.9vw, 20px);
+}
+
+.bonk-menu button:hover {
+  transform: translateX(8px) scale(1.03);
+  border-color: #ffd23f;
+}
+
+.bonk-corner {
+  position: absolute;
+  background: rgba(20, 12, 40, 0.72);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.bonk-corner.tr {
+  top: 12px;
+  right: 12px;
+  color: #ffd23f;
+}
+
+.bonk-corner.br {
+  bottom: 12px;
+  right: 12px;
+}
+
+.bonk-corner.bl {
+  bottom: 12px;
+  left: 12px;
+  cursor: pointer;
+}
+
+.bonk-leaderboard {
+  position: absolute;
+  top: 48px;
+  right: 8px;
+  width: 210px;
+  background: rgba(20, 12, 40, 0.7);
+  border-radius: 10px;
+  padding: 6px 8px;
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.bonk-lb-head,
+.bonk-lb-row {
+  display: grid;
+  grid-template-columns: 1fr 26px 26px;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.bonk-lb-head {
+  font-weight: 900;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  margin-bottom: 2px;
+}
+
+.bonk-lb-row span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.bonk-lb-row.is-human {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.bonk-lb-row.is-out {
+  opacity: 0.4;
+}
+
+.bonk-chat {
+  position: absolute;
+  left: 8px;
+  top: 52px;
+  width: min(340px, 45%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.bonk-chat div {
+  background: rgba(20, 12, 40, 0.55);
+  color: #fff;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.bonk-chat .sys {
+  color: #ffd23f;
+  font-weight: 800;
+}
+
+.bonk-mobile-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 190px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 14px 18px;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.bonk-mobile-controls > * {
+  pointer-events: auto;
+}
+
+.bonk-joystick {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.bonk-knob {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.bonk-mobile-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.bonk-mobile-buttons .bonk-touch-btn {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: rgba(20, 12, 40, 0.65);
+  border: 3px solid rgba(255, 255, 255, 0.7);
+  color: #fff;
+  font-size: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  user-select: none;
+}
+
+.bonk-mobile-buttons .bonk-touch-btn small {
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.bonk-mobile-buttons .jump {
+  width: 86px;
+  height: 86px;
+  background: #2bd96b;
+}
+
+.bonk-mobile-buttons .bonk,
+.bonk-mobile-buttons .interact {
+  width: 96px;
+  height: 96px;
+  background: #ff6b1a;
+  font-size: 34px;
+}
+
+.bonk-root.is-mobile {
+  padding: 0;
+}
+
+.bonk-root.is-mobile .bonk-stage {
+  position: fixed;
+  inset: 0;
+  max-width: none;
+  max-height: none;
+  aspect-ratio: auto;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: 50;
+  touch-action: none;
+}
+
+.bonk-root.is-mobile .bonk-chat {
+  top: 46px;
+  width: min(260px, 55%);
+}
+
+.bonk-root.is-mobile .bonk-chat div {
+  font-size: 11px;
+}
+
+.bonk-root.is-mobile .bonk-chat div:nth-last-child(n + 4) {
+  display: none;
+}
+
+.bonk-settings .bonk-set-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+  font-weight: 800;
+}
+
+.bonk-settings .bonk-set-row > span {
+  min-width: 150px;
+}
+
+.bonk-howto {
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.bonk-howto kbd {
+  background: #3a2670;
+  border: 1px solid #6b4fc4;
+  border-bottom-width: 3px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
+  .bonk-menu button {
+    min-width: 200px;
+    padding: 8px 12px;
+  }
+
+  .bonk-leaderboard {
+    width: 150px;
+    font-size: 10px;
+  }
+
+  .bonk-corner {
+    font-size: 11px;
+  }
+}
+
+.bonk-titlescreen .bonk-menu {
+  position: absolute;
+  left: 3%;
+  bottom: 10%;
+  margin: 0;
+}
+
+@media (max-height: 560px) {
+  .bonk-logo2 {
+    font-size: clamp(36px, 12vh, 70px);
+  }
+
+  .bonk-tagline2 {
+    margin-top: 6px;
+    font-size: 10px;
+  }
+
+  .bonk-titlescreen .bonk-menu {
+    left: 50%;
+    bottom: 60px;
+    transform: translateX(-50%);
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    gap: 6px;
+  }
+
+  .bonk-menu button,
+  .bonk-menu button:first-child {
+    min-width: 0;
+    font-size: 10px;
+    padding: 8px 10px;
+  }
+
+  .bonk-menu button:hover {
+    transform: scale(1.04);
+  }
+}
+
+/* ---------- BONK! online ---------- */
+
+.bonk-online-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.bonk-panel .bonk-big {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 12px;
+  font-size: 18px;
+}
+
+.bonk-big small {
+  font-weight: 600;
+  font-size: 12px;
+  color: #d9ccff;
+}
+
+.bonk-name {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-weight: 900;
+}
+
+.bonk-code-input {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 22px;
+  width: 150px;
+  text-align: center;
+  letter-spacing: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 3px solid #ffd23f;
+  background: #120a26;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.bonk-room-code {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 40px;
+  letter-spacing: 10px;
+  color: #ffd23f;
+  text-shadow: 3px 3px 0 #ff4d6d;
+  text-align: center;
+  margin: 6px 0;
+}
+
+.bonk-waiting {
+  font-weight: 900;
+  font-size: 16px;
+  text-align: center;
+}
+
+.bonk-nogl {
+  aspect-ratio: auto !important;
+  background: linear-gradient(160deg, #48b8ff, #b36bff) !important;
+  color: #fff;
+  padding: 30px;
+  line-height: 1.6;
+  font-size: 16px;
+  max-width: 760px;
+}
+
+.bonk-nogl h2 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.bonk-nogl li {
+  margin-bottom: 8px;
+}
+
+.bonk-loading {
+  background: #000;
+  z-index: 3;
+}
+
+.bonk-loading-chase {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.bonk-reset {
+  background: rgba(255, 45, 45, 0.15);
+  border: 2px solid #ff4d6d;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 6px;
+}
+
+.bonk-reset p {
+  margin: 6px 0 10px;
+  font-size: 13px;
+}
+
+.bonk-panel button.danger {
+  background: #d7263d;
+  border-color: #ff9ea9;
+}
+
+/* ---------- Arcade reset ---------- */
+
+.arcade-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+.arcade-reset-btn,
+.arcade-reset-row button {
+  background: transparent;
+  border: 1px solid var(--muted);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.arcade-reset-btn:hover {
+  border-color: #ff4d6d;
+  color: #ff4d6d;
+}
+
+.arcade-reset-box {
+  max-width: 520px;
+  background: rgba(255, 45, 45, 0.12);
+  border: 2px solid #ff4d6d;
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.arcade-reset-box p {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.arcade-reset-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.arcade-reset-row button.danger {
+  background: #d7263d;
+  border-color: #ff9ea9;
+}
+
+.bonk-wifi-warn {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #ffe14d;
+  color: #5a1a00;
+  font-weight: 900;
+  text-align: center;
+  border: 3px solid #ff7a00;
+}
+
+.bonk-set-note {
+  margin: -4px 0 10px;
+  font-size: 12px;
+}
+
+.bonk-name-input {
+  font-size: 16px;
+  font-weight: 800;
+  width: min(220px, 60vw);
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 3px solid #ffd23f;
+  background: #120a26;
+  color: #fff;
+}
+
+.bonk-chat-box {
+  position: absolute;
+  left: 8px;
+  bottom: 44px;
+  z-index: 60;
+  display: flex;
+  gap: 6px;
+  width: min(420px, calc(100% - 16px));
+}
+
+.bonk-chat-box input {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 3px solid #3aa0ff;
+  background: rgba(18, 10, 38, 0.92);
+  color: #fff;
+}
+
+.bonk-chat-box button {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 900;
+}
+
+.bonk-chat-btn {
+  position: absolute;
+  left: 8px;
+  bottom: 44px;
+  z-index: 55;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 2px solid #3aa0ff;
+  background: rgba(18, 10, 38, 0.8);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bonk-root.is-mobile .bonk-chat-btn,
+.bonk-root.is-mobile .bonk-chat-box {
+  top: 46px;
+  bottom: auto;
+  left: auto;
+  right: 8px;
+}
+
+.bonk-root.is-mobile .bonk-chat-box {
+  width: min(320px, calc(100% - 16px));
+}
+
+.bonk-online-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 44px;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  background: rgba(18, 10, 38, 0.85);
+  border: 2px solid #2bd96b;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.bonk-online-badge button {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.bonk-root.is-mobile .bonk-online-badge {
+  top: 90px;
+  bottom: auto;
+}
+
+.bonk-canvas {
+  touch-action: none;
+  cursor: grab;
+}
+
+.bonk-canvas:active {
+  cursor: grabbing;
+}
