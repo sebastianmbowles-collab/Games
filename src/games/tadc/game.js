@@ -1074,6 +1074,18 @@ export class TadcGame {
   drawArena(c) {
     const t = this.t
     drawBackground(c, this.arenaKey, t, this.floorScroll)
+    // The finale: red warning lights pulse across the stage, in time with the beat.
+    const b = this.boss
+    if (b && b.finalAt && b.time >= b.finalAt && !b.done && this.state === 'fight') {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 7.5)
+      // (Purple on Gangle's stage, so the red ribbons stay easy to see.)
+      const rgb = this.arenaKey === 'gangle' ? '136, 72, 200' : '216, 40, 56'
+      c.fillStyle = `rgba(${rgb}, ${(0.06 + pulse * 0.08).toFixed(3)})`
+      c.fillRect(0, 0, VW, GROUND_Y)
+      c.fillStyle = `rgba(${rgb}, ${(0.15 + pulse * 0.2).toFixed(3)})`
+      c.fillRect(0, 0, 4, GROUND_Y)
+      c.fillRect(VW - 4, 0, 4, GROUND_Y)
+    }
     drawFloor(c, -this.floorScroll)
     drawPlatforms(c, this.platforms)
     for (const h of this.haz) if (h.kind === 'slip') h.draw(c, t)

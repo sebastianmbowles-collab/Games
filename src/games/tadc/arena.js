@@ -68,12 +68,18 @@ const bgs = {
       c.fillRect(x, 0, 16, GROUND_Y)
     }
     // A little stage with a spotlight in the middle.
+    // It swings slowly from side to side, like someone is looking for Pomni with it.
+    const sw = Math.sin(t * 0.5) * 50
     c.fillStyle = 'rgba(255, 240, 180, 0.07)'
     c.beginPath()
     c.moveTo(150, 0)
     c.lineTo(170, 0)
-    c.lineTo(230, GROUND_Y)
-    c.lineTo(90, GROUND_Y)
+    c.lineTo(230 + sw, GROUND_Y)
+    c.lineTo(90 + sw, GROUND_Y)
+    c.fill()
+    c.fillStyle = 'rgba(255, 240, 180, 0.08)'
+    c.beginPath()
+    c.ellipse(160 + sw, GROUND_Y - 1, 70, 4, 0, 0, Math.PI * 2)
     c.fill()
     curtain(c, 0, 30, false, t)
     curtain(c, VW - 30, 30, true, t)
@@ -216,10 +222,10 @@ const bgs = {
 
 // Zooble's room: a pegboard workshop full of spare parts hanging on hooks.
 bgs.zooble = function (c, t) {
-  c.fillStyle = '#16303a'
+  c.fillStyle = '#1e4450'
   c.fillRect(0, 0, VW, VH)
   // Pegboard holes.
-  c.fillStyle = '#0e2028'
+  c.fillStyle = '#123038'
   for (let y = 18; y < GROUND_Y; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < VW; x += 8) c.fillRect(x, y, 1, 1)
   // Shelves.
   c.fillStyle = '#5c3c2c'
@@ -241,7 +247,7 @@ bgs.zooble = function (c, t) {
     c.fillStyle = 'rgba(20, 12, 28, 0.55)'
     c.fillRect(x - Math.floor(w / 2) + sw, y, w, h)
     c.fillStyle = col
-    c.globalAlpha = 0.45
+    c.globalAlpha = 0.6
     c.fillRect(x - Math.floor(w / 2) + sw, y, w, h)
     c.globalAlpha = 1
   })

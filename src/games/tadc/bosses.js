@@ -5,7 +5,7 @@
 import { SPR, drawSprite } from './sprites'
 import { VW, GROUND_Y, clamp, seeded } from './consts'
 import { Cushion, Button, Ribbon, Pillow, Cane, Glob, Part } from './hazards'
-import { sfx, setTempo, playMusic } from './sound'
+import { sfx, setTempo, setKey, playMusic } from './sound'
 import { ARENAS } from './arena'
 
 const G = 520
@@ -165,7 +165,13 @@ class Boss {
       this.events[this.ei][1]()
       this.ei++
     }
-    for (const [at, mul] of this.tempos) if (this.time >= at && this.time - dt < at) setTempo(mul)
+    // Each new part of the show: the music speeds up and moves up a key (the finale gets the biggest lift).
+    this.tempos.forEach(([at, mul], i) => {
+      if (this.time >= at && this.time - dt < at) {
+        setTempo(mul)
+        setKey(i === this.tempos.length - 1 ? 3 : Math.min(2, i + 1))
+      }
+    })
     if (this.finalAt && this.time >= this.finalAt && this.time - dt < this.finalAt) this.g.finalAttack()
   }
   idle(dt) {
@@ -858,6 +864,7 @@ class Encore extends Boss {
     if (this.wave > 1) {
       playMusic(key, true)
       setTempo(1 + k * 0.02)
+      setKey(Math.floor((this.wave - 1) / 6) % 3)
     }
   }
   updateFight(dt) {

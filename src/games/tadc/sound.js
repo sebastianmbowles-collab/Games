@@ -189,6 +189,13 @@ export function setTempo(mul) {
   tempoMul = mul
 }
 
+// Key change! Moves the whole song up by some semitones, starting at the next bar so it sounds on purpose.
+let keyShift = 0
+let pendingKey = null
+export function setKey(semitones) {
+  pendingKey = semitones
+}
+
 function stepDur() {
   return 60 / (song.bpm * tempoMul) / 4
 }
@@ -197,6 +204,10 @@ function schedule() {
   if (!song) return
   while (nextTime < ctx.currentTime + 0.25) {
     const sd = stepDur()
+    if (pendingKey !== null && songStep % 16 === 0) {
+      keyShift = pendingKey
+      pendingKey = null
+    }
     for (const tr of song.tracks) {
       const local = song.loop === false && songStep >= tr.length ? -1 : songStep % tr.length
       for (const ev of tr.events) {
@@ -204,8 +215,9 @@ function schedule() {
         if (ev.drums) {
           for (const d of ev.drums) drum(d, nextTime, tr.vol, musicBus)
         } else if (ev.n !== null) {
-          const f0 = midi(ev.n + (tr.shift || 0))
-          const f1 = ev.to !== null ? midi(ev.to + (tr.shift || 0)) : f0
+          const sh = (tr.shift || 0) + keyShift
+          const f0 = midi(ev.n + sh)
+          const f1 = ev.to !== null ? midi(ev.to + sh) : f0
           voice(tr.wave, f0, f1, nextTime, sd * ev.len * (tr.gate || 0.9), tr.vol, musicBus, tr.vib || 0)
         }
       }
@@ -230,6 +242,8 @@ export function playMusic(name, restart = false) {
   song = parsedSong(name)
   songStep = 0
   tempoMul = 1
+  keyShift = 0
+  pendingKey = null
   nextTime = ctx.currentTime + 0.08
   if (!timer) timer = setInterval(schedule, 40)
 }
