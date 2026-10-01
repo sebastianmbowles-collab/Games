@@ -134,6 +134,18 @@ export class TadcGame {
     return !!(this.keyHeld[a] || this.touchHeld[a] || (this.padHeld && this.padHeld[a]))
   }
 
+  // A little shake for phones and controllers (not in calm mode).
+  buzz(ms) {
+    if (this.save.calm) return
+    try {
+      if (navigator.vibrate) navigator.vibrate(ms)
+      const pad = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find((p) => p && p.vibrationActuator)
+      if (pad) pad.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: 0.6, weakMagnitude: 0.4 })
+    } catch {
+      // No rumble here. That's fine.
+    }
+  }
+
   // Game controllers: d-pad or left stick to move, A to jump, B to go back, START to pause.
   pollPad() {
     const pads = navigator.getGamepads ? navigator.getGamepads() : []
@@ -360,6 +372,7 @@ export class TadcGame {
     setTempo(1)
     sfx.hurt()
     if (killer === 'cushion') sfx.pfft()
+    this.buzz(150)
     this.flashT = 0.12
     this.shake = 0.3
     this.glitch = 0.5
