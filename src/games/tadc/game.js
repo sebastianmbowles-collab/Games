@@ -538,6 +538,7 @@ export class TadcGame {
     const p = this.pomni
     this.flash(Math.random() < 0.5 ? 'CLOSE!' : 'PHEW!', p.x + p.w / 2, p.y - 8, '#68d8f8')
     sfx.blip()
+    this.buzz(25)
     const b = this.boss.sub || this.boss
     b.nearMiss()
   }
