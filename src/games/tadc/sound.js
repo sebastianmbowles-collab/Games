@@ -262,22 +262,22 @@ function notes(list, wave, stepS, vol, delay = 0) {
 
 export const sfx = {
   beep() {
-    sv('p50', 880, 880, 0.05, 0.08)
+    sv('p50', 880, 880, 0.05, 0.11)
   },
   blip() {
-    sv('p25', 660, 1320, 0.08, 0.09)
+    sv('p25', 660, 1320, 0.08, 0.12)
   },
   back() {
-    sv('p25', 660, 330, 0.08, 0.08)
+    sv('p25', 660, 330, 0.08, 0.11)
   },
   jump() {
-    sv('p25', 300, 700, 0.11, 0.07)
+    sv('p25', 300, 700, 0.11, 0.12)
   },
   land() {
     sv('tri', 180, 90, 0.06, 0.14)
   },
   step() {
-    sn(0.02, 0.05, { type: 'highpass', freq: 3000 })
+    sn(0.025, 0.18, { type: 'highpass', freq: 2500 })
   },
   plop() {
     sv('sine', 520, 160, 0.09, 0.2)
@@ -318,21 +318,22 @@ export const sfx = {
     sn(0.25, 0.08, { freq: 500 })
   },
   throw() {
-    sn(0.12, 0.1, { type: 'bandpass', freq: 1500, sweepTo: 4000 })
+    sn(0.14, 0.45, { type: 'bandpass', freq: 1500, sweepTo: 4000 })
   },
   ping() {
-    sv('p12', 1400, 1100, 0.05, 0.05)
+    sv('p12', 1400, 1100, 0.06, 0.1)
   },
   swish() {
-    sn(0.35, 0.14, { type: 'bandpass', freq: 600, q: 1.5, sweepTo: 3500 })
+    sn(0.4, 0.6, { type: 'bandpass', freq: 600, q: 1.2, sweepTo: 3500 })
   },
   whoosh() {
-    sn(0.5, 0.2, { type: 'bandpass', freq: 3000, q: 0.8, sweepTo: 300 })
+    sn(0.5, 0.45, { type: 'bandpass', freq: 3000, q: 0.8, sweepTo: 300 })
   },
   boing() {
     if (!ctx) return
     const t = at()
-    voice('tri', 200, 700, 0.25, 0.25, t, sfxBus, 0.08)
+    voice('tri', 200, 700, t, 0.25, 0.3, sfxBus, 0.08)
+    voice('p25', 400, 1400, t, 0.18, 0.05, sfxBus)
   },
   thump() {
     sv('sine', 140, 60, 0.12, 0.2)
@@ -347,18 +348,18 @@ export const sfx = {
     sv('sine', 200, 80, 0.1, 0.12)
   },
   slip() {
-    sv('sine', 900, 1500, 0.08, 0.05)
+    sv('sine', 900, 1500, 0.08, 0.09)
   },
   warn() {
-    sv('p50', 988, 988, 0.05, 0.05)
-    sv('p50', 988, 988, 0.05, 0.05, 0.09)
+    sv('p50', 988, 988, 0.05, 0.09)
+    sv('p50', 988, 988, 0.05, 0.09, 0.09)
   },
   shake() {
     sn(0.4, 0.2, { freq: 200 })
     sv('sine', 70, 40, 0.4, 0.2)
   },
   countdown() {
-    sv('p25', 440, 440, 0.12, 0.08)
+    sv('p25', 440, 440, 0.12, 0.12)
   },
   go() {
     sv('p25', 880, 880, 0.3, 0.09)
@@ -368,12 +369,12 @@ export const sfx = {
     notes([76, 72, 79], 'p25', 0.06, 0.07)
   },
   text() {
-    sv('p50', 500 + Math.random() * 80, 500, 0.03, 0.03)
+    sv('p50', 500 + Math.random() * 80, 500, 0.03, 0.06)
   },
   glitch() {
     for (let i = 0; i < 6; i++) {
       const f = 200 + Math.random() * 1600
-      sv('p12', f, f * (0.4 + Math.random()), 0.05, 0.05, i * 0.04)
+      sv('p12', f, f * (0.4 + Math.random()), 0.05, 0.09, i * 0.04)
     }
   },
   hurt() {
@@ -410,9 +411,14 @@ export const sfx = {
     notes([72, 76, 79, 84], 'p25', 0.07, 0.07)
   },
   secret() {
-    notes([84, 88, 91, 96, 91, 96], 'p12', 0.07, 0.06)
+    notes([84, 88, 91, 96, 91, 96], 'p25', 0.07, 0.1)
   },
   static() {
     sn(0.6, 0.1, { type: 'highpass', freq: 2500 })
   },
+}
+
+// For testing: lets a test page measure how loud things are.
+export function audioDebug() {
+  return { ctx, master }
 }

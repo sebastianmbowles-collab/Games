@@ -134,7 +134,7 @@ export const SONGS = {
     tracks: [
       {
         wave: 'tri',
-        vol: 0.14,
+        vol: 0.11,
         vib: 0.012,
         notes: 'E5:6 D5:2 B4:8 | C5:6 B4:2 A4:8 | G4:4 A4:4 B4:4 D5:4 | B4:12 .:4 | E5:6 F#5:2 G5:8 | F#5:6 E5:2 D#5:8 | E5:4 B4:4 G4:4 F#4:4 | E4:12 .:4',
       },
@@ -152,7 +152,7 @@ export const SONGS = {
           rep('E4:2 G4:2 B4:2 G4:2', 2),
         ].join(' | '),
       },
-      { wave: 'tri', vol: 0.18, notes: 'E2:16 | A2:16 | G2:8 D2:8 | B1:16 | E2:16 | C2:16 | A1:8 B1:8 | E2:16' },
+      { wave: 'tri', vol: 0.12, notes: 'E2:16 | A2:16 | G2:8 D2:8 | B1:16 | E2:16 | C2:16 | A1:8 B1:8 | E2:16' },
       { vol: 0.06, notes: rep('k:4 .:4 h:2 .:2 s:4', 1) + ' | ' + rep('k:2 k:2 .:4 h:2 .:2 s:4', 1) },
     ],
   },
@@ -163,7 +163,7 @@ export const SONGS = {
     tracks: [
       {
         wave: 'p12',
-        vol: 0.06,
+        vol: 0.05,
         notes: [
           'C5 . C#5 . C5 G4:3 .:2 Eb5 D5 .:2 B4:2',
           'F#4:2 G4 . A#4 B4 .:2 C5 . C6 . C5:2 .:2',
@@ -177,7 +177,7 @@ export const SONGS = {
       },
       {
         wave: 'tri',
-        vol: 0.16,
+        vol: 0.12,
         notes: [
           'C3 .:2 C3 G2 .:2 G2 C3 . E3 . G2:2 .:2',
           'F2 .:2 F2 C3 .:2 C3 F#2 . A2 . G2:2 .:2',

@@ -98,7 +98,9 @@ export class Pomni {
     }
     if (this.onGround && !wasGround && fallSpeed > 120) this.land()
     this.squash = Math.max(0, this.squash - dt)
+    const before = Math.floor(this.anim / 22)
     this.anim += Math.abs(this.vx) * dt
+    if (this.onGround && Math.floor(this.anim / 22) !== before) sfx.step()
     this.idleT = Math.abs(this.vx) < 5 && this.onGround ? this.idleT + dt : 0
   }
 

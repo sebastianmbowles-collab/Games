@@ -131,7 +131,7 @@ export class TadcGame {
   // Touch buttons from the page: 'left', 'right', 'jump' (the A button) and 'start'.
   setTouch(a, down) {
     this.wake()
-    const acts = a === 'jump' ? ['jump', 'confirm'] : a === 'start' ? ['start'] : a === 'left' ? ['left', 'up'] : ['right', 'down']
+    const acts = a === 'jump' ? ['jump', 'confirm'] : a === 'start' ? ['start'] : [a]
     for (const x of acts) {
       if (down && !this.touchHeld[x]) this.pressed.add(x)
       this.touchHeld[x] = down
@@ -360,11 +360,13 @@ export class TadcGame {
 
   // A tiny vertical menu helper: returns the chosen index when confirmed, or -1.
   menuNav(pr, key, count) {
-    if (pr('up')) {
+    // Left/right also move through menus (handy on touch screens), except in Options where they change values.
+    const sideways = key !== 'osel'
+    if (pr('up') || (sideways && pr('left'))) {
       this[key] = (this[key] + count - 1) % count
       sfx.beep()
     }
-    if (pr('down')) {
+    if (pr('down') || (sideways && pr('right'))) {
       this[key] = (this[key] + 1) % count
       sfx.beep()
     }

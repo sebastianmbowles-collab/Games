@@ -28,7 +28,10 @@ export default function TADC({ game, onExit }) {
   useEffect(() => {
     const g = new TadcGame(canvasRef.current)
     gameRef.current = g
-    if (import.meta.env.DEV) window.__tadc = g
+    if (import.meta.env.DEV) {
+      window.__tadc = g
+      import('./tadc/sound').then((m) => (window.__song = m.currentSong))
+    }
     return () => g.destroy()
   }, [])
 
