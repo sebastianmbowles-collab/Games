@@ -6,7 +6,7 @@ export const ARENAS = {
   jax: { platforms: [{ x: 36, y: 108, w: 64 }, { x: 150, y: 108, w: 64 }] },
   ragatha: { platforms: [{ x: 28, y: 110, w: 52 }, { x: 132, y: 98, w: 60 }] },
   gangle: { platforms: [{ x: 20, y: 112, w: 56 }, { x: 108, y: 92, w: 56 }, { x: 192, y: 112, w: 52 }] },
-  kinger: { platforms: [{ x: 48, y: 104, w: 56 }, { x: 170, y: 88, w: 40 }] },
+  kinger: { platforms: [{ x: 48, y: 104, w: 56 }, { x: 150, y: 94, w: 40 }] },
   caine: { platforms: [{ x: 36, y: 110, w: 56 }, { x: 164, y: 110, w: 56 }] },
   menu: { platforms: [] },
 }

@@ -94,6 +94,7 @@ class Boss {
     const s = this.script(this.rng, d)
     this.events = s.events.sort((a, b) => a[0] - b[0])
     this.duration = s.duration
+    this.finalAt = s.finalAt
     this.tempos = s.tempos || []
   }
   get w() {
@@ -126,6 +127,7 @@ class Boss {
       this.ei++
     }
     for (const [at, mul] of this.tempos) if (this.time >= at && this.time - dt < at) setTempo(mul)
+    if (this.finalAt && this.time >= this.finalAt && this.time - dt < this.finalAt) this.g.finalAttack()
   }
   idle(dt) {
     this.throwT = Math.max(0, this.throwT - dt)
@@ -186,7 +188,7 @@ class Jax extends Boss {
       at(t, () => this.toss(this.px + off, 3.2 * d.life, cap + 4))
       t += 0.34 / d.dens
     }
-    return { events: ev, duration: 53, tempos: [[30, 1.06], [42, 1.15]] }
+    return { events: ev, duration: 53, finalAt: 42, tempos: [[30, 1.06], [42, 1.15]] }
   }
   toss(tx, life, cap) {
     const g = this.g
@@ -267,7 +269,7 @@ class Ragatha extends Boss {
       t += 0.75 / d.dens
     }
     at(58.5, () => this.g.setConveyor(0))
-    return { events: ev, duration: 60, tempos: [[13, 1.07], [26, 1.14], [38, 1.22], [46, 1.32]] }
+    return { events: ev, duration: 60, finalAt: 46, tempos: [[13, 1.07], [26, 1.14], [38, 1.22], [46, 1.32]] }
   }
   straight(y, speed, fromLeft = false) {
     const x = fromLeft ? -8 : this.hand().x
@@ -342,32 +344,28 @@ class Gangle extends Boss {
           )
         }
       })
-      t += 3.6 / d.dens
+      t += k < 0.55 ? 3.6 / d.dens : 6.6
     }
     // 3: ribbon walls. Wait for the gap... then GO!
     at(31, () => this.say('A WALL OF RIBBON!'))
-    while (t < 46) {
+    while (t < 40.5) {
       const low = r() < 0.5
       at(t, () => this.wall(low))
       t += 4.6 / d.dens
     }
-    // FINAL: the screen fills with ribbon. A moving maze.
+    // FINAL: the screen fills with ribbon. A moving maze, always with exactly one way through.
     at(46, () => this.say('EVERYTHING IS RED!', 2.4))
-    t = 46.5
-    while (t < 58) {
-      const k = r()
-      const low = r() < 0.5
-      at(t, () => {
-        sfx.swish()
-        if (k < 0.4) this.wall(low, 1.25)
-        else if (k < 0.7) {
-          this.g.haz.push(new Ribbon({ x: 0, y: GROUND_Y - 20, w: span(), h: 20, warn: warn * 0.85, life: 1.6 }))
-          this.g.haz.push(new Ribbon({ x: 0, y: 0, w: span(), h: 86, warn: warn * 0.85, life: 1.6 }))
-        } else this.g.haz.push(new Ribbon({ x: 0, y: 0, w: span(), h: 100, warn: warn * 0.85, life: 1.6 }))
-      })
-      t += 2.2 / d.dens
-    }
-    return { events: ev, duration: 60, tempos: [[31, 1.05], [46, 1.12]] }
+    const fw = warn * 0.85
+    at(46.5, () => this.wall(true, 1.25))
+    at(48.3, () => this.g.haz.push(new Ribbon({ x: 0, y: 0, w: span(), h: 100, warn: fw, life: 2.6 })))
+    at(51.5, () => this.wall(false, 1.25))
+    at(56, () => {
+      sfx.swish()
+      this.g.haz.push(new Ribbon({ x: 0, y: GROUND_Y - 20, w: span(), h: 20, warn: fw, life: 1.6 }))
+      this.g.haz.push(new Ribbon({ x: 0, y: 0, w: span(), h: 86, warn: fw, life: 1.6 }))
+    })
+    if (d.extra) at(53.3, () => this.g.haz.push(new Ribbon({ x: 0, y: -2, w: span(), h: 10, warn: fw, life: 1.4 })))
+    return { events: ev, duration: 60, finalAt: 46, tempos: [[31, 1.05], [46, 1.12]] }
   }
   wall(low, speedMul = 1) {
     const d = this.d
@@ -460,7 +458,7 @@ class Kinger extends Boss {
       })
       t += 0.62 / d.dens
     }
-    return { events: ev, duration: 58, tempos: [[28, 1.08], [42, 1.18]] }
+    return { events: ev, duration: 58, finalAt: 42, tempos: [[28, 1.08], [42, 1.18]] }
   }
   slide(speed) {
     this.g.haz.push(new Pillow({ x: this.x - 22, y: GROUND_Y - 9, vx: -speed, mode: 'slide' }))
@@ -539,7 +537,7 @@ class Caine extends Boss {
       if (i === 1 || i === 3) at(t + 0.6, () => this.vomit())
       t += 2.6 / Math.max(1, d.dens * 0.85)
     }
-    return { events: ev, duration: Math.max(66, t + 2.5), tempos: [[16, 1.05], [32, 1.1], [50, 1.2]] }
+    return { events: ev, duration: Math.max(66, t + 2.5), finalAt: 50, tempos: [[16, 1.05], [32, 1.1], [50, 1.2]] }
   }
   hang() {
     const bottom = GROUND_Y - 30
@@ -553,14 +551,14 @@ class Caine extends Boss {
     this.g.haz.push(
       new Cane({
         cx: this.x + 10,
-        cy: low ? GROUND_Y - 12 : 96,
+        cy: low ? GROUND_Y - 10 : 96,
         len: 40,
         spin: 9,
         vx: -150 * this.d.speed,
         warn: 0.7 * this.d.warn,
-        warnBox: { x: 0, y: (low ? GROUND_Y - 12 : 96) - 1, w: this.x, h: 2 },
+        warnBox: { x: 0, y: (low ? GROUND_Y - 10 : 96) - 1, w: this.x, h: 2 },
         script: (cn) => {
-          if (cn.vx < 0 && cn.cx < 20) {
+          if (cn.vx < 0 && cn.cx < 46) {
             cn.vx = -cn.vx
             sfx.whoosh()
           }
@@ -581,17 +579,17 @@ class Caine extends Boss {
         len,
         thick: 10,
         warn: 1.05 * d.warn,
-        vy: 60 * d.speed,
+        vy: 85 * d.speed,
         warnBox: { x: x0, y: GROUND_Y - 3, w: len, h: 3 },
         script: (cn, dt) => {
           if (cn.vy > 0 && cn.cy >= GROUND_Y - 6) {
             cn.cy = GROUND_Y - 6
             cn.vy = 0
-            cn.hold = 0.4
+            cn.hold = 0.3
             sfx.shake()
           } else if (cn.vy === 0 && cn.hold !== undefined) {
             cn.hold -= dt
-            if (cn.hold <= 0) cn.vy = -110 * d.speed
+            if (cn.hold <= 0) cn.vy = -160 * d.speed
           }
         },
       }),

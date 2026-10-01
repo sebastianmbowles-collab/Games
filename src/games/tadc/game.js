@@ -197,6 +197,7 @@ export class TadcGame {
     this.floorScroll = 0
     this.slip = false
     this.pomniSay = null
+    this.finalBanner = null
     this.boss = makeBoss(this, idx, this.d, 1000 + idx * 97 + this.run.diff * 13)
     const kinger = info.key === 'kinger'
     const spawn = kinger ? { x: this.platforms[0].x + 18, y: this.platforms[0].y - 22 } : { x: 40, y: GROUND_Y - 22 }
@@ -212,6 +213,13 @@ export class TadcGame {
       this.setState('intro')
       sfx.dunDunDun()
     }
+  }
+
+  finalAttack() {
+    this.finalBanner = this.t
+    this.shake = 0.5
+    sfx.warn()
+    sfx.shake()
   }
 
   setConveyor(v) {
@@ -492,7 +500,8 @@ export class TadcGame {
 
   update_intro(dt, pr) {
     const info = BOSSES[this.bossIdx]
-    for (const [at, who, text] of info.intro) {
+    for (const [at0, who, text] of info.intro) {
+      const at = at0 + 1.6
       if (this.st >= at && this.st - dt < at) {
         if (who === 'boss') this.boss.say(text, 1.6)
         else if (who === 'bubble') this.boss.bub.text = { text, until: this.t + 1.6 }
@@ -502,7 +511,7 @@ export class TadcGame {
       }
     }
     this.boss.idle(dt)
-    if (this.st > 4.6 || (this.st > 1 && pr('confirm'))) this.setState('countdown')
+    if (this.st > 6.2 || (this.st > 1 && pr('confirm'))) this.setState('countdown')
     if (pr('start') && !pr('confirm')) this.pause()
   }
 
@@ -534,7 +543,7 @@ export class TadcGame {
     p.update(dt, { left: this.held('left'), right: this.held('right'), jump: this.held('jump'), jumpPressed: pr('jump') }, {
       platforms: this.platforms,
       minX: 2,
-      maxX: b.key === 'caine' ? VW - 2 : b.x + 6,
+      maxX: b.key === 'caine' ? VW - 2 : b.key === 'gangle' || b.key === 'kinger' ? b.x - 28 : b.x - 4,
       slip: this.slip,
       conveyor: this.conveyor,
     })
@@ -809,11 +818,11 @@ export class TadcGame {
     }
 
     if (menuOn && this.helpT <= 0) {
-      MENU.forEach((m, i) => this.menuLine(c, m, 178, 84 + i * 14, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i))))
+      MENU.forEach((m, i) => this.menuLine(c, m, 178, 74 + i * 13, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i))))
       const d = DIFFS[this.save.diff]
-      drawText(c, `MODE: ${d.name}`, 178, 144, { color: d.color })
+      drawText(c, `MODE: ${d.name}`, 178, 128, { color: d.color })
       const rec = this.save.records[d.name]
-      if (rec && rec.any) drawText(c, `BEST ${fmtTime(rec.any)}`, 178, 152, { color: '#c8b8e0' })
+      if (rec && rec.any) drawText(c, `BEST ${fmtTime(rec.any)}`, 178, 136, { color: '#c8b8e0' })
       drawText(c, 'A = Z / SPACE    START = ENTER', VW / 2, 167, { align: 'center', color: '#8c8c9c' })
     } else if (!menuOn && s > 1) {
       drawText(c, 'PRESS A', VW / 2, 167, { align: 'center', color: Math.floor(this.t * 2) % 2 ? '#8c8c9c' : '#4c4c5c' })
@@ -1036,23 +1045,26 @@ export class TadcGame {
     const spr = Math.floor(this.t * 1.5) % 3 === 1 ? SPR.pomniLook : SPR.pomniIdle
     drawPomni(c, spr, p.x + p.w / 2 + Math.round(Math.sin(this.t * 30) * 0.5), p.y + p.h + 1, false)
     drawSprite(c, SPR.sweat, p.x + 12, p.y - 10 + ((this.t * 12) % 6))
-    if (this.boss.key === 'jax' && this.st > 1.6 && this.st < 3.2) {
+    if (this.boss.key === 'jax' && this.st > 3.2 && this.st < 4.8) {
       const h = this.boss.hand()
       drawSprite(c, SPR.bigCushion, h.x - 6, h.y - 4)
     }
     this.drawFx(c)
-    // The boss title card slides in.
-    const k = clamp(this.st * 3, 0, 1)
+    // The boss title card slides in, holds, then slides out so everyone can talk.
+    const k = clamp(Math.min(this.st * 3, (1.9 - this.st) * 3), 0, 1)
     const info = BOSSES[this.bossIdx]
     c.fillStyle = 'rgba(12, 6, 20, 0.85)'
     c.fillRect(0, 58, VW * k, 44)
     c.fillStyle = '#f8c830'
     c.fillRect(0, 58, VW * k, 1)
     c.fillRect(0, 101, VW * k, 1)
-    if (k >= 1) {
+    if (k > 0 && this.st < 1.9) {
+      c.save()
+      c.globalAlpha = k
       drawText(c, `BOSS ${this.bossIdx + 1} / 5`, VW / 2, 62, { align: 'center', color: '#8c8c9c' })
       drawText(c, info.name, VW / 2, 71, { scale: 3, align: 'center', color: '#f4f4f4', shadow: '#d82838' })
       drawText(c, info.title, VW / 2, 91, { align: 'center', color: '#f8c830' })
+      c.restore()
     }
     if (this.st > 1 && Math.floor(this.t * 2) % 2) drawText(c, 'A: SKIP', VW - 4, 167, { align: 'right', color: '#8c8c9c' })
   }
@@ -1074,6 +1086,9 @@ export class TadcGame {
     this.drawPomniNormal(c)
     this.drawFx(c)
     this.drawHud(c)
+    if (this.finalBanner && this.t - this.finalBanner < 2 && Math.floor(this.t * 8) % 2) {
+      drawText(c, 'FINAL ATTACK!', VW / 2, 28, { scale: 2, align: 'center', color: '#e03c9c', shadow: INK })
+    }
   }
 
   draw_dying(c) {
@@ -1123,11 +1138,11 @@ export class TadcGame {
     if (this.defeatFanfare) {
       const k = clamp((this.st - fanAt) * 4, 0, 1)
       c.fillStyle = 'rgba(12, 6, 20, 0.8)'
-      c.fillRect(0, 50, VW, 50 * k)
+      c.fillRect(0, 20, VW, 30 * k)
       if (k >= 1) {
-        drawText(c, 'BOSS DEFEATED!', VW / 2, 56, { scale: 3, align: 'center', color: '#f8c830', shadow: '#d82838' })
-        if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 77, { align: 'center' })
-        if (this.newBadge) drawText(c, `SECRET: ${this.newBadge}!`, VW / 2, 88, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#e03c9c' : '#f8c830' })
+        drawText(c, 'BOSS DEFEATED!', VW / 2, 24, { scale: 3, align: 'center', color: '#f8c830', shadow: '#d82838' })
+        if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 43, { align: 'center' })
+        if (this.newBadge) drawText(c, `SECRET: ${this.newBadge}!`, VW / 2, 56, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#e03c9c' : '#f8c830' })
       }
     }
     if (this.st > fanAt + 1.6 && Math.floor(this.t * 2) % 2) {
