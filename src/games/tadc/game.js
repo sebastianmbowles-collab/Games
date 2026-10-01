@@ -1389,6 +1389,10 @@ export class TadcGame {
       if (menuOn) {
         spr = SPR.pomniIdle
         flip = Math.floor(this.t / 2.5) % 3 === 2
+        // She reacts to what you point at: scary stuff makes her nervous, the rest gets a wave.
+        const pick = this.menuItems()[this.msel]
+        if (pick === 'START' || pick === 'ENCORE' || pick === 'CHALLENGES') spr = SPR.pomniScared
+        else if ((pick === 'OPTIONS' || pick === 'HOW TO PLAY') && Math.floor(this.t * 3) % 2) spr = SPR.pomniWave
       }
       const alpha = clamp((s - 4) * 3, 0, 1)
       const shake = Math.round(Math.sin(this.t * 30) * 0.4)
