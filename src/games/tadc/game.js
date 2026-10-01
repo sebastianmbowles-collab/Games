@@ -915,6 +915,12 @@ export class TadcGame {
     const beat = Math.floor(this.t * 4)
     const frames = [SPR.pomniWave, SPR.pomniRun1, SPR.pomniJump, SPR.pomniRun2]
     drawPomni(c, frames[beat % 4], 70, 140 - (beat % 2) * 3, beat % 8 >= 4, { scale: 2, look: [Math.sin(this.t * 2), 0] })
+    // ...with the song's boss as a dance partner.
+    const key = JUKEBOX[this.jsel][0]
+    const partner = SPR['icon' + key[0].toUpperCase() + key.slice(1)]
+    if (partner && !(key === 'zooble' && !this.save.badges.cleared)) {
+      drawSprite(c, partner, 122 - partner.ax * 2, 140 - partner.length * 2 - ((beat + 1) % 2) * 3, { scale: 2, flip: beat % 4 < 2, look: [-1, 0] })
+    }
     for (let i = 0; i < 3; i++) {
       const k = (this.t * 0.7 + i / 3) % 1
       drawText(c, i % 2 ? '+' : '*', 40 + i * 30, 120 - k * 80, { color: ['#f8c830', '#e03c9c', '#68d8f8'][i] })
