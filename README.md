@@ -73,7 +73,7 @@ Hold a direction to run faster. Let go of jump early for a small hop.
 - Beat Kinger without ever touching the floor for the **PILLOW MASTER** badge.
 - Collect every badge for a rainbow **100%** on the title screen.
 - Leave the title screen alone for a while... Pomni might notice you.
-- On the title screen, press **Up Up Down Down Left Right Left Right**.
+- On the title screen, press **Up Up Down Down Left Right Left Right** (or tap Pomni five times).
 
 </details>
 

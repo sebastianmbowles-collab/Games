@@ -1495,6 +1495,23 @@ export class TadcGame {
       if (s >= 4.6 && s < 6.4 && !menuOn) look = [flip ? 1 : -1, 0]
       if (menuOn) look = [Math.sin(this.t * 0.9) > 0.6 ? 1 : Math.sin(this.t * 0.9) < -0.6 ? -1 : 0, 0.1]
       if (this.helpT <= 0) drawPomni(c, spr, px + shake, 145, flip, { scale: 2, alpha, look })
+      // Secret for touch screens: poke Pomni five times.
+      if (menuOn) {
+        this.hits.push({
+          x: px - 22,
+          y: 76,
+          w: 44,
+          h: 70,
+          fn: () => {
+            this.pokes = (this.pokes || 0) + 1
+            sfx.blip()
+            if (this.pokes >= 5) {
+              this.pokes = 0
+              this.gloinkParty()
+            }
+          },
+        })
+      }
       if (s > 6.4 && s < 6.9) drawText(c, '!', px + 8, 70, { scale: 2, color: '#f8c830' })
       if (s > 7.3 && s < 8.6) this.bubble(c, 'OH NO.', px + 14, 82)
       if (menuOn && this.helpT <= 0 && Math.floor(this.t * 1.3) % 5 === 0) drawSprite(c, SPR.sweat, px + 14, 88 + ((this.t * 20) % 6))
