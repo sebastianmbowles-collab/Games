@@ -1131,6 +1131,14 @@ export class TadcGame {
     this.save.playTime = (this.save.playTime || 0) + dt
     if (this.save.slow) this.run.slow = true
     if (this.run.mode === 'encore' && this.boss.wave >= 10) this.award('encoreStar', 'ENCORE STAR')
+    if (this.run.mode === 'encore' && !this.run.beatBest && !this.run.slow) {
+      const best = this.save.encore[DIFFS[this.run.diff].name]
+      if (best && this.boss.time > best.time) {
+        this.run.beatBest = true
+        this.toast = { text: 'NEW BEST! KEEP GOING!', until: this.t + 2.5 }
+        sfx.secret()
+      }
+    }
     if (pr('start')) {
       this.pause()
       return
