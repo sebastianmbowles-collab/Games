@@ -255,7 +255,7 @@ export class Pillow {
   h = 9
   dead = false
   constructor(o) {
-    Object.assign(this, { vx: -60, vy: 0, mode: 'slide', bouncy: false, slide: -50, t: Math.random() * 6, squish: 0 }, o)
+    Object.assign(this, { vx: -60, vy: 0, mode: 'slide', bouncy: false, slide: -50, t: 0, squish: 0 }, o)
     this.baseY = this.y
   }
   update(dt, g) {
