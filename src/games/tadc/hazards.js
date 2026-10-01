@@ -140,7 +140,9 @@ export class Button {
   h = 7
   dead = false
   constructor(o) {
-    Object.assign(this, { vx: 0, vy: 0, grav: 0, bounces: 0, warn: 0, life: 6, spin: 0, resting: false }, o)
+    Object.assign(this, { vx: 0, vy: 0, grav: 0, bounces: 0, warn: 0, life: 6, spin: 0, resting: false, big: false }, o)
+    // A giant button (Ragatha, on Hard and Insane) is twice the size.
+    if (this.big) this.w = this.h = 14
     if (this.mode === 'drop') {
       this.y = -10
       this.grav = 600
@@ -191,7 +193,8 @@ export class Button {
     }
   }
   hits(b) {
-    return this.active && overlap(b, { x: this.x + 1, y: this.y + 1, w: 5, h: 5 })
+    const k = this.big ? 2 : 1
+    return this.active && overlap(b, { x: this.x + k, y: this.y + k, w: 5 * k, h: 5 * k })
   }
   draw(c, t) {
     if (this.warn > 0) {
@@ -207,7 +210,8 @@ export class Button {
       return
     }
     if (this.resting && this.life < 1 && Math.floor(t * 10) % 2) return
-    drawSprite(c, Math.floor(this.spin) % 2 ? SPR.button1 : SPR.button2, this.x - 1, this.y - 1)
+    const k = this.big ? 2 : 1
+    drawSprite(c, Math.floor(this.spin) % 2 ? SPR.button1 : SPR.button2, this.x - k, this.y - k, { scale: k })
   }
 }
 

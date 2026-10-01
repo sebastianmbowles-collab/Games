@@ -421,7 +421,8 @@ class Ragatha extends Boss {
     sfx.throw()
   }
   roll(speed) {
-    this.g.haz.push(new Button({ mode: 'roll', x: this.hand().x, y: GROUND_Y - 7, vx: -speed, life: 8 }))
+    const big = this.d.extra > 0 && this.rng() < 0.4
+    this.g.haz.push(new Button({ mode: 'roll', x: this.hand().x, y: GROUND_Y - (big ? 14 : 7), vx: -speed * (big ? 0.85 : 1), life: 8, big }))
     this.throwing()
     sfx.throw()
   }
