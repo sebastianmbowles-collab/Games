@@ -7,7 +7,7 @@ import { SPR, drawSprite } from './sprites'
 import { VW, VH, GROUND_Y, INK, DIFFS, clamp, rand, fmtTime, seeded } from './consts'
 import { ARENAS, drawBackground, drawFloor, drawPlatforms } from './arena'
 import { Pomni, drawPomni, setOutfit } from './player'
-import { BOSSES, makeBoss } from './bosses'
+import { BOSSES, BANTER, makeBoss } from './bosses'
 import { sfx, wakeAudio, playMusic, stopMusic, setMusicOn, setSfxOn, setTempo, duckMusic } from './sound'
 
 export { VW, VH }
@@ -1685,6 +1685,23 @@ export class TadcGame {
     const spr = SPR[info.key]
     drawSprite(c, spr, 64 - spr.ax, 150 - spr.length + Math.round(Math.sin(this.t * 2)), { mode: met ? 'normal' : 'shadow', look: [Math.sin(this.t * 0.8) * 0.8, 0.3] })
     if (info.key === 'caine') drawSprite(c, SPR.bubble, 84, 34, { mode: met ? 'normal' : 'shadow' })
+    // Poke a boss and they'll say something.
+    if (met) {
+      this.hits.push({
+        x: 64 - spr.ax - 4,
+        y: 150 - spr.length,
+        w: spr[0].length + 8,
+        h: spr.length,
+        fn: () => {
+          const lines = [...(BANTER[info.key] || []), info.win, info.defeat].filter((l) => l && l !== '...')
+          const text = lines[Math.floor(Math.random() * lines.length)]
+          this.gallerySay = { text, until: this.t + 1.8, key: info.key }
+          sfx.talk(info.key, text)
+        },
+      })
+      const gs = this.gallerySay
+      if (gs && gs.key === info.key && gs.until > this.t) this.bubble(c, gs.text, 64, 150 - spr.length)
+    }
     c.fillStyle = '#f4f4f4'
     c.fillRect(20, 150, 90, 1)
     const x = 124

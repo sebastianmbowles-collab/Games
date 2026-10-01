@@ -138,7 +138,7 @@ export const BOSSES = [
   },
 ]
 
-const BANTER = {
+export const BANTER = {
   jax: ['BORED NOW.', 'THIS IS FUN. FOR ME.', 'YOU LOOK NERVOUS. HEH.'],
   ragatha: ['YOU CAN DO IT!', 'SORRY! SORRY!', 'ALMOST THERE!'],
   gangle: ["I DON'T LIKE THIS...", '*SNIFF*', 'PLEASE BE CAREFUL!'],
