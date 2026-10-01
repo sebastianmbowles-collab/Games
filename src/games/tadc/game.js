@@ -204,8 +204,8 @@ export class TadcGame {
   }
 
   // Switched to another tab or window? Let go of every key, and pause the fight.
-  onBlur() {
-    if (document.visibilityState === 'visible' && document.hasFocus()) return
+  onBlur(e) {
+    if (e && e.type === 'visibilitychange' && document.visibilityState === 'visible') return
     this.keyHeld = {}
     this.touchHeld = {}
     if (!this.paused && (this.state === 'fight' || this.state === 'countdown')) this.pause()
