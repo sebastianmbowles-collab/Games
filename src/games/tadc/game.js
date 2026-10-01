@@ -263,6 +263,8 @@ export class TadcGame {
   toMenu() {
     this.paused = false
     this.run = null
+    // (The menu can get shorter, e.g. once CONTINUE goes away.)
+    this.msel = Math.min(this.msel || 0, this.menuItems().length - 1)
     this.haz = []
     this.parts = []
     this.floats = []
