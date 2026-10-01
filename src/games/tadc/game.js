@@ -1238,6 +1238,8 @@ export class TadcGame {
     }
     if (Math.floor(this.t * 2) % 2) drawText(c, 'REPLAY (SLOW-MO)', 6, 18, { color: '#d82838' })
     drawText(c, end ? 'THAT GOT YOU!' : 'WATCH CLOSELY...', VW - 6, 18, { align: 'right', color: end ? '#f8c830' : '#c8b8e0' })
+    drawText(c, 'A: BACK', VW - 6, VH - 22, { align: 'right', color: '#8c8c9c' })
+    this.hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => this.pressed.add('back') })
   }
 
   // Everything Pomni needs to know to move: the floor, walls, platforms and any challenge twists.
