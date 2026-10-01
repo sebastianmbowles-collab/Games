@@ -1419,7 +1419,12 @@ export class TadcGame {
       // Your badge collection, in the corner.
       const badges = this.badgeList()
       const got = badges.filter(([, ok]) => ok).length
-      if (got) {
+      if (got === badges.length) {
+        // Everything! A rainbow 100% for the true circus master.
+        const rainbow = ['#d82838', '#f88828', '#f8c830', '#38b848', '#2c5ce0', '#8848c8']
+        drawSprite(c, SPR.star, VW - 44, 158)
+        drawText(c, '100%!', VW - 34, 159, { color: rainbow[Math.floor(this.t * 8) % rainbow.length] })
+      } else if (got) {
         drawSprite(c, SPR.star, VW - 38, 158)
         drawText(c, `${got}/${badges.length}`, VW - 28, 159, { color: '#f8c830' })
       }
