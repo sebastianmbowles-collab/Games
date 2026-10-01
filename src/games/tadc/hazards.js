@@ -17,6 +17,30 @@ function landY(g, obj, prevBottom) {
   return null
 }
 
+// Where will a thrown thing land? Runs its flight forward (same maths as the real thing).
+function predictLanding(g, o) {
+  const p = { x: o.x, y: o.y, w: o.w, h: o.h }
+  let vy = o.vy
+  for (let i = 0; i < 600; i++) {
+    const prev = p.y + p.h
+    vy += G / 120
+    p.x += o.vx / 120
+    p.y += vy / 120
+    const top = vy > 0 ? landY(g, p, prev) : null
+    if (top !== null) return { x: p.x, y: top }
+    if (p.y > VH) return null
+  }
+  return null
+}
+
+// A blinking shadow where it's going to land, so you can get out of the way.
+function drawLandingMark(c, t, land, w, color) {
+  if (!land || Math.floor(t * 8) % 2) return
+  c.fillStyle = color
+  c.fillRect(Math.round(land.x + 2), Math.round(land.y - 2), w - 4, 2)
+  c.fillRect(Math.round(land.x), Math.round(land.y - 1), w, 1)
+}
+
 const offscreen = (o) => o.x < -60 || o.x > VW + 60 || o.y > VH + 30
 
 // ---------- Jax: whoopie cushions (little land mines) ----------
@@ -34,6 +58,7 @@ export class Cushion {
   }
   update(dt, g) {
     this.t += dt
+    if (this.state === 'fly' && this.land === undefined) this.land = predictLanding(g, this)
     if (this.state === 'fly') {
       const prev = this.y + this.h
       this.vy += G * dt
@@ -67,6 +92,7 @@ export class Cushion {
   }
   draw(c, t) {
     if (this.state === 'fly') {
+      drawLandingMark(c, t, this.land, this.w, 'rgba(224, 60, 156, 0.7)')
       drawSprite(c, SPR.cushion, this.x - 1, this.y - 1, { rot: this.spin })
     } else if (this.state === 'rest') {
       if (this.life < 1.2 && Math.floor(t * 10) % 2) return
@@ -262,6 +288,7 @@ export class Pillow {
     this.t += dt
     this.squish = Math.max(0, this.squish - dt)
     const prev = this.y + this.h
+    if (this.mode === 'arc' && this.land === undefined) this.land = predictLanding(g, this)
     if (this.mode === 'arc' || this.mode === 'fall') {
       this.vy += G * dt
       this.x += this.vx * dt
@@ -290,7 +317,8 @@ export class Pillow {
   hits(b) {
     return overlap({ x: b.x + 1, y: b.y + 2, w: b.w - 2, h: b.h - 2 }, { x: this.x + 1, y: this.y + 1, w: this.w - 2, h: this.h - 1 })
   }
-  draw(c) {
+  draw(c, t) {
+    if (this.mode === 'arc') drawLandingMark(c, t, this.land, this.w, 'rgba(200, 184, 224, 0.8)')
     const sq = this.squish > 0 ? 0.7 : 1
     drawSprite(c, this.bouncy ? SPR.pillowBouncy : SPR.pillow, this.x - 1, this.y - 1 + (1 - sq) * 11, { sy: sq })
     if (this.bouncy) {
