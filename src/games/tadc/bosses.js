@@ -971,6 +971,9 @@ class Encore extends Boss {
       g.haz = []
       g.wipeT = 0.4
       sfx.cheer()
+      // Confetti for making it through another act!
+      const cols = ['#d82838', '#f8c830', '#38b848', '#2c5ce0', '#e03c9c', '#f4f4f4']
+      for (let i = 0; i < 8; i++) g.puff(20 + i * 40, 30 + (i % 2) * 20, cols, 5)
       this.nextWave()
       this.breakT = BREAK
       this.sub.say(this.sub.intro[0][2], 1.6)
