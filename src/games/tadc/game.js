@@ -277,6 +277,7 @@ export class TadcGame {
     this.run = { mode: practiceIdx === null ? 'run' : 'practice', diff: this.save.diff, time: 0, deaths: 0, splits: [], part }
     if (this.run.mode === 'run') {
       this.save.runs++
+      this.save.resume = null
       this.persist()
       return this.showMap(0)
     }
@@ -353,6 +354,11 @@ export class TadcGame {
     this.pomni.onFloor = !kinger
     this.touchedFloor = false
     if (!info.bonus) this.save.reached = Math.max(this.save.reached, idx)
+    // Remember the run, so it can be continued later.
+    if (this.run.mode === 'run') {
+      const r = this.run
+      this.save.resume = { diff: r.diff, idx, time: r.time, deaths: r.deaths, splits: r.splits, tries: r.tries }
+    }
     this.persist()
     setTempo(1)
     playMusic(info.encore ? this.boss.key : info.key, true)
@@ -483,6 +489,7 @@ export class TadcGame {
 
   finishRun() {
     const r = this.run
+    this.save.resume = null
     const name = DIFFS[r.diff].name
     const rec = (this.save.records[name] ||= {})
     const segs = r.splits.map((t, i) => t - (i ? r.splits[i - 1] : 0))
@@ -728,16 +735,28 @@ export class TadcGame {
 
   // ENCORE appears on the menu once you've beaten the game.
   menuItems() {
-    return this.save.badges.cleared ? [...MENU, 'ENCORE', 'CHALLENGES'] : MENU
+    const items = this.save.badges.cleared ? [...MENU, 'ENCORE', 'CHALLENGES'] : [...MENU]
+    if (this.save.resume) items.unshift('CONTINUE')
+    return items
   }
 
   menuPick(k) {
-    if (k === 4) this.startEncore()
-    else if (k === 5) this.setState('challenges')
-    else if (k === 0) this.startRun()
-    else if (k === 1) this.setState('howto')
-    else if (k === 2) this.setState('bosses')
+    const pick = this.menuItems()[k]
+    if (pick === 'CONTINUE') this.continueRun()
+    else if (pick === 'ENCORE') this.startEncore()
+    else if (pick === 'CHALLENGES') this.setState('challenges')
+    else if (pick === 'START') this.startRun()
+    else if (pick === 'HOW TO PLAY') this.setState('howto')
+    else if (pick === 'BOSSES') this.setState('bosses')
     else this.setState('options')
+  }
+
+  // Pick a run back up where you left it (at the start of the boss you were on).
+  continueRun() {
+    const r = this.save.resume
+    this.save.diff = r.diff
+    this.run = { mode: 'run', diff: r.diff, time: r.time, deaths: r.deaths, splits: r.splits || [], tries: r.tries || {} }
+    this.showMap(r.idx)
   }
 
   update_howto(dt, pr) {
@@ -1541,10 +1560,10 @@ export class TadcGame {
         drawText(c, `${got}/${badges.length}`, VW - 28, 159, { color: '#f8c830' })
       }
       const items = this.menuItems()
-      const gap = items.length > 4 ? 10 : 13
+      const gap = items.length > 6 ? 9 : items.length > 4 ? 10 : 13
       items.forEach((m, i) => this.menuLine(c, m, 178, 72 + i * gap, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i))))
       const d = DIFFS[this.save.diff]
-      const my = items.length > 4 ? 134 : 128
+      const my = items.length > 4 ? 73 + items.length * gap : 128
       drawText(c, `MODE: ${d.name}`, 178, my, { color: d.color })
       const rec = this.save.records[d.name]
       const enc = this.save.encore[d.name]
