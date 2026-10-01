@@ -1138,6 +1138,8 @@ export class TadcGame {
     const cross = (a) => s >= a && s - dt < a
     if (cross(1.5)) this.typed = { text: 'YOU SURVIVED.', at: this.t }
     if (cross(4.2)) this.typed2 = { text: '...SOMEHOW.', at: this.t }
+    if (cross(5.0)) sfx.secret()
+    if (cross(6.75)) sfx.thump()
     if (cross(10.2)) {
       playMusic('ending', true)
       sfx.glitch()
@@ -1927,12 +1929,45 @@ export class TadcGame {
       drawPlatforms(c, this.platforms)
       let spr = SPR.pomniIdle
       let flip = false
-      if (s > 4.6 && s < 6.6) {
+      let px = VW / 2
+      if (s > 4.6 && s < 5.6) {
         spr = SPR.pomniLook
         flip = Math.floor(s * 1.5) % 2 === 0
       }
-      drawPomni(c, spr, VW / 2, GROUND_Y + 1, flip)
-      if (s > 5.2 && s < 7.2) drawText(c, '?', VW / 2 + 6, GROUND_Y - 44, { scale: 2, color: '#f8c830' })
+      // An EXIT door! The one she's been looking for this whole time!
+      if (s > 5.0) {
+        const dx = 262
+        const k = clamp((s - 5.0) / 0.4, 0, 1)
+        c.globalAlpha = k
+        c.fillStyle = INK
+        c.fillRect(dx - 1, GROUND_Y - 41, 26, 41)
+        c.fillStyle = '#8c5c3c'
+        c.fillRect(dx + 1, GROUND_Y - 39, 22, 39)
+        c.fillStyle = '#6c4428'
+        c.fillRect(dx + 4, GROUND_Y - 35, 16, 13)
+        c.fillRect(dx + 4, GROUND_Y - 19, 16, 15)
+        c.fillStyle = '#f8c830'
+        c.fillRect(dx + 18, GROUND_Y - 21, 2, 2)
+        // It opens... onto nothing at all.
+        if (s > 6.75) {
+          c.fillStyle = '#000000'
+          c.fillRect(dx + 1, GROUND_Y - 39, 22, 39)
+          c.fillStyle = '#8c5c3c'
+          c.fillRect(dx + 1, GROUND_Y - 39, 3, 39)
+        }
+        // A glowing green sign.
+        c.fillStyle = Math.floor(this.t * 3) % 2 ? '#38b848' : '#2c8c38'
+        c.fillRect(dx - 1, GROUND_Y - 52, 26, 9)
+        drawText(c, 'EXIT', dx + 12, GROUND_Y - 50, { align: 'center', color: '#f4f4f4', shadow: null })
+        c.globalAlpha = 1
+      }
+      if (s > 5.6) {
+        const k = clamp((s - 5.8) / 1.0, 0, 1)
+        px = VW / 2 + (250 - VW / 2) * k
+        if (k > 0 && k < 1) spr = Math.floor(this.t * 10) % 2 ? SPR.pomniRun1 : SPR.pomniRun2
+      }
+      if (s < 7.0) drawPomni(c, spr, px, GROUND_Y + 1, flip)
+      if (s > 5.1 && s < 5.8) drawText(c, '!', VW / 2 + 6, GROUND_Y - 44, { scale: 2, color: '#f8c830' })
       const type = (o, y) => {
         if (!o) return
         const n = Math.min(o.text.length, Math.floor((this.t - o.at) * 14))
