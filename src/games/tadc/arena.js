@@ -135,9 +135,20 @@ const bgs = {
       c.fill()
     }
     // Faint comedy and tragedy masks in the dark.
-    c.fillStyle = 'rgba(244, 244, 244, 0.08)'
-    c.fillRect(140, 40, 18, 20)
-    c.fillRect(166, 44, 18, 20)
+    const mask = (x, y, happy) => {
+      c.fillStyle = 'rgba(244, 244, 244, 0.1)'
+      c.fillRect(x + 2, y, 16, 22)
+      c.fillRect(x, y + 2, 20, 16)
+      // Eye holes and a smile (comedy) or a frown (tragedy).
+      c.fillStyle = '#0c0818'
+      c.fillRect(x + 4, y + 6 + (happy ? 0 : 1), 4, 3)
+      c.fillRect(x + 12, y + 6 + (happy ? 0 : 1), 4, 3)
+      c.fillRect(x + 6, y + 15, 8, 2)
+      c.fillRect(x + 4, y + (happy ? 13 : 17), 2, 2)
+      c.fillRect(x + 14, y + (happy ? 13 : 17), 2, 2)
+    }
+    mask(138, 38, true)
+    mask(164, 42, false)
     // Ribbons hanging from the ceiling, swaying.
     for (let x = 12; x < VW; x += 28) {
       const len = 20 + ((x * 7) % 30)
