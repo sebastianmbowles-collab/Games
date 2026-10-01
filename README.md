@@ -58,6 +58,7 @@ Hold a direction to run faster. Let go of jump early for a small hop.
 - **Difficulty:** EASY, NORMAL, HARD or INSANE (in OPTIONS).
 - **Practice:** in BOSSES, pick a boss and use up and down to start from any part of the fight. Press START to watch Pomni play it by herself!
 - **Hints:** if a boss keeps beating you, the game over screen gives you a tip.
+- **Game over menu:** WATCH REPLAY shows the last 3 seconds in slow motion, and PRACTISE THIS PART jumps straight to the part that got you.
 - **Continue:** left in the middle of a run? Pick CONTINUE on the title screen to carry on from that boss.
 - **Calm mode** turns off screen shake and big flashes. **Slow motion** plays fights at 3/4 speed (those runs don't count for records).
 
