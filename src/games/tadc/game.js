@@ -6,7 +6,7 @@ import { drawText, textWidth } from './font'
 import { SPR, drawSprite } from './sprites'
 import { VW, VH, GROUND_Y, INK, DIFFS, clamp, rand, fmtTime, seeded } from './consts'
 import { ARENAS, drawBackground, drawFloor, drawPlatforms } from './arena'
-import { Pomni, drawPomni, setOutfit } from './player'
+import { Pomni, drawPomni, setOutfit, COSTUMES } from './player'
 import { BOSSES, BANTER, makeBoss } from './bosses'
 import { Pilot } from './demo'
 import { sfx, wakeAudio, playMusic, stopMusic, setMusicOn, setSfxOn, setTempo, duckMusic } from './sound'
@@ -394,7 +394,7 @@ export class TadcGame {
     this.finalBanner = this.t
     // Of course.
     this.pomniSay = { text: 'OH NO.', until: this.t + 1.3 }
-    sfx.talk('pomni', 'OH NO')
+    sfx.talk(this.heroVoice(), 'OH NO')
     this.shake = 0.5
     sfx.warn()
     sfx.shake()
@@ -912,6 +912,11 @@ export class TadcGame {
     this.hits.push({ x: VW - 44, y: 158, w: 44, h: 18, fn: () => this.pressed.add('back') })
   }
 
+  // Whose voice the hero speaks with (a costume changes it).
+  heroVoice() {
+    return COSTUMES[this.save.outfit] ? this.save.outfit.toLowerCase() : 'pomni'
+  }
+
   // Every badge, whether you have it, and how to get it.
   badgeList() {
     const b = this.save.badges
@@ -1138,7 +1143,7 @@ export class TadcGame {
         if (who === 'boss') this.boss.say(text, 1.6)
         else if (who === 'bubble') this.boss.bub.text = { text, until: this.t + 1.6 }
         else this.pomniSay = { text, until: this.t + 1.4 }
-        if (who !== 'boss') sfx.talk(who, text)
+        if (who !== 'boss') sfx.talk(who === 'pomni' ? this.heroVoice() : who, text)
         sfx.text()
         if (text === 'PFFFFFT.') sfx.pfft()
       }
@@ -1302,7 +1307,7 @@ export class TadcGame {
       const lines = caine ? ['...IS IT REALLY OVER?'] : ['PHEW.', "I'M... STILL HERE?", 'OKAY. I CAN DO THIS.', 'NOT TODAY!', 'WHO IS NEXT?!']
       const text = lines[(this.bossIdx + this.run.deaths) % lines.length]
       this.pomniSay = { text, until: this.t + 2 }
-      sfx.talk('pomni', text)
+      sfx.talk(this.heroVoice(), text)
     }
     if (!this.defeatFanfare && this.st >= fanAt) {
       this.defeatFanfare = true
