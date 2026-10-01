@@ -190,7 +190,7 @@ class Boss {
   }
   // Pomni only just dodged! Sometimes the boss has something to say about it.
   nearMiss() {
-    if (!this.nearLines || (this.bubbleText && this.bubbleText.until > this.g.t) || Math.random() < 0.6) return
+    if (!this.nearLines || (this.bubbleText && this.bubbleText.until > this.g.t) || Math.random() < 0.75) return
     this.say(this.nearLines[Math.floor(Math.random() * this.nearLines.length)], 1.3)
   }
   say(text, dur = 1.8) {
