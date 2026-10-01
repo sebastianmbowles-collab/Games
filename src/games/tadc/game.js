@@ -755,7 +755,8 @@ export class TadcGame {
       sfx.glitch()
       this.glitch = 0.3
     }
-    if (s > 14 || (s > 10.6 && pr('confirm'))) this.setState('results')
+    if (cross(11.6)) sfx.static()
+    if (s > 16 || (s > 10.6 && pr('confirm'))) this.setState('results')
   }
 
   update_results(dt, pr) {
@@ -1390,6 +1391,20 @@ export class TadcGame {
     if (s > 10.2) {
       const jx = Math.random() < 0.15 ? Math.round(rand(-3, 3)) : 0
       drawText(c, 'OR IS IT?', VW / 2 + jx, 96, { align: 'center', color: Math.random() < 0.1 ? '#e03c9c' : '#8c8c9c', shadow: null })
+    }
+    // ...someone is peeking in from the side. There's more to the show.
+    if (s > 11.4) {
+      const k = clamp((s - 11.4) / 0.8, 0, 1)
+      const z = SPR.zooble
+      drawSprite(c, z, VW - Math.round(k * 22), VH - z.length - 4, { mode: 'shadow', look: [-1, 0] })
+      c.fillStyle = '#f4f4f4'
+      // One glowing eye, blinking now and then.
+      const [ex, ey] = z.eyes[0]
+      if (k >= 1 && Math.floor(this.t * 3) % 4) c.fillRect(VW - 22 + Math.round(ex) - 1, VH - z.length - 4 + Math.round(ey), 2, 1)
+    }
+    if (s > 12.4) {
+      drawText(c, 'NEW IN THE MENU: ENCORE', VW / 2, 138, { align: 'center', color: '#f8c830', shadow: null })
+      drawText(c, 'AND A SECRET BONUS BOSS...', VW / 2, 148, { align: 'center', color: '#e03c9c', shadow: null })
     }
   }
 
