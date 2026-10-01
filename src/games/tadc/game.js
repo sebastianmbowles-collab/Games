@@ -435,7 +435,14 @@ export class TadcGame {
     // The music cuts out. For the final boss: total silence.
     stopMusic()
     setTempo(1)
-    if (this.bossIdx === 4) setTimeout(() => this.state === 'defeat' && this.boss.say('...', 2.5), 1000)
+    if (this.bossIdx === 4) {
+      setTimeout(() => this.state === 'defeat' && this.boss.say('...', 2.5), 1000)
+      setTimeout(() => {
+        if (this.state !== 'defeat' || !this.boss.bub) return
+        this.boss.bub.text = { text: 'CAN I EAT THE CANE NOW?', until: this.t + 2.5 }
+        sfx.talk('bubble', 'CAN I EAT THE CANE NOW')
+      }, 3600)
+    }
     else this.boss.say(this.boss.defeat, 3)
     const i = this.bossIdx
     // Speedrun split: the total time when each boss went down, compared with your best run.
