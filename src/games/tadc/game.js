@@ -922,6 +922,7 @@ export class TadcGame {
         this.save.beaten[i] >= 2,
         i === 5 && !b.cleared ? '???' : `BEAT ${BOSSES[i].name} ON HARD`,
       ]),
+      ['BUBBLE', b.encoreStar, 'REACH WAVE 10 IN ENCORE'],
     ]
   }
 

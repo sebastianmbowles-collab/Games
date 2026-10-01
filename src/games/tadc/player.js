@@ -172,7 +172,7 @@ export const OUTFITS = {
   'SHOWSTOPPER': { [BLUE]: '#8848c8', [RED]: '#38b848', [GOLD]: '#f88828', [PUPIL]: '#2c5ce0' },
 }
 // Costumes: play as someone else! (Same rules though: run and jump, that's it.)
-export const COSTUMES = { JAX: 'iconJax', RAGATHA: 'iconRagatha', GANGLE: 'iconGangle', KINGER: 'iconKinger', CAINE: 'iconCaine', ZOOBLE: 'iconZooble' }
+export const COSTUMES = { JAX: 'iconJax', RAGATHA: 'iconRagatha', GANGLE: 'iconGangle', KINGER: 'iconKinger', CAINE: 'iconCaine', ZOOBLE: 'iconZooble', BUBBLE: 'iconBubble' }
 
 let outfit = 'CLASSIC'
 export function setOutfit(name) {
@@ -205,6 +205,8 @@ export function drawPomni(c, spr, cx, bottom, flip = false, { scale = 1, sy = 1,
     if (spr === SPR.pomniPass) bottom -= scale
     if (spr === SPR.pomniJump || spr === SPR.pomniFall) sy *= 1.04
     spr = SPR[costume]
+    // Bubble is small: draw them bigger so they match the space Pomni takes up.
+    if (costume === 'iconBubble') scale *= 1.5
   } else spr = dress(spr, wear)
   const w = spr[0].length * scale
   const ax = spr.ax * scale
