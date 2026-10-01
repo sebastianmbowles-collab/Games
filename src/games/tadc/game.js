@@ -443,6 +443,7 @@ export class TadcGame {
       if (pb && pb[i] !== undefined) this.splitDelta = this.run.time - pb[i]
     }
     this.newBadge = null
+    this.newCostume = null
     if (this.run.mode === 'challenge' && !this.run.slow) {
       const done = this.save.challenges
       if (!done[this.run.ch.name]) this.newBadge = `${this.run.ch.name} DONE`
@@ -456,6 +457,8 @@ export class TadcGame {
     }
     // Practising just one part is great training, but only a whole fight (at full speed) counts.
     if (this.run.part || this.run.slow || this.run.mode === 'challenge') return
+    // First time beating this boss on Hard or harder: you can dress up as them now!
+    this.newCostume = this.save.beaten[i] < 2 && this.run.diff >= 2 && i <= 5 ? BOSSES[i].name.split(' ')[0] : null
     this.save.beaten[i] = Math.max(this.save.beaten[i], this.run.diff)
     this.save.reached = Math.max(this.save.reached, Math.min(4, i + 1))
     if (this.boss.key === 'zooble' && !this.save.badges.zooble) {
@@ -2065,6 +2068,10 @@ export class TadcGame {
             drawText(c, fmtTime(this.run.time), VW / 2 - 4, 43, { align: 'right' })
             drawText(c, fmtDelta(d), VW / 2 + 4, 43, { color: d <= 0 ? '#38b848' : '#d82838' })
           }
+        }
+        if (this.newCostume && !this.newBadge) {
+          drawText(c, `NEW COSTUME: ${this.newCostume}!`, VW / 2, 56, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#e03c9c' : '#f8c830' })
+          drawText(c, 'DRESS UP IN OPTIONS > OUTFIT', VW / 2, 66, { align: 'center', color: '#68d8f8' })
         }
         if (this.newBadge) {
           drawText(c, `SECRET: ${this.newBadge}!`, VW / 2, 56, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#e03c9c' : '#f8c830' })
