@@ -1884,6 +1884,16 @@ export class TadcGame {
 
   drawPomniNormal(c) {
     const p = this.pomni
+    // A little shadow on whatever is below her, to help judge landings.
+    if (!p.onGround) {
+      const feet = p.y + p.h
+      let floor = GROUND_Y
+      for (const pl of this.platforms) if (pl.y >= feet && pl.y < floor && p.x + p.w > pl.x && p.x < pl.x + pl.w) floor = pl.y
+      const k = clamp(1 - (floor - feet) / 120, 0.3, 1)
+      const w = Math.round(10 * k)
+      c.fillStyle = 'rgba(20, 12, 28, 0.45)'
+      c.fillRect(Math.round(p.x + p.w / 2 - w / 2), floor - 1, w, 2)
+    }
     const look = this.threatPoint()
     // Standing still with something deadly right next to her? Eek!
     const eek = p.onGround && Math.abs(p.vx) < 8 && this.threatDist < 30 && this.state === 'fight'
