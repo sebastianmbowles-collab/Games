@@ -159,6 +159,9 @@ export const OUTFITS = {
   'SPARE PARTS': { [BLUE]: '#68d8f8', [RED]: '#f2348a', [GOLD]: '#38b848', [PUPIL]: '#8848c8' },
   'GOLDEN': { [BLUE]: '#f8c830', [RED]: '#d88820', [GOLD]: '#fcfcfc', [PUPIL]: '#d88820' },
   'ABSTRACTED': { [BLUE]: '#2c1c3c', [RED]: '#5c2c8c', [GOLD]: '#e03c9c', [WHITE]: '#c8b8e0', [PUPIL]: '#68d8f8' },
+  'DAREDEVIL': { [BLUE]: '#2c2c3c', [RED]: '#d82838', [GOLD]: '#f88828' },
+  'SPEEDY': { [BLUE]: '#38b848', [RED]: '#f8c830', [GOLD]: '#68d8f8' },
+  'STAR': { [BLUE]: '#cc243c', [RED]: '#f4d474', [GOLD]: '#f4f4f4', [PUPIL]: '#2a4ad8' },
 }
 let outfit = 'CLASSIC'
 export function setOutfit(name) {

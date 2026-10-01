@@ -28,7 +28,7 @@ const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover'
 const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'map', 'intro', 'gameover', 'results', 'credits'])
 
 function loadSave() {
-  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, bossDeaths: {}, outfit: 'CLASSIC', deaths: 0, runs: 0 }
+  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, bossDeaths: {}, close: 0, outfit: 'CLASSIC', deaths: 0, runs: 0 }
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY))
     if (s && typeof s === 'object') {
@@ -269,7 +269,9 @@ export class TadcGame {
     this.shake = 0.3
     this.glitch = 0.5
     this.boss.mood = 'pleased'
-    this.boss.say(this.boss.win, 3)
+    // (In Encore it's whoever is on stage who gets to gloat.)
+    const gloat = this.boss.sub || this.boss
+    gloat.say(gloat.win, 3)
     if (this.run.mode === 'encore') {
       // Endless mode: how long did you last?
       const name = DIFFS[this.run.diff].name
@@ -351,6 +353,10 @@ export class TadcGame {
         this.save.badges.perfect = true
         this.results.badges.push('PERFECT RUN')
       }
+      if (r.diff >= 1 && r.time < 390 && !this.save.badges.speedy) {
+        this.save.badges.speedy = true
+        this.results.badges.push('SPEEDY')
+      }
       if (r.diff === 3 && !this.save.badges.insane) {
         this.save.badges.insane = true
         this.results.badges.push('INSANE CLEAR')
@@ -373,6 +379,8 @@ export class TadcGame {
   closeCall() {
     if (this.t - (this.lastClose ?? -9) < 1.6) return
     this.lastClose = this.t
+    this.save.close = (this.save.close || 0) + 1
+    if (this.save.close >= 100) this.award('daredevil', 'DAREDEVIL')
     const p = this.pomni
     this.flash(Math.random() < 0.5 ? 'CLOSE!' : 'PHEW!', p.x + p.w / 2, p.y - 8, '#68d8f8')
     sfx.blip()
@@ -559,6 +567,30 @@ export class TadcGame {
     ]
   }
 
+  // Every badge, whether you have it, and how to get it.
+  badgeList() {
+    const b = this.save.badges
+    return [
+      ['ESCAPED THE CIRCUS?', b.cleared, 'BEAT ALL FIVE BOSSES.'],
+      ['PILLOW MASTER', b.pillowMaster, 'BEAT KINGER WITHOUT TOUCHING THE FLOOR.'],
+      ['SPARE PARTS', b.zooble, b.cleared ? 'BEAT THE BONUS BOSS.' : '???'],
+      ['DAREDEVIL', b.daredevil, `100 CLOSE CALLS. (${Math.min(100, this.save.close)}/100)`],
+      ['SPEEDY', b.speedy, 'A FULL RUN UNDER 6:30 ON NORMAL OR HARDER.'],
+      ['ENCORE STAR', b.encoreStar, 'REACH WAVE 10 IN ENCORE.'],
+      ['PERFECT RUN', b.perfect, 'NO DEATHS ON HARD OR INSANE.'],
+      ['INSANE CLEAR', b.insane, 'BEAT INSANE MODE.'],
+    ]
+  }
+
+  // A badge earned in the middle of the action pops up at the top of the screen.
+  award(key, name) {
+    if (this.save.badges[key] || (this.run && this.run.slow)) return
+    this.save.badges[key] = true
+    this.persist()
+    this.toast = { text: `BADGE: ${name}! (NEW OUTFIT)`, until: this.t + 3 }
+    sfx.secret()
+  }
+
   // Which outfits you've earned, and what earns the rest.
   outfitList() {
     const b = this.save.badges
@@ -569,6 +601,9 @@ export class TadcGame {
       ['SPARE PARTS', b.zooble, 'BEAT THE BONUS BOSS'],
       ['GOLDEN', b.perfect, 'PERFECT RUN ON HARD OR INSANE'],
       ['ABSTRACTED', b.insane, 'BEAT INSANE MODE'],
+      ['DAREDEVIL', b.daredevil, 'GET 100 CLOSE CALLS'],
+      ['SPEEDY', b.speedy, 'A FULL RUN UNDER 6:30'],
+      ['STAR', b.encoreStar, 'REACH WAVE 10 IN ENCORE'],
     ]
   }
 
@@ -758,6 +793,7 @@ export class TadcGame {
 
   update_fight(dt, pr) {
     if (this.save.slow) this.run.slow = true
+    if (this.run.mode === 'encore' && this.boss.wave >= 10) this.award('encoreStar', 'ENCORE STAR')
     if (pr('start')) {
       this.pause()
       return
@@ -1302,21 +1338,17 @@ export class TadcGame {
       drawText(c, r.nodeath ? fmtTime(r.nodeath) : '--:--:--', 168, y)
       drawText(c, gold ? fmtTime(gold) : '--:--:--', 236, y, { color: gold ? '#f8c830' : '#f4f4f4' })
     })
-    drawText(c, 'BADGES', 30, 100, { color: '#8c8c9c' })
-    const b = this.save.badges
-    const badges = [
-      ['ESCAPED THE CIRCUS?', b.cleared, 'BEAT ALL FIVE BOSSES'],
-      ['PERFECT RUN', b.perfect, 'NO DEATHS ON HARD OR INSANE'],
-      ['INSANE CLEAR', b.insane, 'BEAT INSANE MODE'],
-      ['PILLOW MASTER', b.pillowMaster, '???'],
-      ['SPARE PARTS', b.zooble, b.cleared ? 'BEAT THE BONUS BOSS' : '???'],
-    ]
-    badges.forEach(([name, got, how], i) => {
-      const y = 111 + i * 9
-      drawSprite(c, SPR.star, 30, y - 1, { mode: got ? 'normal' : 'shadow' })
-      drawText(c, name, 42, y, { color: got ? '#f8c830' : '#4c4c5c' })
-      drawText(c, got ? 'GOT IT!' : how, 170, y, { color: got ? '#38b848' : '#8c8c9c' })
+    const badges = this.badgeList()
+    drawText(c, `BADGES ${badges.filter(([, got]) => got).length}/${badges.length}`, 24, 98, { color: '#8c8c9c' })
+    badges.forEach(([name, got], i) => {
+      const x = i < 4 ? 24 : 168
+      const y = 108 + (i % 4) * 9
+      drawSprite(c, SPR.star, x, y - 1, { mode: got ? 'normal' : 'shadow' })
+      drawText(c, name, x + 12, y, { color: got ? '#f8c830' : '#4c4c5c' })
     })
+    // A hint for the next badge you could get.
+    const next = badges.find(([, got]) => !got)
+    if (next) drawText(c, `NEXT BADGE: ${next[2]}`, 24, 145, { color: '#68d8f8' })
     drawText(c, `TOTAL DEATHS: ${this.save.deaths}   RUNS: ${this.save.runs}`, VW / 2, 158, { align: 'center', color: '#c8b8e0' })
     // Your nemesis: the boss that got you the most times.
     const bd = this.save.bossDeaths
@@ -1407,6 +1439,9 @@ export class TadcGame {
 
   drawHud(c) {
     const b = this.boss
+    if (this.toast && this.toast.until > this.t) {
+      drawText(c, this.toast.text, VW / 2, 22, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#e03c9c' : '#f8c830' })
+    }
     if (this.run.mode === 'encore') return this.drawEncoreHud(c)
     drawText(c, b.name, 4, 3, { color: '#f8c830' })
     c.fillStyle = INK
