@@ -2056,7 +2056,10 @@ export class TadcGame {
     const p = this.pomni
     // Pomni is exhausted: panting and sweating.
     const pant = Math.round(Math.abs(Math.sin(this.t * 5)))
-    drawPomni(c, SPR.pomniIdle, p.x + p.w / 2, p.y + p.h + 1, p.face < 0, { sy: 1 - pant * 0.05 })
+    // Panting at first... then a happy little wave once the fanfare plays.
+    const fanAt0 = this.bossIdx === 4 ? 3.2 : 0.8
+    const waving = this.st > fanAt0 + 0.6 && Math.floor(this.t * 3) % 2
+    drawPomni(c, waving ? SPR.pomniWave : SPR.pomniIdle, p.x + p.w / 2, p.y + p.h + 1, p.face < 0, { sy: waving ? 1 : 1 - pant * 0.05 })
     drawSprite(c, SPR.sweat, p.x - 3, p.y - 6 + ((this.t * 14) % 8))
     drawSprite(c, SPR.sweat, p.x + 12, p.y - 2 + ((this.t * 11) % 8))
     this.drawFx(c)
