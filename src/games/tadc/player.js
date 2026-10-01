@@ -11,7 +11,7 @@ const RUN = 106
 
 export class Pomni {
   w = 10
-  h = 22
+  h = 26
 
   constructor(x, y) {
     this.x = x

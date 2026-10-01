@@ -142,13 +142,18 @@ class Boss {
   throwing() {
     this.throwT = 0.28
   }
+  // Where the boss is looking: always at Pomni.
+  lookAt() {
+    const p = this.g.pomni
+    return p ? { x: p.x + p.w / 2, y: p.y + 6 } : [0, 0]
+  }
   draw(c, t) {
     const throwing = this.throwT > 0
     const pose = throwing && SPR[this.key + 'Throw'] ? SPR[this.key + 'Throw'] : this.spr
     const lean = throwing ? -2 : 0
     const bob = this.mood === 'defeated' ? 0 : Math.round(Math.sin(t * 2.4) * 1)
-    // Keep the body in the same place whichever pose is showing.
-    drawSprite(c, pose, this.x + this.spr.ax - pose.ax + lean, this.y + this.h - pose.length + bob + (throwing ? 1 : 0))
+    // Keep the body in the same place whichever pose is showing, and keep an eye on Pomni.
+    drawSprite(c, pose, this.x + this.spr.ax - pose.ax + lean, this.y + this.h - pose.length + bob + (throwing ? 1 : 0), { look: this.lookAt() })
     if (this.mood === 'pleased') {
       c.fillStyle = '#f8c830'
       for (let i = 0; i < 3; i++) c.fillRect(Math.round(this.x + this.spr.ax - 10 + i * 8), Math.round(this.y - 6 - Math.abs(Math.sin(t * 6 + i)) * 4), 2, 2)
@@ -226,7 +231,7 @@ class Ragatha extends Boss {
     // 1: horizontal buttons. Low ones: jump. High ones: stay on the floor.
     while (t < 13) {
       const high = r() < 0.4
-      at(t, () => this.straight(high ? GROUND_Y - 30 : GROUND_Y - 8, 110 * sp))
+      at(t, () => this.straight(high ? GROUND_Y - 36 : GROUND_Y - 8, 110 * sp))
       t += 1.7 / d.dens
     }
     // 2: buttons dropping from above. Move sideways!
@@ -254,7 +259,7 @@ class Ragatha extends Boss {
       const high = r() < 0.5
       const off = r.range(-30, 30)
       at(t, () => {
-        if (k < 0.35) this.straight(high ? GROUND_Y - 30 : GROUND_Y - 8, 130 * sp)
+        if (k < 0.35) this.straight(high ? GROUND_Y - 36 : GROUND_Y - 8, 130 * sp)
         else if (k < 0.7) this.drop(this.px + off)
         else this.spread(3)
       })
@@ -274,7 +279,7 @@ class Ragatha extends Boss {
         if (k < 0.3) this.straight(GROUND_Y - 8, 120 * sp, true)
         else if (k < 0.55) this.straight(GROUND_Y - 8, 120 * sp)
         else if (k < 0.8) this.drop(this.px + off)
-        else this.straight(GROUND_Y - 30, 130 * sp, left)
+        else this.straight(GROUND_Y - 36, 130 * sp, left)
       })
       t += 0.75 / d.dens
     }
@@ -550,7 +555,7 @@ class Caine extends Boss {
     return { events: ev, duration: Math.max(66, t + 2.5), finalAt: 50, tempos: [[16, 1.05], [32, 1.1], [50, 1.2]] }
   }
   hang() {
-    const bottom = GROUND_Y - 30
+    const bottom = GROUND_Y - 36
     this.g.haz.push(
       new Cane({ cx: VW + 30, cy: (bottom - 12) / 2, len: bottom + 12, thick: 10, angle: Math.PI / 2, vx: -115 * this.d.speed, warn: 0.9 * this.d.warn, warnBox: { x: VW - 20, y: 0, w: 20, h: bottom } }),
     )
@@ -561,12 +566,12 @@ class Caine extends Boss {
     this.g.haz.push(
       new Cane({
         cx: this.x + 10,
-        cy: low ? GROUND_Y - 10 : 96,
+        cy: low ? GROUND_Y - 10 : 90,
         len: 40,
         spin: 9,
         vx: -150 * this.d.speed,
         warn: 0.7 * this.d.warn,
-        warnBox: { x: 0, y: (low ? GROUND_Y - 10 : 96) - 1, w: this.x, h: 2 },
+        warnBox: { x: 0, y: (low ? GROUND_Y - 10 : 90) - 1, w: this.x, h: 2 },
         script: (cn) => {
           if (cn.vx < 0 && cn.cx < 46) {
             cn.vx = -cn.vx
@@ -610,7 +615,7 @@ class Caine extends Boss {
   }
   // A wall of cane with one gap. 'high' gap: jump through it. 'low' gap: stay on the floor.
   wall(kind, fromLeft) {
-    const gap = kind === 'high' ? { y: 66, h: 40 } : { y: GROUND_Y - 32, h: 40 }
+    const gap = kind === 'high' ? { y: 60, h: 46 } : { y: GROUND_Y - 32, h: 40 }
     const vx = (fromLeft ? 1 : -1) * 100 * this.d.speed
     const x = fromLeft ? -30 : VW + 30
     const warnBox = fromLeft ? { x: 0, y: 0, w: 14, h: GROUND_Y } : { x: VW - 14, y: 0, w: 14, h: GROUND_Y }
@@ -647,7 +652,7 @@ class Caine extends Boss {
   }
   draw(c, t) {
     super.draw(c, t)
-    drawSprite(c, SPR.bubble, this.bub.x, this.bub.y + Math.round(Math.sin(t * 3)))
+    drawSprite(c, SPR.bubble, this.bub.x, this.bub.y + Math.round(Math.sin(t * 3)), { look: this.lookAt() })
   }
 }
 

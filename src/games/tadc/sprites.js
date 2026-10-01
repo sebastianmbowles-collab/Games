@@ -92,7 +92,8 @@ function build(rows, mode) {
 }
 
 // mode: 'normal', 'white' (flash), 'shadow' (silhouette) or 'glitch' (distorted colors).
-export function drawSprite(c, rows, x, y, { scale = 1, sy = 1, flip = false, mode = 'normal', alpha = 1, rot = 0 } = {}) {
+// look: where the pupils point. Either a point on screen { x, y } (they stare at it) or [dx, dy] from -1 to 1.
+export function drawSprite(c, rows, x, y, { scale = 1, sy = 1, flip = false, mode = 'normal', alpha = 1, rot = 0, look = null } = {}) {
   let entry = cache.get(rows)
   if (!entry) {
     entry = {}
@@ -117,4 +118,31 @@ export function drawSprite(c, rows, x, y, { scale = 1, sy = 1, flip = false, mod
     c.drawImage(img, Math.round(x), Math.round(y), w, h)
   }
   c.restore()
+  if (rows.eyes && rows.eyes.length && mode !== 'shadow' && !rot) {
+    c.save()
+    c.globalAlpha *= alpha
+    drawPupils(c, rows, Math.round(x), Math.round(y), w, scale, sy, flip, mode, look)
+    c.restore()
+  }
+}
+
+// The pupils are drawn on top of the sprite, nudged towards whatever the character is looking at.
+function drawPupils(c, rows, x, y, w, scale, sy, flip, mode, look) {
+  for (const [ex, ey, ew, eh, col, rx, ry] of rows.eyes) {
+    const cx = x + (flip ? w - ex * scale : ex * scale)
+    const cy = y + ey * scale * sy
+    let ux = 0
+    let uy = 0
+    if (look && look.x !== undefined) {
+      const dx = look.x - cx
+      const dy = look.y - cy
+      const d = Math.hypot(dx, dy) || 1
+      ux = dx / d
+      uy = dy / d
+    } else if (Array.isArray(look)) {
+      ;[ux, uy] = look
+    }
+    c.fillStyle = mode === 'white' || mode === 'glitch' ? '#140c1c' : col
+    c.fillRect(Math.round(cx + ux * rx * scale - (ew * scale) / 2), Math.round(cy + uy * ry * scale - (eh * scale * sy) / 2), ew * scale, Math.max(1, Math.round(eh * scale * sy)))
+  }
 }

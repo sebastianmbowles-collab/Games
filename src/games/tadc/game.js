@@ -200,7 +200,7 @@ export class TadcGame {
     this.finalBanner = null
     this.boss = makeBoss(this, idx, this.d, 1000 + idx * 97 + this.run.diff * 13)
     const kinger = info.key === 'kinger'
-    const spawn = kinger ? { x: this.platforms[0].x + 18, y: this.platforms[0].y - 22 } : { x: 40, y: GROUND_Y - 22 }
+    const spawn = kinger ? { x: this.platforms[0].x + 18, y: this.platforms[0].y - 26 } : { x: 40, y: GROUND_Y - 26 }
     this.pomni = new Pomni(spawn.x, spawn.y)
     this.pomni.onFloor = !kinger
     this.touchedFloor = false
@@ -893,7 +893,7 @@ export class TadcGame {
     const info = BOSSES[i]
     const met = i <= this.save.reached
     const spr = SPR[info.key]
-    drawSprite(c, spr, 64 - spr.ax, 150 - spr.length + Math.round(Math.sin(this.t * 2)), { mode: met ? 'normal' : 'shadow' })
+    drawSprite(c, spr, 64 - spr.ax, 150 - spr.length + Math.round(Math.sin(this.t * 2)), { mode: met ? 'normal' : 'shadow', look: [Math.sin(this.t * 0.8) * 0.8, 0.3] })
     if (info.key === 'caine') drawSprite(c, SPR.bubble, 84, 34, { mode: met ? 'normal' : 'shadow' })
     c.fillStyle = '#f4f4f4'
     c.fillRect(20, 150, 90, 1)
