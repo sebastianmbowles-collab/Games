@@ -144,6 +144,11 @@ export class Button {
           this.vy = -this.vy * 0.45
           this.vx *= 0.85
           sfx.ping()
+        } else if (this.mode === 'spread') {
+          // Spread buttons pop once they've done their bounce, so they don't pile up on the floor.
+          this.dead = true
+          g.puff(this.x + 3, this.y + 3, ['#68d8f8', '#2c5ce0'], 3)
+          return
         } else {
           this.vy = 0
           this.grav = 0

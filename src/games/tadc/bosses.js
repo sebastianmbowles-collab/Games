@@ -341,15 +341,24 @@ class Ragatha extends Boss {
       at(t, () => (k < 0.55 ? this.spread(4 + d.extra) : this.roll(95 * sp)))
       t += 1.6 / d.dens
     }
+    // Low buttons say "jump!", high ones say "stay down!". Never send one straight after the other.
+    let prev = null
+    const fair = (kind) => {
+      if ((kind === 'low' && prev === 'high') || (kind === 'high' && prev === 'low')) kind = 'drop'
+      prev = kind
+      return kind
+    }
     // 4: the button storm.
     at(38, () => this.say('BUTTON STORM!'))
     while (t < 46) {
       const k = r()
       const high = r() < 0.5
       const off = r.range(-30, 30)
+      const kind = fair(k < 0.35 ? (high ? 'high' : 'low') : k < 0.7 ? 'drop' : 'spread')
       at(t, () => {
-        if (k < 0.35) this.straight(high ? GROUND_Y - 36 : GROUND_Y - 8, 130 * sp)
-        else if (k < 0.7) this.drop(this.px + off)
+        if (kind === 'high') this.straight(GROUND_Y - 36, 130 * sp)
+        else if (kind === 'low') this.straight(GROUND_Y - 8, 130 * sp)
+        else if (kind === 'drop') this.drop(this.px + off)
         else this.spread(3)
       })
       t += 0.62 / d.dens
@@ -360,14 +369,15 @@ class Ragatha extends Boss {
       this.g.setConveyor(-50 * sp)
     })
     t = 47
+    prev = null
     while (t < 58) {
       const k = r()
       const off = r.range(-20, 40)
       const left = r() < 0.5
+      const kind = fair(k < 0.55 ? 'low' : k < 0.8 ? 'drop' : 'high')
       at(t, () => {
-        if (k < 0.3) this.straight(GROUND_Y - 8, 120 * sp, true)
-        else if (k < 0.55) this.straight(GROUND_Y - 8, 120 * sp)
-        else if (k < 0.8) this.drop(this.px + off)
+        if (kind === 'low') this.straight(GROUND_Y - 8, 120 * sp, k < 0.3)
+        else if (kind === 'drop') this.drop(this.px + off)
         else this.straight(GROUND_Y - 36, 130 * sp, left)
       })
       t += 0.75 / d.dens
