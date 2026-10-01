@@ -24,17 +24,29 @@ const KEYMAP = {
   Escape: ['back', 'start'], x: ['back'], X: ['back'], Backspace: ['back'],
 }
 const MENU = ['START', 'HOW TO PLAY', 'BOSSES', 'OPTIONS']
+
+// Challenges: a boss you know, with a twist. (Unlocked after beating the game.)
+// mods: dark (only a little light around Pomni), grav (gravity), speed (game speed),
+// conveyor (the floor pushes you), ice (the whole floor is slippery). diff forces a difficulty.
+const CHALLENGES = [
+  { name: 'LIGHTS OUT', boss: 0, mods: { dark: true }, about: 'JAX, BUT SOMEONE TURNED OFF THE LIGHTS.' },
+  { name: 'MOON BOUNCE', boss: 3, mods: { grav: 0.55 }, about: 'KINGER ON THE MOON. FLOATY JUMPS!' },
+  { name: 'DOUBLE TIME', boss: 1, mods: { speed: 1.3 }, about: 'RAGATHA, BUT EVERYTHING IS FASTER.' },
+  { name: 'TREADMILL', boss: 2, mods: { conveyor: -30 }, about: 'GANGLE, AND THE FLOOR KEEPS MOVING.' },
+  { name: 'ICE RINK', boss: 5, mods: { ice: true }, about: 'ZOOBLE ON A FROZEN FLOOR. SLIDE!' },
+  { name: 'NO MERCY', boss: 4, diff: 2, mods: {}, about: 'THE FINAL SHOW ON HARD MODE. GOOD LUCK.' },
+]
 const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover', 'defeat'])
-const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'map', 'intro', 'gameover', 'results', 'credits'])
+const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'challenges', 'map', 'intro', 'gameover', 'results', 'credits'])
 
 function loadSave() {
-  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, bossDeaths: {}, close: 0, outfit: 'CLASSIC', deaths: 0, runs: 0 }
+  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, bossDeaths: {}, challenges: {}, close: 0, outfit: 'CLASSIC', deaths: 0, runs: 0 }
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY))
     if (s && typeof s === 'object') {
       // Older saves only know about five bosses: give Zooble a slot too.
       const beaten = base.beaten.map((b, i) => (s.beaten && s.beaten[i] !== undefined ? s.beaten[i] : b))
-      return { ...base, ...s, beaten, records: s.records || {}, badges: s.badges || {}, encore: s.encore || {}, bossDeaths: s.bossDeaths || {} }
+      return { ...base, ...s, beaten, records: s.records || {}, badges: s.badges || {}, encore: s.encore || {}, bossDeaths: s.bossDeaths || {}, challenges: s.challenges || {} }
     }
   } catch {
     // No save yet, or storage is blocked.
@@ -76,6 +88,7 @@ export class TadcGame {
     this.msel = 0
     this.osel = 0
     this.gsel = 0
+    this.csel = 0
     this.psel = 0
     this.gameoverSel = 0
     this.paused = false
@@ -201,6 +214,47 @@ export class TadcGame {
     this.beginBoss(practiceIdx ?? 0, false)
   }
 
+  startChallenge(k) {
+    const ch = CHALLENGES[k]
+    this.run = { mode: 'challenge', diff: ch.diff ?? this.save.diff, time: 0, deaths: 0, splits: [], ch, mods: ch.mods }
+    this.beginBoss(ch.boss, false)
+  }
+
+  update_challenges(dt, pr) {
+    const k = this.st > 0.2 ? this.menuNav(pr, 'csel', CHALLENGES.length) : -1
+    if (k >= 0) this.startChallenge(k)
+    else if (pr('back')) {
+      sfx.back()
+      this.toMenu()
+    }
+  }
+
+  draw_challenges(c) {
+    drawBackground(c, 'menu', this.t)
+    c.fillStyle = 'rgba(12, 6, 20, 0.7)'
+    c.fillRect(0, 0, VW, VH)
+    drawText(c, 'CHALLENGES', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
+    const done = this.save.challenges
+    CHALLENGES.forEach((ch, i) => {
+      const y = 34 + i * 13
+      this.menuLine(c, ch.name, 120, y, this.csel === i, () => ((this.csel = i), sfx.blip(), this.startChallenge(i)), {
+        value: done[ch.name] ? 'DONE!' : '',
+      })
+    })
+    const ch = CHALLENGES[this.csel || 0]
+    // The boss for the selected challenge, standing on the left.
+    const spr = SPR[BOSSES[ch.boss].key]
+    drawSprite(c, spr, 56 - spr.ax, 112 - spr.length + Math.round(Math.sin(this.t * 2)), { look: [Math.sin(this.t * 0.8), 0.3] })
+    c.fillStyle = '#f4f4f4'
+    c.fillRect(20, 112, 72, 1)
+    drawText(c, ch.about, VW / 2, 120, { align: 'center', color: '#68d8f8' })
+    if (ch.diff !== undefined) drawText(c, `(ALWAYS ON ${DIFFS[ch.diff].name})`, VW / 2, 130, { align: 'center', color: DIFFS[ch.diff].color })
+    const n = CHALLENGES.filter((x) => done[x.name]).length
+    drawText(c, `DONE: ${n}/${CHALLENGES.length}   ALL 6 = A BADGE AND AN OUTFIT!`, VW / 2, 148, { align: 'center', color: '#c8b8e0' })
+    drawText(c, 'B: BACK', VW - 4, 167, { align: 'right', color: '#8c8c9c' })
+    this.hits.push({ x: VW - 44, y: 158, w: 44, h: 18, fn: () => this.pressed.add('back') })
+  }
+
   startEncore() {
     this.run = { mode: 'encore', diff: this.save.diff, time: 0, deaths: 0, splits: [] }
     this.beginBoss(BOSSES.findIndex((b) => b.encore), false)
@@ -215,7 +269,7 @@ export class TadcGame {
     this.haz = []
     this.parts = []
     this.floats = []
-    this.conveyor = 0
+    this.conveyor = (this.run.mods && this.run.mods.conveyor) || 0
     this.floorScroll = 0
     this.slip = false
     this.pomniSay = null
@@ -309,8 +363,19 @@ export class TadcGame {
       if (pb && pb[i] !== undefined) this.splitDelta = this.run.time - pb[i]
     }
     this.newBadge = null
+    if (this.run.mode === 'challenge' && !this.run.slow) {
+      const done = this.save.challenges
+      if (!done[this.run.ch.name]) this.newBadge = `${this.run.ch.name} DONE`
+      done[this.run.ch.name] = true
+      if (CHALLENGES.every((x) => done[x.name]) && !this.save.badges.showstopper) {
+        this.save.badges.showstopper = true
+        this.newBadge = 'SHOWSTOPPER'
+      }
+      this.persist()
+      return
+    }
     // Practising just one part is great training, but only a whole fight (at full speed) counts.
-    if (this.run.part || this.run.slow) return
+    if (this.run.part || this.run.slow || this.run.mode === 'challenge') return
     this.save.beaten[i] = Math.max(this.save.beaten[i], this.run.diff)
     this.save.reached = Math.max(this.save.reached, Math.min(4, i + 1))
     if (this.boss.key === 'zooble' && !this.save.badges.zooble) {
@@ -398,8 +463,9 @@ export class TadcGame {
     const dt = Math.min(0.1, (now - this.last) / 1000)
     this.last = now
     // Slow motion (an assist option) slows down the fights, but not the menus.
-    const slow = this.save.slow && (this.state === 'fight' || this.state === 'countdown')
-    this.acc += slow ? dt * 0.75 : dt
+    const playing = this.state === 'fight' || this.state === 'countdown'
+    const speed = playing ? (this.save.slow ? 0.75 : 1) * ((this.run && this.run.mods && this.run.mods.speed) || 1) : 1
+    this.acc += dt * speed
     let first = true
     while (this.acc >= STEP) {
       this.update(STEP)
@@ -495,11 +561,12 @@ export class TadcGame {
 
   // ENCORE appears on the menu once you've beaten the game.
   menuItems() {
-    return this.save.badges.cleared ? [...MENU, 'ENCORE'] : MENU
+    return this.save.badges.cleared ? [...MENU, 'ENCORE', 'CHALLENGES'] : MENU
   }
 
   menuPick(k) {
     if (k === 4) this.startEncore()
+    else if (k === 5) this.setState('challenges')
     else if (k === 0) this.startRun()
     else if (k === 1) this.setState('howto')
     else if (k === 2) this.setState('bosses')
@@ -579,6 +646,7 @@ export class TadcGame {
       ['ENCORE STAR', b.encoreStar, 'REACH WAVE 10 IN ENCORE.'],
       ['PERFECT RUN', b.perfect, 'NO DEATHS ON HARD OR INSANE.'],
       ['INSANE CLEAR', b.insane, 'BEAT INSANE MODE.'],
+      ['SHOWSTOPPER', b.showstopper, b.cleared ? 'FINISH ALL 6 CHALLENGES.' : '???'],
     ]
   }
 
@@ -604,6 +672,7 @@ export class TadcGame {
       ['DAREDEVIL', b.daredevil, 'GET 100 CLOSE CALLS'],
       ['SPEEDY', b.speedy, 'A FULL RUN UNDER 6:30'],
       ['STAR', b.encoreStar, 'REACH WAVE 10 IN ENCORE'],
+      ['SHOWSTOPPER', b.showstopper, 'FINISH ALL 6 CHALLENGES'],
     ]
   }
 
@@ -806,7 +875,9 @@ export class TadcGame {
       minX: 2,
       maxX: b.key === 'caine' ? VW - 2 : b.key === 'gangle' || b.key === 'kinger' ? b.x - 28 : b.x - 4,
       slip: this.slip,
+      ice: !!(this.run.mods && this.run.mods.ice),
       conveyor: this.conveyor,
+      grav: this.run.mods && this.run.mods.grav,
     })
     b.updateFight(dt)
     for (const h of this.haz) h.update(dt, this)
@@ -891,6 +962,9 @@ export class TadcGame {
       if (this.run.mode === 'practice') {
         this.toMenu()
         this.setState('bosses')
+      } else if (this.run.mode === 'challenge') {
+        this.toMenu()
+        this.setState('challenges')
       } else if (this.bossIdx < 4) this.showMap(this.bossIdx + 1)
       else {
         this.finishRun()
@@ -1166,12 +1240,13 @@ export class TadcGame {
 
     if (menuOn && this.helpT <= 0) {
       const items = this.menuItems()
-      const gap = items.length > 4 ? 11 : 13
+      const gap = items.length > 4 ? 10 : 13
       items.forEach((m, i) => this.menuLine(c, m, 178, 72 + i * gap, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i))))
       const d = DIFFS[this.save.diff]
-      drawText(c, `MODE: ${d.name}`, 178, 128, { color: d.color })
+      const my = items.length > 4 ? 134 : 128
+      drawText(c, `MODE: ${d.name}`, 178, my, { color: d.color })
       const rec = this.save.records[d.name]
-      if (rec && rec.any) drawText(c, `BEST ${fmtTime(rec.any)}`, 178, 136, { color: '#c8b8e0' })
+      if (rec && rec.any) drawText(c, `BEST ${fmtTime(rec.any)}`, 178, my + 8, { color: '#c8b8e0' })
       drawText(c, 'A = Z / SPACE    START = ENTER', VW / 2, 167, { align: 'center', color: '#8c8c9c' })
     } else if (!menuOn && s > 1) {
       drawText(c, 'PRESS A', VW / 2, 167, { align: 'center', color: Math.floor(this.t * 2) % 2 ? '#8c8c9c' : '#4c4c5c' })
@@ -1341,14 +1416,14 @@ export class TadcGame {
     const badges = this.badgeList()
     drawText(c, `BADGES ${badges.filter(([, got]) => got).length}/${badges.length}`, 24, 98, { color: '#8c8c9c' })
     badges.forEach(([name, got], i) => {
-      const x = i < 4 ? 24 : 168
-      const y = 108 + (i % 4) * 9
+      const x = i < 5 ? 24 : 168
+      const y = 107 + (i % 5) * 8
       drawSprite(c, SPR.star, x, y - 1, { mode: got ? 'normal' : 'shadow' })
       drawText(c, name, x + 12, y, { color: got ? '#f8c830' : '#4c4c5c' })
     })
     // A hint for the next badge you could get.
     const next = badges.find(([, got]) => !got)
-    if (next) drawText(c, `NEXT BADGE: ${next[2]}`, 24, 145, { color: '#68d8f8' })
+    if (next) drawText(c, `NEXT BADGE: ${next[2]}`, 24, 148, { color: '#68d8f8' })
     drawText(c, `TOTAL DEATHS: ${this.save.deaths}   RUNS: ${this.save.runs}`, VW / 2, 158, { align: 'center', color: '#c8b8e0' })
     // Your nemesis: the boss that got you the most times.
     const bd = this.save.bossDeaths
@@ -1457,6 +1532,7 @@ export class TadcGame {
     for (const m of b.marks) c.fillRect(5 + Math.round(102 * (1 - m)), 11, 1, 6)
     if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 3, { align: 'center', color: '#f4f4f4' })
     if (this.run.mode === 'practice') drawText(c, 'PRACTICE', VW / 2, 3, { align: 'center', color: '#68d8f8' })
+    if (this.run.mode === 'challenge') drawText(c, this.run.ch.name, VW / 2, 3, { align: 'center', color: '#e03c9c' })
     if (this.save.slow) drawText(c, 'SLOW-MO', VW / 2, 11, { align: 'center', color: '#68d8f8' })
     const d = DIFFS[this.run.diff]
     drawText(c, d.name, VW - 4, 3, { align: 'right', color: d.color })
@@ -1512,7 +1588,7 @@ export class TadcGame {
     if (k > 0 && this.st < 1.9) {
       c.save()
       c.globalAlpha = k
-      drawText(c, info.bonus ? 'SECRET BONUS BOSS' : `BOSS ${this.bossIdx + 1} / 5`, VW / 2, 62, { align: 'center', color: info.bonus ? '#e03c9c' : '#8c8c9c' })
+      drawText(c, this.run.mode === 'challenge' ? `CHALLENGE: ${this.run.ch.name}` : info.bonus ? 'SECRET BONUS BOSS' : `BOSS ${this.bossIdx + 1} / 5`, VW / 2, 62, { align: 'center', color: info.bonus ? '#e03c9c' : '#8c8c9c' })
       drawText(c, info.name, VW / 2, 71, { scale: 3, align: 'center', color: '#f4f4f4', shadow: '#d82838' })
       drawText(c, info.title, VW / 2, 91, { align: 'center', color: '#f8c830' })
       c.restore()
@@ -1524,6 +1600,7 @@ export class TadcGame {
     this.drawArena(c)
     this.drawPomniNormal(c)
     this.drawFx(c)
+    this.drawDark(c)
     this.drawHud(c)
     const n = 3 - Math.floor(this.st / 0.6)
     if (n >= 1) {
@@ -1532,10 +1609,32 @@ export class TadcGame {
     }
   }
 
+  // LIGHTS OUT: everything is dark except a little circle of light around Pomni.
+  drawDark(c) {
+    if (!(this.run.mods && this.run.mods.dark)) return
+    const p = this.pomni
+    const x = p.x + p.w / 2
+    const y = p.y + p.h / 2
+    c.save()
+    for (const [r, a] of [[78, 0.55], [62, 0.92]]) {
+      c.beginPath()
+      c.rect(0, 0, VW, VH)
+      c.arc(x, y, r, 0, Math.PI * 2, true)
+      c.fillStyle = `rgba(4, 2, 10, ${a})`
+      c.fill('evenodd')
+    }
+    c.restore()
+    // The boss's eyes still glint in the dark...
+    const b = this.boss
+    c.fillStyle = '#f4f4f4'
+    if (Math.floor(this.t * 1.5) % 4) for (const e of b.spr.eyes || []) c.fillRect(Math.round(b.x + e[0]), Math.round(b.y + e[1]), 1, 1)
+  }
+
   draw_fight(c) {
     this.drawArena(c)
     this.drawPomniNormal(c)
     this.drawFx(c)
+    this.drawDark(c)
     this.drawHud(c)
     if (this.boss.time < 4 && Math.floor(this.t * 3) % 4) drawText(c, this.boss.tip, VW / 2, 164, { align: 'center', color: '#f8c830' })
     if (this.finalBanner && this.t - this.finalBanner < 2 && Math.floor(this.t * 8) % 2) {
@@ -1632,7 +1731,7 @@ export class TadcGame {
       }
     }
     if (this.st > fanAt + 1.6 && Math.floor(this.t * 2) % 2) {
-      const next = this.run.mode === 'practice' ? 'BACK TO BOSSES' : this.bossIdx < 4 ? 'NEXT BOSS' : 'CONTINUE'
+      const next = this.run.mode === 'practice' ? 'BACK TO BOSSES' : this.run.mode === 'challenge' ? 'BACK TO CHALLENGES' : this.bossIdx < 4 ? 'NEXT BOSS' : 'CONTINUE'
       drawText(c, `A: ${next}`, VW / 2, 162, { align: 'center' })
     }
   }

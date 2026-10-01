@@ -41,9 +41,11 @@ export class Pomni {
     if (dir && dir === Math.sign(this.face)) this.holdT += dt
     else if (!dir) this.holdT = 0
     const slip = world.slip
-    const max = (this.holdT > 0.35 ? RUN : WALK) * (slip ? 1.35 : 1)
-    const accel = this.onGround ? (slip ? 120 : 950) : 700
-    const decel = this.onGround ? (slip ? 22 : 1200) : 380
+    // Ice (a challenge) is slippery too, but not as wild as Bubble's goo.
+    const ice = world.ice && !slip && this.onFloor
+    const max = (this.holdT > 0.35 ? RUN : WALK) * (slip ? 1.35 : ice ? 1.15 : 1)
+    const accel = this.onGround ? (slip ? 120 : ice ? 340 : 950) : 700
+    const decel = this.onGround ? (slip ? 22 : ice ? 130 : 1200) : 380
     if (dir) {
       if (Math.sign(this.vx) !== dir) this.holdT = 0
       this.vx = clamp(this.vx + dir * accel * dt, -max, max)
@@ -63,7 +65,8 @@ export class Pomni {
       sfx.jump()
     }
     // Letting go of jump early makes a smaller hop.
-    const g = !input.jump && this.vy < 0 ? GRAV * 2.2 : GRAV
+    // (world.grav: less than 1 on the moon.)
+    const g = (!input.jump && this.vy < 0 ? GRAV * 2.2 : GRAV) * (world.grav || 1)
     this.vy = Math.min(420, this.vy + g * dt)
 
     // The floor can be a treadmill, and pillows carry whoever stands on them.
@@ -162,6 +165,7 @@ export const OUTFITS = {
   'DAREDEVIL': { [BLUE]: '#2c2c3c', [RED]: '#d82838', [GOLD]: '#f88828' },
   'SPEEDY': { [BLUE]: '#38b848', [RED]: '#f8c830', [GOLD]: '#68d8f8' },
   'STAR': { [BLUE]: '#cc243c', [RED]: '#f4d474', [GOLD]: '#f4f4f4', [PUPIL]: '#2a4ad8' },
+  'SHOWSTOPPER': { [BLUE]: '#8848c8', [RED]: '#38b848', [GOLD]: '#f88828', [PUPIL]: '#2c5ce0' },
 }
 let outfit = 'CLASSIC'
 export function setOutfit(name) {
