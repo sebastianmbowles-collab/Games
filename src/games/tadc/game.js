@@ -1387,6 +1387,13 @@ export class TadcGame {
     this.drawGloinks(c)
     for (const f of this.floats) drawText(c, f.text, f.x, f.y, { scale: 2, align: 'center', color: f.color })
     if (menuOn && this.helpT <= 0) {
+      // Your badge collection, in the corner.
+      const badges = this.badgeList()
+      const got = badges.filter(([, ok]) => ok).length
+      if (got) {
+        drawSprite(c, SPR.star, VW - 38, 158)
+        drawText(c, `${got}/${badges.length}`, VW - 28, 159, { color: '#f8c830' })
+      }
       const items = this.menuItems()
       const gap = items.length > 4 ? 10 : 13
       items.forEach((m, i) => this.menuLine(c, m, 178, 72 + i * gap, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i))))
