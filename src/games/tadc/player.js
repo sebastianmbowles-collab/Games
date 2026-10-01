@@ -191,11 +191,13 @@ function dress(spr, name = outfit) {
 }
 
 // Draw a Pomni frame with her feet at (cx, bottom). Her body stays centred whatever the pose.
-export function drawPomni(c, spr, cx, bottom, flip = false, { scale = 1, sy = 1, mode, rot = 0, alpha = 1, look = [0, 0], wear } = {}) {
+export function drawPomni(c, spr, cx, bottom, flip = false, { scale = 1, sy = 1, mode, rot = 0, alpha = 1, look = [0, 0], wear, blink } = {}) {
+  // Pomni blinks too (but not when she's scared: then her eyes are wide open).
+  if (blink === undefined) blink = spr !== SPR.pomniScared && spr !== SPR.pomniFall && performance.now() % 3300 < 110
   spr = dress(spr, wear)
   const w = spr[0].length * scale
   const ax = spr.ax * scale
   const h = spr.length * scale * sy
   const x = Math.round(flip ? cx - (w - ax) : cx - ax)
-  drawSprite(c, spr, x, Math.round(bottom - h), { flip, scale, sy, mode, rot, alpha, look })
+  drawSprite(c, spr, x, Math.round(bottom - h), { flip, scale, sy, mode, rot, alpha, look, blink })
 }

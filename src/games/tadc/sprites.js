@@ -99,7 +99,8 @@ function build(rows, mode) {
 
 // mode: 'normal', 'white' (flash), 'shadow' (silhouette) or 'glitch' (distorted colors).
 // look: where the pupils point. Either a point on screen { x, y } (they stare at it) or [dx, dy] from -1 to 1.
-export function drawSprite(c, rows, x, y, { scale = 1, sy = 1, flip = false, mode = 'normal', alpha = 1, rot = 0, look = null } = {}) {
+// blink: eyes closed (a little line instead of pupils).
+export function drawSprite(c, rows, x, y, { scale = 1, sy = 1, flip = false, mode = 'normal', alpha = 1, rot = 0, look = null, blink = false } = {}) {
   let entry = cache.get(rows)
   if (!entry) {
     entry = {}
@@ -127,16 +128,23 @@ export function drawSprite(c, rows, x, y, { scale = 1, sy = 1, flip = false, mod
   if (rows.eyes && rows.eyes.length && mode !== 'shadow' && !rot) {
     c.save()
     c.globalAlpha *= alpha
-    drawPupils(c, rows, Math.round(x), Math.round(y), w, scale, sy, flip, mode, look)
+    drawPupils(c, rows, Math.round(x), Math.round(y), w, scale, sy, flip, mode, look, blink)
     c.restore()
   }
 }
 
 // The pupils are drawn on top of the sprite, nudged towards whatever the character is looking at.
-function drawPupils(c, rows, x, y, w, scale, sy, flip, mode, look) {
+function drawPupils(c, rows, x, y, w, scale, sy, flip, mode, look, blink) {
   for (const [ex, ey, ew, eh, col, rx, ry] of rows.eyes) {
     const cx = x + (flip ? w - ex * scale : ex * scale)
     const cy = y + ey * scale * sy
+    if (blink) {
+      // Closed eye: a short dark line across where the eye is.
+      const half = Math.max(1, Math.round((rx + ew / 2) * scale))
+      c.fillStyle = '#140c1c'
+      c.fillRect(Math.round(cx - half), Math.round(cy), half * 2, Math.max(1, Math.round(scale)))
+      continue
+    }
     let ux = 0
     let uy = 0
     if (look && look.x !== undefined) {

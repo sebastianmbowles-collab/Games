@@ -238,7 +238,9 @@ class Boss {
     // Keep the body in the same place whichever pose is showing, and keep an eye on Pomni.
     // (entranceY: how far above the stage the boss still is while making an entrance.)
     const y = this.y + this.h - pose.length + bob + (throwing ? 1 : 0) + Math.round(this.entranceY || 0)
-    drawSprite(c, pose, this.x + this.spr.ax - pose.ax + lean, y, { look: this.lookAt() })
+    // Everyone blinks now and then (each at their own moment).
+    const blink = (t + this.x * 0.37) % 3.9 < 0.12 && this.mood !== 'pleased'
+    drawSprite(c, pose, this.x + this.spr.ax - pose.ax + lean, y, { look: this.lookAt(), blink })
     if (this.mood === 'pleased') {
       c.fillStyle = '#f8c830'
       for (let i = 0; i < 3; i++) c.fillRect(Math.round(this.x + this.spr.ax - 10 + i * 8), Math.round(this.y - 6 - Math.abs(Math.sin(t * 6 + i)) * 4), 2, 2)
@@ -740,7 +742,7 @@ class Caine extends Boss {
   }
   draw(c, t) {
     super.draw(c, t)
-    drawSprite(c, SPR.bubble, this.bub.x, this.bub.y + Math.round(Math.sin(t * 3)), { look: this.lookAt() })
+    drawSprite(c, SPR.bubble, this.bub.x, this.bub.y + Math.round(Math.sin(t * 3)), { look: this.lookAt(), blink: (t + 1.3) % 4.4 < 0.12 })
   }
 }
 
