@@ -888,6 +888,7 @@ export class TadcGame {
   }
 
   update_map(dt, pr) {
+    if (this.st >= 0.3 && this.st - dt < 0.3) sfx.talk('caine', 'WELCOME TO THE BOSS RUSH')
     if (this.st >= 1.0 && this.st - dt < 1.0) sfx.step()
     if (this.st >= 2.6 && this.st - dt < 2.6) sfx.dunDunDun()
     if (this.st > 3.6 || (this.st > 0.4 && (pr('confirm') || pr('start')))) this.beginBoss(this.mapTo, false)
@@ -969,6 +970,14 @@ export class TadcGame {
     const walking = k > 0 && k < 1
     const frame = walking ? (Math.floor(t * 8) % 2 ? SPR.pomniRun1 : SPR.pomniRun2) : SPR.pomniIdle
     drawPomni(c, frame, px, py + 3, false, { look: [1, 0] })
+    // Caine pops in to set the scene.
+    if (this.st > 0.3) {
+      const lines = ['WELCOME TO THE BOSS RUSH!', 'ONE DOWN! FOUR TO GO!', 'HALFWAY THERE, SUPERSTAR!', 'ALMOST AT THE BIG TOP!', 'NOW... THE FINAL SHOW!']
+      const ci = SPR.iconCaine
+      const bob = Math.round(Math.sin(this.t * 3) * 2)
+      drawSprite(c, ci, 8, 30 + bob, { look: [1, 0.3] })
+      this.bubble(c, lines[this.mapTo], 8 + ci[0].length + 50, 44)
+    }
     const info = BOSSES[this.mapTo]
     drawText(c, `NEXT: ${info.name}`, VW / 2, 154, { align: 'center', color: '#f4f4f4' })
     if (this.run && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 164, { align: 'center', color: '#8c8c9c' })
