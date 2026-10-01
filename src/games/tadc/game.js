@@ -214,6 +214,7 @@ export class TadcGame {
   // Touch buttons from the page: 'left', 'right', 'jump' (the A button) and 'start'.
   setTouch(a, down) {
     this.wake()
+    this.usedTouch = true
     const acts = a === 'jump' ? ['jump', 'confirm'] : a === 'start' ? ['start'] : [a]
     for (const x of acts) {
       if (down && !this.touchHeld[x]) this.pressed.add(x)
@@ -1423,7 +1424,8 @@ export class TadcGame {
       drawText(c, `MODE: ${d.name}`, 178, my, { color: d.color })
       const rec = this.save.records[d.name]
       if (rec && rec.any) drawText(c, `BEST ${fmtTime(rec.any)}`, 178, my + 8, { color: '#c8b8e0' })
-      drawText(c, 'A = Z / SPACE    START = ENTER', VW / 2, 167, { align: 'center', color: '#8c8c9c' })
+      const hint = this.usedTouch ? 'A BUTTON = JUMP    START = PAUSE' : 'A = Z / SPACE    START = ENTER'
+      drawText(c, hint, VW / 2, 167, { align: 'center', color: '#8c8c9c' })
     } else if (!menuOn && s > 1) {
       drawText(c, 'PRESS A', VW / 2, 167, { align: 'center', color: Math.floor(this.t * 2) % 2 ? '#8c8c9c' : '#4c4c5c' })
     }
