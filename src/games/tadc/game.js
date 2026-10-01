@@ -438,6 +438,11 @@ export class TadcGame {
     this.persist()
   }
 
+  // Little dust clouds at Pomni's feet.
+  dust(x, y, n = 3) {
+    for (let i = 0; i < n; i++) this.parts.push({ x: x + rand(-4, 4), y, vx: rand(-30, 30), vy: rand(-40, -10), life: rand(0.2, 0.35), color: '#c8b8e0' })
+  }
+
   puff(x, y, colors, n) {
     for (let i = 0; i < n; i++) this.parts.push({ x, y, vx: rand(-70, 70), vy: rand(-120, -20), life: rand(0.35, 0.8), color: colors[i % colors.length] })
   }
@@ -637,7 +642,13 @@ export class TadcGame {
   }
 
   update_howto(dt, pr) {
-    if (this.st > 0.2 && (pr('confirm') || pr('back') || pr('start'))) {
+    if (this.st < 0.2) return
+    // Page 1: the basics. Page 2: all the extras.
+    if (pr('confirm') && !this.howPage) {
+      this.howPage = 1
+      sfx.blip()
+    } else if (pr('confirm') || pr('back') || pr('start')) {
+      this.howPage = 0
       sfx.back()
       this.toMenu()
     }
@@ -932,6 +943,8 @@ export class TadcGame {
     }
     const p = this.pomni
     const b = this.boss
+    const wasGround = p.onGround
+    const wasVx = p.vx
     this.floorScroll += this.conveyor * dt
     p.update(dt, { left: this.held('left'), right: this.held('right'), jump: this.held('jump'), jumpPressed: pr('jump') }, {
       platforms: this.platforms,
@@ -942,6 +955,8 @@ export class TadcGame {
       conveyor: this.conveyor,
       grav: this.run.mods && this.run.mods.grav,
     })
+    // Dust when she lands, jumps, or sets off running.
+    if (p.onGround !== wasGround || (p.onGround && Math.abs(wasVx) < 5 && Math.abs(p.vx) >= 5)) this.dust(p.x + p.w / 2, p.y + p.h, p.onGround && !wasGround ? 4 : 2)
     b.updateFight(dt)
     for (const h of this.haz) h.update(dt, this)
     this.haz = this.haz.filter((h) => !h.dead)
@@ -1321,6 +1336,42 @@ export class TadcGame {
   // ---------- How to play (an old game manual) ----------
 
   draw_howto(c) {
+    if (this.howPage) return this.drawExtras(c)
+    this.drawHowto(c)
+  }
+
+  drawExtras(c) {
+    c.fillStyle = '#2a1040'
+    c.fillRect(0, 0, VW, VH)
+    c.fillStyle = INK
+    c.fillRect(6, 6, VW - 12, VH - 12)
+    c.fillStyle = '#f4e8d0'
+    c.fillRect(8, 8, VW - 16, VH - 16)
+    c.fillStyle = '#e4d4b4'
+    for (let y = 28; y < VH - 10; y += 8) c.fillRect(10, y, VW - 20, 1)
+    drawText(c, 'EXTRAS', VW / 2, 12, { scale: 2, align: 'center', color: '#d82838', shadow: INK })
+    const lines = [
+      ['PRACTICE', 'IN BOSSES, UP/DOWN PICKS WHICH PART TO PLAY.'],
+      ['OUTFITS', 'EARN BADGES, THEN DRESS UP POMNI IN OPTIONS.'],
+      ['HELPERS', 'CALM MODE AND SLOW MOTION ARE IN OPTIONS.'],
+      ['RECORDS', 'BEST TIMES, SPLITS, BADGES AND YOUR NEMESIS.'],
+      ['', ''],
+      ['UNLOCK', 'BEAT ALL FIVE BOSSES TO UNLOCK...'],
+      ['', 'ENCORE: EVERY BOSS, AGAIN AND AGAIN.'],
+      ['', 'CHALLENGES: BOSSES WITH A TWIST.'],
+      ['', 'AND A SECRET BONUS BOSS!'],
+    ]
+    lines.forEach(([a, b], i) => {
+      const y = 32 + i * 11
+      drawText(c, a, 20, y, { color: '#d82838', shadow: null })
+      drawText(c, b, 76, y, { color: INK, shadow: null })
+    })
+    drawText(c, 'PSST... TRY A SECRET CODE ON THE TITLE SCREEN.', VW / 2, 138, { align: 'center', color: '#8848c8', shadow: null })
+    if (Math.floor(this.t * 2) % 2) drawText(c, 'PRESS A TO GO BACK', VW / 2, 154, { align: 'center', color: '#8c6c4c', shadow: null })
+    this.hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => this.pressed.add('back') })
+  }
+
+  drawHowto(c) {
     c.fillStyle = '#2a1040'
     c.fillRect(0, 0, VW, VH)
     c.fillStyle = INK
@@ -1363,8 +1414,8 @@ export class TadcGame {
     const lines = ['WATCH THE BOSS.', 'WATCH THE FLOOR.', 'WATCH THE AIR.', 'WATCH EVERYTHING.']
     lines.forEach((l, i) => drawText(c, l, 92, 92 + i * 9, { color: i === 3 ? '#d82838' : INK, shadow: null }))
     drawText(c, 'GOOD LUCK, POMNI.', VW / 2, 134, { scale: 2, align: 'center', color: '#2c5ce0', shadow: INK })
-    if (Math.floor(this.t * 2) % 2) drawText(c, 'PRESS A TO GO BACK', VW / 2, 154, { align: 'center', color: '#8c6c4c', shadow: null })
-    this.hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => this.pressed.add('back') })
+    if (Math.floor(this.t * 2) % 2) drawText(c, 'A: NEXT PAGE   B: BACK', VW / 2, 154, { align: 'center', color: '#8c6c4c', shadow: null })
+    this.hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => this.pressed.add('confirm') })
   }
 
   // ---------- Boss gallery ----------
