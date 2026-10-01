@@ -274,7 +274,7 @@ export class TadcGame {
       const name = DIFFS[this.run.diff].name
       const best = this.save.encore[name]
       const b = this.boss
-      this.encoreResult = { time: b.time, wave: b.wave, best: best ? best.time : 0, isNew: !best || b.time > best.time }
+      this.encoreResult = { time: b.time, wave: b.wave, best: best ? best.time : 0, isNew: !this.run.slow && (!best || b.time > best.time) }
       if (this.encoreResult.isNew) this.save.encore[name] = { time: b.time, wave: b.wave }
       this.persist()
     }
@@ -306,8 +306,8 @@ export class TadcGame {
       if (pb && pb[i] !== undefined) this.splitDelta = this.run.time - pb[i]
     }
     this.newBadge = null
-    // Practising just one part is great training, but only a whole fight counts.
-    if (this.run.part) return
+    // Practising just one part is great training, but only a whole fight (at full speed) counts.
+    if (this.run.part || this.run.slow) return
     this.save.beaten[i] = Math.max(this.save.beaten[i], this.run.diff)
     this.save.reached = Math.max(this.save.reached, Math.min(4, i + 1))
     if (this.boss.key === 'zooble' && !this.save.badges.zooble) {
@@ -327,7 +327,8 @@ export class TadcGame {
     const rec = (this.save.records[name] ||= {})
     const segs = r.splits.map((t, i) => t - (i ? r.splits[i - 1] : 0))
     this.results = { time: r.time, deaths: r.deaths, diff: name, news: [], badges: [], segs, gold: [] }
-    if (r.mode === 'run') {
+    if (r.slow) this.results.badges.push('SLOW-MO RUN: NOT RECORDED')
+    if (r.mode === 'run' && !r.slow) {
       // Gold splits: the fastest you've ever beaten each boss, one boss at a time.
       rec.gold = rec.gold || []
       segs.forEach((s, i) => {
@@ -387,7 +388,9 @@ export class TadcGame {
   loop(now) {
     const dt = Math.min(0.1, (now - this.last) / 1000)
     this.last = now
-    this.acc += dt
+    // Slow motion (an assist option) slows down the fights, but not the menus.
+    const slow = this.save.slow && (this.state === 'fight' || this.state === 'countdown')
+    this.acc += slow ? dt * 0.75 : dt
     let first = true
     while (this.acc >= STEP) {
       this.update(STEP)
@@ -548,6 +551,7 @@ export class TadcGame {
       ['SOUND FX', s.sfx ? 'ON' : 'OFF', () => setSfxOn((s.sfx = !s.sfx))],
       ['SPEEDRUN TIMER', s.timer ? 'ON' : 'OFF', () => (s.timer = !s.timer)],
       ['CALM MODE', s.calm ? 'ON' : 'OFF', () => (s.calm = !s.calm)],
+      ['SLOW MOTION', s.slow ? 'ON' : 'OFF', () => (s.slow = !s.slow)],
       ['RECORDS', '', () => this.setState('records')],
       ['RESET SAVE', this.resetArm ? 'SURE? PRESS AGAIN' : '', () => this.resetSave()],
       ['BACK', '', () => this.toMenu()],
@@ -655,6 +659,7 @@ export class TadcGame {
   }
 
   update_fight(dt, pr) {
+    if (this.save.slow) this.run.slow = true
     if (pr('start')) {
       this.pause()
       return
@@ -1091,9 +1096,10 @@ export class TadcGame {
     const d = DIFFS[this.save.diff]
     const blurbs = ['SLOWER ATTACKS. BIG SAFE SPACES.', 'THE WAY THE SHOW IS MEANT TO BE.', 'MORE HAZARDS. LESS TIME TO REACT.', 'WHY DID YOU DO THIS TO YOURSELF?']
     const calmRow = this.optionItems().findIndex(([label]) => label === 'CALM MODE')
-    if (this.osel === calmRow) drawText(c, 'NO SCREEN SHAKE, NO BIG FLASHES.', VW / 2, 150, { align: 'center', color: '#68d8f8' })
-    else drawText(c, blurbs[this.save.diff], VW / 2, 150, { align: 'center', color: d.color })
-    if (this.osel <= 1) drawText(c, '< > OR A TO CHANGE', VW / 2, 162, { align: 'center', color: '#8c8c9c' })
+    if (this.osel === calmRow) drawText(c, 'NO SCREEN SHAKE, NO BIG FLASHES.', VW / 2, 154, { align: 'center', color: '#68d8f8' })
+    else if (this.osel === calmRow + 1) drawText(c, 'FIGHTS AT 3/4 SPEED. (NO RECORDS OR BADGES.)', VW / 2, 154, { align: 'center', color: '#68d8f8' })
+    else drawText(c, blurbs[this.save.diff], VW / 2, 154, { align: 'center', color: d.color })
+    if (this.osel <= 1) drawText(c, '< > OR A TO CHANGE', VW / 2, 165, { align: 'center', color: '#8c8c9c' })
     // A little Pomni shows off the outfit, with the ones still to earn as shadows.
     drawPomni(c, SPR.pomniWave, 272, 132, true, { scale: 2, look: [-0.6, 0] })
     const list = this.outfitList()
@@ -1244,6 +1250,7 @@ export class TadcGame {
     for (const m of b.marks) c.fillRect(5 + Math.round(102 * (1 - m)), 11, 1, 6)
     if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 3, { align: 'center', color: '#f4f4f4' })
     if (this.run.mode === 'practice') drawText(c, 'PRACTICE', VW / 2, 3, { align: 'center', color: '#68d8f8' })
+    if (this.save.slow) drawText(c, 'SLOW-MO', VW / 2, 11, { align: 'center', color: '#68d8f8' })
     const d = DIFFS[this.run.diff]
     drawText(c, d.name, VW - 4, 3, { align: 'right', color: d.color })
     if (this.run.mode === 'run') drawText(c, `DEATHS ${this.run.deaths}`, VW - 4, 11, { align: 'right', color: '#c8b8e0' })
@@ -1259,6 +1266,7 @@ export class TadcGame {
     c.fillStyle = '#e03c9c'
     c.fillRect(5, 12, Math.round(102 * b.waveProgress), 4)
     drawText(c, fmtTime(b.time), VW / 2, 3, { align: 'center', color: '#f4f4f4' })
+    if (this.save.slow) drawText(c, 'SLOW-MO', VW / 2, 11, { align: 'center', color: '#68d8f8' })
     const d = DIFFS[this.run.diff]
     drawText(c, d.name, VW - 4, 3, { align: 'right', color: d.color })
     const best = this.save.encore[d.name]
