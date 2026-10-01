@@ -103,9 +103,12 @@ export class TadcGame {
     this.onKey = this.onKey.bind(this)
     this.onKeyUp = this.onKeyUp.bind(this)
     this.onPointer = this.onPointer.bind(this)
+    this.onBlur = this.onBlur.bind(this)
     this.loop = this.loop.bind(this)
     window.addEventListener('keydown', this.onKey)
     window.addEventListener('keyup', this.onKeyUp)
+    window.addEventListener('blur', this.onBlur)
+    document.addEventListener('visibilitychange', this.onBlur)
     canvas.addEventListener('pointerdown', this.onPointer)
     this.acc = 0
     this.last = performance.now()
@@ -116,6 +119,8 @@ export class TadcGame {
     cancelAnimationFrame(this.raf)
     window.removeEventListener('keydown', this.onKey)
     window.removeEventListener('keyup', this.onKeyUp)
+    window.removeEventListener('blur', this.onBlur)
+    document.removeEventListener('visibilitychange', this.onBlur)
     this.canvas.removeEventListener('pointerdown', this.onPointer)
     stopMusic()
   }
@@ -196,6 +201,14 @@ export class TadcGame {
   onKeyUp(e) {
     const acts = KEYMAP[e.key]
     if (acts) for (const a of acts) this.keyHeld[a] = false
+  }
+
+  // Switched to another tab or window? Let go of every key, and pause the fight.
+  onBlur() {
+    if (document.visibilityState === 'visible' && document.hasFocus()) return
+    this.keyHeld = {}
+    this.touchHeld = {}
+    if (!this.paused && (this.state === 'fight' || this.state === 'countdown')) this.pause()
   }
 
   // Touch buttons from the page: 'left', 'right', 'jump' (the A button) and 'start'.
