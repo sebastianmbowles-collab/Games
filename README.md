@@ -69,7 +69,9 @@ Hold a direction to run faster. Let go of jump early for a small hop.
 <summary>Secrets (spoilers!)</summary>
 
 - Beat all five bosses to unlock **ENCORE** (every boss again, faster and faster), **CHALLENGES** (bosses with a twist) and a secret bonus boss: **Zooble**.
+- The challenges: LIGHTS OUT, MOON BOUNCE, DOUBLE TIME, TREADMILL, ICE RINK, POGO and NO MERCY. Finish them all for the **SHOWSTOPPER** badge.
 - Beat Kinger without ever touching the floor for the **PILLOW MASTER** badge.
+- Collect every badge for a rainbow **100%** on the title screen.
 - Leave the title screen alone for a while... Pomni might notice you.
 - On the title screen, press **Up Up Down Down Left Right Left Right**.
 
