@@ -232,7 +232,9 @@ class Boss {
     let pose = throwing && SPR[this.key + 'Throw'] ? SPR[this.key + 'Throw'] : this.spr
     // Beaten: everyone reacts their own way (Gangle's mask even flips to the happy one).
     if (this.mood === 'defeated' && SPR[this.key + 'Defeat']) pose = SPR[this.key + 'Defeat']
-    const lean = throwing ? -2 : 0
+    let lean = throwing ? -2 : 0
+    // The finale gets them all worked up: they shake with excitement.
+    if (this.finalAt && this.time >= this.finalAt && this.mood === 'normal' && this.key !== 'caine') lean += Math.floor(t * 30) % 2
     let bob = Math.round(Math.sin(t * 2.4) * 1)
     if (this.mood === 'defeated') bob = this.key === 'jax' ? -Math.round(Math.abs(Math.sin(t * 3)) * 2) : this.key === 'kinger' ? Math.round(Math.sin(t * 30) * 0.6) : 0
     // Keep the body in the same place whichever pose is showing, and keep an eye on Pomni.
