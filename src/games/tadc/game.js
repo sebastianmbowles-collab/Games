@@ -366,6 +366,14 @@ export class TadcGame {
     for (let i = 0; i < n; i++) this.parts.push({ x, y, vx: rand(-70, 70), vy: rand(-120, -20), life: rand(0.35, 0.8), color: colors[i % colors.length] })
   }
 
+  closeCall() {
+    if (this.t - (this.lastClose ?? -9) < 1.6) return
+    this.lastClose = this.t
+    const p = this.pomni
+    this.flash(Math.random() < 0.5 ? 'CLOSE!' : 'PHEW!', p.x + p.w / 2, p.y - 8, '#68d8f8')
+    sfx.blip()
+  }
+
   flash(text, x, y, color = '#f8c830') {
     this.floats.push({ text, x, y, life: 1.2, color })
   }
@@ -535,6 +543,7 @@ export class TadcGame {
       ['MUSIC', s.music ? 'ON' : 'OFF', () => setMusicOn((s.music = !s.music))],
       ['SOUND FX', s.sfx ? 'ON' : 'OFF', () => setSfxOn((s.sfx = !s.sfx))],
       ['SPEEDRUN TIMER', s.timer ? 'ON' : 'OFF', () => (s.timer = !s.timer)],
+      ['CALM MODE', s.calm ? 'ON' : 'OFF', () => (s.calm = !s.calm)],
       ['RECORDS', '', () => this.setState('records')],
       ['RESET SAVE', this.resetArm ? 'SURE? PRESS AGAIN' : '', () => this.resetSave()],
       ['BACK', '', () => this.toMenu()],
@@ -668,10 +677,17 @@ export class TadcGame {
   collide() {
     const p = this.pomni
     const pb = p.box
+    const near = { x: pb.x - 4, y: pb.y - 4, w: pb.w + 8, h: pb.h + 8 }
     let slip = false
     for (const h of this.haz) {
       if (h.kind === 'deadly' || h.kind === 'mine') {
         if (h.hits(pb)) return this.die(h.killer)
+        // A near miss: it came really close, then went away without touching her.
+        if (h.kind === 'deadly' && h.hits(near)) h.close = true
+        else if (h.close && !h.closeDone) {
+          h.closeDone = true
+          this.closeCall()
+        }
       } else if (h.kind === 'platform') {
         const landing = p.vy >= 0 && p.prevBottom <= h.y + 3 && p.y + p.h >= h.y - 1 && p.x + p.w > h.x + 1 && p.x < h.x + h.w - 1
         if (landing) {
@@ -785,7 +801,8 @@ export class TadcGame {
     c.setTransform(1, 0, 0, 1, 0, 0)
     c.imageSmoothingEnabled = false
     this.hits = []
-    if (this.shake > 0 && !this.paused) c.translate(Math.round(rand(-2, 2)), Math.round(rand(-2, 2)))
+    const calm = this.save.calm
+    if (this.shake > 0 && !this.paused && !calm) c.translate(Math.round(rand(-2, 2)), Math.round(rand(-2, 2)))
     const fn = this['draw_' + this.state]
     if (fn) fn.call(this, c)
     c.setTransform(1, 0, 0, 1, 0, 0)
@@ -793,12 +810,13 @@ export class TadcGame {
       this.hits = []
       this.drawPause(c)
     }
+    // Calm mode swaps the big white flash for a soft one, and skips the glitchy stripes.
     if (this.flashT > 0) {
-      c.fillStyle = '#ffffff'
+      c.fillStyle = calm ? 'rgba(255, 255, 255, 0.25)' : '#ffffff'
       c.fillRect(0, 0, VW, VH)
     }
     if (this.wipeT > 0) this.drawWipe(c, this.wipeT / 0.4)
-    if (this.glitch > 0) this.drawGlitch(c)
+    if (this.glitch > 0 && !calm) this.drawGlitch(c)
   }
 
   // A menu line that also works with a mouse click or a finger tap.
@@ -1055,7 +1073,7 @@ export class TadcGame {
         c,
         label,
         80,
-        36 + i * 14,
+        34 + i * 12,
         this.osel === i,
         () => {
           this.osel = i
@@ -1068,7 +1086,9 @@ export class TadcGame {
     )
     const d = DIFFS[this.save.diff]
     const blurbs = ['SLOWER ATTACKS. BIG SAFE SPACES.', 'THE WAY THE SHOW IS MEANT TO BE.', 'MORE HAZARDS. LESS TIME TO REACT.', 'WHY DID YOU DO THIS TO YOURSELF?']
-    drawText(c, blurbs[this.save.diff], VW / 2, 150, { align: 'center', color: d.color })
+    const calmRow = this.optionItems().findIndex(([label]) => label === 'CALM MODE')
+    if (this.osel === calmRow) drawText(c, 'NO SCREEN SHAKE, NO BIG FLASHES.', VW / 2, 150, { align: 'center', color: '#68d8f8' })
+    else drawText(c, blurbs[this.save.diff], VW / 2, 150, { align: 'center', color: d.color })
     if (this.osel <= 1) drawText(c, '< > OR A TO CHANGE', VW / 2, 162, { align: 'center', color: '#8c8c9c' })
     // A little Pomni shows off the outfit, with the ones still to earn as shadows.
     drawPomni(c, SPR.pomniWave, 272, 132, true, { scale: 2, look: [-0.6, 0] })
@@ -1129,7 +1149,7 @@ export class TadcGame {
     // The finale: red warning lights pulse across the stage, in time with the beat.
     const b = this.boss
     if (b && b.finalAt && b.time >= b.finalAt && !b.done && this.state === 'fight') {
-      const pulse = 0.5 + 0.5 * Math.sin(t * 7.5)
+      const pulse = this.save.calm ? 0.3 : 0.5 + 0.5 * Math.sin(t * 7.5)
       // (Purple on Gangle's stage, so the red ribbons stay easy to see.)
       const rgb = this.arenaKey === 'gangle' ? '136, 72, 200' : '216, 40, 56'
       c.fillStyle = `rgba(${rgb}, ${(0.06 + pulse * 0.08).toFixed(3)})`
@@ -1301,7 +1321,7 @@ export class TadcGame {
     if (s < 0.7) {
       // Frozen: Pomni becomes a distorted, glitchy sprite.
       const jx = Math.round(rand(-2, 2))
-      drawPomni(c, p.frame(this.t), p.x + p.w / 2 + jx, p.y + p.h + 1, p.face < 0, { mode: Math.floor(this.t * 20) % 2 ? 'glitch' : 'white' })
+      drawPomni(c, p.frame(this.t), p.x + p.w / 2 + jx, p.y + p.h + 1, p.face < 0, { mode: this.save.calm || Math.floor(this.t * 20) % 2 ? 'white' : 'glitch' })
     } else if (s < 1.65) {
       // ...then she falls over backwards.
       const k = clamp((s - 0.7) / 0.6, 0, 1)
@@ -1330,6 +1350,22 @@ export class TadcGame {
       if (er.isNew) drawText(c, 'NEW BEST!', VW / 2 + 30, 76, { scale: 2, color: Math.floor(this.t * 6) % 2 ? '#38b848' : '#f8c830' })
       else drawText(c, `BEST ${fmtTime(er.best)}`, VW / 2 + 30, 80, { color: '#c8b8e0' })
     } else drawText(c, `NEXT TRY: ATTEMPT ${tries}`, VW / 2, 122, { align: 'center', color: '#f8c830' })
+    // Stuck? After a couple of tries the game gives a hint about whatever got you.
+    if (this.st > 0.6 && tries >= 3) {
+      const hints = {
+        cushion: 'CUSHIONS STAY ON THE FLOOR. WATCH WHERE YOU LAND!',
+        button: 'LOW BUTTONS: JUMP. HIGH BUTTONS: STAY ON THE FLOOR.',
+        ribbon: 'THE FLASHING OUTLINE SHOWS WHERE THE RIBBON GOES.',
+        pillow: 'JUMP ON TOP OF PILLOWS. UP THERE YOU ARE SAFE!',
+        cane: 'WATCH FOR THE GAP IN THE CANE, THEN GO THROUGH IT.',
+        part: 'LOW PARTS: JUMP. HIGH PARTS: STAY ON THE FLOOR.',
+      }
+      let hint = hints[this.killer] || info.tip
+      if (tries >= 6 && Math.floor(this.st / 3) % 2) {
+        hint = this.run.diff > 0 ? 'TOO HARD? TRY EASY MODE IN OPTIONS.' : 'TIP: PRACTISE ONE PART IN THE BOSSES MENU.'
+      }
+      drawText(c, hint, VW / 2, 164, { align: 'center', color: '#68d8f8' })
+    }
     if (this.st > 0.6) {
       this.menuLine(c, 'TRY AGAIN', VW / 2, 134, this.gameoverSel === 0, () => ((this.gameoverSel = 0), this.pressed.add('confirm')), { align: 'center' })
       this.menuLine(c, 'MAIN MENU', VW / 2, 148, this.gameoverSel === 1, () => ((this.gameoverSel = 1), this.pressed.add('confirm')), { align: 'center' })
