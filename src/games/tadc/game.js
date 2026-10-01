@@ -275,6 +275,7 @@ export class TadcGame {
     this.slip = false
     this.pomniSay = null
     this.finalBanner = null
+    this.partBanner = null
     this.boss = makeBoss(this, idx, this.d, 1000 + idx * 97 + this.run.diff * 13)
     // Practising one part: start just before it.
     if (this.run.part && info.parts) this.boss.skipTo(info.parts[this.run.part] - 0.8)
@@ -292,6 +293,11 @@ export class TadcGame {
       this.setState('intro')
       sfx.dunDunDun()
     }
+  }
+
+  newPart(n, of) {
+    this.partBanner = { text: `PART ${n} OF ${of}`, at: this.t }
+    sfx.blip()
   }
 
   finalAttack() {
@@ -1753,6 +1759,8 @@ export class TadcGame {
     this.drawDark(c)
     this.drawHud(c)
     if (this.boss.time < 4 && Math.floor(this.t * 3) % 4) drawText(c, this.boss.tip, VW / 2, 164, { align: 'center', color: '#f8c830' })
+    const pb = this.partBanner
+    if (pb && this.t - pb.at < 1.4 && this.state === 'fight') drawText(c, pb.text, VW / 2, 24, { align: 'center', color: '#f4f4f4' })
     if (this.finalBanner && this.t - this.finalBanner < 2 && Math.floor(this.t * 8) % 2) {
       drawText(c, 'FINAL ATTACK!', VW / 2, 28, { scale: 2, align: 'center', color: '#e03c9c', shadow: INK })
     }

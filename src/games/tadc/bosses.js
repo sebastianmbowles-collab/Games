@@ -203,6 +203,12 @@ class Boss {
       }
     })
     if (this.finalAt && this.time >= this.finalAt && this.time - dt < this.finalAt) this.g.finalAttack()
+    // A little banner when a new part of the show begins (the finale has its own).
+    if (this.parts && this.finalAt) {
+      this.parts.forEach((at, i) => {
+        if (i > 0 && i < this.parts.length - 1 && this.time >= at && this.time - dt < at) this.g.newPart(i + 1, this.parts.length - 1)
+      })
+    }
   }
   idle(dt) {
     this.throwT = Math.max(0, this.throwT - dt)
