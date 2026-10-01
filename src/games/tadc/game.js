@@ -358,6 +358,7 @@ export class TadcGame {
     this.pomniSay = null
     this.finalBanner = null
     this.partBanner = null
+    this.tape = []
     this.boss = makeBoss(this, idx, this.d, 1000 + idx * 97 + this.run.diff * 13)
     // Practising one part: start just before it.
     if (this.run.part && info.parts) this.boss.skipTo(info.parts[this.run.part] - 0.8)
@@ -1176,6 +1177,69 @@ export class TadcGame {
     sfx.pause()
   }
 
+  // ---------- Instant replay: the last few seconds before a hit ----------
+
+  // Every other frame, keep a snapshot of Pomni and the hazards (the last 3 seconds).
+  record() {
+    this.recT = (this.recT || 0) + 1
+    if (this.recT % 2) return
+    const snap = (o) => {
+      const c = Object.create(Object.getPrototypeOf(o))
+      for (const k of Object.keys(o)) {
+        const v = o[k]
+        c[k] = v && typeof v === 'object' && !Array.isArray(v) && k !== 'g' ? { ...v } : v
+      }
+      return c
+    }
+    const p = this.pomni
+    this.tape = this.tape || []
+    this.tape.push({ haz: this.haz.map(snap), p: { x: p.x, y: p.y, w: p.w, h: p.h, face: p.face, frame: p.frame(this.t) }, slip: this.slip, scroll: this.floorScroll })
+    if (this.tape.length > 180) this.tape.shift()
+  }
+
+  startReplay() {
+    // (Freeze the tape as it was at the moment of the hit.)
+    this.replay = { tape: this.tape.slice(-90), i: 0 }
+    this.setState('replay')
+  }
+
+  update_replay(dt, pr) {
+    const r = this.replay
+    // Half speed: one snapshot every two frames of 1/60s.
+    r.i += dt * 30
+    if (r.i >= r.tape.length + 40 || (this.st > 0.3 && (pr('confirm') || pr('back') || pr('start')))) {
+      sfx.back()
+      this.setState('gameover')
+      this.st = 1
+    }
+  }
+
+  draw_replay(c) {
+    const r = this.replay
+    const f = r.tape[Math.min(r.tape.length - 1, Math.floor(r.i))]
+    drawBackground(c, this.arenaKey, this.t * 0.2, f.scroll)
+    drawFloor(c, -f.scroll)
+    drawPlatforms(c, this.platforms)
+    for (const h of f.haz) if (h.kind === 'slip') h.draw(c, this.t)
+    if (this.boss) this.boss.draw(c, this.t)
+    for (const h of f.haz) if (h.kind !== 'slip') h.draw(c, this.t)
+    const p = f.p
+    drawPomni(c, p.frame, p.x + p.w / 2, p.y + p.h + 1, p.face < 0, { look: [0, 0] })
+    const end = Math.floor(r.i) >= r.tape.length - 1
+    if (end) this.drawCulprit(c)
+    // A little film-strip frame, so it's clear this is a replay.
+    c.fillStyle = 'rgba(12, 6, 20, 0.85)'
+    c.fillRect(0, 0, VW, 14)
+    c.fillRect(0, VH - 14, VW, 14)
+    c.fillStyle = '#4c3c5c'
+    for (let x = 4; x < VW; x += 12) {
+      c.fillRect(x, 4, 6, 6)
+      c.fillRect(x, VH - 10, 6, 6)
+    }
+    if (Math.floor(this.t * 2) % 2) drawText(c, 'REPLAY (SLOW-MO)', 6, 18, { color: '#d82838' })
+    drawText(c, end ? 'THAT GOT YOU!' : 'WATCH CLOSELY...', VW - 6, 18, { align: 'right', color: end ? '#f8c830' : '#c8b8e0' })
+  }
+
   // Everything Pomni needs to know to move: the floor, walls, platforms and any challenge twists.
   pomniWorld() {
     const b = this.boss
@@ -1237,6 +1301,7 @@ export class TadcGame {
     b.updateFight(dt)
     for (const h of this.haz) h.update(dt, this)
     this.haz = this.haz.filter((h) => !h.dead)
+    this.record()
     this.collide()
     if (this.state !== 'fight') return
     if (p.onFloor) this.touchedFloor = true
@@ -1291,7 +1356,8 @@ export class TadcGame {
   gameoverItems() {
     const r = this.run
     const canPractise = (r.mode === 'run' || (r.mode === 'practice' && r.part !== this.deathPart)) && !r.demo && BOSSES[this.bossIdx].parts
-    return ['TRY AGAIN', ...(canPractise ? ['PRACTISE THIS PART'] : []), 'MAIN MENU']
+    const canReplay = this.tape && this.tape.length > 10
+    return ['TRY AGAIN', ...(canReplay ? ['WATCH REPLAY'] : []), ...(canPractise ? ['PRACTISE THIS PART'] : []), 'MAIN MENU']
   }
 
   update_gameover(dt, pr) {
@@ -1311,6 +1377,7 @@ export class TadcGame {
       const pick = items[this.gameoverSel] || 'TRY AGAIN'
       if (pick === 'TRY AGAIN') this.beginBoss(this.bossIdx, true)
       else if (pick === 'PRACTISE THIS PART') this.startRun(this.bossIdx, this.deathPart)
+      else if (pick === 'WATCH REPLAY') this.startReplay()
       else this.toMenu()
     }
   }
@@ -2241,7 +2308,7 @@ export class TadcGame {
     }
     if (this.st > 0.6) {
       const items = this.gameoverItems()
-      const gap = items.length > 2 ? 11 : 14
+      const gap = items.length > 3 ? 9 : items.length > 2 ? 11 : 14
       items.forEach((m, i) =>
         this.menuLine(c, m, VW / 2, 133 + i * gap, this.gameoverSel === i, () => ((this.gameoverSel = i), this.pressed.add('confirm')), { align: 'center' }),
       )
