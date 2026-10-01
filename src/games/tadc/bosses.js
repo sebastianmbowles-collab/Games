@@ -14,6 +14,8 @@ const arc = (x0, y0, tx, ty, T) => ({ vx: (tx - x0) / T, vy: (ty - y0 - 0.5 * G 
 export const BOSSES = [
   {
     key: 'jax',
+    // What they say when Pomni only just dodges.
+    nearLines: ['TCH.', 'LUCKY.', 'HUH.'],
     // When each part of the show starts (the last one is the finale).
     parts: [1, 14, 30, 42],
     name: 'JAX',
@@ -30,6 +32,8 @@ export const BOSSES = [
   },
   {
     key: 'ragatha',
+    // What they say when Pomni only just dodges.
+    nearLines: ['CAREFUL!', 'NICE DODGE!', 'EEP!'],
     // When each part of the show starts (the last one is the finale).
     parts: [1, 13, 26, 38, 46],
     name: 'RAGATHA',
@@ -46,6 +50,8 @@ export const BOSSES = [
   },
   {
     key: 'gangle',
+    // What they say when Pomni only just dodges.
+    nearLines: ['PHEW...', 'OH! SORRY!', 'THAT WAS CLOSE...'],
     // When each part of the show starts (the last one is the finale).
     parts: [1, 16, 31, 46],
     name: 'GANGLE',
@@ -61,6 +67,8 @@ export const BOSSES = [
   },
   {
     key: 'kinger',
+    // What they say when Pomni only just dodges.
+    nearLines: ['MISSED?!', 'BLAST!', 'WHERE DID SHE GO?'],
     // When each part of the show starts (the last one is the finale).
     parts: [1, 14, 28, 42],
     name: 'KINGER',
@@ -77,6 +85,8 @@ export const BOSSES = [
   },
   {
     key: 'caine',
+    // What they say when Pomni only just dodges.
+    nearLines: ['OOOH! SO CLOSE!', 'THE CROWD GASPS!', 'WHAT A DODGE!'],
     // When each part of the show starts (the last one is the finale).
     parts: [1, 16, 32, 50],
     name: 'CAINE + BUBBLE',
@@ -93,6 +103,8 @@ export const BOSSES = [
   },
   {
     key: 'zooble',
+    // What they say when Pomni only just dodges.
+    nearLines: ['WHATEVER.', 'COOL. I GUESS.', 'MEH.'],
     // When each part of the show starts (the last one is the finale).
     parts: [1, 14, 28, 42],
     name: 'ZOOBLE',
@@ -166,6 +178,11 @@ class Boss {
   get px() {
     const p = this.g.pomni
     return p.x + p.w / 2
+  }
+  // Pomni only just dodged! Sometimes the boss has something to say about it.
+  nearMiss() {
+    if (!this.nearLines || (this.bubbleText && this.bubbleText.until > this.g.t) || Math.random() < 0.6) return
+    this.say(this.nearLines[Math.floor(Math.random() * this.nearLines.length)], 1.3)
   }
   say(text, dur = 1.8) {
     this.bubbleText = { text, until: this.g.t + dur }

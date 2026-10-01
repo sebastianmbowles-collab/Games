@@ -28,13 +28,13 @@ const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover'
 const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'intro', 'gameover', 'results'])
 
 function loadSave() {
-  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, outfit: 'CLASSIC', deaths: 0, runs: 0 }
+  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, bossDeaths: {}, outfit: 'CLASSIC', deaths: 0, runs: 0 }
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY))
     if (s && typeof s === 'object') {
       // Older saves only know about five bosses: give Zooble a slot too.
       const beaten = base.beaten.map((b, i) => (s.beaten && s.beaten[i] !== undefined ? s.beaten[i] : b))
-      return { ...base, ...s, beaten, records: s.records || {}, badges: s.badges || {}, encore: s.encore || {} }
+      return { ...base, ...s, beaten, records: s.records || {}, badges: s.badges || {}, encore: s.encore || {}, bossDeaths: s.bossDeaths || {} }
     }
   } catch {
     // No save yet, or storage is blocked.
@@ -256,6 +256,8 @@ export class TadcGame {
     this.run.tries = this.run.tries || {}
     this.run.tries[this.bossIdx] = (this.run.tries[this.bossIdx] || 1) + 1
     this.save.deaths++
+    const who = this.boss.key
+    this.save.bossDeaths[who] = (this.save.bossDeaths[who] || 0) + 1
     this.persist()
     this.setState('dying')
     stopMusic()
@@ -372,6 +374,8 @@ export class TadcGame {
     const p = this.pomni
     this.flash(Math.random() < 0.5 ? 'CLOSE!' : 'PHEW!', p.x + p.w / 2, p.y - 8, '#68d8f8')
     sfx.blip()
+    const b = this.boss.sub || this.boss
+    b.nearMiss()
   }
 
   flash(text, x, y, color = '#f8c830') {
@@ -1135,9 +1139,15 @@ export class TadcGame {
       drawText(c, name, 42, y, { color: got ? '#f8c830' : '#4c4c5c' })
       drawText(c, got ? 'GOT IT!' : how, 170, y, { color: got ? '#38b848' : '#8c8c9c' })
     })
+    drawText(c, `TOTAL DEATHS: ${this.save.deaths}   RUNS: ${this.save.runs}`, VW / 2, 158, { align: 'center', color: '#c8b8e0' })
+    // Your nemesis: the boss that got you the most times.
+    const bd = this.save.bossDeaths
+    const nem = Object.keys(bd).sort((x, y) => bd[y] - bd[x])[0]
     const enc = this.save.encore[DIFFS[this.save.diff].name]
-    const encText = enc ? `   ENCORE (${DIFFS[this.save.diff].name}): ${fmtTime(enc.time)}` : ''
-    drawText(c, `TOTAL DEATHS: ${this.save.deaths}   RUNS: ${this.save.runs}${encText}`, VW / 2, 160, { align: 'center', color: '#c8b8e0' })
+    const bits = []
+    if (nem) bits.push(`NEMESIS: ${BOSSES.find((x) => x.key === nem).name} (${bd[nem]})`)
+    if (enc) bits.push(`ENCORE BEST: ${fmtTime(enc.time)}`)
+    if (bits.length) drawText(c, bits.join('   '), VW / 2, 167, { align: 'center', color: '#8c8c9c' })
     this.hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => this.pressed.add('back') })
   }
 
