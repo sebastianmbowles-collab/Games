@@ -611,15 +611,7 @@ export class TadcGame {
     this.t += dt
     const pr = (a) => this.pressed.has(a)
     // M: all sound off (or back on).
-    if (pr('mute')) {
-      const on = !(this.save.music || this.save.sfx)
-      this.save.music = on
-      this.save.sfx = on
-      setMusicOn(on)
-      setSfxOn(on)
-      this.persist()
-      this.muteNote = { text: on ? 'SOUND ON' : 'SOUND OFF', until: this.t + 1.2 }
-    }
+    if (pr('mute')) this.toggleSound()
     // Quieter music while paused.
     if (!!this.paused !== !!this.ducked) {
       this.ducked = !!this.paused
@@ -910,6 +902,16 @@ export class TadcGame {
     }
     drawText(c, 'B: BACK', VW - 4, 167, { align: 'right', color: '#8c8c9c' })
     this.hits.push({ x: VW - 44, y: 158, w: 44, h: 18, fn: () => this.pressed.add('back') })
+  }
+
+  toggleSound() {
+    const on = !(this.save.music || this.save.sfx)
+    this.save.music = on
+    this.save.sfx = on
+    setMusicOn(on)
+    setSfxOn(on)
+    this.persist()
+    this.muteNote = { text: on ? 'SOUND ON' : 'SOUND OFF', until: this.t + 1.2 }
   }
 
   // Whose voice the hero speaks with (a costume changes it).
@@ -1338,13 +1340,14 @@ export class TadcGame {
       sfx.pause()
       return
     }
-    const k = this.menuNav(pr, 'psel', 3)
+    const k = this.menuNav(pr, 'psel', 4)
     if (pr('back')) this.paused = false
     if (k === 0) this.paused = false
     else if (k === 1) {
       this.paused = false
       this.beginBoss(this.bossIdx, true)
-    } else if (k === 2) this.toMenu()
+    } else if (k === 2) this.toggleSound()
+    else if (k === 3) this.toMenu()
   }
 
   update_ending(dt, pr) {
@@ -2414,8 +2417,9 @@ export class TadcGame {
         drawText(c, `${info.name}: ${label}`, VW / 2, 148, { align: 'center', color: '#c8b8e0' })
       }
     }
-    ;['RESUME', 'RETRY BOSS', 'MAIN MENU'].forEach((m, i) =>
-      this.menuLine(c, m, VW / 2, 82 + i * 14, this.psel === i, () => ((this.psel = i), this.pressed.add('confirm')), { align: 'center' }),
+    const sound = this.save.music || this.save.sfx ? 'SOUND: ON' : 'SOUND: OFF'
+    ;['RESUME', 'RETRY BOSS', sound, 'MAIN MENU'].forEach((m, i) =>
+      this.menuLine(c, m, VW / 2, 78 + i * 13, this.psel === i, () => ((this.psel = i), this.pressed.add('confirm')), { align: 'center' }),
     )
   }
 
