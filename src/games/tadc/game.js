@@ -1883,7 +1883,10 @@ export class TadcGame {
     const info = BOSSES[i]
     const met = this.bossMet(i)
     const spr = SPR[info.key]
-    drawSprite(c, spr, 64 - spr.ax, 150 - spr.length + Math.round(Math.sin(this.t * 2)), { mode: met ? 'normal' : 'shadow', look: [Math.sin(this.t * 0.8) * 0.8, 0.3] })
+    // While talking (after a poke) they strike their attack pose.
+    const poked = this.gallerySay && this.gallerySay.key === info.key && this.gallerySay.until > this.t
+    const pose = poked && SPR[info.key + 'Throw'] ? SPR[info.key + 'Throw'] : spr
+    drawSprite(c, pose, 64 - pose.ax, 150 - pose.length + Math.round(Math.sin(this.t * 2)), { mode: met ? 'normal' : 'shadow', look: [Math.sin(this.t * 0.8) * 0.8, 0.3] })
     if (info.key === 'caine') drawSprite(c, SPR.bubble, 84, 34, { mode: met ? 'normal' : 'shadow' })
     // Poke a boss and they'll say something.
     if (met) {
