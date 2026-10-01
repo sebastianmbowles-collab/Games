@@ -320,7 +320,7 @@ export class TadcGame {
     setTempo(1)
     playMusic(info.encore ? this.boss.key : info.key, true)
     if (retry) {
-      this.boss.drop = 0
+      this.boss.entranceY = 0
       this.setState('countdown')
     }
     else {
@@ -946,7 +946,7 @@ export class TadcGame {
     const b = this.boss
     if (!info.encore && b) {
       const k = clamp(this.st / 0.7, 0, 1)
-      b.drop = -(1 - k) * (1 - k) * 150
+      b.entranceY = -(1 - k) * (1 - k) * 150
       if (this.st >= 0.7 && this.st - dt < 0.7) {
         sfx.thump()
         this.shake = 0.15

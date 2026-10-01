@@ -236,8 +236,8 @@ class Boss {
     let bob = Math.round(Math.sin(t * 2.4) * 1)
     if (this.mood === 'defeated') bob = this.key === 'jax' ? -Math.round(Math.abs(Math.sin(t * 3)) * 2) : this.key === 'kinger' ? Math.round(Math.sin(t * 30) * 0.6) : 0
     // Keep the body in the same place whichever pose is showing, and keep an eye on Pomni.
-    // (drop: how far above the stage the boss still is while making an entrance.)
-    const y = this.y + this.h - pose.length + bob + (throwing ? 1 : 0) + Math.round(this.drop || 0)
+    // (entranceY: how far above the stage the boss still is while making an entrance.)
+    const y = this.y + this.h - pose.length + bob + (throwing ? 1 : 0) + Math.round(this.entranceY || 0)
     drawSprite(c, pose, this.x + this.spr.ax - pose.ax + lean, y, { look: this.lookAt() })
     if (this.mood === 'pleased') {
       c.fillStyle = '#f8c830'
