@@ -38,6 +38,14 @@ function loadSave() {
   return base
 }
 
+// +1.23 or -0.45: how far ahead (green) or behind (red) your best run you are.
+function fmtDelta(d) {
+  const a = Math.abs(d)
+  const m = Math.floor(a / 60)
+  const sec = (a % 60).toFixed(2)
+  return (d <= 0 ? '-' : '+') + (m ? `${m}:${sec.padStart(5, '0')}` : sec)
+}
+
 export class TadcGame {
   constructor(canvas) {
     this.canvas = canvas
@@ -179,7 +187,7 @@ export class TadcGame {
   }
 
   startRun(practiceIdx = null) {
-    this.run = { mode: practiceIdx === null ? 'run' : 'practice', diff: this.save.diff, time: 0, deaths: 0 }
+    this.run = { mode: practiceIdx === null ? 'run' : 'practice', diff: this.save.diff, time: 0, deaths: 0, splits: [] }
     if (this.run.mode === 'run') {
       this.save.runs++
       this.persist()
@@ -267,6 +275,13 @@ export class TadcGame {
     if (this.bossIdx === 4) setTimeout(() => this.state === 'defeat' && this.boss.say('...', 2.5), 1000)
     else this.boss.say(this.boss.defeat, 3)
     const i = this.bossIdx
+    // Speedrun split: the total time when each boss went down, compared with your best run.
+    this.splitDelta = null
+    if (this.run.mode === 'run') {
+      this.run.splits[i] = this.run.time
+      const pb = (this.save.records[DIFFS[this.run.diff].name] || {}).pbSplits
+      if (pb && pb[i] !== undefined) this.splitDelta = this.run.time - pb[i]
+    }
     this.save.beaten[i] = Math.max(this.save.beaten[i], this.run.diff)
     this.save.reached = Math.max(this.save.reached, Math.min(4, i + 1))
     this.newBadge = null
@@ -281,10 +296,20 @@ export class TadcGame {
     const r = this.run
     const name = DIFFS[r.diff].name
     const rec = (this.save.records[name] ||= {})
-    this.results = { time: r.time, deaths: r.deaths, diff: name, news: [], badges: [] }
+    const segs = r.splits.map((t, i) => t - (i ? r.splits[i - 1] : 0))
+    this.results = { time: r.time, deaths: r.deaths, diff: name, news: [], badges: [], segs, gold: [] }
     if (r.mode === 'run') {
+      // Gold splits: the fastest you've ever beaten each boss, one boss at a time.
+      rec.gold = rec.gold || []
+      segs.forEach((s, i) => {
+        if (rec.gold[i] === undefined || s < rec.gold[i]) {
+          this.results.gold[i] = rec.gold[i] !== undefined
+          rec.gold[i] = s
+        }
+      })
       if (!rec.any || r.time < rec.any) {
         rec.any = r.time
+        rec.pbSplits = r.splits.slice()
         this.results.news.push('ANY%')
       }
       if (r.deaths === 0 && (!rec.nodeath || r.time < rec.nodeath)) {
@@ -967,15 +992,19 @@ export class TadcGame {
     c.fillStyle = 'rgba(12, 6, 20, 0.75)'
     c.fillRect(0, 0, VW, VH)
     drawText(c, 'RECORDS', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
-    drawText(c, 'MODE', 30, 30, { color: '#8c8c9c' })
-    drawText(c, 'ANY%', 130, 30, { color: '#8c8c9c' })
-    drawText(c, 'NO DEATH', 210, 30, { color: '#8c8c9c' })
+    drawText(c, 'MODE', 24, 30, { color: '#8c8c9c' })
+    drawText(c, 'ANY%', 100, 30, { color: '#8c8c9c' })
+    drawText(c, 'NO DEATH', 168, 30, { color: '#8c8c9c' })
+    drawText(c, 'BEST SUM', 236, 30, { color: '#8c8c9c' })
     DIFFS.forEach((d, i) => {
       const r = this.save.records[d.name] || {}
       const y = 44 + i * 12
-      drawText(c, d.name, 30, y, { color: d.color })
-      drawText(c, r.any ? fmtTime(r.any) : '--:--:--', 130, y)
-      drawText(c, r.nodeath ? fmtTime(r.nodeath) : '--:--:--', 210, y)
+      // Best sum: add up your fastest time on each boss. That's how fast a perfect run could be!
+      const gold = r.gold && r.gold.length === 5 ? r.gold.reduce((a, b) => a + b, 0) : 0
+      drawText(c, d.name, 24, y, { color: d.color })
+      drawText(c, r.any ? fmtTime(r.any) : '--:--:--', 100, y)
+      drawText(c, r.nodeath ? fmtTime(r.nodeath) : '--:--:--', 168, y)
+      drawText(c, gold ? fmtTime(gold) : '--:--:--', 236, y, { color: gold ? '#f8c830' : '#f4f4f4' })
     })
     drawText(c, 'BADGES', 30, 100, { color: '#8c8c9c' })
     const b = this.save.badges
@@ -1182,7 +1211,14 @@ export class TadcGame {
       c.fillRect(0, 20, VW, 30 * k)
       if (k >= 1) {
         drawText(c, 'BOSS DEFEATED!', VW / 2, 24, { scale: 3, align: 'center', color: '#f8c830', shadow: '#d82838' })
-        if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 43, { align: 'center' })
+        if (this.run.mode === 'run' && this.save.timer) {
+          const d = this.splitDelta
+          if (d === null) drawText(c, fmtTime(this.run.time), VW / 2, 43, { align: 'center' })
+          else {
+            drawText(c, fmtTime(this.run.time), VW / 2 - 4, 43, { align: 'right' })
+            drawText(c, fmtDelta(d), VW / 2 + 4, 43, { color: d <= 0 ? '#38b848' : '#d82838' })
+          }
+        }
         if (this.newBadge) drawText(c, `SECRET: ${this.newBadge}!`, VW / 2, 56, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#e03c9c' : '#f8c830' })
       }
     }
@@ -1237,18 +1273,32 @@ export class TadcGame {
     c.fillStyle = 'rgba(12, 6, 20, 0.7)'
     c.fillRect(0, 0, VW, VH)
     const r = this.results || { time: 0, deaths: 0, diff: '', news: [], badges: [] }
-    drawText(c, 'THE SHOW IS OVER', VW / 2, 12, { scale: 2, align: 'center', color: '#f8c830' })
-    drawText(c, `MODE: ${r.diff}`, VW / 2, 36, { align: 'center' })
-    drawText(c, `TIME ${fmtTime(r.time)}`, VW / 2, 48, { scale: 2, align: 'center' })
-    drawText(c, `DEATHS: ${r.deaths}`, VW / 2, 66, { align: 'center', color: '#c8b8e0' })
-    let y = 80
+    drawText(c, 'THE SHOW IS OVER', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
+    const L = 86
+    drawText(c, `MODE: ${r.diff}`, L, 30, { align: 'center' })
+    drawText(c, `TIME ${fmtTime(r.time)}`, L, 42, { scale: 2, align: 'center' })
+    drawText(c, `DEATHS: ${r.deaths}`, L, 58, { align: 'center', color: '#c8b8e0' })
+    let y = 72
     for (const n of r.news) {
-      drawText(c, `NEW RECORD! (${n})`, VW / 2, y, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#38b848' : '#f8c830' })
+      drawText(c, `NEW RECORD! (${n})`, L, y, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#38b848' : '#f8c830' })
       y += 10
     }
     for (const b of r.badges) {
-      drawText(c, `BADGE: ${b}`, VW / 2, y, { align: 'center', color: '#e03c9c' })
+      drawText(c, b, L, y, { align: 'center', color: '#e03c9c' })
       y += 10
+    }
+    // The splits: how long each boss took. Gold means your fastest ever.
+    const segs = r.segs || []
+    if (segs.length) {
+      drawText(c, 'SPLITS', 236, 30, { align: 'center', color: '#8c8c9c' })
+      BOSSES.slice(0, 5).forEach((b, i) => {
+        if (segs[i] === undefined) return
+        const sy = 42 + i * 11
+        const gold = r.gold && r.gold[i]
+        drawText(c, b.name, 176, sy, { color: gold ? '#f8c830' : '#c8b8e0' })
+        drawText(c, fmtTime(segs[i]), 300, sy, { align: 'right', color: gold ? '#f8c830' : '#f4f4f4' })
+        if (gold && Math.floor(this.t * 4) % 2) drawSprite(c, SPR.star, 304, sy - 1)
+      })
     }
     const cast = [SPR.jax, SPR.ragatha, SPR.gangle, SPR.pomniWave, SPR.kinger, SPR.zooble, SPR.caine]
     let x = 4
