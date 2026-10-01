@@ -429,7 +429,7 @@ export class TadcGame {
       if (!this.save.badges.cleared) {
         this.save.badges.cleared = true
         this.results.badges.push('ESCAPED THE CIRCUS?')
-        this.results.badges.push('BONUS BOSS UNLOCKED!')
+        this.results.badges.push('UNLOCKED: BONUS BOSS, ENCORE, CHALLENGES!')
       }
       // Every badge here also unlocks an outfit.
       if (this.results.badges.length) this.results.badges.push('NEW OUTFIT IN OPTIONS!')
@@ -1785,7 +1785,7 @@ export class TadcGame {
       if (k >= 1 && Math.floor(this.t * 3) % 4) c.fillRect(VW - 22 + Math.round(ex) - 1, VH - z.length - 4 + Math.round(ey), 2, 1)
     }
     if (s > 12.4) {
-      drawText(c, 'NEW IN THE MENU: ENCORE', VW / 2, 138, { align: 'center', color: '#f8c830', shadow: null })
+      drawText(c, 'NEW IN THE MENU: ENCORE + CHALLENGES', VW / 2, 138, { align: 'center', color: '#f8c830', shadow: null })
       drawText(c, 'AND A SECRET BONUS BOSS...', VW / 2, 148, { align: 'center', color: '#e03c9c', shadow: null })
     }
   }
