@@ -25,7 +25,7 @@ const KEYMAP = {
 }
 const MENU = ['START', 'HOW TO PLAY', 'BOSSES', 'OPTIONS']
 const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover', 'defeat'])
-const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'map', 'intro', 'gameover', 'results'])
+const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'map', 'intro', 'gameover', 'results', 'credits'])
 
 function loadSave() {
   const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, bossDeaths: {}, outfit: 'CLASSIC', deaths: 0, runs: 0 }
@@ -897,8 +897,79 @@ export class TadcGame {
   update_results(dt, pr) {
     if (this.st > 1 && (pr('confirm') || pr('start'))) {
       sfx.blip()
+      this.setState('credits')
+      playMusic('ending', true)
+    }
+  }
+
+  // ---------- Credits ----------
+
+  creditItems() {
+    const icon = (k) => SPR['icon' + k[0].toUpperCase() + k.slice(1)]
+    return [
+      { text: 'THE AMAZING DIGITAL CIRCUS', scale: 2, color: '#f8c830' },
+      { text: 'BOSS RUSH', scale: 2, color: '#d82838', gap: 24 },
+      { text: 'STARRING', color: '#8c8c9c' },
+      { text: 'POMNI', spr: SPR.pomniWave, color: '#f4f4f4', gap: 16 },
+      { text: 'AND THE BOSSES', color: '#8c8c9c' },
+      { text: 'JAX', spr: icon('jax'), color: '#a48cf4' },
+      { text: 'RAGATHA', spr: icon('ragatha'), color: '#f43c4c' },
+      { text: 'GANGLE', spr: icon('gangle'), color: '#f4346c' },
+      { text: 'KINGER', spr: icon('kinger'), color: '#c8b8e0' },
+      { text: 'CAINE + BUBBLE', spr: icon('caine'), color: '#f8c830' },
+      { text: this.save.badges.zooble ? 'ZOOBLE' : '???', spr: icon('zooble'), shadow: !this.save.badges.zooble, color: '#68d8f8', gap: 24 },
+      { text: 'GAME DESIGN', color: '#8c8c9c' },
+      { text: 'SEB', scale: 2, color: '#f4f4f4', gap: 16 },
+      { text: "MADE FOR SEB'S ARCADE", color: '#c8b8e0', gap: 16 },
+      { text: 'BASED ON THE AMAZING DIGITAL CIRCUS', color: '#8c8c9c' },
+      { text: 'BY GLITCH PRODUCTIONS', color: '#8c8c9c', gap: 40 },
+      { text: 'THANKS FOR PLAYING!', scale: 2, color: '#f8c830' },
+    ]
+  }
+
+  creditsLayout() {
+    let y = 0
+    return this.creditItems().map((it) => {
+      const h = (it.spr ? it.spr.length + 4 : 0) + 6 * (it.scale || 1) + 6 + (it.gap || 0)
+      const at = y
+      y += h
+      return { ...it, at, h }
+    })
+  }
+
+  update_credits(dt, pr) {
+    const items = this.creditsLayout()
+    const total = items[items.length - 1].at + 60
+    // The last line stops in the middle of the screen.
+    if (this.st > 0.5 && (pr('confirm') || pr('start') || this.st > (total + VH / 2) / 30 + 2.5)) {
+      sfx.blip()
       this.toMenu()
     }
+  }
+
+  draw_credits(c) {
+    c.fillStyle = '#0c0818'
+    c.fillRect(0, 0, VW, VH)
+    for (let i = 0; i < 40; i++) {
+      c.fillStyle = Math.floor(this.t * 2 + i) % 5 ? '#4c3c6c' : '#f4f4f4'
+      c.fillRect((i * 73) % VW, (i * 41 + Math.floor(this.st * 6)) % VH, 1, 1)
+    }
+    const items = this.creditsLayout()
+    const last = items[items.length - 1]
+    const scroll = Math.min(this.st * 30, last.at + VH / 2 - 8)
+    for (const it of items) {
+      let y = Math.round(VH + it.at - scroll)
+      if (y > VH || y + it.h < 0) continue
+      if (it.spr) {
+        const bob = Math.round(Math.abs(Math.sin(this.t * 4 + it.at)) * -2)
+        const draw = it.spr === SPR.pomniWave ? drawPomni : null
+        if (draw) draw(c, it.spr, VW / 2, y + it.spr.length + bob, false, { look: [0, 0.5] })
+        else drawSprite(c, it.spr, VW / 2 - it.spr.ax, y + bob, { mode: it.shadow ? 'shadow' : 'normal', look: [Math.sin(this.t + it.at), 0.4] })
+        y += it.spr.length + 4
+      }
+      drawText(c, it.text, VW / 2, y, { scale: it.scale || 1, align: 'center', color: it.color })
+    }
+    if (this.st > 1 && Math.floor(this.t * 2) % 2) drawText(c, 'A: SKIP', VW - 4, 167, { align: 'right', color: '#4c4c5c' })
   }
 
   // ---------- Drawing ----------
