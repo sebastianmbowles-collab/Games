@@ -515,7 +515,7 @@ export class TadcGame {
       if (!this.save.badges.cleared) {
         this.save.badges.cleared = true
         this.results.badges.push('ESCAPED THE CIRCUS?')
-        this.results.badges.push('UNLOCKED: BONUS BOSS, ENCORE, CHALLENGES!')
+        this.results.badges.push('NEW: ENCORE, CHALLENGES, BONUS BOSS!')
       }
       // Every badge here also unlocks an outfit.
       if (this.results.badges.length) this.results.badges.push('NEW OUTFIT IN OPTIONS!')
@@ -2182,6 +2182,16 @@ export class TadcGame {
     c.fillRect(0, 0, VW, VH)
     const r = this.results || { time: 0, deaths: 0, diff: '', news: [], badges: [] }
     drawText(c, 'THE SHOW IS OVER', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
+    // A rank, like a real arcade: S for a fast run with no deaths.
+    const rank = r.deaths === 0 && r.time < 390 ? 'S' : r.deaths === 0 ? 'A' : r.deaths <= 3 ? 'B' : r.deaths <= 8 ? 'C' : 'D'
+    const rc = { S: '#f8c830', A: '#38b848', B: '#68d8f8', C: '#c8b8e0', D: '#8c8c9c' }[rank]
+    c.fillStyle = INK
+    c.fillRect(6, 28, 26, 30)
+    c.fillStyle = rc
+    c.fillRect(7, 29, 24, 1)
+    c.fillRect(7, 56, 24, 1)
+    drawText(c, 'RANK', 19, 31, { align: 'center', color: '#8c8c9c', shadow: null })
+    drawText(c, rank, 19, 39, { scale: 3, align: 'center', color: rank === 'S' && Math.floor(this.t * 6) % 2 ? '#f4f4f4' : rc })
     const L = 86
     drawText(c, `MODE: ${r.diff}`, L, 30, { align: 'center' })
     drawText(c, `TIME ${fmtTime(r.time)}`, L, 42, { scale: 2, align: 'center' })
