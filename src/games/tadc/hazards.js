@@ -434,6 +434,9 @@ export class Glob {
       this.dead = true
       sfx.splat()
       g.haz.push(new Puddle(this.x + 2, top, this.maxW, this.life))
+      // Never too much goo: the oldest puddles dry up, so there's always some dry floor.
+      const wet = g.haz.filter((h) => h instanceof Puddle && h.life > 1)
+      for (let i = 0; i < wet.length - 6; i++) wet[i].life = 1
       g.puff(this.x + 2, top - 2, ['#140c1c', '#5c4c78'], 4)
     }
     if (offscreen(this)) this.dead = true

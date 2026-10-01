@@ -598,11 +598,30 @@ class Caine extends Boss {
     const ev = []
     const at = (t, fn) => ev.push([t, fn])
     let t = 1
+    // Some attacks say "jump!" (a low spin), others say "don't jump!" (hanging, diagonal, high spin).
+    // Never let one of each overlap: that would leave no safe move.
+    let prev = null
+    const fair = (kind) => {
+      const noJump = prev === 'hang' || prev === 'diagonal' || prev === 'spinHigh'
+      if (kind === 'spinLow' && noJump) kind = 'spinHigh'
+      if ((kind === 'hang' || kind === 'diagonal') && prev === 'spinLow') kind = 'descend'
+      prev = kind
+      return kind
+    }
+    const run = (kind, side) => {
+      if (kind === 'hang') this.hang()
+      else if (kind === 'spinLow') this.spin(true)
+      else if (kind === 'spinHigh') this.spin(false)
+      else if (kind === 'descend') this.descend(side)
+      else this.diagonal()
+    }
     // 1: the cane hangs down and sweeps across (stay low!), or spins past (jump, or stay low).
     while (t < 16) {
       const k = r()
       const low = r() < 0.5
-      at(t, () => (k < 0.5 ? this.hang() : this.spin(low)))
+      const kind = fair(k < 0.5 ? 'hang' : low ? 'spinLow' : 'spinHigh')
+      const side = r() < 0.5 ? 0 : 1
+      at(t, () => run(kind, side))
       t += 2.6 / d.dens
     }
     // 2: the cane comes down on one half of the arena. Bubble starts being sick.
@@ -612,6 +631,7 @@ class Caine extends Boss {
     })
     while (t < 32) {
       const side = r() < 0.5 ? 0 : 1
+      prev = 'descend'
       at(t, () => this.descend(side))
       at(t + 1.4, () => this.vomit())
       t += 3.2 / d.dens
@@ -622,12 +642,8 @@ class Caine extends Boss {
       const k = r()
       const low = r() < 0.5
       const side = r() < 0.5 ? 0 : 1
-      at(t, () => {
-        if (k < 0.25) this.hang()
-        else if (k < 0.5) this.spin(low)
-        else if (k < 0.75) this.descend(side)
-        else this.diagonal()
-      })
+      const kind = fair(k < 0.25 ? 'hang' : k < 0.5 ? (low ? 'spinLow' : 'spinHigh') : k < 0.75 ? 'descend' : 'diagonal')
+      at(t, () => run(kind, side))
       if (r() < 0.6) at(t + 0.9, () => this.vomit())
       t += 2.2 / d.dens
     }
@@ -677,8 +693,9 @@ class Caine extends Boss {
     this.throwing()
   }
   descend(side) {
-    const x0 = side === 0 ? 6 : 150
-    const len = 148
+    // Each half leaves a small safe gap in the middle, so there's never too far to run.
+    const x0 = side === 0 ? 4 : 168
+    const len = 132
     const d = this.d
     this.g.haz.push(
       new Cane({
