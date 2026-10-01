@@ -191,8 +191,8 @@ export class TadcGame {
     this.st = 9
   }
 
-  startRun(practiceIdx = null) {
-    this.run = { mode: practiceIdx === null ? 'run' : 'practice', diff: this.save.diff, time: 0, deaths: 0, splits: [] }
+  startRun(practiceIdx = null, part = 0) {
+    this.run = { mode: practiceIdx === null ? 'run' : 'practice', diff: this.save.diff, time: 0, deaths: 0, splits: [], part }
     if (this.run.mode === 'run') {
       this.save.runs++
       this.persist()
@@ -220,6 +220,8 @@ export class TadcGame {
     this.pomniSay = null
     this.finalBanner = null
     this.boss = makeBoss(this, idx, this.d, 1000 + idx * 97 + this.run.diff * 13)
+    // Practising one part: start just before it.
+    if (this.run.part && info.parts) this.boss.skipTo(info.parts[this.run.part] - 0.8)
     const kinger = info.key === 'kinger'
     const spawn = kinger ? { x: this.platforms[0].x + 18, y: this.platforms[0].y - 26 } : { x: 40, y: GROUND_Y - 26 }
     this.pomni = new Pomni(spawn.x, spawn.y)
@@ -301,9 +303,11 @@ export class TadcGame {
       const pb = (this.save.records[DIFFS[this.run.diff].name] || {}).pbSplits
       if (pb && pb[i] !== undefined) this.splitDelta = this.run.time - pb[i]
     }
+    this.newBadge = null
+    // Practising just one part is great training, but only a whole fight counts.
+    if (this.run.part) return
     this.save.beaten[i] = Math.max(this.save.beaten[i], this.run.diff)
     this.save.reached = Math.max(this.save.reached, Math.min(4, i + 1))
-    this.newBadge = null
     if (this.boss.key === 'zooble' && !this.save.badges.zooble) {
       this.newBadge = 'SPARE PARTS'
       this.save.badges.zooble = true
@@ -496,17 +500,25 @@ export class TadcGame {
 
   update_bosses(dt, pr) {
     const n = this.galleryCount()
-    if (pr('left') || pr('up')) {
+    if (pr('left')) {
       this.gsel = (this.gsel + n - 1) % n
+      this.gpart = 0
       sfx.beep()
     }
-    if (pr('right') || pr('down')) {
+    if (pr('right')) {
       this.gsel = (this.gsel + 1) % n
+      this.gpart = 0
+      sfx.beep()
+    }
+    // Up and down pick which part of the show to practise.
+    const parts = BOSSES[this.gsel].parts.length
+    if (this.bossMet(this.gsel) && (pr('up') || pr('down'))) {
+      this.gpart = ((this.gpart || 0) + (pr('up') ? parts - 1 : 1)) % parts
       sfx.beep()
     }
     if (this.st > 0.2 && pr('confirm') && this.bossMet(this.gsel)) {
       sfx.blip()
-      this.startRun(this.gsel)
+      this.startRun(this.gsel, this.gpart || 0)
       return
     }
     if (pr('back')) {
@@ -1007,15 +1019,21 @@ export class TadcGame {
     const best = this.save.beaten[i]
     drawText(c, best >= 0 ? `BEATEN ON ${DIFFS[best].name}` : 'NOT BEATEN YET', x, 110, { color: best >= 0 ? '#38b848' : '#8c8c9c' })
     if (met) {
-      drawText(c, 'A: PRACTICE THIS BOSS', x, 124, { color: Math.floor(this.t * 2) % 2 ? '#f8c830' : '#f88828' })
-      this.hits.push({ x: x - 4, y: 118, w: 120, h: 14, fn: () => this.pressed.add('confirm') })
+      drawText(c, 'A: PRACTICE THIS BOSS', x, 122, { color: Math.floor(this.t * 2) % 2 ? '#f8c830' : '#f88828' })
+      this.hits.push({ x: x - 4, y: 116, w: 120, h: 12, fn: () => this.pressed.add('confirm') })
+      const np = info.parts.length
+      const part = this.gpart || 0
+      const label = part === np - 1 ? 'THE FINALE' : part === 0 ? 'FROM THE START' : `PART ${part + 1}`
+      drawText(c, `START: ${label}`, x, 132, { color: part ? '#68d8f8' : '#c8b8e0' })
+      drawText(c, '(UP/DOWN)', x + textWidth(`START: ${label}`) + 4, 132, { color: '#4c4c5c' })
+      this.hits.push({ x: x - 4, y: 128, w: 120, h: 10, fn: () => this.pressed.add('down') })
     }
-    if (i === 3 && this.save.badges.pillowMaster) drawText(c, '* PILLOW MASTER *', x, 136, { color: '#c8b8e0' })
+    if (i === 3 && this.save.badges.pillowMaster) drawText(c, '* PILLOW MASTER *', x, 143, { color: '#c8b8e0' })
     const n = this.galleryCount()
     for (let k = 0; k < n; k++) {
       c.fillStyle = k === i ? '#f8c830' : BOSSES[k].bonus ? '#8c2c6c' : '#4c3c5c'
       c.fillRect(VW / 2 - 24 + k * 10, 160, 6, 6)
-      this.hits.push({ x: VW / 2 - 26 + k * 10, y: 156, w: 10, h: 14, fn: () => ((this.gsel = k), sfx.beep()) })
+      this.hits.push({ x: VW / 2 - 26 + k * 10, y: 156, w: 10, h: 14, fn: () => ((this.gsel = k), (this.gpart = 0), sfx.beep()) })
     }
     drawText(c, '<', 120, 161, { color: '#f8c830' })
     drawText(c, '>', 197, 161, { color: '#f8c830' })

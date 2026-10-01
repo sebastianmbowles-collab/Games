@@ -14,6 +14,8 @@ const arc = (x0, y0, tx, ty, T) => ({ vx: (tx - x0) / T, vy: (ty - y0 - 0.5 * G 
 export const BOSSES = [
   {
     key: 'jax',
+    // When each part of the show starts (the last one is the finale).
+    parts: [1, 14, 30, 42],
     name: 'JAX',
     title: 'THE WHOOPIE CUSHION MENACE',
     rules: ['THROWS WHOOPIE CUSHIONS.', 'THEY LAND AND STAY ON THE FLOOR.', 'TOUCH ONE OR STAND ON ONE: OUT!'],
@@ -28,6 +30,8 @@ export const BOSSES = [
   },
   {
     key: 'ragatha',
+    // When each part of the show starts (the last one is the finale).
+    parts: [1, 13, 26, 38, 46],
     name: 'RAGATHA',
     title: 'BUTTON BARRAGE',
     rules: ['THROWS BUTTONS EVERY WHICH WAY.', 'RUN INTO ONE, JUMP INTO ONE,', 'TOUCH ONE AT ALL: OUT!'],
@@ -42,6 +46,8 @@ export const BOSSES = [
   },
   {
     key: 'gangle',
+    // When each part of the show starts (the last one is the finale).
+    parts: [1, 16, 31, 46],
     name: 'GANGLE',
     title: 'RIBBON RAMPAGE',
     rules: ['GIANT RED RIBBONS FILL THE SCREEN.', 'WATCH THE FLASHING OUTLINES', 'AND FIND THE GAP!'],
@@ -55,6 +61,8 @@ export const BOSSES = [
   },
   {
     key: 'kinger',
+    // When each part of the show starts (the last one is the finale).
+    parts: [1, 14, 28, 42],
     name: 'KINGER',
     title: 'PILLOW PANIC',
     rules: ['RUN INTO A PILLOW: OUT!', 'STAND ON A PILLOW: SAFE!', 'PINK PILLOWS GO BOING.'],
@@ -69,6 +77,8 @@ export const BOSSES = [
   },
   {
     key: 'caine',
+    // When each part of the show starts (the last one is the finale).
+    parts: [1, 16, 32, 50],
     name: 'CAINE + BUBBLE',
     title: 'THE FINAL SHOW',
     rules: ['ONE ABSURDLY HUGE CANE.', 'BUBBLE MAKES THE FLOOR SLIPPERY.', 'WATCH EVERYTHING.'],
@@ -83,6 +93,8 @@ export const BOSSES = [
   },
   {
     key: 'zooble',
+    // When each part of the show starts (the last one is the finale).
+    parts: [1, 14, 28, 42],
     name: 'ZOOBLE',
     title: 'SPARE PARTS',
     bonus: true,
@@ -176,6 +188,12 @@ class Boss {
   }
   idle(dt) {
     this.throwT = Math.max(0, this.throwT - dt)
+  }
+  // Jump ahead in the show (for practising one part, and for Encore waves).
+  skipTo(t) {
+    this.time = Math.max(0, t)
+    this.ei = this.events.findIndex((e) => e[0] >= this.time)
+    if (this.ei < 0) this.ei = this.events.length
   }
   throwing() {
     this.throwT = 0.28
@@ -805,7 +823,6 @@ const CLASSES = { jax: Jax, ragatha: Ragatha, gangle: Gangle, kinger: Kinger, ca
 // The Encore "boss" is a stand-in: everything it shows (position, pose, speech) belongs to the boss on stage.
 const WAVE_LEN = 13
 const BREAK = 2.4
-const PHASES = { jax: [1, 14, 30, 42], ragatha: [1, 13, 26, 38, 46], gangle: [1, 16, 31, 46], kinger: [1, 14, 28, 42], zooble: [1, 14, 28, 42], caine: [1, 16, 32, 50] }
 class Encore extends Boss {
   constructor(g, info, d, seed) {
     super(g, info, d, seed)
@@ -831,7 +848,7 @@ class Encore extends Boss {
     const g = this.g
     if (!this.order.length) {
       // A shuffled line-up. Caine hosts the first wave; nobody goes on twice in a row.
-      const keys = Object.keys(PHASES)
+      const keys = BOSSES.filter((b) => b.parts).map((b) => b.key)
       for (let i = keys.length - 1; i > 0; i--) {
         const j = Math.floor(this.rng() * (i + 1))
         ;[keys[i], keys[j]] = [keys[j], keys[i]]
@@ -848,11 +865,9 @@ class Encore extends Boss {
     const d = { ...b, speed: b.speed * (1 + k * 0.04), dens: b.dens * (1 + k * 0.05), warn: b.warn * Math.max(0.78, 1 - k * 0.02) }
     const sub = new CLASSES[key](g, BOSSES.find((x) => x.key === key), d, Math.floor(this.rng() * 1e9))
     // Early waves use the start of a show; later waves can pull out the big finales.
-    const starts = PHASES[key]
+    const starts = sub.parts
     const ph = Math.floor(this.rng() * (Math.min(starts.length - 1, Math.floor(this.wave / 2)) + 1))
-    sub.time = starts[ph] - 0.8
-    sub.ei = sub.events.findIndex((e) => e[0] >= sub.time)
-    if (sub.ei < 0) sub.ei = sub.events.length
+    sub.skipTo(starts[ph] - 0.8)
     sub.tempos = []
     sub.finalAt = null
     this.sub = sub
