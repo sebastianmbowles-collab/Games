@@ -584,6 +584,7 @@ class Kinger extends Boss {
 }
 
 // ---------- CAINE & BUBBLE ----------
+const BUBBLE_LINES = ['WHEEE!', "I'M HUNGRY!", 'HIIII!', 'DODGE! DODGE!', 'CAN I EAT THAT?', 'BUBBLE BUBBLE!']
 class Caine extends Boss {
   constructor(g, info, d, seed) {
     super(g, info, d, seed)
@@ -727,6 +728,17 @@ class Caine extends Boss {
   updateFight(dt) {
     super.updateFight(dt)
     this.float(dt)
+    // Bubble can't stay quiet for long.
+    const b = this.bub
+    b.chatT = (b.chatT ?? 5) - dt
+    if (b.chatT <= 0) {
+      b.chatT = 6 + Math.random() * 4
+      if (!b.text || b.text.until < this.g.t) {
+        const line = BUBBLE_LINES[Math.floor(Math.random() * BUBBLE_LINES.length)]
+        b.text = { text: line, until: this.g.t + 1.4 }
+        sfx.talk('bubble', line)
+      }
+    }
   }
   idle(dt) {
     super.idle(dt)
