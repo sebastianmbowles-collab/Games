@@ -115,12 +115,14 @@ export class TadcGame {
     this.onKeyUp = this.onKeyUp.bind(this)
     this.onPointer = this.onPointer.bind(this)
     this.onBlur = this.onBlur.bind(this)
+    this.onMove = this.onMove.bind(this)
     this.loop = this.loop.bind(this)
     window.addEventListener('keydown', this.onKey)
     window.addEventListener('keyup', this.onKeyUp)
     window.addEventListener('blur', this.onBlur)
     document.addEventListener('visibilitychange', this.onBlur)
     canvas.addEventListener('pointerdown', this.onPointer)
+    canvas.addEventListener('pointermove', this.onMove)
     this.acc = 0
     this.last = performance.now()
     this.raf = requestAnimationFrame(this.loop)
@@ -133,6 +135,7 @@ export class TadcGame {
     window.removeEventListener('blur', this.onBlur)
     document.removeEventListener('visibilitychange', this.onBlur)
     this.canvas.removeEventListener('pointerdown', this.onPointer)
+    this.canvas.removeEventListener('pointermove', this.onMove)
     stopMusic()
   }
 
@@ -231,6 +234,12 @@ export class TadcGame {
       if (down && !this.touchHeld[x]) this.pressed.add(x)
       this.touchHeld[x] = down
     }
+  }
+
+  // Where the mouse is (in game pixels), so Pomni can keep an eye on it on the title screen.
+  onMove(e) {
+    const r = this.canvas.getBoundingClientRect()
+    this.mouse = { x: ((e.clientX - r.left) / r.width) * VW, y: ((e.clientY - r.top) / r.height) * VH, t: this.t }
   }
 
   onPointer(e) {
@@ -1524,6 +1533,7 @@ export class TadcGame {
       let look = [0, 0.15]
       if (s >= 4.6 && s < 6.4 && !menuOn) look = [flip ? 1 : -1, 0]
       if (menuOn) look = [Math.sin(this.t * 0.9) > 0.6 ? 1 : Math.sin(this.t * 0.9) < -0.6 ? -1 : 0, 0.1]
+      if (menuOn && this.mouse && this.t - this.mouse.t < 3) look = { x: this.mouse.x, y: this.mouse.y }
       if (this.helpT <= 0) drawPomni(c, spr, px + shake, 145, flip, { scale: 2, alpha, look })
       // Secret for touch screens: poke Pomni five times.
       if (menuOn) {
