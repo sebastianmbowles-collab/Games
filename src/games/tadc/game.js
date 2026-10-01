@@ -408,6 +408,9 @@ export class TadcGame {
     if (this.state !== 'fight') return
     this.killer = killer
     this.killerHaz = haz
+    // Which part of the show was she in? (For "practise this part".)
+    const parts = BOSSES[this.bossIdx].parts
+    this.deathPart = parts ? Math.max(0, parts.filter((at) => this.boss.time >= at - 0.5).length - 1) : 0
     this.run.deaths++
     this.run.tries = this.run.tries || {}
     this.run.tries[this.bossIdx] = (this.run.tries[this.bossIdx] || 1) + 1
@@ -1284,15 +1287,29 @@ export class TadcGame {
     }
   }
 
+  gameoverItems() {
+    const r = this.run
+    const canPractise = (r.mode === 'run' || (r.mode === 'practice' && r.part !== this.deathPart)) && !r.demo && BOSSES[this.bossIdx].parts
+    return ['TRY AGAIN', ...(canPractise ? ['PRACTISE THIS PART'] : []), 'MAIN MENU']
+  }
+
   update_gameover(dt, pr) {
     if (this.st < 0.6) return
-    if (pr('up') || pr('down') || pr('left') || pr('right')) {
-      this.gameoverSel = 1 - this.gameoverSel
+    const items = this.gameoverItems()
+    const n = items.length
+    if (pr('up') || pr('left')) {
+      this.gameoverSel = (this.gameoverSel + n - 1) % n
+      sfx.beep()
+    }
+    if (pr('down') || pr('right')) {
+      this.gameoverSel = (this.gameoverSel + 1) % n
       sfx.beep()
     }
     if (pr('confirm') || pr('start')) {
       sfx.blip()
-      if (this.gameoverSel === 0) this.beginBoss(this.bossIdx, true)
+      const pick = items[this.gameoverSel] || 'TRY AGAIN'
+      if (pick === 'TRY AGAIN') this.beginBoss(this.bossIdx, true)
+      else if (pick === 'PRACTISE THIS PART') this.startRun(this.bossIdx, this.deathPart)
       else this.toMenu()
     }
   }
@@ -2212,11 +2229,14 @@ export class TadcGame {
       if (tries >= 6 && Math.floor(this.st / 3) % 2) {
         hint = this.run.diff > 0 ? 'TOO HARD? TRY EASY MODE IN OPTIONS.' : 'TIP: PRACTISE ONE PART IN THE BOSSES MENU.'
       }
-      drawText(c, hint, VW / 2, 164, { align: 'center', color: '#68d8f8' })
+      drawText(c, hint, VW / 2, 167, { align: 'center', color: '#68d8f8' })
     }
     if (this.st > 0.6) {
-      this.menuLine(c, 'TRY AGAIN', VW / 2, 134, this.gameoverSel === 0, () => ((this.gameoverSel = 0), this.pressed.add('confirm')), { align: 'center' })
-      this.menuLine(c, 'MAIN MENU', VW / 2, 148, this.gameoverSel === 1, () => ((this.gameoverSel = 1), this.pressed.add('confirm')), { align: 'center' })
+      const items = this.gameoverItems()
+      const gap = items.length > 2 ? 11 : 14
+      items.forEach((m, i) =>
+        this.menuLine(c, m, VW / 2, 133 + i * gap, this.gameoverSel === i, () => ((this.gameoverSel = i), this.pressed.add('confirm')), { align: 'center' }),
+      )
     }
   }
 
