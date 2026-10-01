@@ -17,9 +17,20 @@ let sfxOn = true
 
 export const audioState = () => ({ musicOn, sfxOn })
 
+let ducked = false
+function musicLevel() {
+  return musicOn ? (ducked ? 0.18 : 0.5) : 0
+}
+
 export function setMusicOn(on) {
   musicOn = on
-  if (musicBus) musicBus.gain.value = on ? 0.5 : 0
+  if (musicBus) musicBus.gain.value = musicLevel()
+}
+
+// Turn the music down (while paused) or back up.
+export function duckMusic(on) {
+  ducked = on
+  if (musicBus && ctx) musicBus.gain.setTargetAtTime(musicLevel(), ctx.currentTime, 0.05)
 }
 
 export function setSfxOn(on) {
@@ -37,7 +48,7 @@ export function wakeAudio() {
     master.gain.value = 0.9
     master.connect(ctx.destination)
     musicBus = ctx.createGain()
-    musicBus.gain.value = musicOn ? 0.5 : 0
+    musicBus.gain.value = musicLevel()
     musicBus.connect(master)
     sfxBus = ctx.createGain()
     sfxBus.gain.value = sfxOn ? 0.75 : 0

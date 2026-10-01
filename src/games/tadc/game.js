@@ -8,7 +8,7 @@ import { VW, VH, GROUND_Y, INK, DIFFS, clamp, rand, fmtTime, seeded } from './co
 import { ARENAS, drawBackground, drawFloor, drawPlatforms } from './arena'
 import { Pomni, drawPomni, setOutfit } from './player'
 import { BOSSES, makeBoss } from './bosses'
-import { sfx, wakeAudio, playMusic, stopMusic, setMusicOn, setSfxOn, setTempo } from './sound'
+import { sfx, wakeAudio, playMusic, stopMusic, setMusicOn, setSfxOn, setTempo, duckMusic } from './sound'
 
 export { VW, VH }
 
@@ -559,6 +559,11 @@ export class TadcGame {
   update(dt) {
     this.t += dt
     const pr = (a) => this.pressed.has(a)
+    // Quieter music while paused.
+    if (!!this.paused !== !!this.ducked) {
+      this.ducked = !!this.paused
+      duckMusic(this.ducked)
+    }
     if (this.paused) {
       this.updatePause(pr)
       return
