@@ -768,6 +768,7 @@ export class TadcGame {
 
   menuPick(k) {
     const pick = this.menuItems()[k]
+    this.save.seen = { ...(this.save.seen || {}), [pick]: true }
     if (pick === 'CONTINUE') this.continueRun()
     else if (pick === 'ENCORE') this.startEncore()
     else if (pick === 'CHALLENGES') this.setState('challenges')
@@ -1664,6 +1665,13 @@ export class TadcGame {
           value: m === 'CONTINUE' ? BOSSES[this.save.resume.idx].name.split(' ')[0] : '',
         }),
       )
+      // A blinking NEW! next to things you haven't tried yet.
+      const seen = this.save.seen || {}
+      items.forEach((m, i) => {
+        if ((m === 'ENCORE' || m === 'CHALLENGES') && !seen[m] && Math.floor(this.t * 3) % 2) {
+          drawText(c, 'NEW!', 178 + textWidth(m) + 6, 72 + i * gap, { color: '#e03c9c' })
+        }
+      })
       const d = DIFFS[this.save.diff]
       const my = items.length > 4 ? 73 + items.length * gap : 128
       drawText(c, `MODE: ${d.name}`, 178, my, { color: d.color })
