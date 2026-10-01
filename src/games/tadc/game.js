@@ -1572,7 +1572,11 @@ export class TadcGame {
       }
       const items = this.menuItems()
       const gap = items.length > 6 ? 9 : items.length > 4 ? 10 : 13
-      items.forEach((m, i) => this.menuLine(c, m, 178, 72 + i * gap, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i))))
+      items.forEach((m, i) =>
+        this.menuLine(c, m, 178, 72 + i * gap, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i)), {
+          value: m === 'CONTINUE' ? BOSSES[this.save.resume.idx].name.split(' ')[0] : '',
+        }),
+      )
       const d = DIFFS[this.save.diff]
       const my = items.length > 4 ? 73 + items.length * gap : 128
       drawText(c, `MODE: ${d.name}`, 178, my, { color: d.color })
