@@ -1,38 +1,40 @@
-// Pomni's Big Escape: an 8-bit side-scroller. Title screen, level map, levels with a boss at the end.
+// THE AMAZING DIGITAL CIRCUS: BOSS RUSH
+// A 2D, 8-bit boss-rush platformer. Pomni can only run and jump. Everyone else is a boss.
+// This file runs the whole show: title, menus, boss intros, fights, game over, the ending and records.
 
-import { drawText } from './font'
+import { drawText, textWidth } from './font'
 import { SPR, drawSprite } from './sprites'
-import { LEVELS, buildLevel, TILE, VW, VH, GROUND_Y } from './levels'
-import { makeBoss } from './bosses'
-import { sfx, wakeAudio, playMusic, stopMusic } from './sound'
+import { VW, VH, GROUND_Y, INK, DIFFS, clamp, rand, fmtTime, seeded } from './consts'
+import { ARENAS, drawBackground, drawFloor, drawPlatforms } from './arena'
+import { Pomni, drawPomni } from './player'
+import { BOSSES, makeBoss } from './bosses'
+import { sfx, wakeAudio, playMusic, stopMusic, setMusicOn, setSfxOn, setTempo } from './sound'
 
 export { VW, VH }
 
-const STORE_KEY = 'tadc-pomni-v1'
+const STORE_KEY = 'tadc-bossrush-v1'
 const STEP = 1 / 120
-const GRAV = 720
-const JUMP_V = 268
-const RUN = 95
-const BOSS_NAMES = ['JAX', 'RAGATHA', 'GANGLE', 'KINGER', 'CAINE & BUBBLE']
 const KEYMAP = {
-  ArrowLeft: 'left', a: 'left', A: 'left',
-  ArrowRight: 'right', d: 'right', D: 'right',
-  ' ': 'jump', ArrowUp: 'jump', w: 'jump', W: 'jump', z: 'jump', Z: 'jump',
-  Enter: 'start', Escape: 'back',
+  ArrowLeft: ['left'], a: ['left'], A: ['left'],
+  ArrowRight: ['right'], d: ['right'], D: ['right'],
+  ArrowUp: ['up', 'jump'], w: ['up', 'jump'], W: ['up', 'jump'],
+  ArrowDown: ['down'], s: ['down'], S: ['down'],
+  ' ': ['jump', 'confirm'], z: ['jump', 'confirm'], Z: ['jump', 'confirm'], k: ['jump', 'confirm'], K: ['jump', 'confirm'],
+  Enter: ['start', 'confirm'], p: ['start'], P: ['start'],
+  Escape: ['back', 'start'], x: ['back'], X: ['back'], Backspace: ['back'],
 }
+const MENU = ['START', 'HOW TO PLAY', 'BOSSES', 'OPTIONS']
+const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover', 'defeat'])
 
-const rand = (a, b) => a + Math.random() * (b - a)
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
-const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
-
-function loadData() {
+function loadSave() {
+  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1], records: {}, badges: {}, deaths: 0, runs: 0 }
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY))
-    if (s && s.unlocked) return { unlocked: clamp(s.unlocked, 1, LEVELS.length), deaths: s.deaths || 0, beaten: s.beaten || [] }
+    if (s && typeof s === 'object') return { ...base, ...s, beaten: s.beaten || base.beaten, records: s.records || {}, badges: s.badges || {} }
   } catch {
     // No save yet, or storage is blocked.
   }
-  return { unlocked: 1, deaths: 0, beaten: [] }
+  return base
 }
 
 export class TadcGame {
@@ -41,18 +43,35 @@ export class TadcGame {
     canvas.width = VW
     canvas.height = VH
     this.c = canvas.getContext('2d')
-    this.data = loadData()
-    this.state = 'title'
+    this.save = loadSave()
+    setMusicOn(this.save.music)
+    setSfxOn(this.save.sfx)
     this.t = 0
-    this.stateT = 0
-    this.sel = Math.min(this.data.unlocked - 1, LEVELS.length - 1)
+    this.st = 0
+    this.state = 'title'
     this.keyHeld = {}
     this.touchHeld = {}
     this.pressed = new Set()
-    this.glitch = 0
-    this.shake = 0
     this.parts = []
-    this.texts = []
+    this.floats = []
+    this.haz = []
+    this.platforms = []
+    this.shake = 0
+    this.flashT = 0
+    this.glitch = 0
+    this.msel = 0
+    this.osel = 0
+    this.gsel = 0
+    this.psel = 0
+    this.gameoverSel = 0
+    this.paused = false
+    this.idleT = 0
+    this.helpT = 0
+    this.hits = []
+    this.conveyor = 0
+    this.floorScroll = 0
+    this.slip = false
+    this.resetArm = 0
 
     this.onKey = this.onKey.bind(this)
     this.onKeyUp = this.onKeyUp.bind(this)
@@ -76,7 +95,7 @@ export class TadcGame {
 
   persist() {
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(this.data))
+      localStorage.setItem(STORE_KEY, JSON.stringify(this.save))
     } catch {
       // Saving is optional.
     }
@@ -90,27 +109,33 @@ export class TadcGame {
 
   wake() {
     wakeAudio()
-    this.music()
-  }
-
-  setTouch(a, down) {
-    this.wake()
-    if (down && !this.touchHeld[a]) this.pressed.add(a)
-    this.touchHeld[a] = down
+    this.idleT = 0
   }
 
   onKey(e) {
-    const a = KEYMAP[e.key]
-    if (!a) return
+    const acts = KEYMAP[e.key]
+    if (!acts) return
     e.preventDefault()
     this.wake()
-    if (!e.repeat) this.pressed.add(a)
-    this.keyHeld[a] = true
+    for (const a of acts) {
+      if (!e.repeat) this.pressed.add(a)
+      this.keyHeld[a] = true
+    }
   }
 
   onKeyUp(e) {
-    const a = KEYMAP[e.key]
-    if (a) this.keyHeld[a] = false
+    const acts = KEYMAP[e.key]
+    if (acts) for (const a of acts) this.keyHeld[a] = false
+  }
+
+  // Touch buttons from the page: 'left', 'right', 'jump' (the A button) and 'start'.
+  setTouch(a, down) {
+    this.wake()
+    const acts = a === 'jump' ? ['jump', 'confirm'] : a === 'start' ? ['start'] : a === 'left' ? ['left', 'up'] : ['right', 'down']
+    for (const x of acts) {
+      if (down && !this.touchHeld[x]) this.pressed.add(x)
+      this.touchHeld[x] = down
+    }
   }
 
   onPointer(e) {
@@ -118,65 +143,163 @@ export class TadcGame {
     const r = this.canvas.getBoundingClientRect()
     const x = ((e.clientX - r.left) / r.width) * VW
     const y = ((e.clientY - r.top) / r.height) * VH
-    if (this.state === 'map') {
-      const i = LEVELS.findIndex((_, k) => Math.abs(x - this.nodeX(k)) < 22 && y > 50 && y < 135)
-      if (i >= 0 && i < this.data.unlocked) {
-        this.sel = i
-        this.startLevel(i)
+    for (const h of this.hits) {
+      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
+        h.fn()
+        return
       }
-    } else if (this.state !== 'play') {
-      this.pressed.add('start')
     }
+    if (this.state !== 'fight' && this.state !== 'countdown') this.pressed.add('confirm')
   }
 
-  music() {
-    if (this.state === 'play') playMusic(this.locked ? 'boss' : 'level')
-    else playMusic('map')
-  }
-
-  // ---------- Screens ----------
+  // ---------- Flow ----------
 
   setState(s) {
     this.state = s
-    this.stateT = 0
-    this.music()
+    this.st = 0
   }
 
-  goMap() {
-    this.parts = []
-    this.texts = []
-    this.setState('map')
+  get d() {
+    return DIFFS[this.run ? this.run.diff : this.save.diff]
   }
 
-  nodeX(i) {
-    return 32 + i * 64
-  }
-
-  startLevel(i) {
-    this.levelIdx = i
-    this.def = LEVELS[i]
-    this.lv = buildLevel(this.def)
-    this.ents = this.lv.entities.map((e) => ({ ...e, alive: true, on: false }))
-    this.starsTotal = this.ents.filter((e) => e.type === 'star').length
-    this.starsGot = 0
-    this.levelDeaths = 0
-    this.checkpoint = { x: 24, y: GROUND_Y - 22 }
-    this.p = this.newPlayer()
-    this.camX = 0
-    this.locked = false
-    this.boss = null
+  toMenu() {
+    this.paused = false
+    this.run = null
     this.haz = []
-    this.door = null
     this.parts = []
-    this.texts = []
-    this.slip = false
-    this.glitch = 0.3
-    sfx.select()
-    this.setState('play')
+    this.floats = []
+    setTempo(1)
+    playMusic('menu')
+    this.setState('title')
+    this.st = 9
   }
 
-  newPlayer() {
-    return { x: this.checkpoint.x, y: this.checkpoint.y, w: 10, h: 22, vx: 0, vy: 0, onGround: false, coyote: 0, jumpBuf: 0, face: 1, dead: 0, prevBottom: 0, anim: 0 }
+  startRun(practiceIdx = null) {
+    this.run = { mode: practiceIdx === null ? 'run' : 'practice', diff: this.save.diff, time: 0, deaths: 0 }
+    if (this.run.mode === 'run') {
+      this.save.runs++
+      this.persist()
+    }
+    this.beginBoss(practiceIdx ?? 0, false)
+  }
+
+  beginBoss(idx, retry) {
+    this.paused = false
+    this.bossIdx = idx
+    const info = BOSSES[idx]
+    this.arenaKey = info.key
+    this.platforms = ARENAS[info.key].platforms
+    this.haz = []
+    this.parts = []
+    this.floats = []
+    this.conveyor = 0
+    this.floorScroll = 0
+    this.slip = false
+    this.pomniSay = null
+    this.boss = makeBoss(this, idx, this.d, 1000 + idx * 97 + this.run.diff * 13)
+    const kinger = info.key === 'kinger'
+    const spawn = kinger ? { x: this.platforms[0].x + 18, y: this.platforms[0].y - 22 } : { x: 40, y: GROUND_Y - 22 }
+    this.pomni = new Pomni(spawn.x, spawn.y)
+    this.pomni.onFloor = !kinger
+    this.touchedFloor = false
+    this.save.reached = Math.max(this.save.reached, idx)
+    this.persist()
+    setTempo(1)
+    playMusic(info.key, true)
+    if (retry) this.setState('countdown')
+    else {
+      this.setState('intro')
+      sfx.dunDunDun()
+    }
+  }
+
+  setConveyor(v) {
+    this.conveyor = v
+  }
+
+  die(killer) {
+    if (this.state !== 'fight') return
+    this.killer = killer
+    this.run.deaths++
+    this.save.deaths++
+    this.persist()
+    this.setState('dying')
+    stopMusic()
+    setTempo(1)
+    sfx.hurt()
+    if (killer === 'cushion') sfx.pfft()
+    this.flashT = 0.12
+    this.shake = 0.3
+    this.glitch = 0.5
+    this.boss.mood = 'pleased'
+    this.boss.say(this.boss.win, 3)
+  }
+
+  startDefeat() {
+    this.setState('defeat')
+    for (const h of this.haz) {
+      const x = h.x ?? h.cx
+      const y = h.y ?? h.cy
+      if (x !== undefined) this.puff(x + (h.w || 0) / 2, y, ['#f4f4f4', '#c8b8e0'], 3)
+    }
+    this.haz = []
+    this.conveyor = 0
+    this.boss.mood = 'defeated'
+    this.boss.bubbleText = null
+    this.defeatFanfare = false
+    // The music cuts out. For the final boss: total silence.
+    stopMusic()
+    setTempo(1)
+    if (this.bossIdx === 4) setTimeout(() => this.state === 'defeat' && this.boss.say('...', 2.5), 1000)
+    else this.boss.say(this.boss.defeat, 3)
+    const i = this.bossIdx
+    this.save.beaten[i] = Math.max(this.save.beaten[i], this.run.diff)
+    this.save.reached = Math.max(this.save.reached, Math.min(4, i + 1))
+    this.newBadge = null
+    if (this.boss.key === 'kinger' && !this.touchedFloor) {
+      this.newBadge = 'PILLOW MASTER'
+      this.save.badges.pillowMaster = true
+    }
+    this.persist()
+  }
+
+  finishRun() {
+    const r = this.run
+    const name = DIFFS[r.diff].name
+    const rec = (this.save.records[name] ||= {})
+    this.results = { time: r.time, deaths: r.deaths, diff: name, news: [], badges: [] }
+    if (r.mode === 'run') {
+      if (!rec.any || r.time < rec.any) {
+        rec.any = r.time
+        this.results.news.push('ANY%')
+      }
+      if (r.deaths === 0 && (!rec.nodeath || r.time < rec.nodeath)) {
+        rec.nodeath = r.time
+        this.results.news.push('NO DEATH')
+      }
+      if (r.deaths === 0 && r.diff >= 2 && !this.save.badges.perfect) {
+        this.save.badges.perfect = true
+        this.results.badges.push('PERFECT RUN')
+      }
+      if (r.diff === 3 && !this.save.badges.insane) {
+        this.save.badges.insane = true
+        this.results.badges.push('INSANE CLEAR')
+      }
+      if (!this.save.badges.cleared) {
+        this.save.badges.cleared = true
+        this.results.badges.push('ESCAPED THE CIRCUS?')
+      }
+    }
+    this.persist()
+  }
+
+  puff(x, y, colors, n) {
+    for (let i = 0; i < n; i++) this.parts.push({ x, y, vx: rand(-70, 70), vy: rand(-120, -20), life: rand(0.35, 0.8), color: colors[i % colors.length] })
+  }
+
+  flash(text, x, y, color = '#f8c830') {
+    this.floats.push({ text, x, y, life: 1.2, color })
   }
 
   // ---------- Main loop ----------
@@ -200,9 +323,15 @@ export class TadcGame {
 
   update(dt) {
     this.t += dt
-    this.stateT += dt
-    this.glitch = Math.max(0, this.glitch - dt)
+    const pr = (a) => this.pressed.has(a)
+    if (this.paused) {
+      this.updatePause(pr)
+      return
+    }
+    this.st += dt
     this.shake = Math.max(0, this.shake - dt)
+    this.flashT = Math.max(0, this.flashT - dt)
+    this.glitch = Math.max(0, this.glitch - dt)
     for (const q of this.parts) {
       q.vy += 300 * dt
       q.x += q.vx * dt
@@ -210,298 +339,324 @@ export class TadcGame {
       q.life -= dt
     }
     this.parts = this.parts.filter((q) => q.life > 0)
-    for (const f of this.texts) {
-      f.y -= 14 * dt
+    for (const f of this.floats) {
+      f.y -= 12 * dt
       f.life -= dt
     }
-    this.texts = this.texts.filter((f) => f.life > 0)
+    this.floats = this.floats.filter((f) => f.life > 0)
+    if (this.run && this.run.mode === 'run' && TIMED_STATES.has(this.state)) this.run.time += dt
 
-    const pr = (a) => this.pressed.has(a)
-    const go = pr('jump') || pr('start')
-    if (this.state === 'title') {
-      if (go) {
-        sfx.select()
-        this.goMap()
+    const fn = this['update_' + this.state]
+    if (fn) fn.call(this, dt, pr)
+  }
+
+  // A tiny vertical menu helper: returns the chosen index when confirmed, or -1.
+  menuNav(pr, key, count) {
+    if (pr('up')) {
+      this[key] = (this[key] + count - 1) % count
+      sfx.beep()
+    }
+    if (pr('down')) {
+      this[key] = (this[key] + 1) % count
+      sfx.beep()
+    }
+    if (pr('confirm')) {
+      sfx.blip()
+      return this[key]
+    }
+    return -1
+  }
+
+  // ---------- Title + main menu ----------
+
+  update_title(dt, pr) {
+    const menuAt = 8.8
+    if (this.st < menuAt) {
+      if (pr('confirm') || pr('start')) {
+        this.st = menuAt
+        playMusic('menu')
       }
-    } else if (this.state === 'map') {
-      if (pr('left') && this.sel > 0) {
-        this.sel--
-        sfx.select()
-      }
-      if (pr('right') && this.sel < this.data.unlocked - 1) {
-        this.sel++
-        sfx.select()
-      }
-      if (go && this.stateT > 0.2) this.startLevel(this.sel)
-      if (pr('back')) this.setState('title')
-    } else if (this.state === 'play') {
-      this.updatePlay(dt)
-      if (pr('back')) this.goMap()
-    } else if (this.state === 'clear') {
-      if ((go && this.stateT > 1) || this.stateT > 6) {
-        if (this.levelIdx === LEVELS.length - 1) this.setState('ending')
-        else {
-          this.sel = Math.min(this.levelIdx + 1, this.data.unlocked - 1)
-          this.goMap()
-        }
-      }
-    } else if (this.state === 'ending') {
-      if (go && this.stateT > 1.5) this.goMap()
+      if (this.st >= 6.4 && this.st - dt < 6.4) sfx.text()
+      if (this.st >= 7.3 && this.st - dt < 7.3) for (let i = 0; i < 6; i++) setTimeout(() => sfx.text(), i * 60)
+      return
+    }
+    if (this.st - dt < menuAt) playMusic('menu')
+    // Secret: leave the title alone long enough and Pomni slowly looks at you...
+    this.idleT += dt
+    if (this.helpT > 0) {
+      this.helpT -= dt
+      if (this.helpT <= 0) playMusic('menu', true)
+      return
+    }
+    if (this.idleT > 25) {
+      this.idleT = 0
+      this.helpT = 4.5
+      stopMusic()
+      sfx.static()
+    }
+    const k = this.menuNav(pr, 'msel', MENU.length)
+    if (k >= 0) this.menuPick(k)
+  }
+
+  menuPick(k) {
+    if (k === 0) this.startRun()
+    else if (k === 1) this.setState('howto')
+    else if (k === 2) this.setState('bosses')
+    else this.setState('options')
+  }
+
+  update_howto(dt, pr) {
+    if (this.st > 0.2 && (pr('confirm') || pr('back') || pr('start'))) {
+      sfx.back()
+      this.toMenu()
     }
   }
 
-  solidAt(px, py) {
-    const ch = this.lv.tile(Math.floor(px / TILE), Math.floor(py / TILE))
-    return ch === '#' || ch === '='
+  update_bosses(dt, pr) {
+    if (pr('left') || pr('up')) {
+      this.gsel = (this.gsel + 4) % 5
+      sfx.beep()
+    }
+    if (pr('right') || pr('down')) {
+      this.gsel = (this.gsel + 1) % 5
+      sfx.beep()
+    }
+    if (this.st > 0.2 && pr('confirm') && this.gsel <= this.save.reached) {
+      sfx.blip()
+      this.startRun(this.gsel)
+      return
+    }
+    if (pr('back')) {
+      sfx.back()
+      this.toMenu()
+    }
   }
 
-  solidTile(col, row) {
-    const ch = this.lv.tile(col, row)
-    return ch === '#' || ch === '='
+  optionItems() {
+    const s = this.save
+    return [
+      ['DIFFICULTY', DIFFS[s.diff].name, (dir) => (s.diff = (s.diff + (dir || 1) + 4) % 4)],
+      ['MUSIC', s.music ? 'ON' : 'OFF', () => setMusicOn((s.music = !s.music))],
+      ['SOUND FX', s.sfx ? 'ON' : 'OFF', () => setSfxOn((s.sfx = !s.sfx))],
+      ['SPEEDRUN TIMER', s.timer ? 'ON' : 'OFF', () => (s.timer = !s.timer)],
+      ['RECORDS', '', () => this.setState('records')],
+      ['RESET SAVE', this.resetArm ? 'SURE? PRESS AGAIN' : '', () => this.resetSave()],
+      ['BACK', '', () => this.toMenu()],
+    ]
   }
 
-  updatePlay(dt) {
-    const p = this.p
-    if (p.dead > 0) {
-      p.dead -= dt
-      if (p.dead <= 0) this.respawn()
-    } else {
-      this.movePlayer(dt)
+  resetSave() {
+    if (!this.resetArm) {
+      this.resetArm = 1
+      return
     }
-
-    if (!this.locked) {
-      this.camX = clamp(p.x - 130, 0, this.lv.w - VW)
-      if (p.x > this.lv.arenaX + 40 && p.dead <= 0) this.lockArena()
-    } else {
-      this.camX += (this.lv.arenaX - this.camX) * Math.min(1, dt * 6)
+    this.resetArm = 0
+    try {
+      localStorage.removeItem(STORE_KEY)
+    } catch {
+      // Nothing saved.
     }
+    this.save = loadSave()
+    setMusicOn(true)
+    setSfxOn(true)
+    this.flash('SAVE ERASED', VW / 2, 140, '#e03c9c')
+  }
 
-    for (const e of this.ents) {
-      if (e.type !== 'gloink' || !e.alive) continue
-      e.x += e.vx * dt
-      const ahead = e.vx < 0 ? e.x - 1 : e.x + e.w + 1
-      if (this.solidAt(ahead, e.y + e.h - 2) || !this.solidAt(ahead, e.y + e.h + 2)) e.vx = -e.vx
+  update_options(dt, pr) {
+    const items = this.optionItems()
+    if (pr('up') || pr('down')) this.resetArm = 0
+    const k = this.st > 0.2 ? this.menuNav(pr, 'osel', items.length) : -1
+    if (k >= 0) {
+      items[k][2](1)
+      this.persist()
     }
+    if (this.osel === 0 && (pr('left') || pr('right'))) {
+      items[0][2](pr('left') ? -1 : 1)
+      sfx.beep()
+      this.persist()
+    }
+    if (pr('back')) {
+      sfx.back()
+      this.toMenu()
+    }
+  }
 
-    if (this.boss) this.boss.update(dt)
+  update_records(dt, pr) {
+    if (this.st > 0.2 && (pr('confirm') || pr('back') || pr('start'))) {
+      sfx.back()
+      this.setState('options')
+    }
+  }
+
+  // ---------- A boss fight ----------
+
+  update_intro(dt, pr) {
+    const info = BOSSES[this.bossIdx]
+    for (const [at, who, text] of info.intro) {
+      if (this.st >= at && this.st - dt < at) {
+        if (who === 'boss') this.boss.say(text, 1.6)
+        else if (who === 'bubble') this.boss.bub.text = { text, until: this.t + 1.6 }
+        else this.pomniSay = { text, until: this.t + 1.4 }
+        sfx.text()
+        if (text === 'PFFFFFT.') sfx.pfft()
+      }
+    }
+    this.boss.idle(dt)
+    if (this.st > 4.6 || (this.st > 1 && pr('confirm'))) this.setState('countdown')
+    if (pr('start') && !pr('confirm')) this.pause()
+  }
+
+  update_countdown(dt, pr) {
+    this.boss.idle(dt)
+    for (const at of [0, 0.6, 1.2]) if (this.st >= at && this.st - dt < at) sfx.countdown()
+    if (this.st >= 1.8) {
+      sfx.go()
+      this.flash('GO!', VW / 2, 66, '#38b848')
+      this.setState('fight')
+    }
+    if (pr('start')) this.pause()
+  }
+
+  pause() {
+    this.paused = true
+    this.psel = 0
+    sfx.pause()
+  }
+
+  update_fight(dt, pr) {
+    if (pr('start')) {
+      this.pause()
+      return
+    }
+    const p = this.pomni
+    const b = this.boss
+    this.floorScroll += this.conveyor * dt
+    p.update(dt, { left: this.held('left'), right: this.held('right'), jump: this.held('jump'), jumpPressed: pr('jump') }, {
+      platforms: this.platforms,
+      minX: 2,
+      maxX: b.key === 'caine' ? VW - 2 : b.x + 6,
+      slip: this.slip,
+      conveyor: this.conveyor,
+    })
+    b.updateFight(dt)
     for (const h of this.haz) h.update(dt, this)
     this.haz = this.haz.filter((h) => !h.dead)
-
-    if (p.dead <= 0) this.collide()
-  }
-
-  movePlayer(dt) {
-    const p = this.p
-    const dir = (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0)
-    const slip = this.slip
-    const max = slip ? 150 : RUN
-    const accel = p.onGround ? (slip ? 110 : 900) : 650
-    const decel = p.onGround ? (slip ? 18 : 1100) : 350
-    if (dir) {
-      p.vx = clamp(p.vx + dir * accel * dt, -max, max)
-      p.face = dir
-    } else if (p.vx > 0) p.vx = Math.max(0, p.vx - decel * dt)
-    else p.vx = Math.min(0, p.vx + decel * dt)
-
-    if (this.pressed.has('jump')) p.jumpBuf = 0.12
-    p.jumpBuf -= dt
-    p.coyote = p.onGround ? 0.08 : p.coyote - dt
-    if (p.jumpBuf > 0 && p.coyote > 0) {
-      p.vy = -JUMP_V
-      p.jumpBuf = 0
-      p.coyote = 0
-      p.onGround = false
-      sfx.jump()
-    }
-    // Let go of jump early for a little hop.
-    const g = !this.held('jump') && p.vy < 0 ? GRAV * 2.2 : GRAV
-    p.vy = Math.min(420, p.vy + g * dt)
-
-    p.x += p.vx * dt
-    this.collideX()
-    if (this.locked) p.x = Math.max(p.x, this.lv.arenaX + 2)
-    p.prevBottom = p.y + p.h
-    p.y += p.vy * dt
-    p.onGround = false
-    this.collideY()
-    p.anim += Math.abs(p.vx) * dt
-  }
-
-  wallTile(col, row) {
-    return this.lv.tile(col, row) === '#'
-  }
-
-  collideX() {
-    const p = this.p
-    const top = Math.floor(p.y / TILE)
-    const bot = Math.floor((p.y + p.h - 0.01) / TILE)
-    if (p.vx > 0) {
-      const col = Math.floor((p.x + p.w) / TILE)
-      for (let r = top; r <= bot; r++) {
-        if (this.wallTile(col, r)) {
-          p.x = col * TILE - p.w - 0.01
-          p.vx = 0
-          break
-        }
-      }
-    } else if (p.vx < 0) {
-      const col = Math.floor(p.x / TILE)
-      for (let r = top; r <= bot; r++) {
-        if (this.wallTile(col, r)) {
-          p.x = (col + 1) * TILE
-          p.vx = 0
-          break
-        }
-      }
-    }
-  }
-
-  collideY() {
-    const p = this.p
-    const left = Math.floor(p.x / TILE)
-    const right = Math.floor((p.x + p.w - 0.01) / TILE)
-    if (p.vy > 0) {
-      const row = Math.floor((p.y + p.h) / TILE)
-      const fromAbove = p.prevBottom <= row * TILE + 0.5
-      for (let c = left; c <= right; c++) {
-        if (this.wallTile(c, row) || (fromAbove && this.solidTile(c, row))) {
-          p.y = row * TILE - p.h
-          p.vy = 0
-          p.onGround = true
-          break
-        }
-      }
-    } else if (p.vy < 0) {
-      const row = Math.floor(p.y / TILE)
-      for (let c = left; c <= right; c++) {
-        if (this.wallTile(c, row)) {
-          p.y = (row + 1) * TILE
-          p.vy = 0
-          break
-        }
-      }
-    }
+    this.collide()
+    if (this.state !== 'fight') return
+    if (p.onFloor) this.touchedFloor = true
+    if (b.done) this.startDefeat()
   }
 
   collide() {
-    const p = this.p
-    const pb = { x: p.x, y: p.y, w: p.w, h: p.h }
-    const landing = (top, x, w) => p.vy >= 0 && p.prevBottom <= top + 2 && p.y + p.h >= top && p.x + p.w > x && p.x < x + w
-
-    for (const e of this.ents) {
-      if (!e.alive) continue
-      if (e.type === 'star' && overlap(pb, e)) {
-        e.alive = false
-        this.starsGot++
-        sfx.star()
-        this.puff(e.x + 3, e.y + 3, ['#f8c830', '#f4f4f4'], 6)
-      } else if (e.type === 'flag' && !e.on && p.x > e.x) {
-        e.on = true
-        this.checkpoint = { x: e.x + 4, y: GROUND_Y - p.h }
-        sfx.star()
-        this.say('CHECKPOINT!', e.x, e.y - 10)
-      } else if (e.type === 'gloink' && overlap(pb, e)) {
-        if (landing(e.y, e.x, e.w)) {
-          e.alive = false
-          p.vy = -200
-          sfx.stomp()
-          this.puff(e.x + 5, e.y + 4, ['#e03c9c', '#f4f4f4'], 10)
-        } else return this.die()
-      }
-    }
-
+    const p = this.pomni
+    const pb = p.box
     let slip = false
     for (const h of this.haz) {
-      if (h.kind === 'deadly' && h.hits(pb)) return this.die()
-      if (h.kind === 'standkill' && h.active && landing(h.y, h.x, h.w)) return this.die()
-      if (h.kind === 'platform') {
-        if (landing(h.y, h.x, h.w)) {
-          p.y = h.y - p.h
-          p.vy = 0
-          p.onGround = true
-          p.x += (h.flying ? 0 : h.vx) * STEP
-        } else if (h.hits(pb)) return this.die()
-      }
-      if (h.kind === 'slip' && p.onGround && Math.abs(p.y + p.h - h.y) < 3 && p.x + p.w > h.x && p.x < h.x + h.w) slip = true
+      if (h.kind === 'deadly' || h.kind === 'mine') {
+        if (h.hits(pb)) return this.die(h.killer)
+      } else if (h.kind === 'platform') {
+        const landing = p.vy >= 0 && p.prevBottom <= h.y + 3 && p.y + p.h >= h.y - 1 && p.x + p.w > h.x + 1 && p.x < h.x + h.w - 1
+        if (landing) {
+          if (h.bouncy) {
+            p.y = h.y - p.h - 1
+            p.vy = -420
+            p.onGround = false
+            p.onFloor = false
+            h.squish = 0.15
+            sfx.boing()
+          } else p.standOn(h.y, h.dx)
+        } else if (h.hits(pb)) return this.die(h.killer)
+      } else if (h.kind === 'slip' && p.onGround && h.covers(pb)) slip = true
     }
     this.slip = slip
+  }
 
-    const b = this.boss
-    if (b) {
-      const bb = b.box()
-      if (overlap(pb, bb)) {
-        if (b.stompable && landing(bb.y, bb.x, bb.w)) {
-          b.hit()
-          p.vy = -250
-          this.say(b.hp > 0 ? `${b.hp} MORE!` : 'GOT YOU!', b.x + b.w / 2, b.y - 12)
-        } else if (b.harmful) return this.die()
-        else if (p.x + p.w / 2 < bb.x + bb.w / 2) p.x = bb.x - p.w
-        else p.x = bb.x + bb.w
+  update_dying(dt) {
+    this.boss.idle(dt)
+    if (this.st >= 0.7 && this.st - dt < 0.7) sfx.death()
+    if (this.st >= 1.65 && this.st - dt < 1.65) {
+      const p = this.pomni
+      this.puff(p.x + 5, p.y + 6, ['#d82838', '#2c5ce0', '#f8c830', '#f4f4f4', '#f8dcc8'], 26)
+    }
+    if (this.st > 2.4) {
+      this.gameoverSel = 0
+      this.setState('gameover')
+      sfx.gameOver()
+    }
+  }
+
+  update_gameover(dt, pr) {
+    if (this.st < 0.6) return
+    if (pr('up') || pr('down') || pr('left') || pr('right')) {
+      this.gameoverSel = 1 - this.gameoverSel
+      sfx.beep()
+    }
+    if (pr('confirm') || pr('start')) {
+      sfx.blip()
+      if (this.gameoverSel === 0) this.beginBoss(this.bossIdx, true)
+      else this.toMenu()
+    }
+  }
+
+  update_defeat(dt, pr) {
+    const caine = this.bossIdx === 4
+    const p = this.pomni
+    p.update(dt, { left: false, right: false, jump: false, jumpPressed: false }, { platforms: this.platforms, minX: 2, maxX: VW - 2, slip: false, conveyor: 0 })
+    this.boss.idle(dt)
+    const fanAt = caine ? 3.2 : 0.8
+    if (!this.defeatFanfare && this.st >= fanAt) {
+      this.defeatFanfare = true
+      sfx.fanfare()
+      if (this.newBadge) setTimeout(() => sfx.secret(), 1300)
+    }
+    if (this.st > fanAt + 1.6 && (pr('confirm') || pr('start') || this.st > 16)) {
+      sfx.blip()
+      if (this.run.mode === 'practice') {
+        this.toMenu()
+        this.setState('bosses')
+      } else if (this.bossIdx < 4) this.beginBoss(this.bossIdx + 1, false)
+      else {
+        this.finishRun()
+        this.typed = null
+        this.typed2 = null
+        this.setState('ending')
       }
     }
-
-    if (this.door && overlap(pb, this.door)) this.levelClear()
-    if (p.y > VH + 20) this.die()
   }
 
-  die() {
-    const p = this.p
-    if (p.dead > 0) return
-    p.dead = 1.3
-    this.data.deaths++
-    this.levelDeaths++
-    this.persist()
-    sfx.die()
-    this.glitch = 0.5
-    this.shake = 0.2
-    this.puff(p.x + 5, Math.min(p.y + 10, VH - 4), ['#d82838', '#2c5ce0', '#f8c830', '#f8dcc8', '#f4f4f4'], 30)
-  }
-
-  respawn() {
-    this.p = this.newPlayer()
-    this.haz = []
-    this.slip = false
-    if (this.boss) this.boss.playerRespawned()
-    this.glitch = 0.25
-  }
-
-  lockArena() {
-    this.locked = true
-    this.checkpoint = { x: this.lv.arenaX + 24, y: GROUND_Y - 22 }
-    this.boss = makeBoss(this.def.boss, this)
-    this.music()
-  }
-
-  clearHazards() {
-    for (const h of this.haz) if (h.x !== undefined) this.puff(h.x + (h.w || 0) / 2, h.y ?? 100, ['#f4f4f4', '#c8b8e0'], 3)
-    this.haz = []
-  }
-
-  bossDefeated() {
-    this.haz = []
-    this.boss = null
-    this.door = { x: this.lv.arenaX + 280, y: GROUND_Y - 32, w: 16, h: 32 }
-    this.say('BOSS BEATEN!', this.lv.arenaX + 160, 60, 3)
-    sfx.win()
-  }
-
-  levelClear() {
-    this.door = null
-    this.data.unlocked = Math.max(this.data.unlocked, Math.min(LEVELS.length, this.levelIdx + 2))
-    if (!this.data.beaten.includes(this.levelIdx)) this.data.beaten.push(this.levelIdx)
-    this.persist()
-    sfx.win()
-    this.setState('clear')
-  }
-
-  puff(x, y, colors, n) {
-    for (let i = 0; i < n; i++) {
-      this.parts.push({ x, y, vx: rand(-80, 80), vy: rand(-140, -20), life: rand(0.4, 0.9), color: colors[i % colors.length] })
+  updatePause(pr) {
+    if (pr('start') && !pr('confirm')) {
+      this.paused = false
+      sfx.pause()
+      return
     }
+    const k = this.menuNav(pr, 'psel', 3)
+    if (pr('back')) this.paused = false
+    if (k === 0) this.paused = false
+    else if (k === 1) {
+      this.paused = false
+      this.beginBoss(this.bossIdx, true)
+    } else if (k === 2) this.toMenu()
   }
 
-  say(str, x, y, life = 1.4) {
-    this.texts.push({ str, x, y, life })
+  update_ending(dt, pr) {
+    const s = this.st
+    const cross = (a) => s >= a && s - dt < a
+    if (cross(1.5)) this.typed = { text: 'YOU SURVIVED.', at: this.t }
+    if (cross(4.2)) this.typed2 = { text: '...SOMEHOW.', at: this.t }
+    if (cross(10.2)) {
+      playMusic('ending', true)
+      sfx.glitch()
+      this.glitch = 0.3
+    }
+    if (s > 14 || (s > 10.6 && pr('confirm'))) this.setState('results')
+  }
+
+  update_results(dt, pr) {
+    if (this.st > 1 && (pr('confirm') || pr('start'))) {
+      sfx.blip()
+      this.toMenu()
+    }
   }
 
   // ---------- Drawing ----------
@@ -510,268 +665,563 @@ export class TadcGame {
     const c = this.c
     c.setTransform(1, 0, 0, 1, 0, 0)
     c.imageSmoothingEnabled = false
-    if (this.shake > 0) c.translate(Math.round(rand(-2, 2)), Math.round(rand(-2, 2)))
-    if (this.state === 'title') this.drawTitle(c)
-    else if (this.state === 'map') this.drawMap(c)
-    else if (this.state === 'ending') this.drawEnding(c)
-    else {
-      this.drawPlay(c)
-      if (this.state === 'clear') this.drawClear(c)
+    this.hits = []
+    if (this.shake > 0 && !this.paused) c.translate(Math.round(rand(-2, 2)), Math.round(rand(-2, 2)))
+    const fn = this['draw_' + this.state]
+    if (fn) fn.call(this, c)
+    c.setTransform(1, 0, 0, 1, 0, 0)
+    if (this.paused) {
+      this.hits = []
+      this.drawPause(c)
+    }
+    if (this.flashT > 0) {
+      c.fillStyle = '#ffffff'
+      c.fillRect(0, 0, VW, VH)
     }
     if (this.glitch > 0) this.drawGlitch(c)
   }
 
-  drawBackdrop(c, camX, pal) {
-    c.fillStyle = pal.sky
+  // A menu line that also works with a mouse click or a finger tap.
+  menuLine(c, label, x, y, selected, fn, { scale = 1, align = 'left', value = '' } = {}) {
+    const full = label + (value ? '  ' + value : '')
+    const w = textWidth(full, scale)
+    const blink = selected && Math.floor(this.t * 6) % 2
+    const color = selected ? (blink ? '#f4f4f4' : '#f8c830') : '#c8b8e0'
+    const left = align === 'center' ? Math.round(x - w / 2) : x
+    if (selected) drawText(c, '>', left - 8 * scale, y, { scale, color: '#f8c830' })
+    drawText(c, label, left, y, { scale, color })
+    if (value) drawText(c, value, left + textWidth(label + '  ', scale) + scale, y, { scale, color: selected ? '#f4f4f4' : '#8c8c9c' })
+    this.hits.push({ x: left - 10, y: y - 3, w: w + 20, h: 6 * scale + 5, fn })
+  }
+
+  bubble(c, text, ax, ay, color = '#f4f4f4') {
+    const w = textWidth(text) + 8
+    const h = 11
+    const x = clamp(Math.round(ax - w / 2), 2, VW - w - 2)
+    const y = Math.max(2, Math.round(ay - h - 5))
+    c.fillStyle = INK
+    c.fillRect(x - 1, y - 1, w + 2, h + 2)
+    c.fillStyle = color
+    c.fillRect(x, y, w, h)
+    const tx = clamp(Math.round(ax), x + 3, x + w - 3)
+    c.fillStyle = INK
+    c.fillRect(tx - 2, y + h + 1, 4, 2)
+    c.fillStyle = color
+    c.fillRect(tx - 1, y + h, 2, 3)
+    drawText(c, text, x + 4, y + 3, { color: INK, shadow: null })
+  }
+
+  // ---------- Title screen ----------
+
+  titlePixels() {
+    if (this._titlePix) return this._titlePix
+    const cv = document.createElement('canvas')
+    cv.width = VW
+    cv.height = VH
+    const tc = cv.getContext('2d')
+    const colors = ['#d82838', '#f8c830', '#2c5ce0', '#38b848', '#e03c9c', '#f88828', '#c8b8e0']
+    const line = (str, y, scale) => {
+      let x = VW / 2 - textWidth(str, scale) / 2
+      for (let i = 0; i < str.length; i++) {
+        drawText(tc, str[i], x, y, { scale, color: colors[(i + y) % colors.length] })
+        x += 4 * scale
+      }
+    }
+    line('THE AMAZING', 8, 2)
+    line('DIGITAL CIRCUS', 22, 3)
+    const data = tc.getImageData(0, 0, VW, VH).data
+    const pix = []
+    for (let y = 0; y < 45; y++)
+      for (let x = 0; x < VW; x++) {
+        const i = (y * VW + x) * 4
+        if (data[i + 3] > 0) pix.push({ x, y, c: `rgb(${data[i]},${data[i + 1]},${data[i + 2]})` })
+      }
+    const r = seeded(7)
+    for (let i = pix.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1))
+      ;[pix[i], pix[j]] = [pix[j], pix[i]]
+    }
+    this._titlePix = { pix, img: cv }
+    return this._titlePix
+  }
+
+  draw_title(c) {
+    const s = this.st
+    c.fillStyle = '#000000'
     c.fillRect(0, 0, VW, VH)
-    const off = Math.floor(camX * 0.3) % 32
-    c.fillStyle = pal.stripe
-    for (let x = -off; x < VW; x += 32) c.fillRect(x, 0, 16, VH)
-    // Scalloped trim at the top of the tent.
-    const s = Math.floor(camX * 0.3) % 16
-    for (let x = -s - 16; x < VW + 16; x += 16) {
-      c.fillStyle = pal.trim
-      c.fillRect(x, 0, 16, 3)
-      c.fillRect(x + 2, 3, 12, 2)
-      c.fillRect(x + 5, 5, 6, 2)
+    const menuOn = s >= 8.8
+    if (menuOn) {
+      c.save()
+      c.globalAlpha = Math.min(1, (s - 8.8) * 1.5) * 0.9
+      drawBackground(c, 'menu', this.t)
+      drawFloor(c, this.t * 10)
+      c.restore()
     }
-  }
-
-  drawFloorBand(c, y) {
-    for (let x = 0; x < VW; x += 8) {
-      for (let r = 0; r < 2; r++) {
-        c.fillStyle = (x / 8 + r) % 2 ? '#140c1c' : '#f4f4f4'
-        c.fillRect(x, y + r * 8, 8, 8)
+    // The title builds itself out of pixels, one at a time.
+    const tp = this.titlePixels()
+    const k = clamp((s - 0.5) / 3, 0, 1)
+    if (k >= 1) c.drawImage(tp.img, 0, 0)
+    else {
+      const n = Math.floor(tp.pix.length * k * k)
+      for (let i = 0; i < n; i++) {
+        const p = tp.pix[i]
+        c.fillStyle = p.c
+        c.fillRect(p.x, p.y, 1, 1)
+      }
+      if (s > 0.25 && s < 0.6) {
+        c.fillStyle = '#f4f4f4'
+        c.fillRect(VW / 2, 30, 1, 1)
       }
     }
-    c.fillStyle = '#2a1040'
-    c.fillRect(0, y + 16, VW, VH - y - 16)
-  }
-
-  drawTiles(c) {
-    const cam = Math.round(this.camX)
-    const c0 = Math.floor(cam / TILE)
-    for (let col = c0; col <= c0 + 21; col++) {
-      for (let row = 0; row < 11; row++) {
-        const ch = this.lv.tile(col, row)
-        const x = col * TILE - cam
-        const y = row * TILE
-        if (ch === '#') {
-          const top = !this.solidTile(col, row - 1)
-          c.fillStyle = '#3c1c5c'
-          c.fillRect(x, y, TILE, TILE)
-          c.fillStyle = '#2a1040'
-          c.fillRect(x + 3, y + 11, 2, 2)
-          c.fillRect(x + 11, y + 5, 2, 2)
-          if (top) {
-            for (let k = 0; k < 4; k++) {
-              for (let r = 0; r < 2; r++) {
-                c.fillStyle = (k + r) % 2 ? '#140c1c' : '#f4f4f4'
-                c.fillRect(x + k * 4, y + r * 4, 4, 4)
-              }
-            }
-            c.fillStyle = '#140c1c'
-            c.fillRect(x, y + 8, TILE, 1)
-          }
-        } else if (ch === '=') {
-          c.fillStyle = '#140c1c'
-          c.fillRect(x, y, TILE, 10)
-          for (let k = 0; k < 4; k++) {
-            c.fillStyle = k % 2 ? '#f4f4f4' : '#d82838'
-            c.fillRect(x + k * 4, y + 1, 4, 7)
-          }
-          c.fillStyle = '#f8c830'
-          c.fillRect(x, y + 8, TILE, 2)
-        }
-      }
-    }
-  }
-
-  drawPlay(c) {
-    const cam = Math.round(this.camX)
-    const t = this.t
-    this.drawBackdrop(c, cam, this.def)
-    this.drawTiles(c)
-
-    for (const e of this.ents) {
-      if (e.type === 'flag') {
-        const x = e.x - cam + 7
-        c.fillStyle = '#140c1c'
-        c.fillRect(x, e.y - 8, 2, 24)
-        c.fillStyle = e.on ? '#38b848' : '#d82838'
-        c.fillRect(x + 2, e.y - 8, 8, 3)
-        c.fillRect(x + 2, e.y - 5, 5, 2)
-      }
-      if (!e.alive) continue
-      if (e.type === 'star') drawSprite(c, SPR.star, e.x - cam, e.y + Math.round(Math.sin(t * 4 + e.x) * 1.5))
-      if (e.type === 'gloink') drawSprite(c, SPR.gloink, e.x - cam, e.y - (Math.floor(t * 6) % 2), { flip: e.vx > 0 })
+    if (s > 3.6) {
+      const on = s > 4.2 || Math.floor(s * 12) % 2
+      if (on) drawText(c, 'BOSS RUSH', VW / 2, 50, { scale: 2, align: 'center', color: '#f4f4f4', shadow: '#d82838' })
     }
 
-    if (this.door) {
-      const d = this.door
-      const x = d.x - cam
-      c.fillStyle = '#140c1c'
-      c.fillRect(x - 1, d.y - 1, d.w + 2, d.h + 1)
-      c.fillStyle = '#2c5ce0'
-      c.fillRect(x, d.y, d.w, d.h)
-      c.fillStyle = '#d82838'
-      c.fillRect(x + 2, d.y + 2, d.w - 4, d.h - 2)
-      c.fillStyle = '#f8c830'
-      c.fillRect(x + 11, d.y + 16, 2, 2)
-      drawText(c, 'EXIT', x + 8, d.y - 16 - (Math.floor(t * 3) % 2), { align: 'center', color: '#f8c830' })
-    }
-
-    for (const h of this.haz) h.draw(c, cam, t)
-    if (this.boss) this.boss.draw(c, cam, t)
-
-    const p = this.p
-    if (p.dead <= 0) {
+    // Pomni, nervous, under the title.
+    if (s > 4) {
+      const px = menuOn ? 92 : VW / 2
       let spr = SPR.pomniIdle
-      if (!p.onGround) spr = SPR.pomniJump
-      else if (Math.abs(p.vx) > 10) spr = Math.floor(p.anim / 10) % 2 ? SPR.pomniRun1 : SPR.pomniRun2
-      else if (this.t % 4 > 3) spr = SPR.pomniLook
-      this.drawPomni(c, spr, p.x + p.w / 2 - cam, p.y + p.h + 1, p.face < 0)
-      if (this.slip && Math.floor(t * 8) % 2) drawText(c, '!', p.x + 3 - cam, p.y - 10, { color: '#68d8f8' })
+      let flip = false
+      if (s < 4.6) spr = SPR.pomniIdle
+      else if (s < 5.2) flip = true
+      else if (s < 5.8) flip = false
+      else if (s < 6.4) flip = true
+      else if (s < 6.9) spr = SPR.pomniLook
+      else if (s < 8.2) spr = Math.floor(s * 4) % 2 ? SPR.pomniWave : SPR.pomniIdle
+      if (menuOn) {
+        spr = SPR.pomniIdle
+        flip = Math.floor(this.t / 2.5) % 3 === 2
+      }
+      const alpha = clamp((s - 4) * 3, 0, 1)
+      const shake = Math.round(Math.sin(this.t * 30) * 0.4)
+      if (this.helpT <= 0) drawPomni(c, spr, px + shake, 145, flip, { scale: 2, alpha })
+      if (s > 6.4 && s < 6.9) drawText(c, '!', px + 8, 70, { scale: 2, color: '#f8c830' })
+      if (s > 7.3 && s < 8.6) this.bubble(c, 'OH NO.', px + 14, 82)
+      if (menuOn && this.helpT <= 0 && Math.floor(this.t * 1.3) % 5 === 0) drawSprite(c, SPR.sweat, px + 14, 88 + ((this.t * 20) % 6))
+      if (this.helpT > 0) {
+        c.fillStyle = 'rgba(0, 0, 0, 0.6)'
+        c.fillRect(0, 0, VW, VH)
+        const turn = this.helpT > 3.5 ? SPR.pomniIdle : SPR.pomniLook
+        drawPomni(c, turn, px, 145, false, { scale: 2 })
+        if (this.helpT < 3.4 && this.helpT > 0.6) this.bubble(c, '...HELP.', px + 14, 82)
+      }
     }
 
+    if (menuOn && this.helpT <= 0) {
+      MENU.forEach((m, i) => this.menuLine(c, m, 178, 84 + i * 14, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i))))
+      const d = DIFFS[this.save.diff]
+      drawText(c, `MODE: ${d.name}`, 178, 144, { color: d.color })
+      const rec = this.save.records[d.name]
+      if (rec && rec.any) drawText(c, `BEST ${fmtTime(rec.any)}`, 178, 152, { color: '#c8b8e0' })
+      drawText(c, 'A = Z / SPACE    START = ENTER', VW / 2, 167, { align: 'center', color: '#8c8c9c' })
+    } else if (!menuOn && s > 1) {
+      drawText(c, 'PRESS A', VW / 2, 167, { align: 'center', color: Math.floor(this.t * 2) % 2 ? '#8c8c9c' : '#4c4c5c' })
+    }
+  }
+
+  // ---------- How to play (an old game manual) ----------
+
+  draw_howto(c) {
+    c.fillStyle = '#2a1040'
+    c.fillRect(0, 0, VW, VH)
+    c.fillStyle = INK
+    c.fillRect(6, 6, VW - 12, VH - 12)
+    c.fillStyle = '#f4e8d0'
+    c.fillRect(8, 8, VW - 16, VH - 16)
+    c.fillStyle = '#e4d4b4'
+    for (let y = 28; y < VH - 10; y += 8) c.fillRect(10, y, VW - 20, 1)
+    drawText(c, 'HOW TO PLAY', VW / 2, 12, { scale: 2, align: 'center', color: '#d82838', shadow: INK })
+    const shake = Math.round(Math.sin(this.t * 40) * 0.6)
+    drawPomni(c, SPR.pomniScared, 46 + shake, 100, false, { scale: 2 })
+    drawSprite(c, SPR.sweat, 62, 40 + ((this.t * 14) % 8))
+    const row = (y, a, b, cc) => {
+      drawText(c, a, 92, y, { color: '#d82838', shadow: null })
+      drawText(c, b, 120, y, { color: '#2c5ce0', shadow: null })
+      drawText(c, cc, 146, y, { color: INK, shadow: null })
+    }
+    row(32, 'MOVE', '< >', 'MOVE POMNI LEFT AND RIGHT.')
+    row(42, 'JUMP', 'A', 'JUMP OVER THE ATTACKS.')
+    row(52, 'PAUSE', 'START', 'PAUSE THE GAME.')
+    drawText(c, 'KEYS: ARROWS.  A = Z OR SPACE.  START = ENTER.', 92, 62, { color: '#8c6c4c', shadow: null })
+    drawText(c, 'ONE HIT AND YOU ARE OUT.', 92, 72, { color: INK, shadow: null })
+    drawText(c, 'SURVIVE THE WHOLE SHOW!', 92, 80, { color: INK, shadow: null })
+
+    // A little diagram: Pomni jumping over a button.
+    const bx = 236
+    const by = 112
+    c.fillStyle = '#8c6c4c'
+    c.fillRect(bx - 34, by, 96, 1)
+    for (let i = 0; i <= 12; i++) {
+      const k = i / 12
+      c.fillRect(Math.round(bx - 26 + k * 70), Math.round(by - 12 - Math.sin(k * Math.PI) * 26), 1, 1)
+    }
+    drawSprite(c, SPR.button1, bx + 5, by - 9)
+    const k = (this.t * 0.5) % 1
+    const air = k > 0.15 && k < 0.85
+    const jk = air ? (k - 0.15) / 0.7 : 0
+    drawPomni(c, air ? SPR.pomniJump : SPR.pomniIdle, bx - 26 + (air ? jk * 70 : k < 0.15 ? 0 : 70), by + 1 - Math.sin(jk * Math.PI) * 26, false)
+
+    const lines = ['WATCH THE BOSS.', 'WATCH THE FLOOR.', 'WATCH THE AIR.', 'WATCH EVERYTHING.']
+    lines.forEach((l, i) => drawText(c, l, 92, 92 + i * 9, { color: i === 3 ? '#d82838' : INK, shadow: null }))
+    drawText(c, 'GOOD LUCK, POMNI.', VW / 2, 134, { scale: 2, align: 'center', color: '#2c5ce0', shadow: INK })
+    if (Math.floor(this.t * 2) % 2) drawText(c, 'PRESS A TO GO BACK', VW / 2, 154, { align: 'center', color: '#8c6c4c', shadow: null })
+    this.hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => this.pressed.add('back') })
+  }
+
+  // ---------- Boss gallery ----------
+
+  draw_bosses(c) {
+    drawBackground(c, 'menu', this.t)
+    c.fillStyle = 'rgba(12, 6, 20, 0.6)'
+    c.fillRect(0, 0, VW, VH)
+    drawText(c, 'BOSSES', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
+    const i = this.gsel
+    const info = BOSSES[i]
+    const met = i <= this.save.reached
+    const spr = SPR[info.key]
+    drawSprite(c, spr, 64 - spr.ax, 150 - spr.length + Math.round(Math.sin(this.t * 2)), { mode: met ? 'normal' : 'shadow' })
+    if (info.key === 'caine') drawSprite(c, SPR.bubble, 84, 34, { mode: met ? 'normal' : 'shadow' })
+    c.fillStyle = '#f4f4f4'
+    c.fillRect(20, 150, 90, 1)
+    const x = 124
+    drawText(c, `BOSS ${i + 1}`, x, 30, { color: '#8c8c9c' })
+    drawText(c, met ? info.name : '???', x, 40, { scale: 2, color: '#f8c830' })
+    drawText(c, met ? info.title : '???', x, 56, { color: '#e03c9c' })
+    if (met) info.rules.forEach((r, k) => drawText(c, r, x, 72 + k * 10, { color: '#f4f4f4' }))
+    else drawText(c, 'REACH THIS BOSS TO LEARN MORE.', x, 72, { color: '#8c8c9c' })
+    const best = this.save.beaten[i]
+    drawText(c, best >= 0 ? `BEATEN ON ${DIFFS[best].name}` : 'NOT BEATEN YET', x, 110, { color: best >= 0 ? '#38b848' : '#8c8c9c' })
+    if (met) {
+      drawText(c, 'A: PRACTICE THIS BOSS', x, 124, { color: Math.floor(this.t * 2) % 2 ? '#f8c830' : '#f88828' })
+      this.hits.push({ x: x - 4, y: 118, w: 120, h: 14, fn: () => this.pressed.add('confirm') })
+    }
+    if (i === 3 && this.save.badges.pillowMaster) drawText(c, '* PILLOW MASTER *', x, 136, { color: '#c8b8e0' })
+    for (let k = 0; k < 5; k++) {
+      c.fillStyle = k === i ? '#f8c830' : '#4c3c5c'
+      c.fillRect(VW / 2 - 24 + k * 10, 160, 6, 6)
+      this.hits.push({ x: VW / 2 - 26 + k * 10, y: 156, w: 10, h: 14, fn: () => ((this.gsel = k), sfx.beep()) })
+    }
+    drawText(c, '<', 120, 161, { color: '#f8c830' })
+    drawText(c, '>', 197, 161, { color: '#f8c830' })
+    this.hits.push({ x: 108, y: 154, w: 22, h: 18, fn: () => this.pressed.add('left') })
+    this.hits.push({ x: 190, y: 154, w: 22, h: 18, fn: () => this.pressed.add('right') })
+    drawText(c, 'B: BACK', VW - 4, 167, { align: 'right', color: '#8c8c9c' })
+    this.hits.push({ x: VW - 44, y: 158, w: 44, h: 18, fn: () => this.pressed.add('back') })
+  }
+
+  // ---------- Options + records ----------
+
+  draw_options(c) {
+    drawBackground(c, 'menu', this.t)
+    c.fillStyle = 'rgba(12, 6, 20, 0.65)'
+    c.fillRect(0, 0, VW, VH)
+    drawText(c, 'OPTIONS', VW / 2, 10, { scale: 2, align: 'center', color: '#f8c830' })
+    this.optionItems().forEach(([label, value], i) =>
+      this.menuLine(
+        c,
+        label,
+        80,
+        36 + i * 14,
+        this.osel === i,
+        () => {
+          this.osel = i
+          sfx.blip()
+          this.optionItems()[i][2](1)
+          this.persist()
+        },
+        { value },
+      ),
+    )
+    const d = DIFFS[this.save.diff]
+    const blurbs = ['SLOWER ATTACKS. BIG SAFE SPACES.', 'THE WAY THE SHOW IS MEANT TO BE.', 'MORE HAZARDS. LESS TIME TO REACT.', 'WHY DID YOU DO THIS TO YOURSELF?']
+    drawText(c, blurbs[this.save.diff], VW / 2, 150, { align: 'center', color: d.color })
+    if (this.osel === 0) drawText(c, '< > OR A TO CHANGE', VW / 2, 162, { align: 'center', color: '#8c8c9c' })
+    for (const f of this.floats) drawText(c, f.text, f.x, f.y, { align: 'center', color: f.color })
+  }
+
+  draw_records(c) {
+    drawBackground(c, 'menu', this.t)
+    c.fillStyle = 'rgba(12, 6, 20, 0.75)'
+    c.fillRect(0, 0, VW, VH)
+    drawText(c, 'RECORDS', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
+    drawText(c, 'MODE', 30, 30, { color: '#8c8c9c' })
+    drawText(c, 'ANY%', 130, 30, { color: '#8c8c9c' })
+    drawText(c, 'NO DEATH', 210, 30, { color: '#8c8c9c' })
+    DIFFS.forEach((d, i) => {
+      const r = this.save.records[d.name] || {}
+      const y = 44 + i * 12
+      drawText(c, d.name, 30, y, { color: d.color })
+      drawText(c, r.any ? fmtTime(r.any) : '--:--:--', 130, y)
+      drawText(c, r.nodeath ? fmtTime(r.nodeath) : '--:--:--', 210, y)
+    })
+    drawText(c, 'BADGES', 30, 100, { color: '#8c8c9c' })
+    const b = this.save.badges
+    const badges = [
+      ['ESCAPED THE CIRCUS?', b.cleared, 'BEAT ALL FIVE BOSSES'],
+      ['PERFECT RUN', b.perfect, 'NO DEATHS ON HARD OR INSANE'],
+      ['INSANE CLEAR', b.insane, 'BEAT INSANE MODE'],
+      ['PILLOW MASTER', b.pillowMaster, '???'],
+    ]
+    badges.forEach(([name, got, how], i) => {
+      const y = 112 + i * 10
+      drawSprite(c, SPR.star, 30, y - 1, { mode: got ? 'normal' : 'shadow' })
+      drawText(c, name, 42, y, { color: got ? '#f8c830' : '#4c4c5c' })
+      drawText(c, got ? 'GOT IT!' : how, 170, y, { color: got ? '#38b848' : '#8c8c9c' })
+    })
+    drawText(c, `TOTAL DEATHS: ${this.save.deaths}   RUNS: ${this.save.runs}`, VW / 2, 160, { align: 'center', color: '#c8b8e0' })
+    this.hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => this.pressed.add('back') })
+  }
+
+  // ---------- The arena ----------
+
+  drawArena(c) {
+    const t = this.t
+    drawBackground(c, this.arenaKey, t, this.floorScroll)
+    drawFloor(c, -this.floorScroll)
+    drawPlatforms(c, this.platforms)
+    for (const h of this.haz) if (h.kind === 'slip') h.draw(c, t)
+    if (this.boss) this.boss.draw(c, t)
+    for (const h of this.haz) if (h.kind !== 'slip') h.draw(c, t)
+    if (this.conveyor) {
+      const k = Math.floor(t * 6) % 2
+      drawText(c, '<<<', 8 + k * 2, GROUND_Y + 6, { color: '#f8c830' })
+    }
+  }
+
+  drawPomniNormal(c) {
+    const p = this.pomni
+    p.draw(c, this.t)
+    if (this.slip && p.onGround && Math.floor(this.t * 8) % 2) drawText(c, '!', p.x + 3, p.y - 16, { color: '#68d8f8' })
+  }
+
+  drawFx(c) {
     for (const q of this.parts) {
       c.fillStyle = q.color
-      c.fillRect(Math.round(q.x - cam), Math.round(q.y), 2, 2)
+      c.fillRect(Math.round(q.x), Math.round(q.y), 2, 2)
     }
-    for (const f of this.texts) {
-      if (f.life < 0.3 && Math.floor(t * 20) % 2) continue
-      drawText(c, f.str, f.x - cam, f.y, { align: 'center', color: '#f8c830' })
+    for (const f of this.floats) {
+      if (f.life < 0.3 && Math.floor(this.t * 20) % 2) continue
+      drawText(c, f.text, f.x, f.y, { align: 'center', color: f.color, scale: f.text === 'GO!' ? 2 : 1 })
     }
-
-    this.drawHud(c)
-  }
-
-  // Draw a Pomni frame standing with her feet at (cx, bottom), keeping her body centred between frames.
-  drawPomni(c, spr, cx, bottom, flip = false, scale = 1) {
-    const w = spr[0].length * scale
-    const ax = spr.ax * scale
-    drawSprite(c, spr, Math.round(flip ? cx - (w - ax) : cx - ax), Math.round(bottom - spr.length * scale), { flip, scale })
+    const b = this.boss
+    if (b && b.bubbleText && b.bubbleText.until > this.t) this.bubble(c, b.bubbleText.text, b.x + b.spr.ax, b.y + 2)
+    if (b && b.bub && b.bub.text && b.bub.text.until > this.t) this.bubble(c, b.bub.text.text, b.bub.x + 16, b.bub.y + 2)
+    if (this.pomniSay && this.pomniSay.until > this.t) this.bubble(c, this.pomniSay.text, this.pomni.x + 5, this.pomni.y - 10)
   }
 
   drawHud(c) {
-    drawText(c, this.def.title, 4, 4)
-    drawText(c, `STARS ${this.starsGot}/${this.starsTotal}  OUCH ${this.levelDeaths}`, 4, 12, { color: '#c8b8e0' })
     const b = this.boss
-    if (!b) return
-    drawText(c, b.name, VW - 4, 4, { align: 'right', color: '#f8c830' })
-    for (let i = 0; i < 3; i++) {
-      c.fillStyle = '#140c1c'
-      c.fillRect(VW - 46 + i * 14, 11, 12, 6)
-      c.fillStyle = i < b.hp ? '#d82838' : '#3c1c5c'
-      c.fillRect(VW - 45 + i * 14, 12, 10, 4)
-    }
-    if (b.state === 'intro' && Math.floor(this.t * 4) % 2) {
-      drawText(c, b.name, VW / 2, 50, { scale: 3, align: 'center', color: '#f8c830' })
-      drawText(c, 'DODGE, THEN STOMP WHEN THEY GET TIRED!', VW / 2, 72, { align: 'center' })
-    }
-    if (b.state === 'tired' && Math.floor(this.t * 4) % 2) {
-      drawText(c, 'TIRED! JUMP ON THEIR HEAD!', VW / 2, 30, { scale: 1, align: 'center', color: '#38b848' })
-    }
+    drawText(c, b.name, 4, 3, { color: '#f8c830' })
+    c.fillStyle = INK
+    c.fillRect(4, 11, 104, 6)
+    c.fillStyle = '#4c3c5c'
+    c.fillRect(5, 12, 102, 4)
+    const left = 1 - b.progress
+    c.fillStyle = left < 0.2 && Math.floor(this.t * 8) % 2 ? '#f8c830' : '#d82838'
+    c.fillRect(5, 12, Math.round(102 * left), 4)
+    c.fillStyle = 'rgba(255,255,255,0.4)'
+    c.fillRect(5, 12, Math.round(102 * left), 1)
+    if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 3, { align: 'center', color: '#f4f4f4' })
+    if (this.run.mode === 'practice') drawText(c, 'PRACTICE', VW / 2, 3, { align: 'center', color: '#68d8f8' })
+    const d = DIFFS[this.run.diff]
+    drawText(c, d.name, VW - 4, 3, { align: 'right', color: d.color })
+    if (this.run.mode === 'run') drawText(c, `DEATHS ${this.run.deaths}`, VW - 4, 11, { align: 'right', color: '#c8b8e0' })
   }
 
-  drawTitle(c) {
-    const t = this.t
-    this.drawBackdrop(c, t * 40, LEVELS[0])
-    this.drawFloorBand(c, 144)
-    drawText(c, "POMNI'S", VW / 2, 16, { scale: 3, align: 'center', color: '#d82838' })
-    drawText(c, 'BIG ESCAPE', VW / 2, 38, { scale: 3, align: 'center', color: '#2c5ce0' })
-    drawText(c, 'AN AMAZING DIGITAL CIRCUS FAN GAME', VW / 2, 62, { align: 'center', color: '#f8c830' })
-    const look = Math.floor(t / 1.5) % 4
-    const pose = look === 1 ? SPR.pomniLook : look === 3 ? SPR.pomniWave : SPR.pomniIdle
-    this.drawPomni(c, pose, VW / 2, 145 + Math.round(Math.sin(t * 3)), look === 2, 2)
-    const lineup = [
-      [SPR.jax, 6],
-      [SPR.ragatha, 44],
-      [SPR.gangle, 226],
-      [SPR.kinger, 258],
-      [SPR.zooble, 284],
-    ]
-    for (const [s, x] of lineup) drawSprite(c, s, x, 145 - s.length)
-    drawSprite(c, SPR.iconCaine, 86, 76 + Math.round(Math.sin(t * 2) * 3))
-    drawSprite(c, SPR.iconBubble, 204, 82 + Math.round(Math.cos(t * 2) * 3))
-    if (Math.floor(t * 2) % 2) drawText(c, 'PRESS JUMP TO START', VW / 2, 166, { align: 'center', color: '#f8c830' })
-  }
-
-  drawMap(c) {
-    const t = this.t
-    this.drawBackdrop(c, t * 20, LEVELS[this.sel])
-    drawText(c, 'PICK A SHOW', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
+  draw_intro(c) {
+    this.drawArena(c)
+    const p = this.pomni
+    // Pomni is nervous: she looks left and right, and sweats.
+    const spr = Math.floor(this.t * 1.5) % 3 === 1 ? SPR.pomniLook : SPR.pomniIdle
+    drawPomni(c, spr, p.x + p.w / 2 + Math.round(Math.sin(this.t * 30) * 0.5), p.y + p.h + 1, false)
+    drawSprite(c, SPR.sweat, p.x + 12, p.y - 10 + ((this.t * 12) % 6))
+    if (this.boss.key === 'jax' && this.st > 1.6 && this.st < 3.2) {
+      const h = this.boss.hand()
+      drawSprite(c, SPR.bigCushion, h.x - 6, h.y - 4)
+    }
+    this.drawFx(c)
+    // The boss title card slides in.
+    const k = clamp(this.st * 3, 0, 1)
+    const info = BOSSES[this.bossIdx]
+    c.fillStyle = 'rgba(12, 6, 20, 0.85)'
+    c.fillRect(0, 58, VW * k, 44)
     c.fillStyle = '#f8c830'
-    for (let x = this.nodeX(0); x < this.nodeX(LEVELS.length - 1); x += 6) c.fillRect(x, 104, 3, 1)
-    const icons = [SPR.iconJax, SPR.iconRagatha, SPR.iconGangle, SPR.iconKinger, SPR.iconCaine]
-    LEVELS.forEach((lv, i) => {
-      const x = this.nodeX(i)
-      const locked = i >= this.data.unlocked
-      c.fillStyle = '#140c1c'
-      c.fillRect(x - 13, 101, 26, 7)
-      c.fillStyle = locked ? '#4c4c5c' : '#d82838'
-      c.fillRect(x - 12, 102, 24, 5)
-      const s = icons[i]
-      const bob = i === this.sel ? Math.round(Math.sin(t * 5) * 2) : 0
-      drawSprite(c, s, x - s.ax, 102 - s.length + bob, { mode: locked ? 'shadow' : 'normal' })
-      if (i === 4 && !locked) drawSprite(c, SPR.iconBubble, x + 10, 56 + bob)
-      if (locked) drawText(c, '?', x, 82, { align: 'center', color: '#8c8c9c' })
-      if (this.data.beaten.includes(i)) drawSprite(c, SPR.star, x - 3, 30)
-      if (i === this.sel) {
-        this.drawPomni(c, SPR.pomniIdle, x, 141)
-        drawText(c, 'V', x, 60 + (Math.floor(t * 4) % 2), { align: 'center', color: '#f8c830' })
-      }
-    })
-    const lv = LEVELS[this.sel]
-    drawText(c, lv.title, VW / 2, 147, { align: 'center', scale: 1, color: '#f4f4f4' })
-    drawText(c, `BOSS: ${BOSS_NAMES[this.sel]}`, VW / 2, 157, { align: 'center', color: '#f8c830' })
-    if (Math.floor(t * 2) % 2) drawText(c, '< >  PICK      JUMP  PLAY', VW / 2, 167, { align: 'center', color: '#c8b8e0' })
+    c.fillRect(0, 58, VW * k, 1)
+    c.fillRect(0, 101, VW * k, 1)
+    if (k >= 1) {
+      drawText(c, `BOSS ${this.bossIdx + 1} / 5`, VW / 2, 62, { align: 'center', color: '#8c8c9c' })
+      drawText(c, info.name, VW / 2, 71, { scale: 3, align: 'center', color: '#f4f4f4', shadow: '#d82838' })
+      drawText(c, info.title, VW / 2, 91, { align: 'center', color: '#f8c830' })
+    }
+    if (this.st > 1 && Math.floor(this.t * 2) % 2) drawText(c, 'A: SKIP', VW - 4, 167, { align: 'right', color: '#8c8c9c' })
   }
 
-  drawClear(c) {
-    c.fillStyle = 'rgba(20, 12, 28, 0.75)'
+  draw_countdown(c) {
+    this.drawArena(c)
+    this.drawPomniNormal(c)
+    this.drawFx(c)
+    this.drawHud(c)
+    const n = 3 - Math.floor(this.st / 0.6)
+    if (n >= 1) {
+      const pop = 1 + (1 - (this.st % 0.6) / 0.6) * 0.5
+      drawText(c, String(n), VW / 2, 50, { scale: Math.round(4 * pop), align: 'center', color: '#f8c830' })
+    }
+  }
+
+  draw_fight(c) {
+    this.drawArena(c)
+    this.drawPomniNormal(c)
+    this.drawFx(c)
+    this.drawHud(c)
+  }
+
+  draw_dying(c) {
+    this.drawArena(c)
+    const p = this.pomni
+    const s = this.st
+    if (s < 0.7) {
+      // Frozen: Pomni becomes a distorted, glitchy sprite.
+      const jx = Math.round(rand(-2, 2))
+      drawPomni(c, p.frame(this.t), p.x + p.w / 2 + jx, p.y + p.h + 1, p.face < 0, { mode: Math.floor(this.t * 20) % 2 ? 'glitch' : 'white' })
+    } else if (s < 1.65) {
+      // ...then she falls over backwards.
+      const k = clamp((s - 0.7) / 0.6, 0, 1)
+      drawPomni(c, SPR.pomniScared, p.x + p.w / 2 - p.face * k * 6, p.y + p.h + 1 + k * 4, p.face < 0, { rot: -p.face * k * (Math.PI / 2) })
+    }
+    this.drawFx(c)
+    this.drawHud(c)
+  }
+
+  draw_gameover(c) {
+    c.fillStyle = '#000000'
     c.fillRect(0, 0, VW, VH)
-    drawText(c, 'SHOW COMPLETE!', VW / 2, 40, { scale: 3, align: 'center', color: '#f8c830' })
-    drawText(c, `YOU BEAT ${BOSS_NAMES[this.levelIdx]}!`, VW / 2, 70, { scale: 1, align: 'center' })
-    drawText(c, `STARS ${this.starsGot} / ${this.starsTotal}`, VW / 2, 90, { align: 'center', color: '#f8c830' })
-    drawText(c, `OUCHES ${this.levelDeaths}`, VW / 2, 100, { align: 'center', color: '#c8b8e0' })
-    this.drawPomni(c, SPR.pomniJump, VW / 2, 150 - Math.round(Math.abs(Math.sin(this.t * 6)) * 6))
-    if (this.stateT > 1 && Math.floor(this.t * 2) % 2) drawText(c, 'PRESS JUMP', VW / 2, 164, { align: 'center' })
+    const pop = this.st < 0.4 ? this.st / 0.4 : 1
+    drawText(c, 'GAME OVER', VW / 2, 30, { scale: Math.max(1, Math.round(4 * pop)), align: 'center', color: '#d82838', shadow: '#5c1020' })
+    const info = BOSSES[this.bossIdx]
+    const icon = SPR['icon' + info.key[0].toUpperCase() + info.key.slice(1)]
+    if (icon) drawSprite(c, icon, VW / 2 - icon.ax, 62 + Math.round(Math.sin(this.t * 6)))
+    const lines = { cushion: 'PFFFFFT.', button: 'BUTTONED.', ribbon: 'ALL TIED UP.', pillow: 'SMOTHERED IN PILLOWS.', cane: 'CANED.' }
+    drawText(c, lines[this.killer] || 'OUCH.', VW / 2, 102, { align: 'center', color: '#c8b8e0' })
+    drawText(c, `${info.name}: ${info.win}`, VW / 2, 112, { align: 'center', color: '#8c8c9c' })
+    if (this.st > 0.6) {
+      this.menuLine(c, 'TRY AGAIN', VW / 2, 134, this.gameoverSel === 0, () => ((this.gameoverSel = 0), this.pressed.add('confirm')), { align: 'center' })
+      this.menuLine(c, 'MAIN MENU', VW / 2, 148, this.gameoverSel === 1, () => ((this.gameoverSel = 1), this.pressed.add('confirm')), { align: 'center' })
+    }
   }
 
-  drawEnding(c) {
-    const t = this.t
-    this.drawBackdrop(c, t * 30, LEVELS[4])
-    this.drawFloorBand(c, 144)
-    drawText(c, 'YOU BEAT THE WHOLE CIRCUS!', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
-    drawText(c, '...BUT WHERE IS THE EXIT?', VW / 2, 26, { align: 'center', color: '#c8b8e0' })
-    drawText(c, 'THANKS FOR PLAYING!', VW / 2, 36, { align: 'center' })
-    drawText(c, `TOTAL OUCHES: ${this.data.deaths}`, VW / 2, 46, { align: 'center', color: '#c8b8e0' })
+  draw_defeat(c) {
+    this.drawArena(c)
+    const p = this.pomni
+    // Pomni is exhausted: panting and sweating.
+    const pant = Math.round(Math.abs(Math.sin(this.t * 5)))
+    drawPomni(c, SPR.pomniIdle, p.x + p.w / 2, p.y + p.h + 1, p.face < 0, { sy: 1 - pant * 0.05 })
+    drawSprite(c, SPR.sweat, p.x - 3, p.y - 6 + ((this.t * 14) % 8))
+    drawSprite(c, SPR.sweat, p.x + 12, p.y - 2 + ((this.t * 11) % 8))
+    this.drawFx(c)
+    const fanAt = this.bossIdx === 4 ? 3.2 : 0.8
+    if (this.defeatFanfare) {
+      const k = clamp((this.st - fanAt) * 4, 0, 1)
+      c.fillStyle = 'rgba(12, 6, 20, 0.8)'
+      c.fillRect(0, 50, VW, 50 * k)
+      if (k >= 1) {
+        drawText(c, 'BOSS DEFEATED!', VW / 2, 56, { scale: 3, align: 'center', color: '#f8c830', shadow: '#d82838' })
+        if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 77, { align: 'center' })
+        if (this.newBadge) drawText(c, `SECRET: ${this.newBadge}!`, VW / 2, 88, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#e03c9c' : '#f8c830' })
+      }
+    }
+    if (this.st > fanAt + 1.6 && Math.floor(this.t * 2) % 2) {
+      const next = this.run.mode === 'practice' ? 'BACK TO BOSSES' : this.bossIdx < 4 ? 'NEXT BOSS' : 'CONTINUE'
+      drawText(c, `A: ${next}`, VW / 2, 162, { align: 'center' })
+    }
+  }
+
+  draw_ending(c) {
+    const s = this.st
+    if (s < 8) {
+      drawBackground(c, 'caine', this.t * 0.2)
+      drawFloor(c)
+      drawPlatforms(c, this.platforms)
+      let spr = SPR.pomniIdle
+      let flip = false
+      if (s > 4.6 && s < 6.6) {
+        spr = SPR.pomniLook
+        flip = Math.floor(s * 1.5) % 2 === 0
+      }
+      drawPomni(c, spr, VW / 2, GROUND_Y + 1, flip)
+      if (s > 5.2 && s < 7.2) drawText(c, '?', VW / 2 + 6, GROUND_Y - 44, { scale: 2, color: '#f8c830' })
+      const type = (o, y) => {
+        if (!o) return
+        const n = Math.min(o.text.length, Math.floor((this.t - o.at) * 14))
+        if (n > (o.n || 0)) {
+          o.n = n
+          sfx.text()
+        }
+        drawText(c, o.text.slice(0, n), VW / 2, y, { scale: 2, align: 'center' })
+      }
+      type(this.typed, 46)
+      type(this.typed2, 66)
+      if (s > 6.5) {
+        c.fillStyle = `rgba(0,0,0,${clamp((s - 6.5) / 1.5, 0, 1)})`
+        c.fillRect(0, 0, VW, VH)
+      }
+      return
+    }
+    c.fillStyle = '#000000'
+    c.fillRect(0, 0, VW, VH)
+    if (s > 8.5) drawText(c, 'THE END', VW / 2, 66, { scale: 3, align: 'center', color: '#f4f4f4', shadow: null })
+    if (s > 10.2) {
+      const jx = Math.random() < 0.15 ? Math.round(rand(-3, 3)) : 0
+      drawText(c, 'OR IS IT?', VW / 2 + jx, 96, { align: 'center', color: Math.random() < 0.1 ? '#e03c9c' : '#8c8c9c', shadow: null })
+    }
+  }
+
+  draw_results(c) {
+    drawBackground(c, 'menu', this.t)
+    c.fillStyle = 'rgba(12, 6, 20, 0.7)'
+    c.fillRect(0, 0, VW, VH)
+    const r = this.results || { time: 0, deaths: 0, diff: '', news: [], badges: [] }
+    drawText(c, 'THE SHOW IS OVER', VW / 2, 12, { scale: 2, align: 'center', color: '#f8c830' })
+    drawText(c, `MODE: ${r.diff}`, VW / 2, 36, { align: 'center' })
+    drawText(c, `TIME ${fmtTime(r.time)}`, VW / 2, 48, { scale: 2, align: 'center' })
+    drawText(c, `DEATHS: ${r.deaths}`, VW / 2, 66, { align: 'center', color: '#c8b8e0' })
+    let y = 80
+    for (const n of r.news) {
+      drawText(c, `NEW RECORD! (${n})`, VW / 2, y, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#38b848' : '#f8c830' })
+      y += 10
+    }
+    for (const b of r.badges) {
+      drawText(c, `BADGE: ${b}`, VW / 2, y, { align: 'center', color: '#e03c9c' })
+      y += 10
+    }
     const cast = [SPR.jax, SPR.ragatha, SPR.gangle, SPR.pomniWave, SPR.kinger, SPR.zooble, SPR.caine]
     let x = 4
     cast.forEach((s, i) => {
-      const hop = Math.round(Math.abs(Math.sin(t * 4 + i)) * -5)
-      drawSprite(c, s, x, 145 - s.length + hop)
+      const hop = Math.round(Math.abs(Math.sin(this.t * 4 + i)) * -4)
+      drawSprite(c, s, x, 176 - s.length + hop, { alpha: 0.35 })
       x += s[0].length + 2
     })
-    drawSprite(c, SPR.bubble, 280, 58 + Math.round(Math.sin(t * 3) * 3))
-    if (this.stateT > 1.5 && Math.floor(t * 2) % 2) drawText(c, 'PRESS JUMP', VW / 2, 164, { align: 'center' })
+    if (this.st > 1 && Math.floor(this.t * 2) % 2) drawText(c, 'PRESS A', VW / 2, 160, { align: 'center' })
+  }
+
+  drawPause(c) {
+    c.fillStyle = 'rgba(12, 6, 20, 0.75)'
+    c.fillRect(0, 0, VW, VH)
+    drawText(c, 'PAUSED', VW / 2, 40, { scale: 3, align: 'center', color: '#f8c830' })
+    ;['RESUME', 'RETRY BOSS', 'MAIN MENU'].forEach((m, i) =>
+      this.menuLine(c, m, VW / 2, 82 + i * 14, this.psel === i, () => ((this.psel = i), this.pressed.add('confirm')), { align: 'center' }),
+    )
   }
 
   drawGlitch(c) {
-    c.setTransform(1, 0, 0, 1, 0, 0)
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       const y = Math.floor(rand(0, VH))
-      const h = Math.floor(rand(2, 10))
-      c.drawImage(this.canvas, 0, y, VW, h, Math.round(rand(-12, 12)), y, VW, h)
+      const h = Math.floor(rand(2, 9))
+      c.drawImage(this.canvas, 0, y, VW, h, Math.round(rand(-10, 10)), y, VW, h)
     }
     for (let i = 0; i < 3; i++) {
       c.fillStyle = Math.random() < 0.5 ? 'rgba(224, 60, 156, 0.35)' : 'rgba(104, 216, 248, 0.35)'
-      c.fillRect(0, Math.floor(rand(0, VH)), VW, Math.floor(rand(1, 5)))
-    }
-    for (let i = 0; i < 25; i++) {
-      c.fillStyle = Math.random() < 0.5 ? '#140c1c' : '#f4f4f4'
-      c.fillRect(Math.floor(rand(0, VW)), Math.floor(rand(0, VH)), 2, 2)
+      c.fillRect(0, Math.floor(rand(0, VH)), VW, Math.floor(rand(1, 4)))
     }
   }
 }

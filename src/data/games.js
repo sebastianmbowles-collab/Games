@@ -22,8 +22,8 @@ export const GAMES = [
   },
   {
     key: 'tadc',
-    title: "Pomni's Big Escape",
-    blurb: 'An 8-bit Amazing Digital Circus side-scroller. Dodge Jax, Ragatha, Gangle, Kinger, Caine and Bubble!',
+    title: 'TADC: Boss Rush',
+    blurb: 'An 8-bit Amazing Digital Circus boss rush. Pomni can only run and jump. Everyone else is a boss!',
     color: '#d82838',
     icon: '🃏',
   },

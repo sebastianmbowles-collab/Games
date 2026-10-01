@@ -1,6 +1,6 @@
 // Pixel sprites made from the TADC Gang Pack (Stick Nodes figures), turned into 8-bit art.
 // Each sprite is rows of letters; each letter picks a color from pal. ax is where the middle of the body is.
-// These were made by a converter from the Stick Nodes files.
+// Made with the converter in tools/tadc-sprites.
 
 const S = (pal, ax, rows) => Object.assign(rows, { pal, ax })
 
@@ -208,6 +208,40 @@ export const ART = {
     "....AEEA.AEEA.........",
     "....AIIIAABBBA........",
     ".....AAA..AAA.........",
+  ]),
+  pomniScared: S(["#140c1c","#d42c44","#547ce4","#3c64b4","#fcd45c","#fcfcfc","#040404","#5c443c","#bc2c3c","#5484f4"], 10, [
+    ".....AAAAA..A...........",
+    "...AABBBBCAABAA..A......",
+    "..ACCCBBBCCBBCCAADAA....",
+    "..ACCCCBBBCBCCCCDDADA...",
+    ".ACCCCCCBBCBCCCCADDDA...",
+    "ACBBBCCCBBECCCBBEDDDA...",
+    "ACBBBCCEEEEEEEAFECCDA...",
+    "ACBBAAEFFGFGGFFEACCA....",
+    "ABAA.AHFGGGGGGFA.AA.AA..",
+    "AEA..AHFGGGGGGA..AIABBA.",
+    ".A...AHFFFFFFHAAAAIBBBA.",
+    "......AHFFFFFAAFFFEBBBA.",
+    ".......AEJJJFFFFAAABBA..",
+    "......ACJJJBEAAA...AA...",
+    "......ACJJJJJA..........",
+    "......ACCJJJBA..........",
+    "......ACCCCBBA..........",
+    "......ACCCCEBA..........",
+    "......ACCCCBBA..........",
+    ".....AJJJJCBBA..........",
+    ".....AJBJBCBBJA.........",
+    ".....AJBBJJJBJA.........",
+    "......AEEAJEEA..........",
+    "......AFFAAFA...........",
+    "......AFFAAFFA..........",
+    "......AFFAAFFA..........",
+    "......AFA.AFA...........",
+    ".....AFFA.AFA...........",
+    ".....AEEAAEEA...........",
+    "....AEEA.AEEA...........",
+    "....AJJJAABBBA..........",
+    ".....AAA..AAA...........",
   ]),
   jax: S(["#140c1c","#b4b4f4","#040404","#fcd45c","#d4ac4c","#a4a4e4","#ccccfc","#fc7c7c","#fcb4b4","#ccac4c","#ec6c74","#dc9ca4"], 18, [
     "..................AA...............",

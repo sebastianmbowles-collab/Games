@@ -1,323 +1,100 @@
-// The bosses and the things they throw.
-// Hazard kinds: 'deadly' (touch = out), 'standkill' (landing on top = out),
-// 'platform' (landing on top is safe, bumping the side = out), 'slip' (slippery floor), 'none'.
+// The five boss fights. Pomni can't hurt anyone: she wins by SURVIVING each boss's show.
+// Every boss runs a script (a list of timed attacks). The script uses a seeded random number maker,
+// so the same attempt always plays the same way unless Pomni moves differently. Learn it, beat it.
 
 import { SPR, drawSprite } from './sprites'
-import { GROUND_Y, TILE, VH, VW } from './levels'
-import { sfx } from './sound'
+import { VW, GROUND_Y, clamp, seeded } from './consts'
+import { Cushion, Button, Ribbon, Pillow, Cane, Glob } from './hazards'
+import { sfx, setTempo } from './sound'
 
 const G = 520
-const rand = (a, b) => a + Math.random() * (b - a)
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
-const inBox = (px, py, b) => px > b.x && px < b.x + b.w && py > b.y && py < b.y + b.h
+const arc = (x0, y0, tx, ty, T) => ({ vx: (tx - x0) / T, vy: (ty - y0 - 0.5 * G * T * T) / T })
 
-function aim(x0, y0, tx, ty, T) {
-  return { vx: (tx - x0) / T, vy: (ty - y0 - 0.5 * G * T * T) / T }
-}
-
-// Snap something falling onto the top of the tile it just hit. Returns true when it landed.
-function land(obj, g) {
-  if (obj.vy <= 0 || !g.solidAt(obj.x + obj.w / 2, obj.y + obj.h)) return false
-  obj.y = Math.floor((obj.y + obj.h) / TILE) * TILE - obj.h
-  return true
-}
-
-class Hazard {
-  dead = false
-  hits(b) {
-    return this.x < b.x + b.w && this.x + this.w > b.x && this.y < b.y + b.h && this.y + this.h > b.y
-  }
-}
-
-// ---------- Jax: whoopie cushions ----------
-class Cushion extends Hazard {
-  kind = 'standkill'
-  w = 12
-  h = 6
-  constructor(x, y, vx, vy) {
-    super()
-    Object.assign(this, { x, y, vx, vy, life: 5.5, active: false })
-  }
-  update(dt, g) {
-    if (!this.active) {
-      this.vy += G * dt
-      this.x += this.vx * dt
-      this.y += this.vy * dt
-      if (land(this, g)) this.active = true
-      if (this.y > VH) this.dead = true
-      return
-    }
-    this.life -= dt
-    if (this.life <= 0) {
-      this.dead = true
-      sfx.pfft()
-      g.puff(this.x + 6, this.y + 3, ['#f890b8', '#f4f4f4'], 8)
-    }
-  }
-  draw(c, cam) {
-    const x = Math.round(this.x - cam)
-    const y = Math.round(this.y)
-    const squish = this.active && this.life < 0.6 ? 2 : 0
-    c.fillStyle = '#140c1c'
-    c.fillRect(x + 1, y + squish, 10, 6 - squish)
-    c.fillRect(x, y + 1 + squish, 12, 4 - squish)
-    c.fillStyle = '#f890b8'
-    c.fillRect(x + 2, y + 1 + squish, 8, 4 - squish)
-    c.fillRect(x + 1, y + 2 + squish, 10, 2 - squish / 2)
-    c.fillStyle = '#f4f4f4'
-    c.fillRect(x + 3, y + 2 + squish, 2, 1)
-    c.fillStyle = '#b8507c'
-    c.fillRect(x + 11, y + 4, 2, 2)
-  }
-}
-
-// ---------- Ragatha: buttons ----------
-class Button extends Hazard {
-  kind = 'deadly'
-  w = 6
-  h = 6
-  constructor(x, y, vx, vy) {
-    super()
-    Object.assign(this, { x, y, vx, vy, bounces: 0, life: 4, spin: 0 })
-  }
-  update(dt, g) {
-    this.life -= dt
-    this.spin += dt * 12
-    if (this.bounces < 3) this.vy += G * dt
-    this.x += this.vx * dt
-    this.y += this.vy * dt
-    if (land(this, g)) {
-      this.bounces++
-      this.vy = this.bounces < 3 ? -this.vy * 0.5 : 0
-      this.vx *= 0.8
-    }
-    if (this.life <= 0 || this.y > VH || this.x < g.lv.arenaX - 10) this.dead = true
-  }
-  draw(c, cam) {
-    const x = Math.round(this.x - cam)
-    const y = Math.round(this.y)
-    c.fillStyle = '#140c1c'
-    c.fillRect(x + 1, y, 4, 6)
-    c.fillRect(x, y + 1, 6, 4)
-    c.fillStyle = '#68d8f8'
-    c.fillRect(x + 1, y + 1, 4, 4)
-    c.fillStyle = '#140c1c'
-    const o = Math.floor(this.spin) % 2
-    c.fillRect(x + 2, y + 2 + o, 1, 1)
-    c.fillRect(x + 3, y + 3 - o, 1, 1)
-  }
-}
-
-// ---------- Gangle: long red ribbons ----------
-class Ribbon extends Hazard {
-  kind = 'deadly'
-  constructor(x0, x1, y, h) {
-    super()
-    Object.assign(this, { x0, x1, y, h, t: 0 })
-  }
-  get phase() {
-    if (this.t < 1) return 'warn'
-    if (this.t < 1.35) return 'grow'
-    if (this.t < 3) return 'stay'
-    if (this.t < 3.3) return 'shrink'
-    return 'done'
-  }
-  get left() {
-    const len = this.x1 - this.x0
-    if (this.phase === 'grow') return this.x1 - len * ((this.t - 1) / 0.35)
-    if (this.phase === 'shrink') return this.x0 + len * ((this.t - 3) / 0.3)
-    return this.x0
-  }
-  update(dt) {
-    this.t += dt
-    if (this.phase === 'done') this.dead = true
-  }
-  hits(b) {
-    if (this.phase === 'warn') return false
-    const l = this.left
-    return l < b.x + b.w && this.x1 > b.x && this.y < b.y + b.h && this.y + this.h > b.y
-  }
-  draw(c, cam, t) {
-    if (this.phase === 'warn') {
-      if (Math.floor(t * 10) % 2) return
-      c.fillStyle = '#d82838'
-      for (let x = this.x0; x < this.x1; x += 6) {
-        c.fillRect(Math.round(x - cam), this.y, 3, 1)
-        c.fillRect(Math.round(x - cam), this.y + this.h - 1, 3, 1)
-      }
-      return
-    }
-    const l = Math.round(this.left - cam)
-    const r = Math.round(this.x1 - cam)
-    c.fillStyle = '#140c1c'
-    c.fillRect(l, this.y - 1, r - l, this.h + 2)
-    c.fillStyle = '#d82838'
-    c.fillRect(l, this.y, r - l, this.h)
-    c.fillStyle = '#f4f4f4'
-    for (let x = l; x < r - 2; x += 5) {
-      const up = Math.sin(x * 0.4 + t * 12) > 0
-      c.fillRect(x, up ? this.y + 1 : this.y + this.h - 3, 2, 2)
-    }
-  }
-}
-
-// ---------- Kinger: pillows ----------
-class Pillow extends Hazard {
-  kind = 'platform'
-  w = 20
-  h = 10
-  constructor(x, y, vx, vy, slide) {
-    super()
-    Object.assign(this, { x, y, vx, vy, slide, flying: vy !== 0 })
-  }
-  update(dt, g) {
-    if (this.flying) {
-      this.vy += G * dt
-      this.y += this.vy * dt
-      this.x += this.vx * dt
-      if (land(this, g)) {
-        this.flying = false
-        this.vy = 0
-        this.vx = this.slide
-      }
-    } else {
-      this.x += this.vx * dt
-      if (!g.solidAt(this.x + this.w / 2, this.y + this.h + 2)) this.flying = true
-    }
-    if (this.x + this.w < g.lv.arenaX - 4 || this.y > VH) this.dead = true
-  }
-  draw(c, cam) {
-    const x = Math.round(this.x - cam)
-    const y = Math.round(this.y)
-    c.fillStyle = '#140c1c'
-    c.fillRect(x, y + 1, 20, 8)
-    c.fillRect(x + 1, y, 18, 10)
-    c.fillStyle = '#f4f4f4'
-    c.fillRect(x + 1, y + 1, 18, 8)
-    c.fillStyle = '#c8b8e0'
-    c.fillRect(x + 1, y + 6, 18, 3)
-    c.fillRect(x + 5, y + 1, 2, 5)
-    c.fillRect(x + 13, y + 1, 2, 5)
-    c.fillStyle = '#f8c830'
-    c.fillRect(x - 1, y, 2, 2)
-    c.fillRect(x + 19, y, 2, 2)
-    c.fillRect(x - 1, y + 8, 2, 2)
-    c.fillRect(x + 19, y + 8, 2, 2)
-  }
-}
-
-// ---------- Caine: one giant spinning cane ----------
-class Cane extends Hazard {
-  kind = 'deadly'
-  len = 40
-  constructor(cx, cy, speed, homeX) {
-    super()
-    Object.assign(this, { cx, cy, speed, homeX, angle: 0, back: false })
-  }
-  update(dt, g) {
-    this.angle += dt * 9
-    this.cx += (this.back ? 1 : -1) * this.speed * dt
-    if (!this.back && this.cx < g.lv.arenaX + 20) {
-      this.back = true
-      sfx.cane()
-    }
-    if (this.back && this.cx > this.homeX) this.dead = true
-  }
-  hits(b) {
-    const grow = { x: b.x + 1, y: b.y + 1, w: b.w - 2, h: b.h - 2 }
-    for (let k = -4; k <= 4; k++) {
-      const d = (k / 4) * (this.len / 2)
-      if (inBox(this.cx + Math.cos(this.angle) * d, this.cy + Math.sin(this.angle) * d, grow)) return true
-    }
-    return false
-  }
-  draw(c, cam) {
-    c.save()
-    c.translate(Math.round(this.cx - cam), Math.round(this.cy))
-    c.rotate(this.angle)
-    c.fillStyle = '#140c1c'
-    c.fillRect(-this.len / 2 - 1, -3, this.len + 2, 6)
-    for (let x = -this.len / 2; x < this.len / 2; x += 4) {
-      c.fillStyle = ((x + this.len / 2) / 4) % 2 ? '#f4f4f4' : '#d82838'
-      c.fillRect(x, -2, 4, 4)
-    }
-    c.fillStyle = '#f8c830'
-    c.fillRect(this.len / 2 - 2, -6, 6, 6)
-    c.restore()
-  }
-}
-
-// ---------- Bubble: black slippery sick ----------
-class Glob extends Hazard {
-  kind = 'none'
-  w = 4
-  h = 4
-  constructor(x, y, vx) {
-    super()
-    Object.assign(this, { x, y, vx, vy: 0 })
-  }
-  update(dt, g) {
-    this.vy += G * dt
-    this.x += this.vx * dt
-    this.y += this.vy * dt
-    if (land(this, g)) {
-      this.dead = true
-      g.haz.push(new Puddle(this.x - 14, this.y + this.h))
-    }
-    if (this.y > VH) this.dead = true
-  }
-  draw(c, cam) {
-    const x = Math.round(this.x - cam)
-    c.fillStyle = '#140c1c'
-    c.fillRect(x, Math.round(this.y), 4, 4)
-    c.fillStyle = '#5c4c78'
-    c.fillRect(x + 1, Math.round(this.y) + 1, 1, 1)
-  }
-}
-
-class Puddle extends Hazard {
-  kind = 'slip'
-  w = 32
-  h = 3
-  constructor(x, surfaceY) {
-    super()
-    Object.assign(this, { x, y: surfaceY, life: 7 })
-  }
-  update(dt) {
-    this.life -= dt
-    if (this.life <= 0) this.dead = true
-  }
-  draw(c, cam, t) {
-    const x = Math.round(this.x - cam)
-    const y = this.y - 2
-    const shrink = this.life < 1 ? Math.round((1 - this.life) * 12) : 0
-    c.fillStyle = '#140c1c'
-    c.fillRect(x + 2 + shrink, y, 28 - shrink * 2, 3)
-    c.fillRect(x + shrink, y + 1, 32 - shrink * 2, 2)
-    c.fillStyle = '#5c4c78'
-    const s = Math.floor(t * 4) % 20
-    c.fillRect(x + 6 + s, y + 1, 3, 1)
-  }
-}
-
-// ---------- The bosses ----------
+export const BOSSES = [
+  {
+    key: 'jax',
+    name: 'JAX',
+    title: 'THE WHOOPIE CUSHION MENACE',
+    rules: ['THROWS WHOOPIE CUSHIONS.', 'THEY LAND AND STAY ON THE FLOOR.', 'TOUCH ONE OR STAND ON ONE: OUT!'],
+    intro: [
+      [0.4, 'boss', 'HEH.'],
+      [1.6, 'boss', '*PULLS OUT A WHOOPIE CUSHION*'],
+      [3.0, 'boss', 'PFFFFFT.'],
+    ],
+    defeat: '*SHRUG*',
+    win: 'HEH. GOTCHA.',
+  },
+  {
+    key: 'ragatha',
+    name: 'RAGATHA',
+    title: 'BUTTON BARRAGE',
+    rules: ['THROWS BUTTONS EVERY WHICH WAY.', 'RUN INTO ONE, JUMP INTO ONE,', 'TOUCH ONE AT ALL: OUT!'],
+    intro: [
+      [0.4, 'boss', 'HI POMNI!'],
+      [1.8, 'boss', 'I MADE YOU SOME BUTTONS!'],
+      [3.1, 'pomni', 'OH NO.'],
+    ],
+    defeat: 'PHEW! YOU DID IT!',
+    win: 'OOPS! SORRY!',
+  },
+  {
+    key: 'gangle',
+    name: 'GANGLE',
+    title: 'RIBBON RAMPAGE',
+    rules: ['GIANT RED RIBBONS FILL THE SCREEN.', 'WATCH THE FLASHING OUTLINES', 'AND FIND THE GAP!'],
+    intro: [
+      [0.4, 'boss', 'SORRY POMNI...'],
+      [1.8, 'boss', 'THE RIBBONS HAVE A MIND OF THEIR OWN!'],
+    ],
+    defeat: 'IS... IS IT OVER?',
+    win: 'OH NO... SORRY!',
+  },
+  {
+    key: 'kinger',
+    name: 'KINGER',
+    title: 'PILLOW PANIC',
+    rules: ['RUN INTO A PILLOW: OUT!', 'STAND ON A PILLOW: SAFE!', 'PINK PILLOWS GO BOING.'],
+    intro: [
+      [0.4, 'boss', 'PILLOW FIGHT!!'],
+      [1.7, 'boss', 'WAIT. WHO ARE YOU AGAIN?'],
+      [3.0, 'boss', 'PILLOW FIGHT!!!'],
+    ],
+    defeat: 'I REGRET NOTHING!',
+    win: 'GOT YOU! ...WHO WAS THAT?',
+  },
+  {
+    key: 'caine',
+    name: 'CAINE + BUBBLE',
+    title: 'THE FINAL SHOW',
+    rules: ['ONE ABSURDLY HUGE CANE.', 'BUBBLE MAKES THE FLOOR SLIPPERY.', 'WATCH EVERYTHING.'],
+    intro: [
+      [0.4, 'boss', 'LADIES AND GENTLEMEN!'],
+      [1.7, 'boss', 'THE FINAL SHOW!'],
+      [3.0, 'bubble', 'HIIIII!'],
+    ],
+    defeat: '...',
+    win: 'AND THE CROWD GOES WILD!',
+  },
+]
 
 class Boss {
-  maxAttacks = 5
-  interval = 1.2
-  flying = false
-  constructor(g, key, name) {
+  constructor(g, info, d, seed) {
     this.g = g
-    this.spr = SPR[key]
-    this.name = name
-    this.hp = 3
-    this.state = 'intro'
-    this.t = 0
-    this.count = 0
-    this.cool = 1
+    Object.assign(this, info)
+    this.spr = SPR[info.key]
+    this.d = d
+    this.time = 0
+    this.ei = 0
     this.throwT = 0
-    this.x = g.lv.arenaX + VW - this.w - 8
+    this.bubbleText = null
+    this.mood = 'normal'
+    this.x = VW - this.w - 6
     this.y = GROUND_Y - this.h
+    this.rng = seeded(seed)
+    const s = this.script(this.rng, d)
+    this.events = s.events.sort((a, b) => a[0] - b[0])
+    this.duration = s.duration
+    this.tempos = s.tempos || []
   }
   get w() {
     return this.spr[0].length
@@ -325,232 +102,550 @@ class Boss {
   get h() {
     return this.spr.length
   }
-  get speed() {
-    return 1 + (3 - this.hp) * 0.3
+  get progress() {
+    return clamp(this.time / this.duration, 0, 1)
   }
-  get stompable() {
-    return this.state === 'tired'
-  }
-  get harmful() {
-    return this.state === 'attack' || this.state === 'winddown'
-  }
-  box() {
-    // Just the middle of the body, so arms and canes sticking out don't count.
-    const bw = Math.min(this.w - 4, 26)
-    const top = this.y + Math.max(3, this.h - 54)
-    return { x: this.x + this.spr.ax - bw / 2, y: top, w: bw, h: this.y + this.h - top }
+  get done() {
+    return this.time >= this.duration
   }
   hand() {
-    return { x: this.x + this.spr.ax - 10, y: this.y + this.h * 0.35 }
+    return { x: this.x + this.spr.ax - 12, y: this.y + this.h * 0.35 }
   }
-  set(state) {
-    this.state = state
-    this.t = 0
-  }
-  target() {
-    const p = this.g.p
+  get px() {
+    const p = this.g.pomni
     return p.x + p.w / 2
   }
-  update(dt) {
-    this.t += dt
+  say(text, dur = 1.8) {
+    this.bubbleText = { text, until: this.g.t + dur }
+  }
+  updateFight(dt) {
+    this.time += dt
     this.throwT = Math.max(0, this.throwT - dt)
-    if (this.state === 'intro' && this.t > 2) this.set('attack')
-    else if (this.state === 'attack') {
-      this.cool -= dt
-      if (this.cool <= 0) {
-        this.attack()
-        this.throwT = 0.25
-        this.count++
-        this.cool = this.interval / this.speed
-        if (this.count >= this.maxAttacks) this.set('winddown')
-      }
-    } else if (this.state === 'winddown' && this.t > 2.2) {
-      this.g.clearHazards()
-      this.set('tired')
-    } else if (this.state === 'tired' && this.t > 4.5) {
-      this.count = 0
-      this.cool = 0.8
-      this.set('attack')
-    } else if (this.state === 'hurt' && this.t > 1.2) {
-      if (this.hp <= 0) this.set('dead')
-      else {
-        this.count = 0
-        this.cool = 1
-        this.set('attack')
-      }
-    } else if (this.state === 'dead' && this.t > 2) {
-      this.g.bossDefeated()
+    while (this.ei < this.events.length && this.events[this.ei][0] <= this.time) {
+      this.events[this.ei][1]()
+      this.ei++
     }
+    for (const [at, mul] of this.tempos) if (this.time >= at && this.time - dt < at) setTempo(mul)
   }
-  hit() {
-    this.hp--
-    this.set('hurt')
-    sfx.bossHit()
-    this.g.shake = 0.3
-    this.g.puff(this.x + this.w / 2, this.y + 8, ['#f8c830', '#f4f4f4'], 14)
+  idle(dt) {
+    this.throwT = Math.max(0, this.throwT - dt)
   }
-  playerRespawned() {
-    if (this.state === 'attack' || this.state === 'winddown' || this.state === 'tired') {
-      this.count = 0
-      this.cool = 1.5
-      this.set('attack')
-    }
+  throwing() {
+    this.throwT = 0.18
   }
-  draw(c, cam, t) {
-    const x = this.x - cam
-    let y = this.y + (this.throwT > 0 ? 2 : 0)
-    let alpha = 1
-    if (this.state === 'dead') {
-      y += this.t * 20
-      alpha = Math.max(0, 1 - this.t / 2)
-    }
-    const flash = (this.state === 'hurt' || this.state === 'dead') && Math.floor(t * 20) % 2 === 0
-    drawSprite(c, this.spr, x, y, { mode: flash ? 'white' : 'normal', alpha })
-    if (this.state === 'tired') {
-      for (let k = 0; k < 3; k++) {
-        const a = t * 5 + k * 2.1
-        c.fillStyle = '#f8c830'
-        c.fillRect(Math.round(x + this.spr.ax + Math.cos(a) * 12), Math.round(this.y - 5 + Math.sin(a) * 3), 2, 2)
-      }
+  draw(c, t) {
+    const lean = this.throwT > 0 ? -2 : 0
+    const bob = this.mood === 'defeated' ? 0 : Math.round(Math.sin(t * 2.4) * 1)
+    drawSprite(c, this.spr, this.x + lean, this.y + bob + (this.throwT > 0 ? 1 : 0))
+    if (this.mood === 'pleased') {
+      c.fillStyle = '#f8c830'
+      for (let i = 0; i < 3; i++) c.fillRect(Math.round(this.x + this.spr.ax - 10 + i * 8), Math.round(this.y - 6 - Math.abs(Math.sin(t * 6 + i)) * 4), 2, 2)
     }
   }
 }
 
+// ---------- JAX ----------
 class Jax extends Boss {
-  maxAttacks = 7
-  interval = 1.0
-  constructor(g) {
-    super(g, 'jax', 'JAX')
+  script(r, d) {
+    const ev = []
+    const at = (t, fn) => ev.push([t, fn])
+    const cap = 5 + d.extra * 2 + (d.dens > 0.9 ? 1 : 0)
+    const life = 9 * d.life
+    let t = 1
+    // 1: single throws that land next to Pomni, slowly using up the floor.
+    while (t < 14) {
+      const side = r.pick([-1, 1])
+      const off = r.range(14, 26)
+      at(t, () => this.toss(this.px + side * off, life, cap))
+      t += 2.1 / d.dens
+    }
+    at(14, () => this.say('HEH HEH.'))
+    // 2: straight at her, and sometimes a second one to the other side.
+    while (t < 30) {
+      const two = r() < 0.5
+      const side = r.pick([-1, 1])
+      at(t, () => {
+        this.toss(this.px, life, cap)
+        if (two) this.toss(this.px + side * 64, life, cap)
+      })
+      t += 1.7 / d.dens
+    }
+    // 3: carpet bombing. Taking away the safe places one by one.
+    at(30, () => this.say('WHERE YOU GONNA STAND NOW?'))
+    const spots = [20, 50, 80, 110, 140, 170, 200, 230, 68, 182]
+    while (t < 42) {
+      const s = r.pick(spots)
+      at(t, () => this.toss(s, life, cap + 2))
+      t += 1.15 / d.dens
+    }
+    // FINAL: THROW THROW THROW THROW.
+    at(42, () => this.say('THROW THROW THROW THROW!', 2.5))
+    t = 42.6
+    while (t < 51) {
+      const off = r.range(-30, 30)
+      at(t, () => this.toss(this.px + off, 3.2 * d.life, cap + 4))
+      t += 0.34 / d.dens
+    }
+    return { events: ev, duration: 53, tempos: [[30, 1.06], [42, 1.15]] }
   }
-  attack() {
-    const a = this.g.lv.arenaX
+  toss(tx, life, cap) {
+    const g = this.g
     const h = this.hand()
-    const tx = clamp(this.target() + rand(-28, 28), a + 8, a + 250)
-    const v = aim(h.x, h.y, tx, GROUND_Y, rand(0.85, 1.15))
-    this.g.haz.push(new Cushion(h.x, h.y, v.vx, v.vy))
+    tx = clamp(tx, 10, this.x - 16)
+    const plat = g.platforms.find((p) => tx > p.x + 4 && tx < p.x + p.w - 4)
+    const ty = plat && this.rng() < 0.5 ? plat.y : GROUND_Y
+    const T = 0.95 / this.d.speed
+    const v = arc(h.x, h.y, tx - 7, ty - 7, T)
+    g.haz.push(new Cushion(h.x - 7, h.y - 4, v.vx, v.vy, life))
+    const resting = g.haz.filter((c) => c instanceof Cushion && c.state === 'rest')
+    for (let i = 0; i < resting.length - cap; i++) resting[i].deflate()
+    this.throwing()
     sfx.throw()
   }
 }
 
+// ---------- RAGATHA ----------
 class Ragatha extends Boss {
-  maxAttacks = 5
-  interval = 1.6
-  constructor(g) {
-    super(g, 'ragatha', 'RAGATHA')
-  }
-  attack() {
-    const a = this.g.lv.arenaX
-    const h = this.hand()
-    for (let i = -1; i <= 1; i++) {
-      const tx = clamp(this.target() + i * 30 + rand(-10, 10), a + 6, a + 250)
-      const v = aim(h.x, h.y, tx, GROUND_Y, rand(0.75, 1.25))
-      this.g.haz.push(new Button(h.x, h.y, v.vx, v.vy))
+  script(r, d) {
+    const ev = []
+    const at = (t, fn) => ev.push([t, fn])
+    const sp = d.speed
+    let t = 1
+    // 1: horizontal buttons. Low ones: jump. High ones: stay on the floor.
+    while (t < 13) {
+      const high = r() < 0.4
+      at(t, () => this.straight(high ? GROUND_Y - 30 : GROUND_Y - 8, 110 * sp))
+      t += 1.7 / d.dens
     }
-    sfx.throw()
-  }
-}
-
-class Gangle extends Boss {
-  maxAttacks = 5
-  interval = 2.7
-  constructor(g) {
-    super(g, 'gangle', 'GANGLE')
-  }
-  attack() {
-    const a = this.g.lv.arenaX
-    const p = this.g.p
-    const onPlatform = p.y + p.h < GROUND_Y - 10
-    if (onPlatform || Math.random() < 0.35) {
-      // High ribbon across the whole room: stay on the floor and don't jump!
-      this.g.haz.push(new Ribbon(a, this.x - 2, 98, 8))
-    } else {
-      // Floor ribbon under Pomni: hop up onto a platform!
-      const x0 = clamp(this.target() - rand(60, 90), a, a + 110)
-      this.g.haz.push(new Ribbon(x0, Math.min(x0 + rand(140, 170), this.x - 2), GROUND_Y - 7, 7))
-    }
-    sfx.warn()
-  }
-}
-
-class Kinger extends Boss {
-  maxAttacks = 7
-  interval = 1.4
-  constructor(g) {
-    super(g, 'kinger', 'KINGER')
-  }
-  attack() {
-    const h = this.hand()
-    const slide = -rand(55, 85) * this.speed
-    if (Math.random() < 0.7) {
-      this.g.haz.push(new Pillow(this.x - 16, GROUND_Y - 10, slide, 0, slide))
-    } else {
-      const v = aim(h.x - 10, h.y, clamp(this.target(), this.g.lv.arenaX + 20, this.x - 40), GROUND_Y, 1)
-      this.g.haz.push(new Pillow(h.x - 10, h.y, v.vx, v.vy, -40))
-    }
-    sfx.throw()
-  }
-}
-
-class Caine extends Boss {
-  maxAttacks = 4
-  interval = 2.6
-  flying = true
-  constructor(g) {
-    super(g, 'caine', 'CAINE & BUBBLE')
-    this.y = 30
-    this.pending = null
-    this.bub = { x: g.lv.arenaX + 150, y: 18, t: 0, cool: 2 }
-  }
-  update(dt) {
-    super.update(dt)
-    const ground = GROUND_Y - this.h
-    const want = this.state === 'tired' || this.state === 'hurt' || this.state === 'dead' ? ground : 30 + Math.sin(this.g.t * 2) * 6
-    if (this.state !== 'dead') this.y += (want - this.y) * Math.min(1, dt * 4)
-
-    if (this.pending) {
-      this.pending.t -= dt
-      if (this.pending.t <= 0) {
-        this.g.haz.push(new Cane(this.x + 10, this.pending.y, 150 * this.speed, this.x + 20))
-        sfx.cane()
-        this.pending = null
+    // 2: buttons dropping from above. Move sideways!
+    at(13, () => this.say('LOOK UP!'))
+    while (t < 26) {
+      const n = 2 + d.extra
+      for (let i = 0; i < n; i++) {
+        const off = (i - (n - 1) / 2) * 26
+        at(t + i * 0.22, () => this.drop(this.px + off))
       }
+      at(t + 1.1, () => this.straight(GROUND_Y - 8, 105 * sp))
+      t += 2.3 / d.dens
     }
+    // 3: spreads and rollers.
+    at(26, () => this.say('CATCH!'))
+    while (t < 38) {
+      const k = r()
+      at(t, () => (k < 0.55 ? this.spread(4 + d.extra) : this.roll(95 * sp)))
+      t += 1.6 / d.dens
+    }
+    // 4: the button storm.
+    at(38, () => this.say('BUTTON STORM!'))
+    while (t < 46) {
+      const k = r()
+      const high = r() < 0.5
+      const off = r.range(-30, 30)
+      at(t, () => {
+        if (k < 0.35) this.straight(high ? GROUND_Y - 30 : GROUND_Y - 8, 130 * sp)
+        else if (k < 0.7) this.drop(this.px + off)
+        else this.spread(3)
+      })
+      t += 0.62 / d.dens
+    }
+    // FINAL: the floor becomes a treadmill and buttons come from both sides.
+    at(46, () => {
+      this.say('KEEP RUNNING!', 2.5)
+      this.g.setConveyor(-50 * sp)
+    })
+    t = 47
+    while (t < 58) {
+      const k = r()
+      const off = r.range(-20, 40)
+      const left = r() < 0.5
+      at(t, () => {
+        if (k < 0.3) this.straight(GROUND_Y - 8, 120 * sp, true)
+        else if (k < 0.55) this.straight(GROUND_Y - 8, 120 * sp)
+        else if (k < 0.8) this.drop(this.px + off)
+        else this.straight(GROUND_Y - 30, 130 * sp, left)
+      })
+      t += 0.75 / d.dens
+    }
+    at(58.5, () => this.g.setConveyor(0))
+    return { events: ev, duration: 60, tempos: [[13, 1.07], [26, 1.14], [38, 1.22], [46, 1.32]] }
+  }
+  straight(y, speed, fromLeft = false) {
+    const x = fromLeft ? -8 : this.hand().x
+    this.g.haz.push(new Button({ mode: 'straight', x, y, vx: fromLeft ? speed : -speed, life: 8 }))
+    if (!fromLeft) this.throwing()
+    sfx.throw()
+  }
+  drop(x) {
+    x = clamp(x, 4, this.x - 10)
+    this.g.haz.push(new Button({ mode: 'drop', x, warn: 0.85 * this.d.warn, life: 2.6 * this.d.life }))
+  }
+  spread(n) {
+    const h = this.hand()
+    for (let i = 0; i < n; i++) {
+      const a = 0.2 + (i / Math.max(1, n - 1)) * 0.95
+      const s = 150 * this.d.speed
+      this.g.haz.push(new Button({ mode: 'spread', x: h.x, y: h.y, vx: -Math.cos(a) * s, vy: -Math.sin(a) * s, grav: 320, bounces: 1, life: 4 }))
+    }
+    this.throwing()
+    sfx.throw()
+  }
+  roll(speed) {
+    this.g.haz.push(new Button({ mode: 'roll', x: this.hand().x, y: GROUND_Y - 7, vx: -speed, life: 8 }))
+    this.throwing()
+    sfx.throw()
+  }
+}
 
-    // Bubble floats around the top of the tent and is sick everywhere.
+// ---------- GANGLE ----------
+class Gangle extends Boss {
+  script(r, d) {
+    const ev = []
+    const at = (t, fn) => ev.push([t, fn])
+    const span = () => this.x - 4
+    const warn = 1.15 * d.warn
+    const life = 2 * d.life
+    let t = 1
+    // 1: one big band at a time. Floor ribbon: get up on a platform. Top ribbon: get down low.
+    while (t < 16) {
+      const top = r() < 0.5
+      at(t, () =>
+        this.g.haz.push(
+          top ? new Ribbon({ x: 0, y: 0, w: span(), h: 100, warn, life }) : new Ribbon({ x: 0, y: GROUND_Y - 20, w: span(), h: 20, warn, life }),
+        ),
+      )
+      at(t, () => sfx.swish())
+      t += 3.3 / d.dens
+    }
+    // 2: trapped between two ribbons, and ribbons that slowly move.
+    at(16, () => this.say("I CAN'T STOP THEM!"))
+    while (t < 31) {
+      const k = r()
+      at(t, () => {
+        sfx.swish()
+        if (k < 0.55) {
+          this.g.haz.push(new Ribbon({ x: 0, y: GROUND_Y - 20, w: span(), h: 20, warn, life: life + 0.4 }))
+          this.g.haz.push(new Ribbon({ x: 0, y: 0, w: span(), h: 86, warn, life: life + 0.4 }))
+        } else {
+          this.g.haz.push(
+            new Ribbon({
+              x: 0,
+              y: -2,
+              w: span(),
+              h: 14,
+              warn: warn * 0.8,
+              life: 5,
+              vy: 34 * d.speed,
+              script: (rb) => {
+                if (rb.vy > 0 && rb.y > 100) rb.vy = -40 * d.speed
+              },
+            }),
+          )
+        }
+      })
+      t += 3.6 / d.dens
+    }
+    // 3: ribbon walls. Wait for the gap... then GO!
+    at(31, () => this.say('A WALL OF RIBBON!'))
+    while (t < 46) {
+      const low = r() < 0.5
+      at(t, () => this.wall(low))
+      t += 4.6 / d.dens
+    }
+    // FINAL: the screen fills with ribbon. A moving maze.
+    at(46, () => this.say('EVERYTHING IS RED!', 2.4))
+    t = 46.5
+    while (t < 58) {
+      const k = r()
+      const low = r() < 0.5
+      at(t, () => {
+        sfx.swish()
+        if (k < 0.4) this.wall(low, 1.25)
+        else if (k < 0.7) {
+          this.g.haz.push(new Ribbon({ x: 0, y: GROUND_Y - 20, w: span(), h: 20, warn: warn * 0.85, life: 1.6 }))
+          this.g.haz.push(new Ribbon({ x: 0, y: 0, w: span(), h: 86, warn: warn * 0.85, life: 1.6 }))
+        } else this.g.haz.push(new Ribbon({ x: 0, y: 0, w: span(), h: 100, warn: warn * 0.85, life: 1.6 }))
+      })
+      t += 2.2 / d.dens
+    }
+    return { events: ev, duration: 60, tempos: [[31, 1.05], [46, 1.12]] }
+  }
+  wall(low, speedMul = 1) {
+    const d = this.d
+    // Low gap: stay on the floor. High gap: be up on a low platform (or jumping) when it passes.
+    const gap = low ? { y: GROUND_Y - 30, h: 40 } : { y: 82, h: 38 }
+    const stopX = 200
+    this.g.haz.push(
+      new Ribbon({
+        x: this.x - 22,
+        y: -4,
+        w: 18,
+        h: GROUND_Y + 8,
+        vertical: true,
+        warn: 0.5 * d.warn,
+        life: 14,
+        vx: -45 * d.speed * speedMul,
+        script: (rb, dt, g) => {
+          if (rb.phase !== 'on') return
+          if (!rb.stopped && rb.x <= stopX) {
+            rb.stopped = true
+            rb.vx = 0
+            rb.hold = 1.1 * d.warn
+          } else if (rb.stopped && !rb.gap) {
+            rb.hold -= dt
+            if (rb.hold <= 0) {
+              rb.gap = gap
+              rb.vx = -62 * d.speed * speedMul
+              g.flash('GO!', rb.x + 9, gap.y + gap.h / 2)
+              sfx.blip()
+            }
+          }
+        },
+      }),
+    )
+    sfx.swish()
+  }
+}
+
+// ---------- KINGER ----------
+class Kinger extends Boss {
+  script(r, d) {
+    const ev = []
+    const at = (t, fn) => ev.push([t, fn])
+    const sp = d.speed
+    let t = 1
+    // 1: pillows sliding along the floor. Hop on (safe) or over.
+    while (t < 14) {
+      const s = r.range(55, 75) * sp
+      at(t, () => this.slide(s))
+      t += 2.3 / d.dens
+    }
+    // 2: floating pillows drift by, like stepping stones.
+    at(14, () => this.say('FLOATING PILLOWS! ...WHY?'))
+    while (t < 28) {
+      const y = r.pick([118, 100, 84])
+      const two = r() < 0.5
+      const s1 = r.range(38, 52) * sp
+      const s2 = r.range(60, 80) * sp
+      at(t, () => {
+        this.float(y, s1)
+        if (two) this.slide(s2)
+      })
+      t += 1.9 / d.dens
+    }
+    // 3: bouncy pillows. BOING!
+    at(28, () => this.say('BOING! BOING!'))
+    while (t < 42) {
+      const k = r()
+      const y = r.pick([110, 92, 76])
+      const s = r.range(40, 55) * sp
+      at(t, () => {
+        if (k < 0.45) this.lob(true)
+        else if (k < 0.75) this.float(y, s)
+        else this.slide(s + 25)
+      })
+      t += 1.5 / d.dens
+    }
+    // FINAL: pillows everywhere. Don't trust the pillows. (Or do. Carefully.)
+    at(42, () => this.say('ALL THE PILLOWS!!!', 2.4))
+    t = 42.6
+    while (t < 56) {
+      const k = r()
+      const y = r.pick([120, 104, 88, 72])
+      const s = r.range(45, 70) * sp
+      const bouncy = r() < 0.6
+      at(t, () => {
+        if (k < 0.35) this.slide(s + 25)
+        else if (k < 0.75) this.float(y, s)
+        else this.lob(bouncy)
+      })
+      t += 0.62 / d.dens
+    }
+    return { events: ev, duration: 58, tempos: [[28, 1.08], [42, 1.18]] }
+  }
+  slide(speed) {
+    this.g.haz.push(new Pillow({ x: this.x - 22, y: GROUND_Y - 9, vx: -speed, mode: 'slide' }))
+    this.throwing()
+    sfx.thump()
+  }
+  float(y, speed) {
+    this.g.haz.push(new Pillow({ x: VW + 2, y, vx: -speed, mode: 'float' }))
+  }
+  lob(bouncy) {
+    const h = this.hand()
+    const tx = clamp(this.px + this.rng.range(-40, 40), 20, this.x - 40)
+    const v = arc(h.x - 20, h.y, tx - 10, GROUND_Y - 9, 1.0 / this.d.speed)
+    this.g.haz.push(new Pillow({ x: h.x - 20, y: h.y, vx: v.vx, vy: v.vy, mode: 'arc', bouncy, slide: -35 * this.d.speed }))
+    this.throwing()
+    sfx.throw()
+  }
+}
+
+// ---------- CAINE & BUBBLE ----------
+class Caine extends Boss {
+  constructor(g, info, d, seed) {
+    super(g, info, d, seed)
+    this.baseY = 26
+    this.y = this.baseY
+    this.bub = { x: 120, y: 18, t: 0, text: null }
+  }
+  script(r, d) {
+    const ev = []
+    const at = (t, fn) => ev.push([t, fn])
+    let t = 1
+    // 1: the cane hangs down and sweeps across (stay low!), or spins past (jump, or stay low).
+    while (t < 16) {
+      const k = r()
+      const low = r() < 0.5
+      at(t, () => (k < 0.5 ? this.hang() : this.spin(low)))
+      t += 2.6 / d.dens
+    }
+    // 2: the cane comes down on one half of the arena. Bubble starts being sick.
+    at(16, () => {
+      this.say('AND NOW... BUBBLE!')
+      this.bub.text = { text: 'BLEHHH!', until: this.g.t + 1.5 }
+    })
+    while (t < 32) {
+      const side = r() < 0.5 ? 0 : 1
+      at(t, () => this.descend(side))
+      at(t + 1.4, () => this.vomit())
+      t += 3.2 / d.dens
+    }
+    // 3: everything mixed, plus a diagonal sweep.
+    at(32, () => this.say('MORE! MORE! MORE!'))
+    while (t < 50) {
+      const k = r()
+      const low = r() < 0.5
+      const side = r() < 0.5 ? 0 : 1
+      at(t, () => {
+        if (k < 0.25) this.hang()
+        else if (k < 0.5) this.spin(low)
+        else if (k < 0.75) this.descend(side)
+        else this.diagonal()
+      })
+      if (r() < 0.6) at(t + 0.9, () => this.vomit())
+      t += 2.2 / d.dens
+    }
+    // FINAL: the cane covers almost the whole screen. One tiny opening. Jump through it!
+    at(50, () => {
+      this.say('THE GRAND FINALE!', 2.5)
+      this.vomit()
+    })
+    t = 51
+    const pattern = ['high', 'low', 'high', 'low', 'high']
+    for (let i = 0; i < pattern.length + d.extra; i++) {
+      const kind = pattern[i % pattern.length]
+      const fromLeft = i % 2 === 1
+      at(t, () => this.wall(kind, fromLeft))
+      if (i === 1 || i === 3) at(t + 0.6, () => this.vomit())
+      t += 2.6 / Math.max(1, d.dens * 0.85)
+    }
+    return { events: ev, duration: Math.max(66, t + 2.5), tempos: [[16, 1.05], [32, 1.1], [50, 1.2]] }
+  }
+  hang() {
+    const bottom = GROUND_Y - 30
+    this.g.haz.push(
+      new Cane({ cx: VW + 30, cy: (bottom - 12) / 2, len: bottom + 12, thick: 10, angle: Math.PI / 2, vx: -115 * this.d.speed, warn: 0.9 * this.d.warn, warnBox: { x: VW - 20, y: 0, w: 20, h: bottom } }),
+    )
+    this.throwing()
+  }
+  spin(low) {
+    const home = this.x + 20
+    this.g.haz.push(
+      new Cane({
+        cx: this.x + 10,
+        cy: low ? GROUND_Y - 12 : 96,
+        len: 40,
+        spin: 9,
+        vx: -150 * this.d.speed,
+        warn: 0.7 * this.d.warn,
+        warnBox: { x: 0, y: (low ? GROUND_Y - 12 : 96) - 1, w: this.x, h: 2 },
+        script: (cn) => {
+          if (cn.vx < 0 && cn.cx < 20) {
+            cn.vx = -cn.vx
+            sfx.whoosh()
+          }
+          if (cn.vx > 0 && cn.cx > home) cn.dead = true
+        },
+      }),
+    )
+    this.throwing()
+  }
+  descend(side) {
+    const x0 = side === 0 ? 6 : 150
+    const len = 148
+    const d = this.d
+    this.g.haz.push(
+      new Cane({
+        cx: x0 + len / 2,
+        cy: -14,
+        len,
+        thick: 10,
+        warn: 1.05 * d.warn,
+        vy: 60 * d.speed,
+        warnBox: { x: x0, y: GROUND_Y - 3, w: len, h: 3 },
+        script: (cn, dt) => {
+          if (cn.vy > 0 && cn.cy >= GROUND_Y - 6) {
+            cn.cy = GROUND_Y - 6
+            cn.vy = 0
+            cn.hold = 0.4
+            sfx.shake()
+          } else if (cn.vy === 0 && cn.hold !== undefined) {
+            cn.hold -= dt
+            if (cn.hold <= 0) cn.vy = -110 * d.speed
+          }
+        },
+      }),
+    )
+  }
+  diagonal() {
+    this.g.haz.push(new Cane({ cx: VW + 50, cy: 92, len: 96, thick: 9, angle: 0.42, vx: -105 * this.d.speed, warn: 0.8 * this.d.warn, warnBox: { x: VW - 16, y: 70, w: 16, h: 46 } }))
+  }
+  // A wall of cane with one gap. 'high' gap: jump through it. 'low' gap: stay on the floor.
+  wall(kind, fromLeft) {
+    const gap = kind === 'high' ? { y: 66, h: 40 } : { y: GROUND_Y - 32, h: 40 }
+    const vx = (fromLeft ? 1 : -1) * 100 * this.d.speed
+    const x = fromLeft ? -30 : VW + 30
+    const warnBox = fromLeft ? { x: 0, y: 0, w: 14, h: GROUND_Y } : { x: VW - 14, y: 0, w: 14, h: GROUND_Y }
+    const topLen = gap.y + 12
+    const botTop = gap.y + gap.h
+    const botLen = GROUND_Y + 8 - botTop
+    const opts = { thick: 12, angle: Math.PI / 2, vx, warn: 1.0 * this.d.warn }
+    this.g.haz.push(new Cane({ ...opts, warnBox, cx: x, cy: gap.y - topLen / 2, len: topLen }))
+    this.g.haz.push(new Cane({ ...opts, cx: x, cy: botTop + botLen / 2, len: botLen }))
+    this.throwing()
+  }
+  vomit() {
+    const b = this.bub
+    sfx.vomit()
+    b.text = { text: 'BLEH!', until: this.g.t + 0.8 }
+    const n = 2 + (this.d.extra > 1 ? 1 : 0)
+    for (let i = 0; i < n; i++) this.g.haz.push(new Glob(b.x + 14, b.y + 26, (i - (n - 1) / 2) * 50 + this.rng.range(-15, 15), 44, 16 * this.d.life))
+  }
+  updateFight(dt) {
+    super.updateFight(dt)
+    this.float(dt)
+  }
+  idle(dt) {
+    super.idle(dt)
+    this.float(dt)
+  }
+  float(dt) {
+    const want = this.mood === 'defeated' ? GROUND_Y - this.h : this.baseY + Math.sin(this.g.t * 1.8) * 5
+    this.y += (want - this.y) * Math.min(1, dt * 3)
     const b = this.bub
     b.t += dt
-    b.x = this.g.lv.arenaX + 118 + Math.sin(b.t * 0.7) * 95
-    b.y = 16 + Math.sin(b.t * 2.3) * 4
-    if (this.state !== 'dead' && this.state !== 'intro') {
-      b.cool -= dt
-      if (b.cool <= 0) {
-        b.cool = rand(2.2, 3.2)
-        sfx.vomit()
-        for (let i = 0; i < 3; i++) this.g.haz.push(new Glob(b.x + 16, b.y + 26, rand(-40, 40)))
-      }
-    }
+    b.x = 110 + Math.sin(b.t * 0.6) * 90
+    b.y = 14 + Math.sin(b.t * 2.1) * 4
   }
-  attack() {
-    // Low cane: get up on a platform (or jump it). High cane: stay on the floor.
-    const low = Math.random() < 0.5
-    this.pending = { y: low ? GROUND_Y - 12 : 96, t: 0.8 }
-    sfx.warn()
-  }
-  playerRespawned() {
-    this.pending = null
-    super.playerRespawned()
-  }
-  draw(c, cam, t) {
-    if (this.pending && Math.floor(t * 10) % 2) {
-      c.fillStyle = '#f8c830'
-      for (let x = this.g.lv.arenaX; x < this.x; x += 8) c.fillRect(Math.round(x - cam), this.pending.y, 4, 1)
-    }
-    super.draw(c, cam, t)
-    if (this.state !== 'dead') drawSprite(c, SPR.bubble, this.bub.x - cam, this.bub.y)
+  draw(c, t) {
+    super.draw(c, t)
+    drawSprite(c, SPR.bubble, this.bub.x, this.bub.y + Math.round(Math.sin(t * 3)))
   }
 }
 
-export function makeBoss(key, g) {
-  const B = { jax: Jax, ragatha: Ragatha, gangle: Gangle, kinger: Kinger, caine: Caine }[key]
-  return new B(g)
+const CLASSES = { jax: Jax, ragatha: Ragatha, gangle: Gangle, kinger: Kinger, caine: Caine }
+
+export function makeBoss(g, index, d, seed) {
+  const info = BOSSES[index]
+  return new CLASSES[info.key](g, info, d, seed)
 }
