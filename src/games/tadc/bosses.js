@@ -21,6 +21,7 @@ export const BOSSES = [
       [1.6, 'boss', '*PULLS OUT A WHOOPIE CUSHION*'],
       [3.0, 'boss', 'PFFFFFT.'],
     ],
+    tip: "DON'T TOUCH THE CUSHIONS!",
     defeat: '*SHRUG*',
     win: 'HEH. GOTCHA.',
   },
@@ -34,6 +35,7 @@ export const BOSSES = [
       [1.8, 'boss', 'I MADE YOU SOME BUTTONS!'],
       [3.1, 'pomni', 'OH NO.'],
     ],
+    tip: 'DON\'T TOUCH A SINGLE BUTTON!',
     defeat: 'PHEW! YOU DID IT!',
     win: 'OOPS! SORRY!',
   },
@@ -46,6 +48,7 @@ export const BOSSES = [
       [0.4, 'boss', 'SORRY POMNI...'],
       [1.8, 'boss', 'THE RIBBONS HAVE A MIND OF THEIR OWN!'],
     ],
+    tip: 'WATCH THE OUTLINES. FIND THE GAP!',
     defeat: 'IS... IS IT OVER?',
     win: 'OH NO... SORRY!',
   },
@@ -59,6 +62,7 @@ export const BOSSES = [
       [1.7, 'boss', 'WAIT. WHO ARE YOU AGAIN?'],
       [3.0, 'boss', 'PILLOW FIGHT!!!'],
     ],
+    tip: 'STAND ON PILLOWS. NEVER RUN INTO THEM!',
     defeat: 'I REGRET NOTHING!',
     win: 'GOT YOU! ...WHO WAS THAT?',
   },
@@ -72,6 +76,7 @@ export const BOSSES = [
       [1.7, 'boss', 'THE FINAL SHOW!'],
       [3.0, 'bubble', 'HIIIII!'],
     ],
+    tip: 'DODGE THE CANE. THE BLACK GOO IS SLIPPERY!',
     defeat: '...',
     win: 'AND THE CROWD GOES WILD!',
   },
@@ -133,12 +138,15 @@ class Boss {
     this.throwT = Math.max(0, this.throwT - dt)
   }
   throwing() {
-    this.throwT = 0.18
+    this.throwT = 0.28
   }
   draw(c, t) {
-    const lean = this.throwT > 0 ? -2 : 0
+    const throwing = this.throwT > 0
+    const pose = throwing && SPR[this.key + 'Throw'] ? SPR[this.key + 'Throw'] : this.spr
+    const lean = throwing ? -2 : 0
     const bob = this.mood === 'defeated' ? 0 : Math.round(Math.sin(t * 2.4) * 1)
-    drawSprite(c, this.spr, this.x + lean, this.y + bob + (this.throwT > 0 ? 1 : 0))
+    // Keep the body in the same place whichever pose is showing.
+    drawSprite(c, pose, this.x + this.spr.ax - pose.ax + lean, this.y + this.h - pose.length + bob + (throwing ? 1 : 0))
     if (this.mood === 'pleased') {
       c.fillStyle = '#f8c830'
       for (let i = 0; i < 3; i++) c.fillRect(Math.round(this.x + this.spr.ax - 10 + i * 8), Math.round(this.y - 6 - Math.abs(Math.sin(t * 6 + i)) * 4), 2, 2)
@@ -609,7 +617,7 @@ class Caine extends Boss {
     const botLen = GROUND_Y + 8 - botTop
     const opts = { thick: 12, angle: Math.PI / 2, vx, warn: 1.0 * this.d.warn }
     this.g.haz.push(new Cane({ ...opts, warnBox, cx: x, cy: gap.y - topLen / 2, len: topLen }))
-    this.g.haz.push(new Cane({ ...opts, cx: x, cy: botTop + botLen / 2, len: botLen }))
+    this.g.haz.push(new Cane({ ...opts, cx: x, cy: botTop + botLen / 2, len: botLen, hook: false }))
     this.throwing()
   }
   vomit() {

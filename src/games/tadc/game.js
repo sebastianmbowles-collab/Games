@@ -1088,6 +1088,7 @@ export class TadcGame {
     this.drawPomniNormal(c)
     this.drawFx(c)
     this.drawHud(c)
+    if (this.boss.time < 4 && Math.floor(this.t * 3) % 4) drawText(c, this.boss.tip, VW / 2, 164, { align: 'center', color: '#f8c830' })
     if (this.finalBanner && this.t - this.finalBanner < 2 && Math.floor(this.t * 8) % 2) {
       drawText(c, 'FINAL ATTACK!', VW / 2, 28, { scale: 2, align: 'center', color: '#e03c9c', shadow: INK })
     }

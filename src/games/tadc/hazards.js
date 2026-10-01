@@ -308,7 +308,7 @@ export class Cane {
   killer = 'cane'
   dead = false
   constructor(o) {
-    Object.assign(this, { thick: 8, angle: 0, warn: 0.8, t: 0, spin: 0, vx: 0, vy: 0, script: null, warnBox: null, whooshed: false }, o)
+    Object.assign(this, { thick: 8, angle: 0, warn: 0.8, t: 0, spin: 0, vx: 0, vy: 0, script: null, warnBox: null, whooshed: false, hook: true }, o)
   }
   get active() {
     return this.t >= this.warn
@@ -371,6 +371,10 @@ export class Cane {
     c.fillStyle = 'rgba(255, 255, 255, 0.35)'
     c.fillRect(-L / 2, -T / 2, L, 2)
     // The hook at one end.
+    if (!this.hook) {
+      c.restore()
+      return
+    }
     c.fillStyle = INK
     c.fillRect(L / 2 - 2, -T / 2 - 9, T + 3, T + 10)
     c.fillStyle = '#d82838'
@@ -440,11 +444,15 @@ export class Puddle {
     const w = Math.round(this.w * fade)
     const x = Math.round(this.cx - w / 2)
     const y = this.y
+    // A glossy black puddle with a purple rim, so it shows up on the checkered floor.
+    c.fillStyle = '#5c4c78'
+    c.fillRect(x + 1, y - 3, Math.max(0, w - 2), 4)
     c.fillStyle = INK
     c.fillRect(x + 2, y - 2, Math.max(0, w - 4), 3)
     c.fillRect(x, y - 1, w, 2)
-    c.fillStyle = '#5c4c78'
-    const s = Math.floor(t * 6) % Math.max(1, w - 6)
-    c.fillRect(x + 3 + s, y - 2, 3, 1)
+    c.fillStyle = '#c8b8e0'
+    const s = Math.floor(t * 6) % Math.max(1, w - 8)
+    c.fillRect(x + 4 + s, y - 2, 3, 1)
+    c.fillRect(x + w - 6, y - 1, 1, 1)
   }
 }
