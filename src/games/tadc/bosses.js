@@ -267,12 +267,17 @@ class Jax extends Boss {
     }
     at(14, () => this.say('HEH HEH.'))
     // 2: straight at her, and sometimes a second one to the other side.
+    // (Hard and Insane: now and then he kicks one along the floor instead. Jump it!)
     while (t < 30) {
       const two = r() < 0.5
       const side = r.pick([-1, 1])
+      const kick = d.extra > 0 && r() < 0.35
       at(t, () => {
-        this.toss(this.px, life, cap)
-        if (two) this.toss(this.px + side * 64, life, cap)
+        if (kick) this.kick(life, cap)
+        else {
+          this.toss(this.px, life, cap)
+          if (two) this.toss(this.px + side * 64, life, cap)
+        }
       })
       t += 1.7 / d.dens
     }
@@ -288,11 +293,21 @@ class Jax extends Boss {
     at(42, () => this.say('THROW THROW THROW THROW!', 2.5))
     t = 42.6
     while (t < 51) {
-      const off = r.range(-30, 30)
+      // They land around her, never right on her: keep your cool and don't run into them!
+      const off = r.pick([-1, 1]) * r.range(16, 34)
       at(t, () => this.toss(this.px + off, 3.2 * d.life, cap + 4))
       t += 0.34 / d.dens
     }
     return { events: ev, duration: 53, finalAt: 42, tempos: [[30, 1.06], [42, 1.15]] }
+  }
+  kick(life, cap) {
+    const c = new Cushion(this.x - 16, GROUND_Y - 7, 0, 0, life)
+    c.kick(-120 * this.d.speed, this.rng.range(120, 220))
+    this.g.haz.push(c)
+    const resting = this.g.haz.filter((h) => h instanceof Cushion && h.state === 'rest')
+    for (let i = 0; i < resting.length - cap; i++) resting[i].deflate()
+    this.throwing()
+    sfx.pfft()
   }
   toss(tx, life, cap) {
     const g = this.g

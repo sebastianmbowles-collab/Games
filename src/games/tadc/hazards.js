@@ -54,10 +54,29 @@ export class Cushion {
     Object.assign(this, { x, y, vx, vy, life, state: 'fly', spin: 0, t: 0, born: performance.now() })
   }
   get active() {
-    return this.state === 'rest'
+    return this.state === 'rest' || this.state === 'slide'
+  }
+  // Kicked along the floor (Jax, on Hard and Insane). It slides, then stops and stays.
+  kick(vx, dist) {
+    this.state = 'slide'
+    this.y = GROUND_Y - this.h
+    this.vx = vx
+    this.slideLeft = dist
   }
   update(dt, g) {
     this.t += dt
+    if (this.state === 'slide') {
+      const step = this.vx * dt
+      this.x += step
+      this.slideLeft -= Math.abs(step)
+      this.spin += dt * 14
+      if (this.slideLeft <= 0 || this.x < 4) {
+        this.state = 'rest'
+        this.t = 0
+        sfx.plop()
+      }
+      return
+    }
     if (this.state === 'fly' && this.land === undefined) this.land = predictLanding(g, this)
     if (this.state === 'fly') {
       const prev = this.y + this.h
@@ -91,6 +110,13 @@ export class Cushion {
     return this.active && overlap(b, { x: this.x + 2, y: this.y + 1, w: this.w - 4, h: this.h - 1 })
   }
   draw(c, t) {
+    if (this.state === 'slide') {
+      // A little wobble as it skids along.
+      drawSprite(c, SPR.cushion, this.x - 1, this.y - 1 + (Math.floor(this.spin) % 2))
+      c.fillStyle = 'rgba(244, 244, 244, 0.5)'
+      c.fillRect(Math.round(this.x + this.w + 1), Math.round(this.y + 4), 4, 1)
+      return
+    }
     if (this.state === 'fly') {
       drawLandingMark(c, t, this.land, this.w, 'rgba(224, 60, 156, 0.7)')
       drawSprite(c, SPR.cushion, this.x - 1, this.y - 1, { rot: this.spin })
