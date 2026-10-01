@@ -2379,6 +2379,51 @@ button.bonk-pill:hover {
   font-size: 10px;
 }
 
+/* Keep the whole game screen visible: never taller than the window leaves room for. */
+.tadc-canvas {
+  width: min(100%, 960px, calc((100vh - 200px) * 320 / 176));
+  width: min(100%, 960px, calc((100dvh - 200px) * 320 / 176));
+  min-width: min(100%, 300px);
+}
+
+/* Phone on its side: buttons go beside the screen, so the game can be as big as possible. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .game-screen:has(.tadc-canvas) {
+    padding: 6px 8px;
+    min-height: 100dvh;
+  }
+  .tadc-topbar {
+    margin-bottom: 6px;
+  }
+  .tadc-canvas {
+    width: min(calc(100% - 230px), calc((100dvh - 70px) * 320 / 176));
+    min-width: 0;
+  }
+  .tadc-pad {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 12px;
+    max-width: none;
+    margin: 0;
+    padding: 0 12px;
+    pointer-events: none;
+  }
+  .tadc-pad-side {
+    pointer-events: auto;
+    flex-direction: column;
+  }
+  /* START sits on the right, above the A button. */
+  .tadc-pad-side:nth-child(2) {
+    position: fixed;
+    bottom: 136px;
+    right: 12px;
+  }
+  .tadc-help {
+    display: none;
+  }
+}
+
 .tadc-help {
   max-width: 720px;
   text-align: center;
