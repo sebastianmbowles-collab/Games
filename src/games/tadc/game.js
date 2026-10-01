@@ -632,6 +632,7 @@ export class TadcGame {
         if (who === 'boss') this.boss.say(text, 1.6)
         else if (who === 'bubble') this.boss.bub.text = { text, until: this.t + 1.6 }
         else this.pomniSay = { text, until: this.t + 1.4 }
+        if (who !== 'boss') sfx.talk(who, text)
         sfx.text()
         if (text === 'PFFFFFT.') sfx.pfft()
       }

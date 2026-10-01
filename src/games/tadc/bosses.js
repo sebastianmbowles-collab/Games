@@ -186,6 +186,7 @@ class Boss {
   }
   say(text, dur = 1.8) {
     this.bubbleText = { text, until: this.g.t + dur }
+    sfx.talk(this.key, text)
   }
   updateFight(dt) {
     this.time += dt

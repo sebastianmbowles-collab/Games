@@ -256,6 +256,17 @@ export function stopMusic() {
 
 // ---------- Sound effects ----------
 
+const VOICES = {
+  pomni: { wave: 'p25', f: 560, spread: 0.05, bend: 1, len: 0.04, vol: 0.035, gap: 0.06 },
+  jax: { wave: 'p50', f: 210, spread: 0.04, bend: 0.85, len: 0.05, vol: 0.04, gap: 0.075 },
+  ragatha: { wave: 'p25', f: 680, spread: 0.07, bend: 1.08, len: 0.035, vol: 0.035, gap: 0.055 },
+  gangle: { wave: 'tri', f: 470, spread: 0.04, bend: 0.92, len: 0.06, vol: 0.06, gap: 0.08 },
+  kinger: { wave: 'p12', f: 360, spread: 0.1, bend: 1.2, len: 0.045, vol: 0.035, gap: 0.06, wobble: 0.15 },
+  caine: { wave: 'p25', f: 760, spread: 0.09, bend: 1.15, len: 0.035, vol: 0.035, gap: 0.05 },
+  bubble: { wave: 'p12', f: 1000, spread: 0.08, bend: 1.3, len: 0.03, vol: 0.03, gap: 0.045 },
+  zooble: { wave: 'p50', f: 300, spread: 0.02, bend: 0.97, len: 0.05, vol: 0.035, gap: 0.08 },
+}
+
 function at(delay = 0) {
   return ctx.currentTime + delay
 }
@@ -384,6 +395,19 @@ export const sfx = {
   },
   text() {
     sv('p50', 500 + Math.random() * 80, 500, 0.03, 0.06)
+  },
+  // Little beepy voices when someone talks. Everyone has their own sound.
+  talk(who, text) {
+    const v = VOICES[who] || VOICES.pomni
+    const letters = String(text).replace(/[^A-Z0-9]/gi, '')
+    const n = Math.min(9, Math.max(letters ? 1 : 0, Math.ceil(letters.length / 3)))
+    for (let i = 0; i < n; i++) {
+      // The same words always make the same tune.
+      const code = letters.charCodeAt((i * 3) % letters.length) || 0
+      const f = v.f * (1 + ((code % 7) - 3) * v.spread)
+      const wob = v.wobble ? 1 + Math.sin(i * 2.3) * v.wobble : 1
+      sv(v.wave, f * wob, f * wob * v.bend, v.len, v.vol, i * v.gap)
+    }
   },
   glitch() {
     for (let i = 0; i < 6; i++) {
