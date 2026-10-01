@@ -138,6 +138,15 @@ export const BOSSES = [
   },
 ]
 
+const BANTER = {
+  jax: ['BORED NOW.', 'THIS IS FUN. FOR ME.', 'YOU LOOK NERVOUS. HEH.'],
+  ragatha: ['YOU CAN DO IT!', 'SORRY! SORRY!', 'ALMOST THERE!'],
+  gangle: ["I DON'T LIKE THIS...", '*SNIFF*', 'PLEASE BE CAREFUL!'],
+  kinger: ['WHAT WAS I DOING?', 'PILLOW FORT!!', 'IS IT TUESDAY?'],
+  caine: ['MARVELOUS!', 'SPLENDID!', 'THE CROWD LOVES YOU!'],
+  zooble: ['ARE WE DONE YET?', 'UGH.', 'THIS IS SO DUMB.'],
+}
+
 class Boss {
   constructor(g, info, d, seed) {
     this.g = g
@@ -191,6 +200,13 @@ class Boss {
   updateFight(dt) {
     this.time += dt
     this.throwT = Math.max(0, this.throwT - dt)
+    // Now and then they chat (when they're not already talking).
+    this.chatT = (this.chatT ?? 9 + Math.random() * 6) - dt
+    if (this.chatT <= 0) {
+      this.chatT = 11 + Math.random() * 8
+      const lines = BANTER[this.key]
+      if (lines && (!this.bubbleText || this.bubbleText.until < this.g.t)) this.say(lines[Math.floor(Math.random() * lines.length)], 1.6)
+    }
     while (this.ei < this.events.length && this.events[this.ei][0] <= this.time) {
       this.events[this.ei][1]()
       this.ei++
