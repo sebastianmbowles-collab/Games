@@ -198,6 +198,7 @@ export class TadcGame {
     this.haz = []
     this.parts = []
     this.floats = []
+    this.floats = []
     setTempo(1)
     playMusic('menu')
     this.setState('title')
@@ -555,8 +556,70 @@ export class TadcGame {
       stopMusic()
       sfx.static()
     }
+    // Secret code: UP UP DOWN DOWN LEFT RIGHT LEFT RIGHT = GLOINK PARTY!
+    for (const dir of ['up', 'down', 'left', 'right']) if (pr(dir)) this.code = [...(this.code || []), dir].slice(-8)
+    if (this.code && this.code.join() === 'up,up,down,down,left,right,left,right') {
+      this.code = []
+      this.gloinkParty()
+    }
+    this.updateGloinks(dt)
     const k = this.menuNav(pr, 'msel', this.menuItems().length)
     if (k >= 0) this.menuPick(k)
+  }
+
+  // ---------- Gloink party (a secret) ----------
+
+  gloinkParty() {
+    sfx.secret()
+    const cols = ['#f88828', '#8848c8', '#38b848', '#e03c9c', '#68d8f8', '#f8c830']
+    this.gloinks = []
+    for (let i = 0; i < 36; i++) {
+      this.gloinks.push({ x: rand(4, VW - 10), y: rand(-160, -8), vx: rand(-30, 30), vy: 0, r: Math.floor(rand(3, 6)), col: cols[i % cols.length], life: rand(8, 11) })
+    }
+    this.floats.push({ text: 'GLOINK PARTY!', x: VW / 2, y: 156, life: 2.5, color: '#f8c830' })
+  }
+
+  updateGloinks(dt) {
+    if (!this.gloinks) return
+    for (const q of this.gloinks) {
+      q.life -= dt
+      q.vy += 400 * dt
+      q.x += q.vx * dt
+      q.y += q.vy * dt
+      if (q.y + q.r > 146) {
+        q.y = 146 - q.r
+        q.vy = -Math.abs(q.vy) * 0.75 - rand(20, 60)
+        if (Math.random() < 0.15) sfx.blip()
+      }
+      if (q.x < q.r || q.x > VW - q.r) q.vx = -q.vx
+    }
+    this.gloinks = this.gloinks.filter((q) => q.life > 0)
+    if (!this.gloinks.length) this.gloinks = null
+  }
+
+  drawGloinks(c) {
+    if (!this.gloinks) return
+    for (const q of this.gloinks) {
+      if (q.life < 1 && Math.floor(this.t * 10) % 2) continue
+      const x = Math.round(q.x)
+      const y = Math.round(q.y)
+      c.fillStyle = INK
+      c.beginPath()
+      c.arc(x, y, q.r + 1, 0, Math.PI * 2)
+      c.fill()
+      c.fillStyle = q.col
+      c.beginPath()
+      c.arc(x, y, q.r, 0, Math.PI * 2)
+      c.fill()
+      // Two little eyes, looking wherever they're going.
+      const lx = q.vx > 0 ? 1 : 0
+      c.fillStyle = '#f4f4f4'
+      c.fillRect(x - 2 + lx, y - 1, 2, 2)
+      c.fillRect(x + 1 + lx, y - 1, 2, 2)
+      c.fillStyle = INK
+      c.fillRect(x - 1 + lx, y - 1, 1, 1)
+      c.fillRect(x + 2 + lx, y - 1, 1, 1)
+    }
   }
 
   // ENCORE appears on the menu once you've beaten the game.
@@ -1238,6 +1301,8 @@ export class TadcGame {
       }
     }
 
+    this.drawGloinks(c)
+    for (const f of this.floats) drawText(c, f.text, f.x, f.y, { scale: 2, align: 'center', color: f.color })
     if (menuOn && this.helpT <= 0) {
       const items = this.menuItems()
       const gap = items.length > 4 ? 10 : 13
