@@ -101,6 +101,8 @@ class Boss {
     this.duration = s.duration
     this.finalAt = s.finalAt
     this.tempos = s.tempos || []
+    // Where each new part of the show starts (for the little marks on the boss bar).
+    this.marks = this.tempos.map(([at]) => at / this.duration)
   }
   get w() {
     return this.spr[0].length

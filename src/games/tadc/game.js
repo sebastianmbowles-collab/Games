@@ -230,6 +230,8 @@ export class TadcGame {
     if (this.state !== 'fight') return
     this.killer = killer
     this.run.deaths++
+    this.run.tries = this.run.tries || {}
+    this.run.tries[this.bossIdx] = (this.run.tries[this.bossIdx] || 1) + 1
     this.save.deaths++
     this.persist()
     this.setState('dying')
@@ -1033,6 +1035,8 @@ export class TadcGame {
     c.fillRect(5, 12, Math.round(102 * left), 4)
     c.fillStyle = 'rgba(255,255,255,0.4)'
     c.fillRect(5, 12, Math.round(102 * left), 1)
+    c.fillStyle = INK
+    for (const m of b.marks) c.fillRect(5 + Math.round(102 * (1 - m)), 11, 1, 6)
     if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 3, { align: 'center', color: '#f4f4f4' })
     if (this.run.mode === 'practice') drawText(c, 'PRACTICE', VW / 2, 3, { align: 'center', color: '#68d8f8' })
     const d = DIFFS[this.run.diff]
@@ -1122,6 +1126,8 @@ export class TadcGame {
     const lines = { cushion: 'PFFFFFT.', button: 'BUTTONED.', ribbon: 'ALL TIED UP.', pillow: 'SMOTHERED IN PILLOWS.', cane: 'CANED.' }
     drawText(c, lines[this.killer] || 'OUCH.', VW / 2, 102, { align: 'center', color: '#c8b8e0' })
     drawText(c, `${info.name}: ${info.win}`, VW / 2, 112, { align: 'center', color: '#8c8c9c' })
+    const tries = (this.run && this.run.tries && this.run.tries[this.bossIdx]) || 2
+    drawText(c, `NEXT TRY: ATTEMPT ${tries}`, VW / 2, 122, { align: 'center', color: '#f8c830' })
     if (this.st > 0.6) {
       this.menuLine(c, 'TRY AGAIN', VW / 2, 134, this.gameoverSel === 0, () => ((this.gameoverSel = 0), this.pressed.add('confirm')), { align: 'center' })
       this.menuLine(c, 'MAIN MENU', VW / 2, 148, this.gameoverSel === 1, () => ((this.gameoverSel = 1), this.pressed.add('confirm')), { align: 'center' })
