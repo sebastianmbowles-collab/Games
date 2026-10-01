@@ -1289,6 +1289,8 @@ export class TadcGame {
       { text: 'GAME DESIGN', color: '#8c8c9c' },
       { text: 'SEB', scale: 2, color: '#f4f4f4', gap: 16 },
       { text: "MADE FOR SEB'S ARCADE", color: '#c8b8e0', gap: 16 },
+      { text: 'TESTED BY', color: '#8c8c9c' },
+      { text: 'A VERY DETERMINED ROBOT', color: '#68d8f8', gap: 16 },
       { text: 'BASED ON THE AMAZING DIGITAL CIRCUS', color: '#8c8c9c' },
       { text: 'BY GLITCH PRODUCTIONS', color: '#8c8c9c', gap: 40 },
       { text: 'THANKS FOR PLAYING!', scale: 2, color: '#f8c830' },
