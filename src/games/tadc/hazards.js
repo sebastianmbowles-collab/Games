@@ -456,3 +456,80 @@ export class Puddle {
     c.fillRect(x + w - 6, y - 1, 1, 1)
   }
 }
+
+// ---------- Zooble: spare parts ----------
+// A body part that flies, bounces along the floor, drops from the sky or comes back like a boomerang.
+// bounceV: how hard it bounces off the floor (0 = it stops). warnAt: where to show a warning first.
+export class Part {
+  kind = 'deadly'
+  killer = 'part'
+  w = 8
+  h = 8
+  dead = false
+  constructor(o) {
+    Object.assign(this, { vx: 0, vy: 0, grav: G, bounceV: 0, warn: 0, warnAt: null, life: 9, spin: 0, spinV: 8, look: 'Glove', script: null, landed: false }, o)
+  }
+  get active() {
+    return this.warn <= 0
+  }
+  update(dt, g) {
+    if (this.warn > 0) {
+      this.warn -= dt
+      if (this.warn <= 0) sfx.ping()
+      return
+    }
+    this.spin += dt * this.spinV
+    this.life -= dt
+    this.vy += this.grav * dt
+    this.x += this.vx * dt
+    this.y += this.vy * dt
+    if (this.grav && this.vy > 0 && this.y + this.h >= GROUND_Y) {
+      this.y = GROUND_Y - this.h
+      if (this.bounceV) {
+        this.vy = -this.bounceV
+        sfx.step()
+      } else {
+        this.vy = 0
+        this.grav = 0
+        if (!this.landed) {
+          this.landed = true
+          this.vx = 0
+          this.life = Math.min(this.life, 0.5)
+          sfx.plop()
+        }
+      }
+    }
+    if (this.script) this.script(this, dt, g)
+    if (this.life <= 0 || offscreen(this)) {
+      this.dead = true
+      if (this.life <= 0) g.puff(this.x + 4, this.y + 4, ['#f8c830', '#e03c9c', '#68d8f8'], 4)
+    }
+  }
+  hits(b) {
+    return this.active && overlap(b, { x: this.x + 1, y: this.y + 1, w: this.w - 2, h: this.h - 2 })
+  }
+  draw(c, t) {
+    if (this.warn > 0) {
+      const w = this.warnAt
+      if (!w || !(Math.floor(t * 12) % 2)) return
+      c.fillStyle = '#e03c9c'
+      if (w.side === 'top') {
+        // An arrow pointing down at the top, and a shadow on the floor.
+        c.fillRect(Math.round(this.x + 1), 2, 6, 2)
+        c.fillRect(Math.round(this.x + 2), 4, 4, 2)
+        c.fillRect(Math.round(this.x + 3), 6, 2, 2)
+        c.fillStyle = 'rgba(20, 12, 28, 0.5)'
+        c.fillRect(Math.round(this.x), GROUND_Y - 1, 8, 2)
+      } else {
+        // An arrow on the left edge, pointing right, at the height the part will fly.
+        const y = Math.round(this.y + 4)
+        c.fillRect(2, y - 3, 2, 7)
+        c.fillRect(4, y - 2, 2, 5)
+        c.fillRect(6, y - 1, 2, 3)
+      }
+      return
+    }
+    if (this.landed && Math.floor(t * 12) % 2) return
+    drawSprite(c, SPR['part' + this.look], this.x - 1, this.y - 1, { rot: this.spin })
+  }
+}

@@ -485,7 +485,8 @@ export function bubble(c) {
 }
 
 // ---------- Zooble ----------
-export function zooble(c) {
+// pose: { throw: the yellow arm goes up to throw a part, bored: arms down and a flat mouth }
+export function zooble(c, p = {}) {
   // Spring leg and long blue leg.
   for (let i = 0; i < 5; i++) ell(c, -3.6, -24 + i * 2.2, 2.2, 0.9, '#a8f0f4', { ol: 0.5 })
   curve(c, -3.6, -13, -3.8, -6, -6.5, -1, 1.1, '#f8b060')
@@ -493,8 +494,13 @@ export function zooble(c) {
   limb(c, [[2.6, -26], [3, -3]], 1.6, '#6240e8')
   ell(c, 5, -1.6, 4, 1.8, '#6240e8')
   // Arms: a yellow one with a glove, a zig-zag one with a red claw.
-  curve(c, -5, -38, -10, -32, -9, -18, 1, '#f8b060')
-  ell(c, -9, -17, 2.2, 2.4, '#f8d040')
+  if (p.throw) {
+    curve(c, -5, -38, -11, -40, -12, -50, 1, '#f8b060')
+    ell(c, -12, -51, 2.2, 2.4, '#f8d040')
+  } else {
+    curve(c, -5, -38, -10, -32, -9, -18, 1, '#f8b060')
+    ell(c, -9, -17, 2.2, 2.4, '#f8d040')
+  }
   limb(c, [[5, -38], [8, -36], [6.4, -34], [9, -32]], 0.9, '#f2589a')
   ell(c, 9.4, -31, 1.4, 1.4, '#f8a0d0')
   limb(c, [[9.4, -31], [10.4, -22]], 1, '#f8d040')
@@ -511,6 +517,7 @@ export function zooble(c) {
   ell(c, -3, -47, 3.6, 3, '#7a30c0')
   poly(c, [[0, -52], [9, -53], [3.6, -42.4]], '#f2348a')
   ell(c, 4.4, -49.6, 1.6, 1.4, '#ffffff', { ol: 0.5 })
+  if (p.bored) line(c, 2.4, -45.6, 5.4, -45.6, 0.7)
   return [{ x: 4.4, y: -49.6, w: 1, h: 1, color: K, rx: 0.5, ry: 0.3 }]
 }
 

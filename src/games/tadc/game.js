@@ -28,10 +28,14 @@ const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover'
 const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'intro', 'gameover', 'results'])
 
 function loadSave() {
-  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1], records: {}, badges: {}, deaths: 0, runs: 0 }
+  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, deaths: 0, runs: 0 }
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY))
-    if (s && typeof s === 'object') return { ...base, ...s, beaten: s.beaten || base.beaten, records: s.records || {}, badges: s.badges || {} }
+    if (s && typeof s === 'object') {
+      // Older saves only know about five bosses: give Zooble a slot too.
+      const beaten = base.beaten.map((b, i) => (s.beaten && s.beaten[i] !== undefined ? s.beaten[i] : b))
+      return { ...base, ...s, beaten, records: s.records || {}, badges: s.badges || {} }
+    }
   } catch {
     // No save yet, or storage is blocked.
   }
@@ -215,7 +219,7 @@ export class TadcGame {
     this.pomni = new Pomni(spawn.x, spawn.y)
     this.pomni.onFloor = !kinger
     this.touchedFloor = false
-    this.save.reached = Math.max(this.save.reached, idx)
+    if (!info.bonus) this.save.reached = Math.max(this.save.reached, idx)
     this.persist()
     setTempo(1)
     playMusic(info.key, true)
@@ -285,6 +289,10 @@ export class TadcGame {
     this.save.beaten[i] = Math.max(this.save.beaten[i], this.run.diff)
     this.save.reached = Math.max(this.save.reached, Math.min(4, i + 1))
     this.newBadge = null
+    if (this.boss.key === 'zooble' && !this.save.badges.zooble) {
+      this.newBadge = 'SPARE PARTS'
+      this.save.badges.zooble = true
+    }
     if (this.boss.key === 'kinger' && !this.touchedFloor) {
       this.newBadge = 'PILLOW MASTER'
       this.save.badges.pillowMaster = true
@@ -327,6 +335,7 @@ export class TadcGame {
       if (!this.save.badges.cleared) {
         this.save.badges.cleared = true
         this.results.badges.push('ESCAPED THE CIRCUS?')
+        this.results.badges.push('BONUS BOSS UNLOCKED!')
       }
     }
     this.persist()
@@ -453,16 +462,26 @@ export class TadcGame {
     }
   }
 
+  // Zooble, the secret sixth boss, only shows up once you've beaten the game.
+  galleryCount() {
+    return this.save.badges.cleared ? 6 : 5
+  }
+
+  bossMet(i) {
+    return BOSSES[i].bonus ? !!this.save.badges.cleared : i <= this.save.reached
+  }
+
   update_bosses(dt, pr) {
+    const n = this.galleryCount()
     if (pr('left') || pr('up')) {
-      this.gsel = (this.gsel + 4) % 5
+      this.gsel = (this.gsel + n - 1) % n
       sfx.beep()
     }
     if (pr('right') || pr('down')) {
-      this.gsel = (this.gsel + 1) % 5
+      this.gsel = (this.gsel + 1) % n
       sfx.beep()
     }
-    if (this.st > 0.2 && pr('confirm') && this.gsel <= this.save.reached) {
+    if (this.st > 0.2 && pr('confirm') && this.bossMet(this.gsel)) {
       sfx.blip()
       this.startRun(this.gsel)
       return
@@ -925,14 +944,14 @@ export class TadcGame {
     drawText(c, 'BOSSES', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
     const i = this.gsel
     const info = BOSSES[i]
-    const met = i <= this.save.reached
+    const met = this.bossMet(i)
     const spr = SPR[info.key]
     drawSprite(c, spr, 64 - spr.ax, 150 - spr.length + Math.round(Math.sin(this.t * 2)), { mode: met ? 'normal' : 'shadow', look: [Math.sin(this.t * 0.8) * 0.8, 0.3] })
     if (info.key === 'caine') drawSprite(c, SPR.bubble, 84, 34, { mode: met ? 'normal' : 'shadow' })
     c.fillStyle = '#f4f4f4'
     c.fillRect(20, 150, 90, 1)
     const x = 124
-    drawText(c, `BOSS ${i + 1}`, x, 30, { color: '#8c8c9c' })
+    drawText(c, info.bonus ? 'SECRET BONUS BOSS' : `BOSS ${i + 1}`, x, 30, { color: info.bonus ? '#e03c9c' : '#8c8c9c' })
     drawText(c, met ? info.name : '???', x, 40, { scale: 2, color: '#f8c830' })
     drawText(c, met ? info.title : '???', x, 56, { color: '#e03c9c' })
     if (met) info.rules.forEach((r, k) => drawText(c, r, x, 72 + k * 10, { color: '#f4f4f4' }))
@@ -944,8 +963,9 @@ export class TadcGame {
       this.hits.push({ x: x - 4, y: 118, w: 120, h: 14, fn: () => this.pressed.add('confirm') })
     }
     if (i === 3 && this.save.badges.pillowMaster) drawText(c, '* PILLOW MASTER *', x, 136, { color: '#c8b8e0' })
-    for (let k = 0; k < 5; k++) {
-      c.fillStyle = k === i ? '#f8c830' : '#4c3c5c'
+    const n = this.galleryCount()
+    for (let k = 0; k < n; k++) {
+      c.fillStyle = k === i ? '#f8c830' : BOSSES[k].bonus ? '#8c2c6c' : '#4c3c5c'
       c.fillRect(VW / 2 - 24 + k * 10, 160, 6, 6)
       this.hits.push({ x: VW / 2 - 26 + k * 10, y: 156, w: 10, h: 14, fn: () => ((this.gsel = k), sfx.beep()) })
     }
@@ -1013,6 +1033,7 @@ export class TadcGame {
       ['PERFECT RUN', b.perfect, 'NO DEATHS ON HARD OR INSANE'],
       ['INSANE CLEAR', b.insane, 'BEAT INSANE MODE'],
       ['PILLOW MASTER', b.pillowMaster, '???'],
+      ['SPARE PARTS', b.zooble, b.cleared ? 'BEAT THE BONUS BOSS' : '???'],
     ]
     badges.forEach(([name, got, how], i) => {
       const y = 112 + i * 10
@@ -1128,7 +1149,7 @@ export class TadcGame {
     if (k > 0 && this.st < 1.9) {
       c.save()
       c.globalAlpha = k
-      drawText(c, `BOSS ${this.bossIdx + 1} / 5`, VW / 2, 62, { align: 'center', color: '#8c8c9c' })
+      drawText(c, info.bonus ? 'SECRET BONUS BOSS' : `BOSS ${this.bossIdx + 1} / 5`, VW / 2, 62, { align: 'center', color: info.bonus ? '#e03c9c' : '#8c8c9c' })
       drawText(c, info.name, VW / 2, 71, { scale: 3, align: 'center', color: '#f4f4f4', shadow: '#d82838' })
       drawText(c, info.title, VW / 2, 91, { align: 'center', color: '#f8c830' })
       c.restore()
@@ -1184,7 +1205,7 @@ export class TadcGame {
     const info = BOSSES[this.bossIdx]
     const icon = SPR['icon' + info.key[0].toUpperCase() + info.key.slice(1)]
     if (icon) drawSprite(c, icon, VW / 2 - icon.ax, 62 + Math.round(Math.sin(this.t * 6)))
-    const lines = { cushion: 'PFFFFFT.', button: 'BUTTONED.', ribbon: 'ALL TIED UP.', pillow: 'SMOTHERED IN PILLOWS.', cane: 'CANED.' }
+    const lines = { cushion: 'PFFFFFT.', button: 'BUTTONED.', ribbon: 'ALL TIED UP.', pillow: 'SMOTHERED IN PILLOWS.', cane: 'CANED.', part: 'HIT BY A SPARE PART.' }
     drawText(c, lines[this.killer] || 'OUCH.', VW / 2, 102, { align: 'center', color: '#c8b8e0' })
     drawText(c, `${info.name}: ${info.win}`, VW / 2, 112, { align: 'center', color: '#8c8c9c' })
     const tries = (this.run && this.run.tries && this.run.tries[this.bossIdx]) || 2

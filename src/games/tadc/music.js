@@ -231,6 +231,49 @@ export const SONGS = {
   },
 
   // The end: a slow, slightly spooky music box.
+  // Zooble (bonus): a bored, wonky shuffle. Notes jump around like mismatched parts.
+  zooble: {
+    bpm: 138,
+    tracks: [
+      {
+        wave: 'p50',
+        vol: 0.05,
+        notes: [
+          'E5:2 .:2 E4:1 .:1 G4:2 B4:2 .:2 A4:2 G4:2',
+          'F#4:2 .:2 D5:2 .:2 C5:2 B4:2 A4:4',
+          'E5:2 .:2 E4:1 .:1 G4:2 B4:2 .:2 C5:2 D5:2',
+          'E5:3 D5:1 B4:4 .:4 E4~E5:4',
+          'G5:2 .:2 F#5:2 .:2 E5:2 D5:2 B4:4',
+          'C5:2 .:2 B4:2 .:2 A4:2 G4:2 F#4:4',
+          'E4:1 G4:1 B4:1 E5:1 .:4 D5:1 B4:1 G4:1 D4:1 .:4',
+          'E5:2 B4:2 G4:2 E4:2 .:4 E4:2 .:2',
+        ].join(' | '),
+      },
+      {
+        wave: 'tri',
+        vol: 0.16,
+        notes: [['E2', 'E3'], ['D2', 'D3'], ['E2', 'E3'], ['B1', 'B2'], ['C2', 'C3'], ['A1', 'A2'], ['E2', 'E3'], ['B1', 'B2']]
+          .map(([n, m]) => rep(`${n}:2 .:2 ${m}:1 .:1 ${n}:2`, 2))
+          .join(' | '),
+      },
+      {
+        wave: 'p12',
+        vol: 0.022,
+        notes: [
+          rep('.:2 G4+B4:1 .:1', 4),
+          rep('.:2 F#4+A4:1 .:1', 4),
+          rep('.:2 G4+B4:1 .:1', 4),
+          rep('.:2 F#4+B4:1 .:1', 4),
+          rep('.:2 E4+G4:1 .:1', 4),
+          rep('.:2 E4+A4:1 .:1', 4),
+          rep('.:2 G4+B4:1 .:1', 4),
+          rep('.:2 F#4+B4:1 .:1', 4),
+        ].join(' | '),
+      },
+      { vol: 0.08, notes: 'k:2 .:2 s:2 k:1 k:1 .:2 h:2 s:2 h:2 | k:2 h:2 s:2 .:1 k:1 k:2 h:2 s:1 s:1 t:2' },
+    ],
+  },
+
   ending: {
     bpm: 84,
     tracks: [

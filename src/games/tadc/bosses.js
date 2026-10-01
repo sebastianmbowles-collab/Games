@@ -4,7 +4,7 @@
 
 import { SPR, drawSprite } from './sprites'
 import { VW, GROUND_Y, clamp, seeded } from './consts'
-import { Cushion, Button, Ribbon, Pillow, Cane, Glob } from './hazards'
+import { Cushion, Button, Ribbon, Pillow, Cane, Glob, Part } from './hazards'
 import { sfx, setTempo } from './sound'
 
 const G = 520
@@ -79,6 +79,21 @@ export const BOSSES = [
     tip: 'DODGE THE CANE. THE BLACK GOO IS SLIPPERY!',
     defeat: '...',
     win: 'AND THE CROWD GOES WILD!',
+  },
+  {
+    key: 'zooble',
+    name: 'ZOOBLE',
+    title: 'SPARE PARTS',
+    bonus: true,
+    rules: ['THROWS THEIR OWN BODY PARTS.', 'LOW BOUNCERS: JUMP OVER.', 'HIGH BOUNCERS: RUN UNDER.'],
+    intro: [
+      [0.4, 'boss', 'UGH. FINE.'],
+      [1.7, 'boss', "I DON'T EVEN WANT TO BE HERE."],
+      [3.0, 'boss', "LET'S JUST GET THIS OVER WITH."],
+    ],
+    tip: 'LOW PARTS: JUMP. HIGH PARTS: STAY DOWN!',
+    defeat: "WHATEVER. I WASN'T TRYING.",
+    win: '...OOPS. NOT SORRY.',
   },
 ]
 
@@ -659,7 +674,105 @@ class Caine extends Boss {
   }
 }
 
-const CLASSES = { jax: Jax, ragatha: Ragatha, gangle: Gangle, kinger: Kinger, caine: Caine }
+// ---------- ZOOBLE (secret bonus boss) ----------
+const LOOKS = ['Glove', 'Claw', 'Ball', 'Spring', 'Wing']
+class Zooble extends Boss {
+  script(r, d) {
+    const ev = []
+    const at = (t, fn) => ev.push([t, fn])
+    const sp = d.speed
+    let t = 1
+    // 1: bouncing parts. Low bouncers: jump over them. High bouncers: run under them.
+    while (t < 14) {
+      const k = r()
+      at(t, () => (k < 0.4 ? this.bounce(false) : k < 0.75 ? this.bounce(true) : this.roll(110 * sp)))
+      t += 2.2 / d.dens
+    }
+    // 2: the claw arm comes back like a boomerang. Low: jump. High: stay on the floor.
+    at(14, () => this.say('CATCH. OR DON\'T.'))
+    while (t < 28) {
+      const low = r() < 0.5
+      const extra = r() < 0.4
+      at(t, () => this.boomerang(low))
+      // Never ask for "jump!" and "stay down!" at the same time: extras match the boomerang.
+      if (extra) at(t + 1.3, () => (low ? this.roll(100 * sp) : this.bounce(true)))
+      t += 2.5 / d.dens
+    }
+    // 3: Zooble falls to pieces. Parts rain down: watch the arrows at the top.
+    at(28, () => this.say('OOPS. I FELL APART.'))
+    while (t < 42) {
+      const n = 3 + d.extra
+      const offs = []
+      for (let i = 0; i < n; i++) offs.push((i - (n - 1) / 2) * 30 + r.range(-6, 6))
+      at(t, () => offs.forEach((o, i) => this.g.haz.push(this.rain(this.px + o, i * 0.12))))
+      if (r() < 0.6) at(t + 1.6, () => this.bounce(false))
+      t += 2.6 / d.dens
+    }
+    // FINAL: putting themself back together. Parts fly home from the LEFT side too!
+    at(42, () => this.say('PUT ME BACK TOGETHER... NOT LIKE THAT!', 2.6))
+    t = 43
+    let i = 0
+    while (t < 56) {
+      const high = r() < 0.5
+      const look = r.pick(LOOKS)
+      at(t, () => this.homing(high, look))
+      // A bouncer from the right that wants the same move as the part from the left.
+      if (i % 2 === 1) at(t + 0.55, () => this.bounce(high))
+      t += 1.3 / Math.min(d.dens, 1.2)
+      i++
+    }
+    return { events: ev, duration: 58, finalAt: 42, tempos: [[14, 1.05], [28, 1.1], [42, 1.2]] }
+  }
+  part(o) {
+    const p = new Part({ look: this.rng.pick(LOOKS), ...o })
+    this.g.haz.push(p)
+    return p
+  }
+  bounce(high) {
+    const h = this.hand()
+    this.part({ x: h.x - 8, y: GROUND_Y - 40, vx: -(high ? 62 : 72) * this.d.speed, vy: high ? -160 : -60, bounceV: high ? 330 : 165, life: 9 })
+    this.throwing()
+    sfx.throw()
+  }
+  roll(speed) {
+    this.part({ x: this.hand().x - 8, y: GROUND_Y - 8, vx: -speed, look: 'Ball', bounceV: 40, spinV: 14, life: 8 })
+    this.throwing()
+    sfx.throw()
+  }
+  boomerang(low) {
+    const d = this.d
+    const home = this.x + 10
+    this.part({
+      x: this.hand().x - 8,
+      y: low ? GROUND_Y - 10 : GROUND_Y - 40,
+      vx: -150 * d.speed,
+      grav: 0,
+      look: 'Claw',
+      spinV: 16,
+      life: 7,
+      script: (p, dt) => {
+        if (p.x < 130) p.vx += 210 * d.speed * dt
+        if (p.vx > 0 && p.x > home) p.dead = true
+      },
+    })
+    this.throwing()
+    sfx.whoosh()
+  }
+  rain(x, delay) {
+    x = clamp(x, 4, this.x - 12)
+    return new Part({ x, y: -10, grav: 520, warn: 0.9 * this.d.warn + delay, warnAt: { side: 'top' }, look: this.rng.pick(LOOKS), life: 4 })
+  }
+  homing(high, look) {
+    // Flies in from the left edge back to Zooble, low (jump) or high (stay down).
+    this.part({ x: -10, y: high ? GROUND_Y - 40 : GROUND_Y - 10, vx: 125 * this.d.speed, grav: 0, look, spinV: 10, warn: 0.75 * this.d.warn, warnAt: { side: 'left' }, life: 6,
+      script: (p) => {
+        if (p.x > this.x + 6) p.dead = true
+      },
+    })
+  }
+}
+
+const CLASSES = { jax: Jax, ragatha: Ragatha, gangle: Gangle, kinger: Kinger, caine: Caine, zooble: Zooble }
 
 export function makeBoss(g, index, d, seed) {
   const info = BOSSES[index]

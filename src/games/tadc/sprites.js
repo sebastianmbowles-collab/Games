@@ -60,6 +60,12 @@ export const SPR = {
   pillow: outlined(PILLOW),
   pillowBouncy: outlined(PILLOW.map((r) => r.replace(/W/g, 'P').replace(/w/g, 'p').replace(/Y/g, 'W'))),
   sweat: ['.C.', 'CCC', 'CWC', '.C.'],
+  // Zooble's spare parts (Zooble throws them!).
+  partGlove: outlined(['.YY.Y.', 'YYYYYY', 'YYYYYY', 'YYYYY.', '.YYY..', '.OOO..']),
+  partClaw: outlined(['R...R.', 'RR.RR.', 'RRRRR.', '.RRRR.', '..PP..', '..PP..']),
+  partBall: outlined(['.CCCC.', 'CWCCCC', 'CCCCCC', 'CCCCCC', 'CCCCCb', '.Cbbb.']),
+  partSpring: outlined(['CCCCCC', '.WWWW.', 'CCCCCC', '.WWWW.', 'CCCCCC', '.WWWW.']),
+  partWing: outlined(['..PPPP', '.PPWPP', 'PPPPPP', 'PPPPP.', '.PPP..', '..P...']),
   bigCushion: outlined([
     '..pPPPp..',
     '.PPWPPPP.',

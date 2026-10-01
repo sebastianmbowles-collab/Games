@@ -1,6 +1,7 @@
 // Boss arenas: the backgrounds, the checkered floor and the floating platforms for each boss.
 
 import { VW, VH, GROUND_Y, INK } from './consts'
+import { drawText } from './font'
 
 export const ARENAS = {
   jax: { platforms: [{ x: 36, y: 108, w: 64 }, { x: 150, y: 108, w: 64 }] },
@@ -8,6 +9,7 @@ export const ARENAS = {
   gangle: { platforms: [{ x: 20, y: 112, w: 56 }, { x: 108, y: 92, w: 56 }, { x: 192, y: 112, w: 52 }] },
   kinger: { platforms: [{ x: 48, y: 104, w: 56 }, { x: 150, y: 94, w: 40 }] },
   caine: { platforms: [{ x: 36, y: 110, w: 56 }, { x: 164, y: 110, w: 56 }] },
+  zooble: { platforms: [{ x: 40, y: 106, w: 52 }, { x: 150, y: 106, w: 52 }] },
   menu: { platforms: [] },
 }
 
@@ -209,6 +211,46 @@ const bgs = {
       c.fillRect(x, GROUND_Y - 20 - bob, 4, 4)
     }
   },
+}
+
+// Zooble's room: a pegboard workshop full of spare parts hanging on hooks.
+bgs.zooble = function (c, t) {
+  c.fillStyle = '#16303a'
+  c.fillRect(0, 0, VW, VH)
+  // Pegboard holes.
+  c.fillStyle = '#0e2028'
+  for (let y = 18; y < GROUND_Y; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < VW; x += 8) c.fillRect(x, y, 1, 1)
+  // Shelves.
+  c.fillStyle = '#5c3c2c'
+  for (const [x, y, w] of [[12, 60, 70], [230, 50, 70], [120, 34, 60]]) {
+    c.fillRect(x, y, w, 3)
+    c.fillStyle = '#3c241c'
+    c.fillRect(x, y + 3, w, 1)
+    c.fillStyle = '#5c3c2c'
+  }
+  // Spare parts swinging on hooks: arms, springs, balls and wings in Zooble colours.
+  const parts = [
+    [30, 20, '#f8c830', 4, 12], [60, 26, '#e03c9c', 6, 6], [140, 12, '#68d8f8', 5, 5], [168, 14, '#f890b8', 8, 4],
+    [250, 16, '#8848c8', 3, 16], [280, 20, '#f88828', 6, 6], [100, 70, '#38b848', 4, 10], [205, 66, '#68d8f8', 8, 3],
+  ]
+  parts.forEach(([x, y, col, w, h], i) => {
+    const sw = Math.round(Math.sin(t * 1.3 + i * 1.7) * 1.5)
+    c.fillStyle = '#8c8c9c'
+    c.fillRect(x, y - 4, 1, 4)
+    c.fillStyle = 'rgba(20, 12, 28, 0.55)'
+    c.fillRect(x - Math.floor(w / 2) + sw, y, w, h)
+    c.fillStyle = col
+    c.globalAlpha = 0.45
+    c.fillRect(x - Math.floor(w / 2) + sw, y, w, h)
+    c.globalAlpha = 1
+  })
+  // A grumpy sign.
+  c.fillStyle = '#d8c8a0'
+  c.fillRect(132, 86, 56, 13)
+  c.fillStyle = INK
+  c.fillRect(132, 99, 56, 1)
+  drawText(c, 'NO REFUNDS', 160, 90, { align: 'center', color: INK, shadow: null })
+  valance(c, '#6240e8', '#f2348a')
 }
 
 export function drawBackground(c, key, t, scroll = 0) {
