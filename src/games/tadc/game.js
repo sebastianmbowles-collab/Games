@@ -8,6 +8,7 @@ import { VW, VH, GROUND_Y, INK, DIFFS, clamp, rand, fmtTime, seeded } from './co
 import { ARENAS, drawBackground, drawFloor, drawPlatforms } from './arena'
 import { Pomni, drawPomni, setOutfit } from './player'
 import { BOSSES, BANTER, makeBoss } from './bosses'
+import { Pilot } from './demo'
 import { sfx, wakeAudio, playMusic, stopMusic, setMusicOn, setSfxOn, setTempo, duckMusic } from './sound'
 
 export { VW, VH }
@@ -409,6 +410,13 @@ export class TadcGame {
     this.run.deaths++
     this.run.tries = this.run.tries || {}
     this.run.tries[this.bossIdx] = (this.run.tries[this.bossIdx] || 1) + 1
+    if (this.run.demo) {
+      this.setState('dying')
+      stopMusic()
+      sfx.hurt()
+      this.flashT = 0.12
+      return
+    }
     this.save.deaths++
     const who = this.boss.key
     this.save.bossDeaths[who] = (this.save.bossDeaths[who] || 0) + 1
@@ -482,7 +490,7 @@ export class TadcGame {
       return
     }
     // Practising just one part is great training, but only a whole fight (at full speed) counts.
-    if (this.run.part || this.run.slow || this.run.mode === 'challenge') return
+    if (this.run.part || this.run.slow || this.run.demo || this.run.mode === 'challenge') return
     // First time beating this boss on Hard or harder: you can dress up as them now!
     this.newCostume = this.save.beaten[i] < 2 && this.run.diff >= 2 && i <= 5 ? BOSSES[i].name.split(' ')[0] : null
     this.save.beaten[i] = Math.max(this.save.beaten[i], this.run.diff)
@@ -559,6 +567,7 @@ export class TadcGame {
   closeCall() {
     if (this.t - (this.lastClose ?? -9) < 1.6) return
     this.lastClose = this.t
+    if (this.run && this.run.demo) return
     this.save.close = (this.save.close || 0) + 1
     if (this.run) this.run.close = (this.run.close || 0) + 1
     if (this.save.close >= 100) this.award('daredevil', 'DAREDEVIL')
@@ -813,6 +822,12 @@ export class TadcGame {
     if (this.st > 0.2 && pr('confirm') && this.bossMet(this.gsel)) {
       sfx.blip()
       this.startRun(this.gsel, this.gpart || 0)
+      return
+    }
+    // START: watch Pomni play this boss by herself.
+    if (this.st > 0.2 && pr('start') && this.bossMet(this.gsel)) {
+      sfx.blip()
+      this.startDemo(this.gsel, this.gpart || 0)
       return
     }
     if (pr('back')) {
@@ -1139,8 +1154,29 @@ export class TadcGame {
     sfx.pause()
   }
 
+  // Everything Pomni needs to know to move: the floor, walls, platforms and any challenge twists.
+  pomniWorld() {
+    const b = this.boss
+    const mods = this.run.mods || {}
+    return {
+      platforms: this.platforms,
+      minX: 2,
+      maxX: b.key === 'caine' ? VW - 2 : b.key === 'gangle' || b.key === 'kinger' ? b.x - 28 : b.x - 4,
+      slip: this.slip,
+      ice: !!mods.ice,
+      conveyor: this.conveyor,
+      grav: mods.grav,
+      pogo: !!mods.pogo,
+    }
+  }
+
+  startDemo(idx, part) {
+    this.startRun(idx, part)
+    this.run.demo = true
+  }
+
   update_fight(dt, pr) {
-    this.save.playTime = (this.save.playTime || 0) + dt
+    if (!this.run.demo) this.save.playTime = (this.save.playTime || 0) + dt
     if (this.save.slow) this.run.slow = true
     if (this.run.mode === 'encore' && this.boss.wave >= 10) this.award('encoreStar', 'ENCORE STAR')
     if (this.run.mode === 'encore' && !this.run.beatBest && !this.run.slow) {
@@ -1160,16 +1196,20 @@ export class TadcGame {
     const wasGround = p.onGround
     const wasVx = p.vx
     this.floorScroll += this.conveyor * dt
-    p.update(dt, { left: this.held('left'), right: this.held('right'), jump: this.held('jump'), jumpPressed: pr('jump') }, {
-      platforms: this.platforms,
-      minX: 2,
-      maxX: b.key === 'caine' ? VW - 2 : b.key === 'gangle' || b.key === 'kinger' ? b.x - 28 : b.x - 4,
-      slip: this.slip,
-      ice: !!(this.run.mods && this.run.mods.ice),
-      conveyor: this.conveyor,
-      grav: this.run.mods && this.run.mods.grav,
-      pogo: !!(this.run.mods && this.run.mods.pogo),
-    })
+    // In a demo, Pomni plays herself (any button stops the demo).
+    if (this.run.demo && (pr('confirm') || pr('back'))) {
+      this.toMenu()
+      this.setState('bosses')
+      return
+    }
+    if (this.run.demo && (!this.pilot || this.pilot.boss !== b)) {
+      this.pilot = new Pilot(this)
+      this.pilot.boss = b
+    }
+    const input = this.run.demo
+      ? this.pilot.input(dt)
+      : { left: this.held('left'), right: this.held('right'), jump: this.held('jump'), jumpPressed: pr('jump') }
+    p.update(dt, input, this.pomniWorld())
     // Dust when she lands, jumps, or sets off running.
     if (p.onGround !== wasGround || (p.onGround && Math.abs(wasVx) < 5 && Math.abs(p.vx) >= 5)) this.dust(p.x + p.w / 2, p.y + p.h, p.onGround && !wasGround ? 4 : 2)
     b.updateFight(dt)
@@ -1735,12 +1775,16 @@ export class TadcGame {
       this.hits.push({ x: x - 4, y: 116, w: 120, h: 12, fn: () => this.pressed.add('confirm') })
       const np = info.parts.length
       const part = this.gpart || 0
-      const label = part === np - 1 ? 'THE FINALE' : part === 0 ? 'FROM THE START' : `PART ${part + 1}`
-      drawText(c, `START: ${label}`, x, 132, { color: part ? '#68d8f8' : '#c8b8e0' })
-      drawText(c, '(UP/DOWN)', x + textWidth(`START: ${label}`) + 4, 132, { color: '#4c4c5c' })
+      const label = part === np - 1 ? 'THE FINALE' : part === 0 ? 'THE START' : `PART ${part + 1}`
+      drawText(c, `PLAY FROM: ${label}`, x, 132, { color: part ? '#68d8f8' : '#c8b8e0' })
+      drawText(c, '(UP/DOWN)', x + textWidth(`PLAY FROM: ${label}`) + 4, 132, { color: '#4c4c5c' })
       this.hits.push({ x: x - 4, y: 128, w: 120, h: 10, fn: () => this.pressed.add('down') })
     }
-    if (i === 3 && this.save.badges.pillowMaster) drawText(c, '* PILLOW MASTER *', x, 143, { color: '#c8b8e0' })
+    if (met) {
+      drawText(c, 'START BUTTON: WATCH A DEMO', x, 143, { color: '#8c8c9c' })
+      this.hits.push({ x: x - 4, y: 139, w: 90, h: 10, fn: () => this.pressed.add('start') })
+    }
+    if (i === 3 && this.save.badges.pillowMaster) drawText(c, '* PILLOW MASTER *', x, 151, { color: '#c8b8e0' })
     const n = this.galleryCount()
     for (let k = 0; k < n; k++) {
       c.fillStyle = k === i ? '#f8c830' : BOSSES[k].bonus ? '#8c2c6c' : '#4c3c5c'
@@ -1945,7 +1989,7 @@ export class TadcGame {
     c.fillStyle = INK
     for (const m of b.marks) c.fillRect(5 + Math.round(102 * (1 - m)), 11, 1, 6)
     if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 3, { align: 'center', color: '#f4f4f4' })
-    if (this.run.mode === 'practice') drawText(c, 'PRACTICE', VW / 2, 3, { align: 'center', color: '#68d8f8' })
+    if (this.run.mode === 'practice') drawText(c, this.run.demo ? 'DEMO (A: STOP)' : 'PRACTICE', VW / 2, 3, { align: 'center', color: '#68d8f8' })
     if (this.run.mode === 'challenge') drawText(c, this.run.ch.name, VW / 2, 3, { align: 'center', color: '#e03c9c' })
     if (this.save.slow) drawText(c, 'SLOW-MO', VW / 2, 11, { align: 'center', color: '#68d8f8' })
     const d = DIFFS[this.run.diff]
