@@ -1399,6 +1399,9 @@ export class TadcGame {
     if (!this.defeatFanfare && this.st >= fanAt) {
       this.defeatFanfare = true
       sfx.fanfare()
+      // Confetti!
+      const cols = ['#d82838', '#f8c830', '#38b848', '#2c5ce0', '#e03c9c', '#f4f4f4']
+      for (let i = 0; i < 10; i++) this.puff(16 + i * 32, 54, cols, 5)
       if (this.newBadge) setTimeout(() => sfx.secret(), 1300)
     }
     if (this.st > fanAt + 1.6 && (pr('confirm') || pr('start') || this.st > 16)) {
