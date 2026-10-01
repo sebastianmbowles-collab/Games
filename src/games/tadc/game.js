@@ -357,9 +357,10 @@ export class TadcGame {
     this.conveyor = v
   }
 
-  die(killer) {
+  die(killer, haz = null) {
     if (this.state !== 'fight') return
     this.killer = killer
+    this.killerHaz = haz
     this.run.deaths++
     this.run.tries = this.run.tries || {}
     this.run.tries[this.bossIdx] = (this.run.tries[this.bossIdx] || 1) + 1
@@ -1038,7 +1039,7 @@ export class TadcGame {
     let slip = false
     for (const h of this.haz) {
       if (h.kind === 'deadly' || h.kind === 'mine') {
-        if (h.hits(pb)) return this.die(h.killer)
+        if (h.hits(pb)) return this.die(h.killer, h)
         // A near miss: it came really close, then went away without touching her.
         if (h.kind === 'deadly' && h.hits(near)) h.close = true
         else if (h.close && !h.closeDone) {
@@ -1056,7 +1057,7 @@ export class TadcGame {
             h.squish = 0.15
             sfx.boing()
           } else p.standOn(h.y, h.dx)
-        } else if (h.hits(pb)) return this.die(h.killer)
+        } else if (h.hits(pb)) return this.die(h.killer, h)
       } else if (h.kind === 'slip' && p.onGround && h.covers(pb)) slip = true
     }
     this.slip = slip
@@ -1827,6 +1828,35 @@ export class TadcGame {
     }
   }
 
+  // A blinking red outline around whatever hit Pomni, so you can see what got you.
+  drawCulprit(c) {
+    const h = this.killerHaz
+    if (!h || Math.floor(this.t * 6) % 2) return
+    let box
+    if (h.cx !== undefined) {
+      // A cane: outline the area it sweeps through.
+      const half = (h.len || 20) / 2
+      const ax = Math.abs(Math.cos(h.angle || 0)) * half + 6
+      const ay = Math.abs(Math.sin(h.angle || 0)) * half + 6
+      box = { x: h.cx - ax, y: h.cy - ay, w: ax * 2, h: ay * 2 }
+    } else if (h.parts) {
+      const ps = h.parts().filter((q) => q.h > 0)
+      if (!ps.length) return
+      const x0 = Math.min(...ps.map((q) => q.x))
+      const y0 = Math.min(...ps.map((q) => q.y))
+      box = { x: x0, y: y0, w: Math.max(...ps.map((q) => q.x + q.w)) - x0, h: Math.max(...ps.map((q) => q.y + q.h)) - y0 }
+    } else box = { x: h.x, y: h.y, w: h.w || 8, h: h.h || 8 }
+    const x = Math.round(box.x) - 2
+    const y = Math.round(box.y) - 2
+    const w = Math.round(box.w) + 4
+    const hh = Math.round(box.h) + 4
+    c.fillStyle = '#ff2040'
+    c.fillRect(x, y, w, 1)
+    c.fillRect(x, y + hh - 1, w, 1)
+    c.fillRect(x, y, 1, hh)
+    c.fillRect(x + w - 1, y, 1, hh)
+  }
+
   draw_dying(c) {
     this.drawArena(c)
     const p = this.pomni
@@ -1841,6 +1871,7 @@ export class TadcGame {
       drawPomni(c, SPR.pomniScared, p.x + p.w / 2 - p.face * k * 6, p.y + p.h + 1 + k * 4, p.face < 0, { rot: -p.face * k * (Math.PI / 2) })
     }
     this.drawFx(c)
+    this.drawCulprit(c)
     this.drawHud(c)
   }
 
