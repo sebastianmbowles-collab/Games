@@ -1197,6 +1197,7 @@ export class TadcGame {
         best = { x: hx, y: hy }
       }
     }
+    this.threatDist = bd
     if (best && bd < 160) return best
     const b = this.boss
     return b ? { x: b.x + b.spr.ax, y: b.y + 12 } : [0, 0]
@@ -1204,7 +1205,10 @@ export class TadcGame {
 
   drawPomniNormal(c) {
     const p = this.pomni
-    p.draw(c, this.t, { look: this.threatPoint() })
+    const look = this.threatPoint()
+    // Standing still with something deadly right next to her? Eek!
+    const eek = p.onGround && Math.abs(p.vx) < 8 && this.threatDist < 30 && this.state === 'fight'
+    p.draw(c, this.t, { look, frame: eek ? SPR.pomniScared : undefined })
     if (this.slip && p.onGround && Math.floor(this.t * 8) % 2) drawText(c, '!', p.x + 3, p.y - 16, { color: '#68d8f8' })
   }
 
