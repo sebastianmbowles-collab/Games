@@ -1706,11 +1706,11 @@ export class TadcGame {
     for (let y = 28; y < VH - 10; y += 8) c.fillRect(10, y, VW - 20, 1)
     drawText(c, 'EXTRAS', VW / 2, 12, { scale: 2, align: 'center', color: '#d82838', shadow: INK })
     const lines = [
-      ['PRACTICE', 'IN BOSSES, UP/DOWN PICKS WHICH PART TO PLAY.'],
-      ['OUTFITS', 'EARN BADGES, THEN DRESS UP POMNI IN OPTIONS.'],
+      ['PRACTICE', 'IN BOSSES: UP/DOWN PICKS A PART, START = DEMO.'],
+      ['OUTFITS', 'BADGES UNLOCK OUTFITS. BEAT BOSSES ON HARD'],
+      ['', 'TO PLAY AS THEM! (OPTIONS > OUTFIT)'],
       ['HELPERS', 'CALM MODE AND SLOW MOTION ARE IN OPTIONS.'],
       ['RECORDS', 'BEST TIMES, SPLITS, BADGES AND YOUR NEMESIS.'],
-      ['', ''],
       ['UNLOCK', 'BEAT ALL FIVE BOSSES TO UNLOCK...'],
       ['', 'ENCORE: EVERY BOSS, AGAIN AND AGAIN.'],
       ['', 'CHALLENGES: BOSSES WITH A TWIST.'],
