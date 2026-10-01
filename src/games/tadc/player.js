@@ -145,8 +145,45 @@ export class Pomni {
   }
 }
 
+// ---------- Outfits ----------
+// New colours for Pomni's costume. Each one is earned with a badge (see game.js).
+const BLUE = '#3c8cf4'
+const RED = '#f4447c'
+const GOLD = '#fccc34'
+const WHITE = '#f4f4f4'
+const PUPIL = '#f2407e'
+export const OUTFITS = {
+  CLASSIC: {},
+  'SWAPPED': { [BLUE]: RED, [RED]: BLUE },
+  'PILLOW': { [BLUE]: '#c8b8e0', [RED]: '#8848c8', [GOLD]: '#f4f4f4' },
+  'SPARE PARTS': { [BLUE]: '#68d8f8', [RED]: '#f2348a', [GOLD]: '#38b848', [PUPIL]: '#8848c8' },
+  'GOLDEN': { [BLUE]: '#f8c830', [RED]: '#d88820', [GOLD]: '#fcfcfc', [PUPIL]: '#d88820' },
+  'ABSTRACTED': { [BLUE]: '#2c1c3c', [RED]: '#5c2c8c', [GOLD]: '#e03c9c', [WHITE]: '#c8b8e0', [PUPIL]: '#68d8f8' },
+}
+let outfit = 'CLASSIC'
+export function setOutfit(name) {
+  outfit = OUTFITS[name] ? name : 'CLASSIC'
+}
+const dressed = new Map()
+function dress(spr, name = outfit) {
+  const swap = OUTFITS[name]
+  if (!swap || !Object.keys(swap).length) return spr
+  let byOutfit = dressed.get(spr)
+  if (!byOutfit) dressed.set(spr, (byOutfit = {}))
+  if (!byOutfit[name]) {
+    const copy = Object.assign([...spr], {
+      pal: spr.pal.map((col) => swap[col] || col),
+      ax: spr.ax,
+      eyes: spr.eyes && spr.eyes.map((e) => e.map((v) => swap[v] || v)),
+    })
+    byOutfit[name] = copy
+  }
+  return byOutfit[name]
+}
+
 // Draw a Pomni frame with her feet at (cx, bottom). Her body stays centred whatever the pose.
-export function drawPomni(c, spr, cx, bottom, flip = false, { scale = 1, sy = 1, mode, rot = 0, alpha = 1, look = [0, 0] } = {}) {
+export function drawPomni(c, spr, cx, bottom, flip = false, { scale = 1, sy = 1, mode, rot = 0, alpha = 1, look = [0, 0], wear } = {}) {
+  spr = dress(spr, wear)
   const w = spr[0].length * scale
   const ax = spr.ax * scale
   const h = spr.length * scale * sy

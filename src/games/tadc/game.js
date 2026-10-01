@@ -6,7 +6,7 @@ import { drawText, textWidth } from './font'
 import { SPR, drawSprite } from './sprites'
 import { VW, VH, GROUND_Y, INK, DIFFS, clamp, rand, fmtTime, seeded } from './consts'
 import { ARENAS, drawBackground, drawFloor, drawPlatforms } from './arena'
-import { Pomni, drawPomni } from './player'
+import { Pomni, drawPomni, setOutfit } from './player'
 import { BOSSES, makeBoss } from './bosses'
 import { sfx, wakeAudio, playMusic, stopMusic, setMusicOn, setSfxOn, setTempo } from './sound'
 
@@ -28,7 +28,7 @@ const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover'
 const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'intro', 'gameover', 'results'])
 
 function loadSave() {
-  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, deaths: 0, runs: 0 }
+  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, outfit: 'CLASSIC', deaths: 0, runs: 0 }
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY))
     if (s && typeof s === 'object') {
@@ -57,6 +57,7 @@ export class TadcGame {
     canvas.height = VH
     this.c = canvas.getContext('2d')
     this.save = loadSave()
+    setOutfit(this.save.outfit)
     setMusicOn(this.save.music)
     setSfxOn(this.save.sfx)
     this.t = 0
@@ -351,6 +352,8 @@ export class TadcGame {
         this.results.badges.push('ESCAPED THE CIRCUS?')
         this.results.badges.push('BONUS BOSS UNLOCKED!')
       }
+      // Every badge here also unlocks an outfit.
+      if (this.results.badges.length) this.results.badges.push('NEW OUTFIT IN OPTIONS!')
     }
     this.persist()
   }
@@ -516,6 +519,7 @@ export class TadcGame {
     const s = this.save
     return [
       ['DIFFICULTY', DIFFS[s.diff].name, (dir) => (s.diff = (s.diff + (dir || 1) + 4) % 4)],
+      ['OUTFIT', s.outfit, (dir) => this.nextOutfit(dir || 1)],
       ['MUSIC', s.music ? 'ON' : 'OFF', () => setMusicOn((s.music = !s.music))],
       ['SOUND FX', s.sfx ? 'ON' : 'OFF', () => setSfxOn((s.sfx = !s.sfx))],
       ['SPEEDRUN TIMER', s.timer ? 'ON' : 'OFF', () => (s.timer = !s.timer)],
@@ -523,6 +527,26 @@ export class TadcGame {
       ['RESET SAVE', this.resetArm ? 'SURE? PRESS AGAIN' : '', () => this.resetSave()],
       ['BACK', '', () => this.toMenu()],
     ]
+  }
+
+  // Which outfits you've earned, and what earns the rest.
+  outfitList() {
+    const b = this.save.badges
+    return [
+      ['CLASSIC', true, ''],
+      ['SWAPPED', b.cleared, 'BEAT ALL FIVE BOSSES'],
+      ['PILLOW', b.pillowMaster, 'FIND THE PILLOW SECRET'],
+      ['SPARE PARTS', b.zooble, 'BEAT THE BONUS BOSS'],
+      ['GOLDEN', b.perfect, 'PERFECT RUN ON HARD OR INSANE'],
+      ['ABSTRACTED', b.insane, 'BEAT INSANE MODE'],
+    ]
+  }
+
+  nextOutfit(dir) {
+    const got = this.outfitList().filter(([, ok]) => ok).map(([n]) => n)
+    const i = got.indexOf(this.save.outfit)
+    this.save.outfit = got[(i + dir + got.length) % got.length]
+    setOutfit(this.save.outfit)
   }
 
   resetSave() {
@@ -537,6 +561,7 @@ export class TadcGame {
       // Nothing saved.
     }
     this.save = loadSave()
+    setOutfit(this.save.outfit)
     setMusicOn(true)
     setSfxOn(true)
     this.flash('SAVE ERASED', VW / 2, 140, '#e03c9c')
@@ -550,8 +575,8 @@ export class TadcGame {
       items[k][2](1)
       this.persist()
     }
-    if (this.osel === 0 && (pr('left') || pr('right'))) {
-      items[0][2](pr('left') ? -1 : 1)
+    if (this.osel <= 1 && (pr('left') || pr('right'))) {
+      items[this.osel][2](pr('left') ? -1 : 1)
       sfx.beep()
       this.persist()
     }
@@ -1025,7 +1050,15 @@ export class TadcGame {
     const d = DIFFS[this.save.diff]
     const blurbs = ['SLOWER ATTACKS. BIG SAFE SPACES.', 'THE WAY THE SHOW IS MEANT TO BE.', 'MORE HAZARDS. LESS TIME TO REACT.', 'WHY DID YOU DO THIS TO YOURSELF?']
     drawText(c, blurbs[this.save.diff], VW / 2, 150, { align: 'center', color: d.color })
-    if (this.osel === 0) drawText(c, '< > OR A TO CHANGE', VW / 2, 162, { align: 'center', color: '#8c8c9c' })
+    if (this.osel <= 1) drawText(c, '< > OR A TO CHANGE', VW / 2, 162, { align: 'center', color: '#8c8c9c' })
+    // A little Pomni shows off the outfit, with the ones still to earn as shadows.
+    drawPomni(c, SPR.pomniWave, 272, 132, true, { scale: 2, look: [-0.6, 0] })
+    const list = this.outfitList()
+    drawText(c, `OUTFITS ${list.filter(([, got]) => got).length}/${list.length}`, 272, 138, { align: 'center', color: '#c8b8e0' })
+    if (this.osel === 1) {
+      const lock = list.find(([, got]) => !got)
+      if (lock) drawText(c, `NEXT: ${lock[2]}`, VW - 4, 28, { align: 'right', color: '#8c8c9c' })
+    }
     for (const f of this.floats) drawText(c, f.text, f.x, f.y, { align: 'center', color: f.color })
   }
 
@@ -1308,7 +1341,10 @@ export class TadcGame {
             drawText(c, fmtDelta(d), VW / 2 + 4, 43, { color: d <= 0 ? '#38b848' : '#d82838' })
           }
         }
-        if (this.newBadge) drawText(c, `SECRET: ${this.newBadge}!`, VW / 2, 56, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#e03c9c' : '#f8c830' })
+        if (this.newBadge) {
+          drawText(c, `SECRET: ${this.newBadge}!`, VW / 2, 56, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#e03c9c' : '#f8c830' })
+          drawText(c, 'NEW OUTFIT UNLOCKED IN OPTIONS!', VW / 2, 66, { align: 'center', color: '#68d8f8' })
+        }
       }
     }
     if (this.st > fanAt + 1.6 && Math.floor(this.t * 2) % 2) {
