@@ -41,6 +41,7 @@ Pomni can't fight back. To beat a boss, she has to **survive their whole show**.
 | Jump | Z / Space / Up | A | A |
 | Pause | Enter | START | START |
 | Back | X / Esc | B | tap *B: BACK* |
+| Sound on/off | M | | OPTIONS |
 
 Hold a direction to run faster. Let go of jump early for a small hop.
 

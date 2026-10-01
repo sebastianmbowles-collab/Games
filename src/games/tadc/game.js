@@ -23,6 +23,7 @@ const KEYMAP = {
   ' ': ['jump', 'confirm'], z: ['jump', 'confirm'], Z: ['jump', 'confirm'], k: ['jump', 'confirm'], K: ['jump', 'confirm'],
   Enter: ['start', 'confirm'], p: ['start'], P: ['start'],
   Escape: ['back', 'start'], x: ['back'], X: ['back'], Backspace: ['back'],
+  m: ['mute'], M: ['mute'],
 }
 const MENU = ['START', 'HOW TO PLAY', 'BOSSES', 'OPTIONS']
 const JUKEBOX = [
@@ -609,6 +610,16 @@ export class TadcGame {
   update(dt) {
     this.t += dt
     const pr = (a) => this.pressed.has(a)
+    // M: all sound off (or back on).
+    if (pr('mute')) {
+      const on = !(this.save.music || this.save.sfx)
+      this.save.music = on
+      this.save.sfx = on
+      setMusicOn(on)
+      setSfxOn(on)
+      this.persist()
+      this.muteNote = { text: on ? 'SOUND ON' : 'SOUND OFF', until: this.t + 1.2 }
+    }
     // Quieter music while paused.
     if (!!this.paused !== !!this.ducked) {
       this.ducked = !!this.paused
@@ -1449,6 +1460,7 @@ export class TadcGame {
       c.fillRect(0, 0, VW, VH)
     }
     if (this.wipeT > 0) this.drawWipe(c, this.wipeT / 0.4)
+    if (this.muteNote && this.muteNote.until > this.t) drawText(c, this.muteNote.text, VW - 4, VH - 18, { align: 'right', color: '#f8c830' })
     if (this.glitch > 0 && !calm) this.drawGlitch(c)
   }
 
