@@ -616,6 +616,11 @@ export class TadcGame {
     const pr = (a) => this.pressed.has(a)
     // M: all sound off (or back on).
     if (pr('mute')) this.toggleSound()
+    // Attract mode: any button goes back to the title.
+    if (this.run && this.run.attract && this.state !== 'title' && ['confirm', 'start', 'back', 'jump'].some((a) => pr(a))) {
+      this.toMenu()
+      return
+    }
     // Quieter music while paused.
     if (!!this.paused !== !!this.ducked) {
       this.ducked = !!this.paused
@@ -690,9 +695,18 @@ export class TadcGame {
     }
     if (this.idleT > 25) {
       this.idleT = 0
-      this.helpT = 4.5
-      stopMusic()
-      sfx.static()
+      this.idleCycles = (this.idleCycles || 0) + 1
+      if (this.idleCycles % 2) {
+        this.helpT = 4.5
+        stopMusic()
+        sfx.static()
+      } else {
+        // Attract mode, like an arcade machine: Pomni plays a boss by herself.
+        const met = BOSSES.map((b, i) => i).filter((i) => BOSSES[i].parts && this.bossMet(i))
+        this.startDemo(met[Math.floor(Math.random() * met.length)] ?? 0, 0)
+        this.run.attract = true
+        return
+      }
     }
     // Secret code: UP UP DOWN DOWN LEFT RIGHT LEFT RIGHT = GLOINK PARTY!
     for (const dir of ['up', 'down', 'left', 'right']) if (pr(dir)) this.code = [...(this.code || []), dir].slice(-8)
@@ -1285,9 +1299,10 @@ export class TadcGame {
     const wasVx = p.vx
     this.floorScroll += this.conveyor * dt
     // In a demo, Pomni plays herself (any button stops the demo).
-    if (this.run.demo && (pr('confirm') || pr('back'))) {
+    if (this.run.demo && (pr('confirm') || pr('back') || (this.run.attract && (pr('start') || pr('left') || pr('right'))))) {
+      const attract = this.run.attract
       this.toMenu()
-      this.setState('bosses')
+      if (!attract) this.setState('bosses')
       return
     }
     if (this.run.demo && (!this.pilot || this.pilot.boss !== b)) {
@@ -1363,6 +1378,8 @@ export class TadcGame {
   }
 
   update_gameover(dt, pr) {
+    // (Attract mode just goes back to the title.)
+    if (this.run.attract && (this.st > 3 || pr('confirm') || pr('start'))) return this.toMenu()
     if (this.st < 0.6) return
     const items = this.gameoverItems()
     const n = items.length
@@ -1409,8 +1426,9 @@ export class TadcGame {
     if (this.st > fanAt + 1.6 && (pr('confirm') || pr('start') || this.st > 16)) {
       sfx.blip()
       if (this.run.mode === 'practice') {
+        const attract = this.run.attract
         this.toMenu()
-        this.setState('bosses')
+        if (!attract) this.setState('bosses')
       } else if (this.run.mode === 'challenge') {
         this.toMenu()
         this.setState('challenges')
@@ -2116,7 +2134,7 @@ export class TadcGame {
     c.fillStyle = INK
     for (const m of b.marks) c.fillRect(5 + Math.round(102 * (1 - m)), 11, 1, 6)
     if (this.run.mode === 'run' && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 3, { align: 'center', color: '#f4f4f4' })
-    if (this.run.mode === 'practice') drawText(c, this.run.demo ? 'DEMO (A: STOP)' : 'PRACTICE', VW / 2, 3, { align: 'center', color: '#68d8f8' })
+    if (this.run.mode === 'practice') drawText(c, this.run.attract ? 'DEMO - PRESS A TO PLAY!' : this.run.demo ? 'DEMO (A: STOP)' : 'PRACTICE', VW / 2, 3, { align: 'center', color: this.run.attract && Math.floor(this.t * 2) % 2 ? '#f8c830' : '#68d8f8' })
     if (this.run.mode === 'challenge') drawText(c, this.run.ch.name, VW / 2, 3, { align: 'center', color: '#e03c9c' })
     if (this.save.slow) drawText(c, 'SLOW-MO', VW / 2, 11, { align: 'center', color: '#68d8f8' })
     const d = DIFFS[this.run.diff]
