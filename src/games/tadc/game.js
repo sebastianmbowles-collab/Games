@@ -1090,6 +1090,7 @@ export class TadcGame {
   }
 
   update_fight(dt, pr) {
+    this.save.playTime = (this.save.playTime || 0) + dt
     if (this.save.slow) this.run.slow = true
     if (this.run.mode === 'encore' && this.boss.wave >= 10) this.award('encoreStar', 'ENCORE STAR')
     if (pr('start')) {
@@ -1725,7 +1726,9 @@ export class TadcGame {
     // A hint for the next badge you could get.
     const next = badges.find(([, got]) => !got)
     if (next) drawText(c, `NEXT BADGE: ${next[2]}`, 24, 148, { color: '#68d8f8' })
-    drawText(c, `TOTAL DEATHS: ${this.save.deaths}   RUNS: ${this.save.runs}`, VW / 2, 158, { align: 'center', color: '#c8b8e0' })
+    const pt = Math.floor(this.save.playTime || 0)
+    const played = pt >= 3600 ? `${Math.floor(pt / 3600)}H ${Math.floor((pt % 3600) / 60)}M` : `${Math.floor(pt / 60)}M ${pt % 60}S`
+    drawText(c, `TOTAL DEATHS: ${this.save.deaths}   RUNS: ${this.save.runs}   TIME IN FIGHTS: ${played}`, VW / 2, 158, { align: 'center', color: '#c8b8e0' })
     // Your nemesis: the boss that got you the most times.
     const bd = this.save.bossDeaths
     const nem = Object.keys(bd).sort((x, y) => bd[y] - bd[x])[0]
