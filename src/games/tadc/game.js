@@ -1651,8 +1651,18 @@ export class TadcGame {
       const enc = this.save.encore[d.name]
       if (items[this.msel] === 'ENCORE' && enc) drawText(c, `BEST ${fmtTime(enc.time)} (WAVE ${enc.wave})`, 178, my + 8, { color: '#e03c9c' })
       else if (rec && rec.any) drawText(c, `BEST ${fmtTime(rec.any)}`, 178, my + 8, { color: '#c8b8e0' })
-      const hint = this.usedTouch ? 'A BUTTON = JUMP    START = PAUSE' : 'A = Z / SPACE    START = ENTER'
-      drawText(c, hint, VW / 2, 167, { align: 'center', color: '#8c8c9c' })
+      const keysHint = this.usedTouch ? 'A BUTTON = JUMP    START = PAUSE' : 'A = Z / SPACE    START = ENTER'
+      // Every few seconds, swap the controls for a handy tip.
+      const tips = [
+        keysHint,
+        'TIP: HOLD A DIRECTION TO RUN FASTER.',
+        'TIP: LET GO OF JUMP EARLY FOR A SMALL HOP.',
+        keysHint,
+        'TIP: IN BOSSES, PRESS START TO WATCH A DEMO.',
+        'TIP: STUCK? TRY PRACTISING JUST ONE PART.',
+      ]
+      const hint = tips[Math.floor(this.t / 4) % tips.length]
+      drawText(c, hint, VW / 2, 167, { align: 'center', color: hint === keysHint ? '#8c8c9c' : '#68d8f8' })
     } else if (!menuOn && s > 1) {
       drawText(c, 'PRESS A', VW / 2, 167, { align: 'center', color: Math.floor(this.t * 2) % 2 ? '#8c8c9c' : '#4c4c5c' })
     }
