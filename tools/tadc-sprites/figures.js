@@ -364,6 +364,24 @@ export function gangle(c, p = {}) {
   c.stroke()
   c.fillStyle = '#f8f8f8'
   c.fill()
+  if (p.happy) {
+    // The comedy mask: happy closed eyes and a big smile.
+    for (const ex of [-2.5, 2.5]) {
+      c.beginPath()
+      c.arc(ex, -57.4, 1.5, Math.PI + 0.3, -0.3)
+      c.lineWidth = 0.9
+      c.strokeStyle = K
+      c.stroke()
+    }
+    c.beginPath()
+    c.arc(0, -55, 2.8, 0.25, Math.PI - 0.25)
+    c.lineWidth = 0.8
+    c.strokeStyle = K
+    c.stroke()
+    ell(c, -4, -55, 0.9, 0.6, '#f8a0b8', { ol: 0 })
+    ell(c, 4, -55, 0.9, 0.6, '#f8a0b8', { ol: 0 })
+    return []
+  }
   c.beginPath()
   c.arc(0, -52.4, 2.4, Math.PI + 0.4, -0.4)
   c.lineWidth = 0.6

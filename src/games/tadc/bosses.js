@@ -149,9 +149,12 @@ class Boss {
   }
   draw(c, t) {
     const throwing = this.throwT > 0
-    const pose = throwing && SPR[this.key + 'Throw'] ? SPR[this.key + 'Throw'] : this.spr
+    let pose = throwing && SPR[this.key + 'Throw'] ? SPR[this.key + 'Throw'] : this.spr
+    // Beaten: everyone reacts their own way (Gangle's mask even flips to the happy one).
+    if (this.mood === 'defeated' && SPR[this.key + 'Defeat']) pose = SPR[this.key + 'Defeat']
     const lean = throwing ? -2 : 0
-    const bob = this.mood === 'defeated' ? 0 : Math.round(Math.sin(t * 2.4) * 1)
+    let bob = Math.round(Math.sin(t * 2.4) * 1)
+    if (this.mood === 'defeated') bob = this.key === 'jax' ? -Math.round(Math.abs(Math.sin(t * 3)) * 2) : this.key === 'kinger' ? Math.round(Math.sin(t * 30) * 0.6) : 0
     // Keep the body in the same place whichever pose is showing, and keep an eye on Pomni.
     drawSprite(c, pose, this.x + this.spr.ax - pose.ax + lean, this.y + this.h - pose.length + bob + (throwing ? 1 : 0), { look: this.lookAt() })
     if (this.mood === 'pleased') {

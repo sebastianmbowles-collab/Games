@@ -25,6 +25,7 @@ const KEYMAP = {
 }
 const MENU = ['START', 'HOW TO PLAY', 'BOSSES', 'OPTIONS']
 const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover', 'defeat'])
+const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'intro', 'gameover', 'results'])
 
 function loadSave() {
   const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1], records: {}, badges: {}, deaths: 0, runs: 0 }
@@ -155,6 +156,8 @@ export class TadcGame {
   // ---------- Flow ----------
 
   setState(s) {
+    // Screens that change completely get an old-school pixel wipe.
+    if (WIPE_STATES.has(s) && s !== this.state) this.wipeT = 0.4
     this.state = s
     this.st = 0
   }
@@ -341,6 +344,7 @@ export class TadcGame {
     this.st += dt
     this.shake = Math.max(0, this.shake - dt)
     this.flashT = Math.max(0, this.flashT - dt)
+    this.wipeT = Math.max(0, (this.wipeT || 0) - dt)
     this.glitch = Math.max(0, this.glitch - dt)
     for (const q of this.parts) {
       q.vy += 300 * dt
@@ -691,6 +695,7 @@ export class TadcGame {
       c.fillStyle = '#ffffff'
       c.fillRect(0, 0, VW, VH)
     }
+    if (this.wipeT > 0) this.drawWipe(c, this.wipeT / 0.4)
     if (this.glitch > 0) this.drawGlitch(c)
   }
 
@@ -1235,6 +1240,19 @@ export class TadcGame {
     ;['RESUME', 'RETRY BOSS', 'MAIN MENU'].forEach((m, i) =>
       this.menuLine(c, m, VW / 2, 82 + i * 14, this.psel === i, () => ((this.psel = i), this.pressed.add('confirm')), { align: 'center' }),
     )
+  }
+
+  // A dithered wipe: 8x8 black blocks that vanish in a checkerboard-ish order.
+  drawWipe(c, k) {
+    const order = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+    c.fillStyle = '#000000'
+    for (let y = 0; y < VH; y += 8) {
+      for (let x = 0; x < VW; x += 8) {
+        const o = order[((y / 8) % 4) * 4 + ((x / 8) % 4)] / 16
+        const sweep = (x / VW) * 0.35
+        if (k > o * 0.65 + sweep) c.fillRect(x, y, 8, 8)
+      }
+    }
   }
 
   drawGlitch(c) {
