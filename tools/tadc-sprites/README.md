@@ -9,9 +9,13 @@ Bubble, Zooble) with simple shapes, using a lineup of fan art the player shared 
 for colours and outfits. Each figure also says where its eyes are, so the game can draw pupils
 that follow Pomni.
 
-`node tools/tadc-sprites/gen.mjs` renders every entry in `gen-specs.json` (poses are just
-different arm/leg positions), shrinks it to 8-bit pixels with a dark outline, and writes
-`src/games/tadc/art.js`. It needs the global Playwright install.
+`node tools/tadc-sprites/gen.mjs sheet.png` renders every entry in `gen-specs.json` (poses are just
+different arm/leg positions), shrinks it to 8-bit pixels with a dark outline, writes
+`src/games/tadc/art.js`, and saves a contact sheet of all the sprites to `sheet.png` (it must be a
+`.png` path) so you can check them. It needs the global Playwright install.
+
+The game also recolours Pomni at runtime for outfits (`OUTFITS` in `src/games/tadc/player.js`)
+and uses the small `icon...` sprites as costumes, so those don't need their own entries.
 
 ## Older sprites: the TADC Gang Pack (Stick Nodes)
 
