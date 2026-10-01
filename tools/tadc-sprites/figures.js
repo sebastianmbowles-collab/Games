@@ -141,12 +141,8 @@ export function pomni(c, p = {}) {
   ell(c, 0, -29.4, 4.5, 4.2, '#f6f6f6', { ol: 0 })
   poly(c, [[-4.4, -32.6], [4.4, -32.6], [3.6, -31.2], [1, -31.8], [-1, -31.2], [-3.6, -31.8]], K, 0)
   // Huge worried eyes.
-  const look = p.look || [0, 0]
-  for (const ex of [-1.7, 1.7]) {
-    ell(c, ex, -29.3, 1.5, 2, '#ffffff', { ol: 0.6 })
-    const r = p.face === 'scared' ? 0.5 : 0.75
-    ell(c, ex + look[0] * 0.55, -29.2 + look[1] * 0.6, r, r * 1.25, pink, { ol: 0 })
-  }
+  // (The pupils are drawn by the game, so Pomni can watch whatever is most dangerous.)
+  for (const ex of [-1.7, 1.7]) ell(c, ex, -29.3, 1.5, 2, '#ffffff', { ol: 0.6 })
   if (p.face === 'scared') ell(c, 0, -26.2, 0.8, 0.9, K, { ol: 0 })
   else line(c, -0.7, -26.1, 0.7, -26.1, 0.55)
 
@@ -160,7 +156,8 @@ export function pomni(c, p = {}) {
   }
   horn(-1)
   horn(1)
-  return []
+  const small = p.face === 'scared'
+  return [-1.7, 1.7].map((ex) => ({ x: ex, y: -29.2, w: small ? 0.8 : 1.2, h: small ? 0.8 : 1.6, color: pink, rx: 0.7, ry: 0.7 }))
 }
 
 // ---------- Ragatha ----------

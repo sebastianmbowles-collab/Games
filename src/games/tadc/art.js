@@ -5,7 +5,7 @@
 const S = (pal, ax, eyes, rows) => Object.assign(rows, { pal, ax, eyes })
 
 export const ART = {
-  pomniIdle: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [], [
+  pomniIdle: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [[9.5,8.3,1,1,"#f2407e",0.6,0.6],[12.5,8.3,1,1,"#f2407e",0.6,0.6]], [
     "....AAAAAAAAAAAAAA....",
     "..AABBBBBCCDDBBBBBAA..",
     ".ABDDDDDDCDDDCCCCCCBA.",
@@ -14,7 +14,7 @@ export const ART = {
     "ABDDA.ABBBBBBBBA.ACCBA",
     "ABDBA.AFFGBFGBBA.ABCBA",
     "AEEBAABFGGGGGGFBAABEEA",
-    "AEEEAABFGDGGDGFBAAEEEA",
+    "AEEEAABFGGGGGGFBAAEEEA",
     ".AEA.ABFGGGGGGFBA.AEA.",
     "..A...ABFFFFFFBA...A..",
     ".......ABFFFFBA.......",
@@ -41,7 +41,7 @@ export const ART = {
     "..AACCCCCCAADDDDDDAA..",
     "....AAAAAA..AAAAAA....",
   ]),
-  pomniLook: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [], [
+  pomniLook: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [[9.5,8.3,1,1,"#f2407e",0.6,0.6],[12.5,8.3,1,1,"#f2407e",0.6,0.6]], [
     "....AAAAAAAAAAAAAA....",
     "..AABBBBBCCDDBBBBBAA..",
     ".ABDDDDDDCDDDCCCCCCBA.",
@@ -50,7 +50,7 @@ export const ART = {
     "ABDDA.ABBBBBBBBA.ACCBA",
     "ABDBA.AFFGBFGBBA.ABCBA",
     "AEEBAABFGGGGGGFBAABEEA",
-    "AEEEAABFGDDGDDFBAAEEEA",
+    "AEEEAABFGGGGGGFBAAEEEA",
     ".AEA.ABFGGGGGGFBA.AEA.",
     "..A...ABFFFFFFBA...A..",
     ".......ABFFFFBA.......",
@@ -77,7 +77,7 @@ export const ART = {
     "..AACCCCCCAADDDDDDAA..",
     "....AAAAAA..AAAAAA....",
   ]),
-  pomniRun1: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [], [
+  pomniRun1: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [[9.5,8.3,1,1,"#f2407e",0.6,0.6],[12.5,8.3,1,1,"#f2407e",0.6,0.6]], [
     "....AAAAAAAAAAAAAA....",
     "..AABBBBBCCDDBBBBBAA..",
     ".ABDDDDDDCDDDCCCCCCBA.",
@@ -86,7 +86,7 @@ export const ART = {
     "ABDDA.ABBBBBBBBA.ACCBA",
     "ABDBA.AFFGBFGBBA.ABCBA",
     "AEEBAABFGGGGGGFBAABEEA",
-    "AEEEAABFGDGGDGFBAAEEEA",
+    "AEEEAABFGGGGGGFBAAEEEA",
     ".AEA.ABFGGGGGGFBA.AEA.",
     "..A...ABFFFFFFBA...A..",
     ".......ABFFFFBA.......",
@@ -112,7 +112,7 @@ export const ART = {
     "......ABCDDDDDDBA.....",
     ".......AAAAAAAAA......",
   ]),
-  pomniRun2: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 13, [], [
+  pomniRun2: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 13, [[11.5,8.3,1,1,"#f2407e",0.6,0.6],[14.5,8.3,1,1,"#f2407e",0.6,0.6]], [
     "......AAAAAAAAAAAAAA.......",
     "....AABBBBBCCDDBBBBBAA.....",
     "...ABDDDDDDCDDDCCCCCCBA....",
@@ -121,7 +121,7 @@ export const ART = {
     "..ABDDA.ABBBBBBBBA.ACCBA...",
     "..ABDBA.AFFGBFGBBA.ABCBA...",
     "..AEEBAABFGGGGGGFBAABEEA...",
-    "..AEEEAABFGDGGDGFBAAEEEA...",
+    "..AEEEAABFGGGGGGFBAAEEEA...",
     "...AEA.ABFGGGGGGFBA.AEA....",
     "....A...ABFFFFFFBA...A.....",
     ".........ABFFFFBA..........",
@@ -147,16 +147,16 @@ export const ART = {
     ".AACCCCCCBA.....ADDDDDDBA..",
     "...AAAAAAA.......AAAAAAA...",
   ]),
-  pomniJump: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [], [
+  pomniJump: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [[9.5,8.3,1,1,"#f2407e",0.6,0.6],[12.5,8.3,1,1,"#f2407e",0.6,0.6]], [
     "....AAAAAAAAAAAAAA....",
     "..AABBBBBCCDDBBBBBAA..",
     ".ABDDDDDDCDDDCCCCCCBA.",
     ".ADDDDBDBCCDDBCBCCCCA.",
     "ABDDBAAECCEEDDEAABCCBA",
     "ABDDA.ABBBBBBBBA.ACCBA",
-    "ABDBA.AFFBBFGBBA.ABCBA",
-    "AEEBAABFGDGGDGFBAABEEA",
-    "AEEEBABFGDGGGGFBABEEEA",
+    "ABDBA.AFFGBFGBBA.ABCBA",
+    "AEEBAABFGGGGGGFBAABEEA",
+    "AEEEBABFGGGGGGFBABEEEA",
     ".ABDDABFGGGGGGFBACCBA.",
     ".ADDDDABFFFFFFBACCCCA.",
     "..ADDBAABFFFFBAABCCA..",
@@ -182,7 +182,7 @@ export const ART = {
     ".....AACCDDDDDDAA.....",
     ".......AAAAAAAA.......",
   ]),
-  pomniWave: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [], [
+  pomniWave: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [[9.5,8.3,1,1,"#f2407e",0.6,0.6],[12.5,8.3,1,1,"#f2407e",0.6,0.6]], [
     "....AAAAAAAAAAAAAA....",
     "..AABBBBBCCDDBBBBBAA..",
     ".ABDDDDDDCDDDCCCCCCBA.",
@@ -191,7 +191,7 @@ export const ART = {
     "ABDDA.ABBBBBBBBA.ACCBA",
     "ABDBA.AFFGBFGBBA.ABCBA",
     "AEEBAABFGGGGGGFBACBEEA",
-    "AEEEAABFGDGGDGFBACEEEA",
+    "AEEEAABFGGGGGGFBACEEEA",
     ".AEA.ABFGGGGGGFBACCBA.",
     "..A...ABFFFFFFBABFAA..",
     ".......ABFFFFBABFBA...",
@@ -218,7 +218,7 @@ export const ART = {
     "..AACCCCCCAADDDDDDAA..",
     "....AAAAAA..AAAAAA....",
   ]),
-  pomniScared: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [], [
+  pomniScared: S(["#140c1c","#140c1c","#3c8cf4","#f4447c","#fccc34","#f4f4f4","#fcfcfc"], 11, [[9.5,8.3,1,1,"#f2407e",0.6,0.6],[12.5,8.3,1,1,"#f2407e",0.6,0.6]], [
     "....AAAAAAAAAAAAAA....",
     "..AABBBBBCCDDBBBBBAA..",
     ".ABDDDDDDCDDDCCCCCCBA.",
@@ -227,7 +227,7 @@ export const ART = {
     "ABDDA.ABBBBBBBBA.ACCBA",
     "ABDBA.AFFGBFGBBA.ABCBA",
     "AEEBAABFGGGGGGFBAABEEA",
-    "AEEEAABFGDGGDGFBAAEEEA",
+    "AEEEAABFGGGGGGFBAAEEEA",
     ".AEA.ABFGGGGGGFBA.AEA.",
     "..A..ADBFFBBFFBCA..A..",
     ".....ABDBFBBFBCBA.....",

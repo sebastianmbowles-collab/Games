@@ -813,15 +813,19 @@ export class TadcGame {
       }
       const alpha = clamp((s - 4) * 3, 0, 1)
       const shake = Math.round(Math.sin(this.t * 30) * 0.4)
-      if (this.helpT <= 0) drawPomni(c, spr, px + shake, 145, flip, { scale: 2, alpha })
+      let look = [0, 0.15]
+      if (s >= 4.6 && s < 6.4 && !menuOn) look = [flip ? 1 : -1, 0]
+      if (menuOn) look = [Math.sin(this.t * 0.9) > 0.6 ? 1 : Math.sin(this.t * 0.9) < -0.6 ? -1 : 0, 0.1]
+      if (this.helpT <= 0) drawPomni(c, spr, px + shake, 145, flip, { scale: 2, alpha, look })
       if (s > 6.4 && s < 6.9) drawText(c, '!', px + 8, 70, { scale: 2, color: '#f8c830' })
       if (s > 7.3 && s < 8.6) this.bubble(c, 'OH NO.', px + 14, 82)
       if (menuOn && this.helpT <= 0 && Math.floor(this.t * 1.3) % 5 === 0) drawSprite(c, SPR.sweat, px + 14, 88 + ((this.t * 20) % 6))
       if (this.helpT > 0) {
         c.fillStyle = 'rgba(0, 0, 0, 0.6)'
         c.fillRect(0, 0, VW, VH)
-        const turn = this.helpT > 3.5 ? SPR.pomniIdle : SPR.pomniLook
-        drawPomni(c, turn, px, 145, false, { scale: 2 })
+        // She slowly turns her eyes towards you...
+        const k = clamp((4.5 - this.helpT) / 1.5, 0, 1)
+        drawPomni(c, SPR.pomniIdle, px, 145, false, { scale: 2, look: [-1 + k, k * 0.4] })
         if (this.helpT < 3.4 && this.helpT > 0.6) this.bubble(c, '...HELP.', px + 14, 82)
       }
     }
@@ -1007,9 +1011,32 @@ export class TadcGame {
     }
   }
 
+  // Pomni keeps an eye on the nearest danger (or the boss, if nothing is flying at her).
+  threatPoint() {
+    const p = this.pomni
+    const px = p.x + p.w / 2
+    const py = p.y + 6
+    let best = null
+    let bd = Infinity
+    for (const h of this.haz) {
+      if (h.kind === 'slip' || h.kind === 'none') continue
+      if (h.active === false) continue
+      const hx = h.cx ?? h.x + (h.w || 0) / 2
+      const hy = h.cy ?? h.y + (h.h || 0) / 2
+      const d = Math.hypot(hx - px, hy - py)
+      if (d < bd) {
+        bd = d
+        best = { x: hx, y: hy }
+      }
+    }
+    if (best && bd < 160) return best
+    const b = this.boss
+    return b ? { x: b.x + b.spr.ax, y: b.y + 12 } : [0, 0]
+  }
+
   drawPomniNormal(c) {
     const p = this.pomni
-    p.draw(c, this.t)
+    p.draw(c, this.t, { look: this.threatPoint() })
     if (this.slip && p.onGround && Math.floor(this.t * 8) % 2) drawText(c, '!', p.x + 3, p.y - 16, { color: '#68d8f8' })
   }
 

@@ -140,15 +140,16 @@ export class Pomni {
       mode: opts.mode,
       rot: opts.rot,
       alpha: opts.alpha,
+      look: opts.look ?? (spr === SPR.pomniLook ? [Math.sin(t * 2) > 0 ? 1 : -1, 0] : [0, 0]),
     })
   }
 }
 
 // Draw a Pomni frame with her feet at (cx, bottom). Her body stays centred whatever the pose.
-export function drawPomni(c, spr, cx, bottom, flip = false, { scale = 1, sy = 1, mode, rot = 0, alpha = 1 } = {}) {
+export function drawPomni(c, spr, cx, bottom, flip = false, { scale = 1, sy = 1, mode, rot = 0, alpha = 1, look = [0, 0] } = {}) {
   const w = spr[0].length * scale
   const ax = spr.ax * scale
   const h = spr.length * scale * sy
   const x = Math.round(flip ? cx - (w - ax) : cx - ax)
-  drawSprite(c, spr, x, Math.round(bottom - h), { flip, scale, sy, mode, rot, alpha })
+  drawSprite(c, spr, x, Math.round(bottom - h), { flip, scale, sy, mode, rot, alpha, look })
 }
