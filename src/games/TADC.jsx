@@ -70,6 +70,7 @@ export default function TADC({ game, onExit }) {
           <TouchButton action="jump" label="A" gameRef={gameRef} className="tadc-jump" />
         </div>
       </div>
+      <p className="tadc-rotate">📱 Turn your phone sideways for a bigger screen!</p>
       <p className="tadc-help">
         Arrow keys (or a game controller) to move, Z / Space / Up to jump (the A button), Enter to pause (START). One hit and you are out:
         survive each boss&apos;s whole show to beat them. Sound, difficulty, outfits and helpers (Calm mode, Slow motion)

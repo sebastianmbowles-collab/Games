@@ -2397,6 +2397,22 @@ button.bonk-pill:hover {
   min-width: min(100%, 300px);
 }
 
+/* Only shown on phones held upright. */
+.tadc-rotate {
+  display: none;
+  margin: 14px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f8c830;
+  text-align: center;
+}
+
+@media (orientation: portrait) and (max-width: 600px) {
+  .tadc-rotate {
+    display: block;
+  }
+}
+
 /* Phone on its side: buttons go beside the screen, so the game can be as big as possible. */
 @media (orientation: landscape) and (max-height: 540px) {
   .game-screen:has(.tadc-canvas) {
