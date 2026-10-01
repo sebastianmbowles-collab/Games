@@ -24,6 +24,16 @@ const KEYMAP = {
   Escape: ['back', 'start'], x: ['back'], X: ['back'], Backspace: ['back'],
 }
 const MENU = ['START', 'HOW TO PLAY', 'BOSSES', 'OPTIONS']
+const JUKEBOX = [
+  ['menu', 'BIG TOP MARCH (MENU)'],
+  ['jax', 'PFFFT POLKA (JAX)'],
+  ['ragatha', 'BUTTON BARRAGE (RAGATHA)'],
+  ['gangle', 'RIBBON BALLAD (GANGLE)'],
+  ['kinger', 'PILLOW PANIC (KINGER)'],
+  ['caine', 'THE FINAL SHOW (CAINE)'],
+  ['zooble', 'SPARE PARTS (ZOOBLE)'],
+  ['ending', 'OR IS IT? (ENDING)'],
+]
 
 // Challenges: a boss you know, with a twist. (Unlocked after beating the game.)
 // mods: dark (only a little light around Pomni), grav (gravity), speed (game speed),
@@ -38,7 +48,7 @@ const CHALLENGES = [
   { name: 'NO MERCY', boss: 4, diff: 2, mods: {}, about: 'THE FINAL SHOW ON HARD MODE. GOOD LUCK.' },
 ]
 const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover', 'defeat'])
-const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'challenges', 'map', 'intro', 'gameover', 'results', 'credits'])
+const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'jukebox', 'challenges', 'map', 'intro', 'gameover', 'results', 'credits'])
 
 function loadSave() {
   const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, bossDeaths: {}, challenges: {}, close: 0, outfit: 'CLASSIC', deaths: 0, runs: 0 }
@@ -778,10 +788,59 @@ export class TadcGame {
       ['SPEEDRUN TIMER', s.timer ? 'ON' : 'OFF', () => (s.timer = !s.timer)],
       ['CALM MODE', s.calm ? 'ON' : 'OFF', () => (s.calm = !s.calm)],
       ['SLOW MOTION', s.slow ? 'ON' : 'OFF', () => (s.slow = !s.slow)],
+      ['JUKEBOX', '', () => this.openJukebox()],
       ['RECORDS', '', () => this.setState('records')],
       ['RESET SAVE', this.resetArm ? 'SURE? PRESS AGAIN' : '', () => this.resetSave()],
       ['BACK', '', () => this.toMenu()],
     ]
+  }
+
+  // ---------- Jukebox: listen to every song ----------
+
+  openJukebox() {
+    this.jsel = this.jsel || 0
+    this.setState('jukebox')
+    playMusic(JUKEBOX[this.jsel][0], true)
+  }
+
+  update_jukebox(dt, pr) {
+    const n = JUKEBOX.length
+    if (pr('left') || pr('up') || pr('right') || pr('down')) {
+      this.jsel = (this.jsel + (pr('left') || pr('up') ? n - 1 : 1)) % n
+      sfx.beep()
+      playMusic(JUKEBOX[this.jsel][0], true)
+    }
+    if (pr('confirm')) playMusic(JUKEBOX[this.jsel][0], true)
+    if (pr('back') || pr('start')) {
+      sfx.back()
+      playMusic('menu', true)
+      this.setState('options')
+    }
+  }
+
+  draw_jukebox(c) {
+    drawBackground(c, 'menu', this.t)
+    c.fillStyle = 'rgba(12, 6, 20, 0.7)'
+    c.fillRect(0, 0, VW, VH)
+    drawText(c, 'JUKEBOX', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
+    JUKEBOX.forEach(([key, name], i) => {
+      // (The bonus boss's song stays a secret until you've beaten the game.)
+      if (key === 'zooble' && !this.save.badges.cleared) name = '??? (SECRET)'
+      this.menuLine(c, name, 150, 34 + i * 12, this.jsel === i, () => {
+        this.jsel = i
+        playMusic(key, true)
+      })
+    })
+    // Pomni dances along (and even Pomni has to admit it's a bop).
+    const beat = Math.floor(this.t * 4)
+    const frames = [SPR.pomniWave, SPR.pomniRun1, SPR.pomniJump, SPR.pomniRun2]
+    drawPomni(c, frames[beat % 4], 70, 140 - (beat % 2) * 3, beat % 8 >= 4, { scale: 2, look: [Math.sin(this.t * 2), 0] })
+    for (let i = 0; i < 3; i++) {
+      const k = (this.t * 0.7 + i / 3) % 1
+      drawText(c, i % 2 ? '+' : '*', 40 + i * 30, 120 - k * 80, { color: ['#f8c830', '#e03c9c', '#68d8f8'][i] })
+    }
+    drawText(c, 'B: BACK', VW - 4, 167, { align: 'right', color: '#8c8c9c' })
+    this.hits.push({ x: VW - 44, y: 158, w: 44, h: 18, fn: () => this.pressed.add('back') })
   }
 
   // Every badge, whether you have it, and how to get it.
@@ -1607,7 +1666,7 @@ export class TadcGame {
         c,
         label,
         80,
-        34 + i * 12,
+        33 + i * 11,
         this.osel === i,
         () => {
           this.osel = i

@@ -63,6 +63,7 @@ Hold a direction to run faster. Let go of jump early for a small hop.
 
 - **Records:** best times per difficulty, speedrun splits (gold = your fastest ever), and your nemesis.
 - **Badges and outfits:** earn badges, then dress Pomni up in new colours in OPTIONS.
+- **Jukebox** (in OPTIONS): listen to every song while Pomni dances.
 
 <details>
 <summary>Secrets (spoilers!)</summary>
