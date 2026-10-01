@@ -58,7 +58,8 @@ export default function TADC({ game, onExit }) {
       </div>
       <p className="tadc-help">
         Arrow keys to move, Z / Space / Up to jump (the A button), Enter to pause (START). One hit and you are out:
-        survive each boss&apos;s whole show to beat them. Sound and difficulty are in OPTIONS.
+        survive each boss&apos;s whole show to beat them. Sound, difficulty, outfits and helpers (Calm mode, Slow motion)
+        are in OPTIONS. Beat the game to unlock ENCORE and a secret bonus boss!
       </p>
     </div>
   )

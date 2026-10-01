@@ -1214,6 +1214,9 @@ export class TadcGame {
     else drawText(c, 'REACH THIS BOSS TO LEARN MORE.', x, 72, { color: '#8c8c9c' })
     const best = this.save.beaten[i]
     drawText(c, best >= 0 ? `BEATEN ON ${DIFFS[best].name}` : 'NOT BEATEN YET', x, 110, { color: best >= 0 ? '#38b848' : '#8c8c9c' })
+    // Your fastest time on this boss (from full runs) on the current difficulty.
+    const gold = (this.save.records[DIFFS[this.save.diff].name] || {}).gold
+    if (gold && gold[i] !== undefined) drawText(c, `FASTEST: ${fmtTime(gold[i])}`, VW - 4, 110, { align: 'right', color: '#f8c830' })
     if (met) {
       drawText(c, 'A: PRACTICE THIS BOSS', x, 122, { color: Math.floor(this.t * 2) % 2 ? '#f8c830' : '#f88828' })
       this.hits.push({ x: x - 4, y: 116, w: 120, h: 12, fn: () => this.pressed.add('confirm') })
@@ -1699,6 +1702,17 @@ export class TadcGame {
     c.fillStyle = 'rgba(12, 6, 20, 0.75)'
     c.fillRect(0, 0, VW, VH)
     drawText(c, 'PAUSED', VW / 2, 40, { scale: 3, align: 'center', color: '#f8c830' })
+    // A reminder of how this boss works, and how far into the show you are.
+    const b = this.boss
+    const info = b && b.sub ? BOSSES.find((x) => x.key === b.key) : BOSSES[this.bossIdx]
+    if (info && this.state !== 'title') {
+      drawText(c, `TIP: ${info.tip}`, VW / 2, 136, { align: 'center', color: '#68d8f8' })
+      if (info.parts && !b.sub) {
+        const part = info.parts.filter((p) => b.time >= p - 0.5).length
+        const label = part >= info.parts.length ? 'THE FINALE' : `PART ${Math.max(1, part)} OF ${info.parts.length - 1}`
+        drawText(c, `${info.name}: ${label}`, VW / 2, 148, { align: 'center', color: '#c8b8e0' })
+      }
+    }
     ;['RESUME', 'RETRY BOSS', 'MAIN MENU'].forEach((m, i) =>
       this.menuLine(c, m, VW / 2, 82 + i * 14, this.psel === i, () => ((this.psel = i), this.pressed.add('confirm')), { align: 'center' }),
     )
