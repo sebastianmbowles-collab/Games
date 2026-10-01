@@ -126,10 +126,12 @@ export class Pomni {
   }
 
   frame(t) {
-    if (!this.onGround) return SPR.pomniJump
+    // Going up: looking up. Coming down fast: arms flailing!
+    if (!this.onGround) return this.vy > 90 ? SPR.pomniFall : SPR.pomniJump
     if (Math.abs(this.vx) > 8) {
-      const speed = Math.abs(this.vx) > 90 ? 7 : 10
-      return Math.floor(this.anim / speed) % 2 ? SPR.pomniRun1 : SPR.pomniRun2
+      // A four-step run: one leg forward, legs together, the other leg forward, together again.
+      const speed = Math.abs(this.vx) > 90 ? 4.5 : 6
+      return [SPR.pomniRun1, SPR.pomniPass, SPR.pomniRun2, SPR.pomniPass][Math.floor(this.anim / speed) % 4]
     }
     // Standing still: she looks around nervously now and then.
     if (this.idleT > 1.2 && t % 3 > 2.2) return SPR.pomniLook
