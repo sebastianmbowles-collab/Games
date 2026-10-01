@@ -25,7 +25,7 @@ const KEYMAP = {
 }
 const MENU = ['START', 'HOW TO PLAY', 'BOSSES', 'OPTIONS']
 const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover', 'defeat'])
-const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'intro', 'gameover', 'results'])
+const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'map', 'intro', 'gameover', 'results'])
 
 function loadSave() {
   const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, bossDeaths: {}, outfit: 'CLASSIC', deaths: 0, runs: 0 }
@@ -196,6 +196,7 @@ export class TadcGame {
     if (this.run.mode === 'run') {
       this.save.runs++
       this.persist()
+      return this.showMap(0)
     }
     this.beginBoss(practiceIdx ?? 0, false)
   }
@@ -624,6 +625,102 @@ export class TadcGame {
 
   // ---------- A boss fight ----------
 
+  // ---------- The circus map (between bosses in a full run) ----------
+
+  showMap(next) {
+    this.mapTo = next
+    this.setState('map')
+    playMusic('menu', true)
+  }
+
+  update_map(dt, pr) {
+    if (this.st >= 1.0 && this.st - dt < 1.0) sfx.step()
+    if (this.st >= 2.6 && this.st - dt < 2.6) sfx.dunDunDun()
+    if (this.st > 3.6 || (this.st > 0.4 && (pr('confirm') || pr('start')))) this.beginBoss(this.mapTo, false)
+  }
+
+  draw_map(c) {
+    const t = this.t
+    // Night sky over the digital circus.
+    c.fillStyle = '#0c0818'
+    c.fillRect(0, 0, VW, VH)
+    for (let i = 0; i < 40; i++) {
+      const x = (i * 73) % VW
+      const y = (i * 37) % 90
+      c.fillStyle = Math.floor(t * 2 + i) % 5 ? '#4c3c6c' : '#f4f4f4'
+      c.fillRect(x, y, 1, 1)
+    }
+    // The big top in the distance.
+    c.fillStyle = '#2a1040'
+    c.beginPath()
+    c.moveTo(110, 96)
+    c.lineTo(160, 40)
+    c.lineTo(210, 96)
+    c.fill()
+    c.fillStyle = '#1b0c30'
+    c.fillRect(0, 96, VW, VH - 96)
+    drawText(c, 'THE DIGITAL CIRCUS', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
+    // The path and the five tents.
+    const tx = (i) => 36 + i * 62
+    const ty = (i) => 134 + (i % 2 ? -8 : 4)
+    c.fillStyle = '#5c4c78'
+    for (let x = 4; x < tx(4); x += 4) {
+      const i = Math.min(4, Math.max(0, (x - 36) / 62))
+      const a = Math.floor(i)
+      const k = i - a
+      const y = ty(a) + (ty(Math.min(4, a + 1)) - ty(a)) * k
+      c.fillRect(x, Math.round(y + 2), 2, 1)
+    }
+    const colors = ['#8848c8', '#d82838', '#e03c9c', '#6c34f4', '#cc243c']
+    for (let i = 0; i < 5; i++) {
+      const x = tx(i)
+      const y = ty(i)
+      const done = i < this.mapTo
+      const next = i === this.mapTo
+      // A striped tent.
+      for (let s = 0; s < 6; s++) {
+        c.fillStyle = s % 2 ? '#f4f4f4' : colors[i]
+        c.beginPath()
+        c.moveTo(x, y - 40)
+        c.lineTo(x - 21 + s * 7, y)
+        c.lineTo(x - 21 + (s + 1) * 7, y)
+        c.fill()
+      }
+      c.fillStyle = INK
+      c.fillRect(x - 4, y - 12, 8, 12)
+      c.fillStyle = '#f8c830'
+      c.fillRect(x, y - 47, 1, 7)
+      c.fillRect(x + 1, y - 47, 5, 3)
+      if (done) {
+        c.fillStyle = 'rgba(12, 6, 20, 0.55)'
+        c.fillRect(x - 22, y - 48, 45, 49)
+        drawSprite(c, SPR.star, x - 3, y - 58)
+      }
+      const key = BOSSES[i].key
+      const icon = SPR['icon' + key[0].toUpperCase() + key.slice(1)]
+      if (next && icon) {
+        const bob = Math.round(Math.sin(t * 4) * 2)
+        drawSprite(c, icon, x - icon.ax, y - 49 - icon.length + bob, { look: [-1, 0] })
+      }
+      drawText(c, String(i + 1), x, y + 5, { align: 'center', color: next ? '#f8c830' : '#8c8c9c' })
+    }
+    // Pomni walks to the next tent.
+    const from = this.mapTo === 0 ? 10 : tx(this.mapTo - 1) + 6
+    const to = tx(this.mapTo) - 24
+    const k = clamp((this.st - 0.4) / 1.8, 0, 1)
+    const e = k * k * (3 - 2 * k)
+    const px = from + (to - from) * e
+    const a = this.mapTo === 0 ? 0 : this.mapTo - 1
+    const py = this.mapTo === 0 ? ty(0) : ty(a) + (ty(this.mapTo) - ty(a)) * e
+    const walking = k > 0 && k < 1
+    const frame = walking ? (Math.floor(t * 8) % 2 ? SPR.pomniRun1 : SPR.pomniRun2) : SPR.pomniIdle
+    drawPomni(c, frame, px, py + 3, false, { look: [1, 0] })
+    const info = BOSSES[this.mapTo]
+    drawText(c, `NEXT: ${info.name}`, VW / 2, 154, { align: 'center', color: '#f4f4f4' })
+    if (this.run && this.save.timer) drawText(c, fmtTime(this.run.time), VW / 2, 164, { align: 'center', color: '#8c8c9c' })
+    if (this.st > 0.4 && Math.floor(t * 2) % 2) drawText(c, 'A: GO', VW - 4, 167, { align: 'right', color: '#8c8c9c' })
+  }
+
   update_intro(dt, pr) {
     const info = BOSSES[this.bossIdx]
     for (const [at0, who, text] of info.intro) {
@@ -758,7 +855,7 @@ export class TadcGame {
       if (this.run.mode === 'practice') {
         this.toMenu()
         this.setState('bosses')
-      } else if (this.bossIdx < 4) this.beginBoss(this.bossIdx + 1, false)
+      } else if (this.bossIdx < 4) this.showMap(this.bossIdx + 1)
       else {
         this.finishRun()
         this.typed = null
