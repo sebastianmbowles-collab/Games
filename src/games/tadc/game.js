@@ -1096,6 +1096,14 @@ export class TadcGame {
     p.update(dt, { left: false, right: false, jump: false, jumpPressed: false }, { platforms: this.platforms, minX: 2, maxX: VW - 2, slip: false, conveyor: 0 })
     this.boss.idle(dt)
     const fanAt = caine ? 3.2 : 0.8
+    // Pomni gets a word in too.
+    const sayAt = caine ? 4.8 : 3.2
+    if (this.st >= sayAt && this.st - dt < sayAt) {
+      const lines = caine ? ['...IS IT REALLY OVER?'] : ['PHEW.', "I'M... STILL HERE?", 'OKAY. I CAN DO THIS.', 'NOT TODAY!', 'WHO IS NEXT?!']
+      const text = lines[(this.bossIdx + this.run.deaths) % lines.length]
+      this.pomniSay = { text, until: this.t + 2 }
+      sfx.talk('pomni', text)
+    }
     if (!this.defeatFanfare && this.st >= fanAt) {
       this.defeatFanfare = true
       sfx.fanfare()
