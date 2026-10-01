@@ -140,7 +140,7 @@ export class TadcGame {
     try {
       if (navigator.vibrate) navigator.vibrate(ms)
       const pad = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find((p) => p && p.vibrationActuator)
-      if (pad) pad.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: 0.6, weakMagnitude: 0.4 })
+      if (pad) pad.vibrationActuator.playEffect('dual-rumble', { duration: ms, strongMagnitude: 0.6, weakMagnitude: 0.4 })?.catch?.(() => {})
     } catch {
       // No rumble here. That's fine.
     }
