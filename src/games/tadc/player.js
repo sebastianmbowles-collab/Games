@@ -171,9 +171,12 @@ export const OUTFITS = {
   'STAR': { [BLUE]: '#cc243c', [RED]: '#f4d474', [GOLD]: '#f4f4f4', [PUPIL]: '#2a4ad8' },
   'SHOWSTOPPER': { [BLUE]: '#8848c8', [RED]: '#38b848', [GOLD]: '#f88828', [PUPIL]: '#2c5ce0' },
 }
+// Costumes: play as someone else! (Same rules though: run and jump, that's it.)
+export const COSTUMES = { JAX: 'iconJax', RAGATHA: 'iconRagatha', GANGLE: 'iconGangle', KINGER: 'iconKinger', CAINE: 'iconCaine', ZOOBLE: 'iconZooble' }
+
 let outfit = 'CLASSIC'
 export function setOutfit(name) {
-  outfit = OUTFITS[name] ? name : 'CLASSIC'
+  outfit = OUTFITS[name] || COSTUMES[name] ? name : 'CLASSIC'
 }
 const dressed = new Map()
 function dress(spr, name = outfit) {
@@ -196,7 +199,13 @@ function dress(spr, name = outfit) {
 export function drawPomni(c, spr, cx, bottom, flip = false, { scale = 1, sy = 1, mode, rot = 0, alpha = 1, look = [0, 0], wear, blink } = {}) {
   // Pomni blinks too (but not when she's scared: then her eyes are wide open).
   if (blink === undefined) blink = spr !== SPR.pomniScared && spr !== SPR.pomniFall && performance.now() % 3300 < 110
-  spr = dress(spr, wear)
+  const costume = COSTUMES[wear ?? outfit]
+  if (costume) {
+    // Someone else in Pomni's shoes: they bob along when running.
+    if (spr === SPR.pomniPass) bottom -= scale
+    if (spr === SPR.pomniJump || spr === SPR.pomniFall) sy *= 1.04
+    spr = SPR[costume]
+  } else spr = dress(spr, wear)
   const w = spr[0].length * scale
   const ax = spr.ax * scale
   const h = spr.length * scale * sy

@@ -882,6 +882,12 @@ export class TadcGame {
       ['SPEEDY', b.speedy, 'A FULL RUN UNDER 6:30'],
       ['STAR', b.encoreStar, 'REACH WAVE 10 IN ENCORE'],
       ['SHOWSTOPPER', b.showstopper, 'FINISH ALL THE CHALLENGES'],
+      // Costumes: beat a boss on HARD (or harder) to dress up as them.
+      ...[['JAX', 0], ['RAGATHA', 1], ['GANGLE', 2], ['KINGER', 3], ['CAINE', 4], ['ZOOBLE', 5]].map(([n, i]) => [
+        n,
+        this.save.beaten[i] >= 2,
+        i === 5 && !b.cleared ? '???' : `BEAT ${BOSSES[i].name} ON HARD`,
+      ]),
     ]
   }
 
