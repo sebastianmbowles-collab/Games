@@ -1440,7 +1440,9 @@ export class TadcGame {
       const my = items.length > 4 ? 134 : 128
       drawText(c, `MODE: ${d.name}`, 178, my, { color: d.color })
       const rec = this.save.records[d.name]
-      if (rec && rec.any) drawText(c, `BEST ${fmtTime(rec.any)}`, 178, my + 8, { color: '#c8b8e0' })
+      const enc = this.save.encore[d.name]
+      if (items[this.msel] === 'ENCORE' && enc) drawText(c, `BEST ${fmtTime(enc.time)} (WAVE ${enc.wave})`, 178, my + 8, { color: '#e03c9c' })
+      else if (rec && rec.any) drawText(c, `BEST ${fmtTime(rec.any)}`, 178, my + 8, { color: '#c8b8e0' })
       const hint = this.usedTouch ? 'A BUTTON = JUMP    START = PAUSE' : 'A = Z / SPACE    START = ENTER'
       drawText(c, hint, VW / 2, 167, { align: 'center', color: '#8c8c9c' })
     } else if (!menuOn && s > 1) {
