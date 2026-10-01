@@ -1650,7 +1650,8 @@ export class TadcGame {
     row(32, 'MOVE', '< >', 'MOVE POMNI LEFT AND RIGHT.')
     row(42, 'JUMP', 'A', 'JUMP OVER THE ATTACKS.')
     row(52, 'PAUSE', 'START', 'PAUSE THE GAME.')
-    drawText(c, 'KEYS: ARROWS.  A = Z OR SPACE.  START = ENTER.', 92, 62, { color: '#8c6c4c', shadow: null })
+    const keys = this.usedTouch ? 'TOUCH: USE THE BUTTONS BY THE SCREEN.' : 'KEYS: ARROWS.  A = Z OR SPACE.  START = ENTER.'
+    drawText(c, keys, 92, 62, { color: '#8c6c4c', shadow: null })
     drawText(c, 'ONE HIT AND YOU ARE OUT.', 92, 72, { color: INK, shadow: null })
     drawText(c, 'SURVIVE THE WHOLE SHOW!', 92, 80, { color: INK, shadow: null })
 
