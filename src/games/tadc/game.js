@@ -319,7 +319,10 @@ export class TadcGame {
     this.persist()
     setTempo(1)
     playMusic(info.encore ? this.boss.key : info.key, true)
-    if (retry) this.setState('countdown')
+    if (retry) {
+      this.boss.drop = 0
+      this.setState('countdown')
+    }
     else {
       this.setState('intro')
       sfx.dunDunDun()
@@ -939,6 +942,17 @@ export class TadcGame {
 
   update_intro(dt, pr) {
     const info = BOSSES[this.bossIdx]
+    // The boss drops onto the stage. THUMP.
+    const b = this.boss
+    if (!info.encore && b) {
+      const k = clamp(this.st / 0.7, 0, 1)
+      b.drop = -(1 - k) * (1 - k) * 150
+      if (this.st >= 0.7 && this.st - dt < 0.7) {
+        sfx.thump()
+        this.shake = 0.15
+        this.puff(b.x + b.spr.ax, b.y + b.h, ['#c8b8e0', '#f4f4f4'], 6)
+      }
+    }
     for (const [at0, who, text] of info.intro) {
       const at = at0 + 1.6
       if (this.st >= at && this.st - dt < at) {
