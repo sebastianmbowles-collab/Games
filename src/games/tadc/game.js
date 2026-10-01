@@ -373,6 +373,9 @@ export class TadcGame {
 
   finalAttack() {
     this.finalBanner = this.t
+    // Of course.
+    this.pomniSay = { text: 'OH NO.', until: this.t + 1.3 }
+    sfx.talk('pomni', 'OH NO')
     this.shake = 0.5
     sfx.warn()
     sfx.shake()
