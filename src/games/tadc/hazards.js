@@ -9,17 +9,19 @@ import { sfx } from './sound'
 const G = 520
 
 // Where does something falling land? Returns the top of the floor or a platform, or null.
+// (Things aimed at the floor fall straight through platforms, just like Pomni can jump up through them,
+// so hiding under a platform doesn't make you safe.)
 function landY(g, obj, prevBottom) {
   const b = obj.y + obj.h
   const cx = obj.x + obj.w / 2
-  for (const p of g.platforms) if (prevBottom <= p.y + 0.5 && b >= p.y && cx > p.x && cx < p.x + p.w) return p.y
+  if (!obj.throughPlatforms) for (const p of g.platforms) if (prevBottom <= p.y + 0.5 && b >= p.y && cx > p.x && cx < p.x + p.w) return p.y
   if (b >= GROUND_Y) return GROUND_Y
   return null
 }
 
 // Where will a thrown thing land? Runs its flight forward (same maths as the real thing).
 function predictLanding(g, o) {
-  const p = { x: o.x, y: o.y, w: o.w, h: o.h }
+  const p = { x: o.x, y: o.y, w: o.w, h: o.h, throughPlatforms: o.throughPlatforms }
   let vy = o.vy
   for (let i = 0; i < 600; i++) {
     const prev = p.y + p.h

@@ -328,12 +328,19 @@ class Jax extends Boss {
   toss(tx, life, cap) {
     const g = this.g
     const h = this.hand()
-    tx = clamp(tx, 10, this.x - 16)
+    // (Right up to his feet: hugging Jax is no hiding place either.)
+    tx = clamp(tx, 10, this.x - 2)
     const plat = g.platforms.find((p) => tx > p.x + 4 && tx < p.x + p.w - 4)
-    const ty = plat && this.rng() < 0.5 ? plat.y : GROUND_Y
+    // Half the time it lands up on the platform instead, but not if Pomni is hiding underneath it!
+    const px = g.pomni.x + g.pomni.w / 2
+    const under = g.pomni.onFloor && plat && px > plat.x - 8 && px < plat.x + plat.w + 8
+    const ty = plat && !under && this.rng() < 0.5 ? plat.y : GROUND_Y
     const T = 0.95 / this.d.speed
     const v = arc(h.x, h.y, tx - 7, ty - 7, T)
-    g.haz.push(new Cushion(h.x - 7, h.y - 4, v.vx, v.vy, life))
+    const cushion = new Cushion(h.x - 7, h.y - 4, v.vx, v.vy, life)
+    // Aimed at the floor? Then it falls right through any platform on the way.
+    cushion.throughPlatforms = ty === GROUND_Y
+    g.haz.push(cushion)
     const resting = g.haz.filter((c) => c instanceof Cushion && c.state === 'rest')
     for (let i = 0; i < resting.length - cap; i++) resting[i].deflate()
     this.throwing()
@@ -424,7 +431,8 @@ class Ragatha extends Boss {
   }
   drop(x) {
     x = clamp(x, 4, this.x - 10)
-    this.g.haz.push(new Button({ mode: 'drop', x, warn: 0.85 * this.d.warn, life: 2.6 * this.d.life }))
+    // If Pomni is down on the floor, the button falls through platforms to reach her.
+    this.g.haz.push(new Button({ mode: 'drop', x, warn: 0.85 * this.d.warn, life: 2.6 * this.d.life, throughPlatforms: !!this.g.pomni.onFloor }))
   }
   spread(n) {
     const h = this.hand()
@@ -621,7 +629,7 @@ class Kinger extends Boss {
     const h = this.hand()
     const tx = clamp(this.px + this.rng.range(-40, 40), 20, this.x - 40)
     const v = arc(h.x - 20, h.y, tx - 10, GROUND_Y - 9, 1.0 / this.d.speed)
-    this.g.haz.push(new Pillow({ x: h.x - 20, y: h.y, vx: v.vx, vy: v.vy, mode: 'arc', bouncy, slide: -35 * this.d.speed }))
+    this.g.haz.push(new Pillow({ x: h.x - 20, y: h.y, vx: v.vx, vy: v.vy, mode: 'arc', bouncy, slide: -35 * this.d.speed, throughPlatforms: true }))
     this.throwing()
     sfx.throw()
   }
