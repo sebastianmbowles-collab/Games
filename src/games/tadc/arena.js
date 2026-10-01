@@ -156,6 +156,28 @@ const bgs = {
         c.fillRect(x, y, 16, 16)
       }
     }
+    // Giant chess pieces in the shadows (Kinger does love chess).
+    const piece = (x, h, top) => {
+      c.fillStyle = '#2a1c44'
+      c.fillRect(x - 10, GROUND_Y - 6, 20, 6)
+      c.fillRect(x - 7, GROUND_Y - 9, 14, 3)
+      c.fillRect(x - 4, GROUND_Y - h, 8, h - 9)
+      c.fillRect(x - 7, GROUND_Y - h - 2, 14, 3)
+      if (top === 'pawn') {
+        c.beginPath()
+        c.arc(x, GROUND_Y - h - 7, 6, 0, Math.PI * 2)
+        c.fill()
+      } else {
+        // A king: a crown with a little cross on top.
+        c.fillRect(x - 6, GROUND_Y - h - 10, 12, 8)
+        c.fillRect(x - 1, GROUND_Y - h - 18, 2, 8)
+        c.fillRect(x - 4, GROUND_Y - h - 15, 8, 2)
+      }
+      c.fillStyle = 'rgba(255, 255, 255, 0.06)'
+      c.fillRect(x - 3, GROUND_Y - h, 2, h - 9)
+    }
+    piece(140, 30, 'pawn')
+    piece(206, 44, 'king')
     // Stacks of pillows at the back.
     const piles = [20, 90, 230, 290]
     for (const px of piles) {
