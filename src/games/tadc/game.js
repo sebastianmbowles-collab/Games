@@ -442,8 +442,7 @@ export class TadcGame {
         this.boss.bub.text = { text: 'CAN I EAT THE CANE NOW?', until: this.t + 2.5 }
         sfx.talk('bubble', 'CAN I EAT THE CANE NOW')
       }, 3600)
-    }
-    else this.boss.say(this.boss.defeat, 3)
+    } else this.boss.say(this.boss.defeat, 3)
     const i = this.bossIdx
     // Speedrun split: the total time when each boss went down, compared with your best run.
     this.splitDelta = null
