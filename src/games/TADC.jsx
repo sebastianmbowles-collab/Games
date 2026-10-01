@@ -24,6 +24,13 @@ function TouchButton({ action, label, gameRef, className }) {
 export default function TADC({ game, onExit }) {
   const canvasRef = useRef(null)
   const gameRef = useRef(null)
+  const screenRef = useRef(null)
+  const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen()
+    else screenRef.current?.requestFullscreen?.().catch(() => {})
+  }
 
   useEffect(() => {
     const g = new TadcGame(canvasRef.current)
@@ -36,12 +43,19 @@ export default function TADC({ game, onExit }) {
   }, [])
 
   return (
-    <div className="game-screen" style={{ '--card-color': game.color }}>
+    <div className="game-screen tadc-screen" ref={screenRef} style={{ '--card-color': game.color }}>
       <div className="game-topbar tadc-topbar">
         <GameTitle game={game} />
-        <button className="exit-btn" onClick={onExit}>
-          Back to arcade
-        </button>
+        <div className="tadc-topbtns">
+          {canFullscreen && (
+            <button className="exit-btn" onClick={toggleFullscreen} title="Fullscreen">
+              ⛶
+            </button>
+          )}
+          <button className="exit-btn" onClick={onExit}>
+            Back to arcade
+          </button>
+        </div>
       </div>
       <canvas ref={canvasRef} className="tadc-canvas" />
       <div className="tadc-pad">
@@ -57,7 +71,7 @@ export default function TADC({ game, onExit }) {
         </div>
       </div>
       <p className="tadc-help">
-        Arrow keys to move, Z / Space / Up to jump (the A button), Enter to pause (START). One hit and you are out:
+        Arrow keys (or a game controller) to move, Z / Space / Up to jump (the A button), Enter to pause (START). One hit and you are out:
         survive each boss&apos;s whole show to beat them. Sound, difficulty, outfits and helpers (Calm mode, Slow motion)
         are in OPTIONS. Beat the game to unlock ENCORE and a secret bonus boss!
       </p>

@@ -131,7 +131,38 @@ export class TadcGame {
   // ---------- Input ----------
 
   held(a) {
-    return !!(this.keyHeld[a] || this.touchHeld[a])
+    return !!(this.keyHeld[a] || this.touchHeld[a] || (this.padHeld && this.padHeld[a]))
+  }
+
+  // Game controllers: d-pad or left stick to move, A to jump, B to go back, START to pause.
+  pollPad() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : []
+    let pad = null
+    for (const p of pads) if (p && p.connected) pad = pad || p
+    if (!pad && !this.padHeld) return
+    this.padHeld = this.padHeld || {}
+    const now = {}
+    if (pad) {
+      const b = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed)
+      const ax = pad.axes[0] || 0
+      const ay = pad.axes[1] || 0
+      now.left = b(14) || ax < -0.5
+      now.right = b(15) || ax > 0.5
+      now.up = b(12) || ay < -0.5
+      now.down = b(13) || ay > 0.5
+      now.jump = b(0) || b(12)
+      now.confirm = b(0)
+      now.back = b(1)
+      now.start = b(9)
+    }
+    for (const a of ['left', 'right', 'up', 'down', 'jump', 'confirm', 'back', 'start']) {
+      const v = !!now[a]
+      if (v && !this.padHeld[a]) {
+        this.pressed.add(a)
+        this.wake()
+      }
+      this.padHeld[a] = v
+    }
   }
 
   wake() {
@@ -474,6 +505,7 @@ export class TadcGame {
   loop(now) {
     const dt = Math.min(0.1, (now - this.last) / 1000)
     this.last = now
+    this.pollPad()
     // Slow motion (an assist option) slows down the fights, but not the menus.
     const playing = this.state === 'fight' || this.state === 'countdown'
     const speed = playing ? (this.save.slow ? 0.75 : 1) * ((this.run && this.run.mods && this.run.mods.speed) || 1) : 1

@@ -2300,6 +2300,17 @@ button.bonk-pill:hover {
   max-width: 960px;
 }
 
+.tadc-topbtns {
+  display: flex;
+  gap: 8px;
+}
+
+/* In fullscreen the page background must fill the screen too. */
+.tadc-screen:fullscreen {
+  background: #0c0818;
+  overflow: auto;
+}
+
 .tadc-canvas {
   width: 100%;
   max-width: 960px;
