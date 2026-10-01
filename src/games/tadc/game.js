@@ -464,7 +464,7 @@ export class TadcGame {
     const name = DIFFS[r.diff].name
     const rec = (this.save.records[name] ||= {})
     const segs = r.splits.map((t, i) => t - (i ? r.splits[i - 1] : 0))
-    this.results = { time: r.time, deaths: r.deaths, diff: name, news: [], badges: [], segs, gold: [] }
+    this.results = { time: r.time, deaths: r.deaths, close: r.close || 0, diff: name, news: [], badges: [], segs, gold: [] }
     if (r.slow) this.results.badges.push('SLOW-MO RUN: NOT RECORDED')
     if (r.mode === 'run' && !r.slow) {
       // Gold splits: the fastest you've ever beaten each boss, one boss at a time.
@@ -520,6 +520,7 @@ export class TadcGame {
     if (this.t - (this.lastClose ?? -9) < 1.6) return
     this.lastClose = this.t
     this.save.close = (this.save.close || 0) + 1
+    if (this.run) this.run.close = (this.run.close || 0) + 1
     if (this.save.close >= 100) this.award('daredevil', 'DAREDEVIL')
     const p = this.pomni
     this.flash(Math.random() < 0.5 ? 'CLOSE!' : 'PHEW!', p.x + p.w / 2, p.y - 8, '#68d8f8')
@@ -2080,7 +2081,7 @@ export class TadcGame {
     const L = 86
     drawText(c, `MODE: ${r.diff}`, L, 30, { align: 'center' })
     drawText(c, `TIME ${fmtTime(r.time)}`, L, 42, { scale: 2, align: 'center' })
-    drawText(c, `DEATHS: ${r.deaths}`, L, 58, { align: 'center', color: '#c8b8e0' })
+    drawText(c, `DEATHS: ${r.deaths}   CLOSE CALLS: ${r.close || 0}`, L, 58, { align: 'center', color: '#c8b8e0' })
     let y = 72
     for (const n of r.news) {
       drawText(c, `NEW RECORD! (${n})`, L, y, { align: 'center', color: Math.floor(this.t * 6) % 2 ? '#38b848' : '#f8c830' })
