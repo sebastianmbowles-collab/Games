@@ -34,6 +34,7 @@ const CHALLENGES = [
   { name: 'DOUBLE TIME', boss: 1, mods: { speed: 1.3 }, about: 'RAGATHA, BUT EVERYTHING IS FASTER.' },
   { name: 'TREADMILL', boss: 2, mods: { conveyor: -30 }, about: 'GANGLE, AND THE FLOOR KEEPS MOVING.' },
   { name: 'ICE RINK', boss: 5, mods: { ice: true }, about: 'ZOOBLE ON A FROZEN FLOOR. SLIDE!' },
+  { name: 'POGO', boss: 0, mods: { pogo: true }, about: "JAX, BUT POMNI CAN'T STOP BOUNCING!" },
   { name: 'NO MERCY', boss: 4, diff: 2, mods: {}, about: 'THE FINAL SHOW ON HARD MODE. GOOD LUCK.' },
 ]
 const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover', 'defeat'])
@@ -294,7 +295,7 @@ export class TadcGame {
     drawText(c, 'CHALLENGES', VW / 2, 8, { scale: 2, align: 'center', color: '#f8c830' })
     const done = this.save.challenges
     CHALLENGES.forEach((ch, i) => {
-      const y = 34 + i * 13
+      const y = 32 + i * 12
       this.menuLine(c, ch.name, 120, y, this.csel === i, () => ((this.csel = i), sfx.blip(), this.startChallenge(i)), {
         value: done[ch.name] ? 'DONE!' : '',
       })
@@ -308,7 +309,7 @@ export class TadcGame {
     drawText(c, ch.about, VW / 2, 120, { align: 'center', color: '#68d8f8' })
     if (ch.diff !== undefined) drawText(c, `(ALWAYS ON ${DIFFS[ch.diff].name})`, VW / 2, 130, { align: 'center', color: DIFFS[ch.diff].color })
     const n = CHALLENGES.filter((x) => done[x.name]).length
-    drawText(c, `DONE: ${n}/${CHALLENGES.length}   ALL 6 = A BADGE AND AN OUTFIT!`, VW / 2, 148, { align: 'center', color: '#c8b8e0' })
+    drawText(c, `DONE: ${n}/${CHALLENGES.length}   ALL ${CHALLENGES.length} = A BADGE AND AN OUTFIT!`, VW / 2, 148, { align: 'center', color: '#c8b8e0' })
     drawText(c, 'B: BACK', VW - 4, 167, { align: 'right', color: '#8c8c9c' })
     this.hits.push({ x: VW - 44, y: 158, w: 44, h: 18, fn: () => this.pressed.add('back') })
   }
@@ -789,7 +790,7 @@ export class TadcGame {
       ['ENCORE STAR', b.encoreStar, 'REACH WAVE 10 IN ENCORE.'],
       ['PERFECT RUN', b.perfect, 'NO DEATHS ON HARD OR INSANE.'],
       ['INSANE CLEAR', b.insane, 'BEAT INSANE MODE.'],
-      ['SHOWSTOPPER', b.showstopper, b.cleared ? 'FINISH ALL 6 CHALLENGES.' : '???'],
+      ['SHOWSTOPPER', b.showstopper, b.cleared ? 'FINISH ALL THE CHALLENGES.' : '???'],
     ]
   }
 
@@ -815,7 +816,7 @@ export class TadcGame {
       ['DAREDEVIL', b.daredevil, 'GET 100 CLOSE CALLS'],
       ['SPEEDY', b.speedy, 'A FULL RUN UNDER 6:30'],
       ['STAR', b.encoreStar, 'REACH WAVE 10 IN ENCORE'],
-      ['SHOWSTOPPER', b.showstopper, 'FINISH ALL 6 CHALLENGES'],
+      ['SHOWSTOPPER', b.showstopper, 'FINISH ALL THE CHALLENGES'],
     ]
   }
 
@@ -1034,6 +1035,7 @@ export class TadcGame {
       ice: !!(this.run.mods && this.run.mods.ice),
       conveyor: this.conveyor,
       grav: this.run.mods && this.run.mods.grav,
+      pogo: !!(this.run.mods && this.run.mods.pogo),
     })
     // Dust when she lands, jumps, or sets off running.
     if (p.onGround !== wasGround || (p.onGround && Math.abs(wasVx) < 5 && Math.abs(p.vx) >= 5)) this.dust(p.x + p.w / 2, p.y + p.h, p.onGround && !wasGround ? 4 : 2)

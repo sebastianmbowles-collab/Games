@@ -55,6 +55,8 @@ export class Pomni {
     if (slip && this.onGround && dir && Math.random() < dt * 4) sfx.slip()
 
     if (input.jumpPressed) this.jumpBuf = 0.12
+    // Pogo (a challenge): she bounces again the moment she lands.
+    if (world.pogo && this.onGround) this.jumpBuf = 0.12
     this.jumpBuf -= dt
     this.coyote = this.onGround ? 0.08 : this.coyote - dt
     if (this.jumpBuf > 0 && this.coyote > 0) {
