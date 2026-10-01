@@ -11,6 +11,7 @@ export const ARENAS = {
   caine: { platforms: [{ x: 36, y: 110, w: 56 }, { x: 164, y: 110, w: 56 }] },
   zooble: { platforms: [{ x: 40, y: 106, w: 52 }, { x: 150, y: 106, w: 52 }] },
   menu: { platforms: [] },
+  encore: { platforms: [] },
 }
 
 function curtain(c, x, w, flip, t) {

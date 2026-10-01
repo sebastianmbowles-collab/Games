@@ -28,13 +28,13 @@ const TIMED_STATES = new Set(['intro', 'countdown', 'fight', 'dying', 'gameover'
 const WIPE_STATES = new Set(['title', 'howto', 'bosses', 'options', 'records', 'intro', 'gameover', 'results'])
 
 function loadSave() {
-  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, deaths: 0, runs: 0 }
+  const base = { diff: 1, music: true, sfx: true, timer: true, reached: 0, beaten: [-1, -1, -1, -1, -1, -1], records: {}, badges: {}, encore: {}, deaths: 0, runs: 0 }
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY))
     if (s && typeof s === 'object') {
       // Older saves only know about five bosses: give Zooble a slot too.
       const beaten = base.beaten.map((b, i) => (s.beaten && s.beaten[i] !== undefined ? s.beaten[i] : b))
-      return { ...base, ...s, beaten, records: s.records || {}, badges: s.badges || {} }
+      return { ...base, ...s, beaten, records: s.records || {}, badges: s.badges || {}, encore: s.encore || {} }
     }
   } catch {
     // No save yet, or storage is blocked.
@@ -199,6 +199,11 @@ export class TadcGame {
     this.beginBoss(practiceIdx ?? 0, false)
   }
 
+  startEncore() {
+    this.run = { mode: 'encore', diff: this.save.diff, time: 0, deaths: 0, splits: [] }
+    this.beginBoss(BOSSES.findIndex((b) => b.encore), false)
+  }
+
   beginBoss(idx, retry) {
     this.paused = false
     this.bossIdx = idx
@@ -222,7 +227,7 @@ export class TadcGame {
     if (!info.bonus) this.save.reached = Math.max(this.save.reached, idx)
     this.persist()
     setTempo(1)
-    playMusic(info.key, true)
+    playMusic(info.encore ? this.boss.key : info.key, true)
     if (retry) this.setState('countdown')
     else {
       this.setState('intro')
@@ -259,6 +264,15 @@ export class TadcGame {
     this.glitch = 0.5
     this.boss.mood = 'pleased'
     this.boss.say(this.boss.win, 3)
+    if (this.run.mode === 'encore') {
+      // Endless mode: how long did you last?
+      const name = DIFFS[this.run.diff].name
+      const best = this.save.encore[name]
+      const b = this.boss
+      this.encoreResult = { time: b.time, wave: b.wave, best: best ? best.time : 0, isNew: !best || b.time > best.time }
+      if (this.encoreResult.isNew) this.save.encore[name] = { time: b.time, wave: b.wave }
+      this.persist()
+    }
   }
 
   startDefeat() {
@@ -444,12 +458,18 @@ export class TadcGame {
       stopMusic()
       sfx.static()
     }
-    const k = this.menuNav(pr, 'msel', MENU.length)
+    const k = this.menuNav(pr, 'msel', this.menuItems().length)
     if (k >= 0) this.menuPick(k)
   }
 
+  // ENCORE appears on the menu once you've beaten the game.
+  menuItems() {
+    return this.save.badges.cleared ? [...MENU, 'ENCORE'] : MENU
+  }
+
   menuPick(k) {
-    if (k === 0) this.startRun()
+    if (k === 4) this.startEncore()
+    else if (k === 0) this.startRun()
     else if (k === 1) this.setState('howto')
     else if (k === 2) this.setState('bosses')
     else this.setState('options')
@@ -875,7 +895,9 @@ export class TadcGame {
     }
 
     if (menuOn && this.helpT <= 0) {
-      MENU.forEach((m, i) => this.menuLine(c, m, 178, 74 + i * 13, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i))))
+      const items = this.menuItems()
+      const gap = items.length > 4 ? 11 : 13
+      items.forEach((m, i) => this.menuLine(c, m, 178, 72 + i * gap, this.msel === i, () => ((this.msel = i), sfx.blip(), this.menuPick(i))))
       const d = DIFFS[this.save.diff]
       drawText(c, `MODE: ${d.name}`, 178, 128, { color: d.color })
       const rec = this.save.records[d.name]
@@ -1036,12 +1058,14 @@ export class TadcGame {
       ['SPARE PARTS', b.zooble, b.cleared ? 'BEAT THE BONUS BOSS' : '???'],
     ]
     badges.forEach(([name, got, how], i) => {
-      const y = 112 + i * 10
+      const y = 111 + i * 9
       drawSprite(c, SPR.star, 30, y - 1, { mode: got ? 'normal' : 'shadow' })
       drawText(c, name, 42, y, { color: got ? '#f8c830' : '#4c4c5c' })
       drawText(c, got ? 'GOT IT!' : how, 170, y, { color: got ? '#38b848' : '#8c8c9c' })
     })
-    drawText(c, `TOTAL DEATHS: ${this.save.deaths}   RUNS: ${this.save.runs}`, VW / 2, 160, { align: 'center', color: '#c8b8e0' })
+    const enc = this.save.encore[DIFFS[this.save.diff].name]
+    const encText = enc ? `   ENCORE (${DIFFS[this.save.diff].name}): ${fmtTime(enc.time)}` : ''
+    drawText(c, `TOTAL DEATHS: ${this.save.deaths}   RUNS: ${this.save.runs}${encText}`, VW / 2, 160, { align: 'center', color: '#c8b8e0' })
     this.hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => this.pressed.add('back') })
   }
 
@@ -1107,6 +1131,7 @@ export class TadcGame {
 
   drawHud(c) {
     const b = this.boss
+    if (this.run.mode === 'encore') return this.drawEncoreHud(c)
     drawText(c, b.name, 4, 3, { color: '#f8c830' })
     c.fillStyle = INK
     c.fillRect(4, 11, 104, 6)
@@ -1124,6 +1149,31 @@ export class TadcGame {
     const d = DIFFS[this.run.diff]
     drawText(c, d.name, VW - 4, 3, { align: 'right', color: d.color })
     if (this.run.mode === 'run') drawText(c, `DEATHS ${this.run.deaths}`, VW - 4, 11, { align: 'right', color: '#c8b8e0' })
+  }
+
+  drawEncoreHud(c) {
+    const b = this.boss
+    drawText(c, `ENCORE  WAVE ${b.wave}`, 4, 3, { color: '#f8c830' })
+    c.fillStyle = INK
+    c.fillRect(4, 11, 104, 6)
+    c.fillStyle = '#4c3c5c'
+    c.fillRect(5, 12, 102, 4)
+    c.fillStyle = '#e03c9c'
+    c.fillRect(5, 12, Math.round(102 * b.waveProgress), 4)
+    drawText(c, fmtTime(b.time), VW / 2, 3, { align: 'center', color: '#f4f4f4' })
+    const d = DIFFS[this.run.diff]
+    drawText(c, d.name, VW - 4, 3, { align: 'right', color: d.color })
+    const best = this.save.encore[d.name]
+    if (best) drawText(c, `BEST ${fmtTime(best.time)}`, VW - 4, 11, { align: 'right', color: b.time > best.time ? '#38b848' : '#c8b8e0' })
+    if (b.breakT > 0) {
+      const k = clamp(Math.min((2.4 - b.breakT) * 4, b.breakT * 4), 0, 1)
+      c.fillStyle = 'rgba(12, 6, 20, 0.8)'
+      c.fillRect(0, 52, VW * k, 30)
+      if (k >= 1) {
+        drawText(c, `WAVE ${b.wave}`, VW / 2, 56, { scale: 2, align: 'center', color: '#f8c830', shadow: '#d82838' })
+        drawText(c, b.sub.name, VW / 2, 72, { align: 'center', color: '#f4f4f4' })
+      }
+    }
   }
 
   draw_intro(c) {
@@ -1202,14 +1252,20 @@ export class TadcGame {
     c.fillRect(0, 0, VW, VH)
     const pop = this.st < 0.4 ? this.st / 0.4 : 1
     drawText(c, 'GAME OVER', VW / 2, 30, { scale: Math.max(1, Math.round(4 * pop)), align: 'center', color: '#d82838', shadow: '#5c1020' })
-    const info = BOSSES[this.bossIdx]
+    // In Encore mode, it's whoever was on stage that got you.
+    const info = this.boss.sub ? BOSSES.find((b) => b.key === this.boss.key) : BOSSES[this.bossIdx]
     const icon = SPR['icon' + info.key[0].toUpperCase() + info.key.slice(1)]
     if (icon) drawSprite(c, icon, VW / 2 - icon.ax, 62 + Math.round(Math.sin(this.t * 6)))
     const lines = { cushion: 'PFFFFFT.', button: 'BUTTONED.', ribbon: 'ALL TIED UP.', pillow: 'SMOTHERED IN PILLOWS.', cane: 'CANED.', part: 'HIT BY A SPARE PART.' }
     drawText(c, lines[this.killer] || 'OUCH.', VW / 2, 102, { align: 'center', color: '#c8b8e0' })
     drawText(c, `${info.name}: ${info.win}`, VW / 2, 112, { align: 'center', color: '#8c8c9c' })
     const tries = (this.run && this.run.tries && this.run.tries[this.bossIdx]) || 2
-    drawText(c, `NEXT TRY: ATTEMPT ${tries}`, VW / 2, 122, { align: 'center', color: '#f8c830' })
+    const er = this.run.mode === 'encore' && this.encoreResult
+    if (er) {
+      drawText(c, `YOU LASTED ${fmtTime(er.time)}  (WAVE ${er.wave})`, VW / 2, 122, { align: 'center', color: '#f8c830' })
+      if (er.isNew) drawText(c, 'NEW BEST!', VW / 2 + 30, 76, { scale: 2, color: Math.floor(this.t * 6) % 2 ? '#38b848' : '#f8c830' })
+      else drawText(c, `BEST ${fmtTime(er.best)}`, VW / 2 + 30, 80, { color: '#c8b8e0' })
+    } else drawText(c, `NEXT TRY: ATTEMPT ${tries}`, VW / 2, 122, { align: 'center', color: '#f8c830' })
     if (this.st > 0.6) {
       this.menuLine(c, 'TRY AGAIN', VW / 2, 134, this.gameoverSel === 0, () => ((this.gameoverSel = 0), this.pressed.add('confirm')), { align: 'center' })
       this.menuLine(c, 'MAIN MENU', VW / 2, 148, this.gameoverSel === 1, () => ((this.gameoverSel = 1), this.pressed.add('confirm')), { align: 'center' })

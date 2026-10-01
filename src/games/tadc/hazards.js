@@ -127,7 +127,7 @@ export class Button {
       }
     }
     // Buttons resting on a platform roll off its edge.
-    if (!this.grav && this.y + this.h < GROUND_Y - 1 && !g.platforms.some((p) => this.x + 3 > p.x && this.x + 3 < p.x + p.w && Math.abs(p.y - this.y - this.h) < 2)) this.grav = 600
+    if (!this.grav && this.mode !== 'straight' && this.y + this.h < GROUND_Y - 1 && !g.platforms.some((p) => this.x + 3 > p.x && this.x + 3 < p.x + p.w && Math.abs(p.y - this.y - this.h) < 2)) this.grav = 600
     if (this.life <= 0 || offscreen(this)) {
       this.dead = true
       if (this.life <= 0) g.puff(this.x + 3, this.y + 3, ['#68d8f8', '#2c5ce0'], 4)

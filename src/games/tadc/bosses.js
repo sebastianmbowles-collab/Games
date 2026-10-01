@@ -5,7 +5,8 @@
 import { SPR, drawSprite } from './sprites'
 import { VW, GROUND_Y, clamp, seeded } from './consts'
 import { Cushion, Button, Ribbon, Pillow, Cane, Glob, Part } from './hazards'
-import { sfx, setTempo } from './sound'
+import { sfx, setTempo, playMusic } from './sound'
+import { ARENAS } from './arena'
 
 const G = 520
 const arc = (x0, y0, tx, ty, T) => ({ vx: (tx - x0) / T, vy: (ty - y0 - 0.5 * G * T * T) / T })
@@ -94,6 +95,22 @@ export const BOSSES = [
     tip: 'LOW PARTS: JUMP. HIGH PARTS: STAY DOWN!',
     defeat: "WHATEVER. I WASN'T TRYING.",
     win: '...OOPS. NOT SORRY.',
+  },
+  {
+    key: 'encore',
+    name: 'ENCORE',
+    title: 'THE SHOW MUST GO ON',
+    bonus: true,
+    encore: true,
+    rules: ['EVERY BOSS, ONE AFTER ANOTHER.', 'IT GETS FASTER EVERY WAVE.', 'HOW LONG CAN YOU LAST?'],
+    intro: [
+      [0.4, 'boss', 'ENCORE! ENCORE!'],
+      [1.7, 'boss', 'EVERYBODY BACK ON STAGE!'],
+      [3.0, 'pomni', 'OH NO. NOT AGAIN.'],
+    ],
+    tip: 'SURVIVE AS LONG AS YOU CAN!',
+    defeat: '',
+    win: 'WHAT A SHOW!',
   },
 ]
 
@@ -341,15 +358,18 @@ class Gangle extends Boss {
     const life = 2 * d.life
     let t = 1
     // 1: one big band at a time. Floor ribbon: get up on a platform. Top ribbon: get down low.
+    // Each band is gone (with time to move) before the next one can hurt you.
+    const gapT = 3.3 / d.dens
+    const life1 = Math.min(life, gapT - 0.6)
     while (t < 16) {
       const top = r() < 0.5
       at(t, () =>
         this.g.haz.push(
-          top ? new Ribbon({ x: 0, y: 0, w: span(), h: 100, warn, life }) : new Ribbon({ x: 0, y: GROUND_Y - 20, w: span(), h: 20, warn, life }),
+          top ? new Ribbon({ x: 0, y: 0, w: span(), h: 100, warn, life: life1 }) : new Ribbon({ x: 0, y: GROUND_Y - 20, w: span(), h: 20, warn, life: life1 }),
         ),
       )
       at(t, () => sfx.swish())
-      t += 3.3 / d.dens
+      t += gapT
     }
     // 2: trapped between two ribbons, and ribbons that slowly move.
     at(16, () => this.say("I CAN'T STOP THEM!"))
@@ -773,6 +793,116 @@ class Zooble extends Boss {
 }
 
 const CLASSES = { jax: Jax, ragatha: Ragatha, gangle: Gangle, kinger: Kinger, caine: Caine, zooble: Zooble }
+
+// ---------- ENCORE (endless mode) ----------
+// The whole cast takes turns. Each wave is one part of a boss's show, a little faster than the last.
+// The Encore "boss" is a stand-in: everything it shows (position, pose, speech) belongs to the boss on stage.
+const WAVE_LEN = 13
+const BREAK = 2.4
+const PHASES = { jax: [1, 14, 30, 42], ragatha: [1, 13, 26, 38, 46], gangle: [1, 16, 31, 46], kinger: [1, 14, 28, 42], zooble: [1, 14, 28, 42], caine: [1, 16, 32, 50] }
+class Encore extends Boss {
+  constructor(g, info, d, seed) {
+    super(g, info, d, seed)
+    this.base = d
+    this.wave = 0
+    this.order = []
+    this.breakT = 0
+    this.nextWave()
+  }
+  script() {
+    return { events: [], duration: Infinity }
+  }
+  get w() {
+    return this.sub ? this.sub.w : 30
+  }
+  get h() {
+    return this.sub ? this.sub.h : 60
+  }
+  get waveProgress() {
+    return this.breakT > 0 ? 0 : clamp((this.time - this.waveStart) / WAVE_LEN, 0, 1)
+  }
+  nextWave() {
+    const g = this.g
+    if (!this.order.length) {
+      // A shuffled line-up. Caine hosts the first wave; nobody goes on twice in a row.
+      const keys = Object.keys(PHASES)
+      for (let i = keys.length - 1; i > 0; i--) {
+        const j = Math.floor(this.rng() * (i + 1))
+        ;[keys[i], keys[j]] = [keys[j], keys[i]]
+      }
+      if (this.wave === 0) keys.push(keys.splice(keys.indexOf('caine'), 1)[0])
+      else if (keys[keys.length - 1] === this.sub.key) keys.unshift(keys.pop())
+      this.order = keys
+    }
+    const key = this.order.pop()
+    this.wave++
+    // Faster and busier every wave (up to a point), with a little less warning.
+    const k = Math.min(this.wave - 1, 12)
+    const b = this.base
+    const d = { ...b, speed: b.speed * (1 + k * 0.04), dens: b.dens * (1 + k * 0.05), warn: b.warn * Math.max(0.78, 1 - k * 0.02) }
+    const sub = new CLASSES[key](g, BOSSES.find((x) => x.key === key), d, Math.floor(this.rng() * 1e9))
+    // Early waves use the start of a show; later waves can pull out the big finales.
+    const starts = PHASES[key]
+    const ph = Math.floor(this.rng() * (Math.min(starts.length - 1, Math.floor(this.wave / 2)) + 1))
+    sub.time = starts[ph] - 0.8
+    sub.ei = sub.events.findIndex((e) => e[0] >= sub.time)
+    if (sub.ei < 0) sub.ei = sub.events.length
+    sub.tempos = []
+    sub.finalAt = null
+    this.sub = sub
+    this.waveStart = this.time
+    g.arenaKey = key
+    g.platforms = ARENAS[key].platforms
+    g.conveyor = 0
+    g.slip = false
+    if (this.wave > 1) {
+      playMusic(key, true)
+      setTempo(1 + k * 0.02)
+    }
+  }
+  updateFight(dt) {
+    this.time += dt
+    if (this.breakT > 0) {
+      this.breakT -= dt
+      this.sub.idle(dt)
+      if (this.breakT <= 0) this.waveStart = this.time
+      return
+    }
+    this.sub.updateFight(dt)
+    if (this.time - this.waveStart >= WAVE_LEN) {
+      // Curtain! Clear the stage and bring on the next act.
+      const g = this.g
+      for (const h of g.haz) {
+        const x = h.x ?? h.cx
+        const y = h.y ?? h.cy
+        if (x !== undefined) g.puff(x + (h.w || 0) / 2, y, ['#f4f4f4', '#f8c830'], 2)
+      }
+      g.haz = []
+      g.wipeT = 0.4
+      sfx.cheer()
+      this.nextWave()
+      this.breakT = BREAK
+      this.sub.say(this.sub.intro[0][2], 1.6)
+    }
+  }
+  idle(dt) {
+    this.sub.idle(dt)
+  }
+  draw(c, t) {
+    this.sub.draw(c, t)
+  }
+}
+for (const f of ['spr', 'x', 'y', 'key', 'mood', 'bubbleText', 'throwT', 'bub']) {
+  Object.defineProperty(Encore.prototype, f, {
+    get() {
+      return this.sub ? this.sub[f] : f === 'key' ? 'encore' : undefined
+    },
+    set(v) {
+      if (this.sub) this.sub[f] = v
+    },
+  })
+}
+CLASSES.encore = Encore
 
 export function makeBoss(g, index, d, seed) {
   const info = BOSSES[index]
