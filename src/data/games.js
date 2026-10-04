@@ -166,4 +166,12 @@ export const GAMES = [
     icon: '🍓',
     playable: true,
   },
+  {
+    key: 'aliens-vs-dinos',
+    title: 'Aliens VS Dinos',
+    blurb: 'Pick a side: beam up dinos in a UFO, or roar the aliens away!',
+    color: '#4fd18b',
+    icon: '🛸',
+    playable: true,
+  },
 ]

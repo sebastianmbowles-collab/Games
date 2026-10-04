@@ -1,0 +1,2218 @@
+// Aliens VS Dinos: pick a side, then either beam up dinos in your UFO or roar the alien UFOs away.
+// This file runs the whole game: menus, both game modes, cutscenes, particles and the HUD.
+
+import {
+  W,
+  H,
+  GROUND,
+  WORLD,
+  TAU,
+  FONT,
+  INK,
+  DINO_KINDS,
+  KIND_LIST,
+  circle,
+  rrect,
+  drawDino,
+  drawUFO,
+  drawAlien,
+  drawStar,
+  drawBeam,
+  drawMothership,
+  drawEgg,
+  drawLeaf,
+  drawSky,
+  drawBackdrop,
+  drawGround,
+  drawForeground,
+  getTheme,
+  mixTheme,
+} from './art'
+import { sfx, wakeAudio, beamOn } from './sound'
+
+export { W, H }
+
+// The game switches itself off at this time of day (the player asked for it to stop at 18:15).
+const STOP_AT = { h: 18, m: 15 }
+
+const WAVES = 3
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
+const lerp = (a, b, t) => a + (b - a) * t
+const rand = (a, b) => a + Math.random() * (b - a)
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
+const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2)
+const easeOut = (t) => 1 - (1 - t) ** 3
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1)
+const approach = (v, target, rate, dt) => v + (target - v) * (1 - Math.exp(-rate * dt))
+
+const KEYMAP = {
+  ArrowLeft: 'left',
+  KeyA: 'left',
+  ArrowRight: 'right',
+  KeyD: 'right',
+  ArrowUp: 'up',
+  KeyW: 'up',
+  ArrowDown: 'down',
+  KeyS: 'down',
+  Space: 'action',
+  KeyZ: 'fire',
+  KeyX: 'fire',
+  KeyF: 'fire',
+  KeyJ: 'fire',
+  Enter: 'enter',
+  KeyP: 'pause',
+  Escape: 'pause',
+}
+
+// ---------- particles ----------
+
+class FX {
+  list = []
+  add(p) {
+    const q = { vx: 0, vy: 0, g: 0, drag: 0, life: 1, size: 4, color: '#fff', type: 'dot', rot: 0, vr: 0, age: 0, ...p }
+    this.list.push(q)
+    return q
+  }
+  burst(x, y, n, o) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, TAU)
+      const s = rand(o.speed * 0.3, o.speed)
+      this.add({
+        x,
+        y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s - (o.up || 0),
+        life: rand(o.life * 0.6, o.life),
+        size: rand(o.size * 0.5, o.size),
+        color: Array.isArray(o.color) ? pick(o.color) : o.color,
+        type: o.type || 'dot',
+        g: o.g || 0,
+        drag: o.drag ?? 2,
+        vr: rand(-8, 8),
+      })
+    }
+  }
+  ring(x, y, r, color, life = 0.5, width = 6) {
+    this.add({ x, y, size: r, color, type: 'ring', life, width })
+  }
+  text(x, y, text, color = '#fff', size = 26) {
+    this.add({ x, y, vy: -60, drag: 1.5, text, color, size, type: 'text', life: 1.1 })
+  }
+  dust(x, y, n = 8) {
+    this.burst(x, y, n, { speed: 140, life: 0.6, size: 9, color: ['#c9a477', '#e0c49a'], type: 'smoke', up: 40, drag: 4 })
+  }
+  boom(x, y) {
+    this.burst(x, y, 30, { speed: 420, life: 0.7, size: 5, color: ['#fff3a0', '#ffb43a', '#ff6a2a'], type: 'spark', drag: 2.5 })
+    this.burst(x, y, 16, { speed: 160, life: 1.3, size: 26, color: ['#555', '#777', '#3d3d3d'], type: 'smoke', up: 60, drag: 2 })
+    this.burst(x, y, 12, { speed: 380, life: 1.6, size: 9, color: ['#9fb2d6', '#c3324a', '#5a6890'], type: 'debris', g: 1100, drag: 0.4, up: 250 })
+    this.add({ x, y, size: 90, color: '#ffd36a', type: 'flash', life: 0.3 })
+    this.ring(x, y, 150, '#ffd36a', 0.5, 10)
+  }
+  update(dt) {
+    for (const p of this.list) {
+      p.age += dt
+      const d = Math.exp(-p.drag * dt)
+      p.vx *= d
+      p.vy = p.vy * d + p.g * dt
+      p.x += p.vx * dt
+      p.y += p.vy * dt
+      p.rot += p.vr * dt
+      if (p.type === 'debris' && p.y > GROUND && p.vy > 0) {
+        p.y = GROUND
+        p.vy *= -0.4
+        p.vx *= 0.6
+      }
+    }
+    this.list = this.list.filter((p) => p.age < p.life)
+  }
+  draw(ctx) {
+    for (const p of this.list) {
+      const f = p.age / p.life
+      const a = 1 - f
+      ctx.save()
+      switch (p.type) {
+        case 'dot':
+          ctx.globalAlpha = a
+          ctx.fillStyle = p.color
+          circle(ctx, p.x, p.y, p.size * (1 - f * 0.5))
+          ctx.fill()
+          break
+        case 'glow': {
+          ctx.globalCompositeOperation = 'lighter'
+          ctx.globalAlpha = a
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size)
+          g.addColorStop(0, p.color)
+          g.addColorStop(1, 'rgba(0,0,0,0)')
+          ctx.fillStyle = g
+          ctx.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2)
+          break
+        }
+        case 'spark':
+          ctx.globalCompositeOperation = 'lighter'
+          ctx.globalAlpha = a
+          ctx.strokeStyle = p.color
+          ctx.lineWidth = p.size * (1 - f)
+          ctx.lineCap = 'round'
+          ctx.beginPath()
+          ctx.moveTo(p.x, p.y)
+          ctx.lineTo(p.x - p.vx * 0.04, p.y - p.vy * 0.04)
+          ctx.stroke()
+          break
+        case 'smoke':
+          ctx.globalAlpha = a * 0.7
+          ctx.fillStyle = p.color
+          circle(ctx, p.x, p.y, p.size * (0.5 + f))
+          ctx.fill()
+          break
+        case 'ring':
+          ctx.globalAlpha = a
+          ctx.strokeStyle = p.color
+          ctx.lineWidth = (p.width || 6) * a + 1
+          circle(ctx, p.x, p.y, p.size * easeOut(f))
+          ctx.stroke()
+          break
+        case 'flash': {
+          ctx.globalCompositeOperation = 'lighter'
+          ctx.globalAlpha = a
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * (0.6 + f))
+          g.addColorStop(0, '#fff')
+          g.addColorStop(0.4, p.color)
+          g.addColorStop(1, 'rgba(0,0,0,0)')
+          ctx.fillStyle = g
+          circle(ctx, p.x, p.y, p.size * (0.6 + f))
+          ctx.fill()
+          break
+        }
+        case 'debris':
+          ctx.globalAlpha = Math.min(1, a * 3)
+          ctx.translate(p.x, p.y)
+          ctx.rotate(p.rot)
+          ctx.fillStyle = p.color
+          ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66)
+          ctx.strokeStyle = INK
+          ctx.lineWidth = 1.5
+          ctx.strokeRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66)
+          break
+        case 'star':
+          ctx.globalAlpha = a
+          ctx.translate(p.x, p.y)
+          ctx.rotate(p.rot)
+          drawStar(ctx, 0, 0, p.size, p.color)
+          break
+        case 'heart':
+          ctx.globalAlpha = a
+          ctx.fillStyle = p.color
+          ctx.font = `${p.size}px ${FONT}`
+          ctx.textAlign = 'center'
+          ctx.fillText('❤', p.x, p.y)
+          break
+        case 'text': {
+          ctx.globalAlpha = Math.min(1, a * 2)
+          const s = p.size * (f < 0.15 ? 0.6 + (f / 0.15) * 0.6 : 1.2 - Math.min(0.2, f))
+          ctx.font = `900 ${s}px ${FONT}`
+          ctx.textAlign = 'center'
+          ctx.lineWidth = 5
+          ctx.strokeStyle = INK
+          ctx.strokeText(p.text, p.x, p.y)
+          ctx.fillStyle = p.color
+          ctx.fillText(p.text, p.x, p.y)
+          break
+        }
+      }
+      ctx.restore()
+    }
+  }
+}
+
+// ---------- characters ----------
+
+class Dino {
+  constructor(x, kind, scale = 1) {
+    this.x = x
+    this.y = GROUND
+    this.vx = 0
+    this.vy = 0
+    this.kind = kind
+    this.scale = scale
+    this.face = Math.random() < 0.5 ? -1 : 1
+    this.state = 'walk' // walk | lifted | fall | gone
+    this.walk = rand(0, TAU)
+    this.target = x
+    this.think = 0
+    this.seed = rand(0, 10)
+    this.liftedBy = null
+    this.scared = 0
+    this.offset = rand(-140, 140)
+    this.squash = 0
+  }
+  get lift() {
+    return DINO_KINDS[this.kind].lift
+  }
+  // Ground physics shared by everyone: falling back down after a beam lets go.
+  physics(dt, fx) {
+    if (this.state === 'fall') {
+      this.vy += 1500 * dt
+      this.y += this.vy * dt
+      this.x += this.vx * dt
+      if (this.y >= GROUND) {
+        this.y = GROUND
+        this.vy = 0
+        this.state = 'walk'
+        this.squash = 1
+        this.scared = 2
+        fx.dust(this.x, GROUND, 8)
+        sfx.land()
+      }
+    }
+    this.squash = Math.max(0, this.squash - dt * 4)
+    this.scared = Math.max(0, this.scared - dt)
+    this.x = clamp(this.x, 30, WORLD - 30)
+  }
+  draw(ctx, time, extra = {}) {
+    ctx.save()
+    ctx.translate(this.x, this.y)
+    if (this.state === 'lifted') ctx.rotate(Math.sin(time * 4 + this.seed) * 0.25)
+    const sq = Math.sin(this.squash * Math.PI) * 0.25
+    ctx.scale(this.face * this.scale * (1 + sq), this.scale * (1 - sq))
+    drawDino(ctx, this.kind, {
+      time: time + this.seed,
+      walk: this.walk,
+      moving: this.state === 'walk' && Math.abs(this.vx) > 15,
+      scared: this.scared > 0 || this.state !== 'walk',
+      flail: this.state === 'lifted',
+      blink: (time + this.seed) % 4 < 0.12,
+      ...extra,
+    })
+    ctx.restore()
+  }
+}
+
+class Saucer {
+  constructor(x, y, enemy = true) {
+    this.x = x
+    this.y = y
+    this.vx = 0
+    this.vy = 0
+    this.enemy = enemy
+    this.hp = 3
+    this.tilt = 0
+    this.hurt = 0
+    this.stun = 0
+    this.state = 'hunt'
+    this.timer = 0
+    this.target = null
+    this.beaming = false
+    this.shootCd = rand(1.5, 3)
+    this.seed = rand(0, 10)
+    this.hoverY = rand(150, 200)
+  }
+  draw(ctx, time) {
+    ctx.save()
+    ctx.translate(this.x, this.y + Math.sin(time * 2.5 + this.seed) * 4)
+    drawUFO(ctx, { time: time + this.seed, enemy: this.enemy, tilt: this.tilt, hurt: this.hurt > 0, stun: this.stun > 0, beam: this.beaming })
+    ctx.restore()
+  }
+}
+
+// Is the point (x, y) inside a tractor beam shining down from (bx, by)?
+function inBeam(bx, by, x, y, wide = 70) {
+  if (y < by + 10) return false
+  const f = clamp((y - by) / (GROUND - by), 0, 1)
+  return Math.abs(x - bx) < 16 + (wide - 16) * f + 12
+}
+
+function loadBest() {
+  try {
+    return JSON.parse(localStorage.getItem('avd-best-v1')) || { aliens: 0, dinos: 0 }
+  } catch {
+    return { aliens: 0, dinos: 0 }
+  }
+}
+
+// ---------- the game ----------
+
+export class AliensVsDinos {
+  constructor(canvas) {
+    this.canvas = canvas
+    this.ctx = canvas.getContext('2d')
+    this.time = 0
+    this.fx = new FX()
+    this.keys = {}
+    this.pressed = new Set()
+    this.mouse = { x: -1, y: -1 }
+    this.shake = 0
+    this.slowmo = 0
+    this.flash = 0
+    this.best = loadBest()
+    this.scene = 'menu'
+    this.side = null
+    this.menuPick = 0
+    this.menuT = 0
+    this.cam = { x: W / 2, y: H / 2, zoom: 1 }
+    this.stopped = false
+
+    this.onKeyDown = (e) => {
+      const k = KEYMAP[e.code]
+      if (!k) return
+      wakeAudio()
+      e.preventDefault()
+      if (!this.keys[k]) this.pressed.add(k)
+      this.keys[k] = true
+    }
+    this.onKeyUp = (e) => {
+      const k = KEYMAP[e.code]
+      if (k) this.keys[k] = false
+    }
+    this.onPointerDown = (e) => {
+      wakeAudio()
+      const p = this.toCanvas(e)
+      this.mouse = p
+      this.click(p.x, p.y)
+    }
+    this.onPointerMove = (e) => {
+      this.mouse = this.toCanvas(e)
+    }
+    window.addEventListener('keydown', this.onKeyDown)
+    window.addEventListener('keyup', this.onKeyUp)
+    canvas.addEventListener('pointerdown', this.onPointerDown)
+    canvas.addEventListener('pointermove', this.onPointerMove)
+
+    this.last = performance.now()
+    const loop = (now) => {
+      const dt = Math.min(1 / 30, (now - this.last) / 1000)
+      this.last = now
+      this.update(dt)
+      this.draw()
+      this.raf = requestAnimationFrame(loop)
+    }
+    this.raf = requestAnimationFrame(loop)
+  }
+
+  destroy() {
+    cancelAnimationFrame(this.raf)
+    beamOn(false)
+    window.removeEventListener('keydown', this.onKeyDown)
+    window.removeEventListener('keyup', this.onKeyUp)
+    this.canvas.removeEventListener('pointerdown', this.onPointerDown)
+    this.canvas.removeEventListener('pointermove', this.onPointerMove)
+  }
+
+  toCanvas(e) {
+    const r = this.canvas.getBoundingClientRect()
+    return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H }
+  }
+
+  // Used by the on-screen touch buttons.
+  setKey(k, down) {
+    wakeAudio()
+    if (down && !this.keys[k]) this.pressed.add(k)
+    this.keys[k] = down
+  }
+
+  isStopTime() {
+    const d = new Date()
+    return d.getHours() * 60 + d.getMinutes() >= STOP_AT.h * 60 + STOP_AT.m
+  }
+
+  // ---------- flow between screens ----------
+
+  goMenu() {
+    beamOn(false)
+    this.scene = 'menu'
+    this.menuT = 0
+    this.fx.list = []
+  }
+
+  choose(side) {
+    sfx.select()
+    this.side = side
+    this.startCutscene(side === 'aliens' ? 'alienIntro' : 'dinoIntro', () => this.startPlay())
+  }
+
+  startPlay() {
+    this.scene = 'play'
+    this.fx.list = []
+    this.score = 0
+    this.wave = 1
+    this.banner = { text: 'WAVE 1', sub: this.side === 'aliens' ? 'Beam up 6 dinos!' : 'Survive 35 seconds!', t: 0 }
+    this.pickups = []
+    this.eggs = []
+    this.bolts = []
+    this.plasma = []
+    this.ending = null
+    if (this.side === 'aliens') this.setupAliens()
+    else this.setupDinos()
+    this.cam.x = clamp(this.playerX(), W / 2, WORLD - W / 2)
+    this.cam.y = H / 2
+    this.cam.zoom = 1
+    sfx.wave()
+  }
+
+  playerX() {
+    return this.side === 'aliens' ? this.ufo.x : this.rex.x
+  }
+
+  // End of a game: a short slow-motion moment, then the ending cutscene, then the results.
+  finish(won) {
+    if (this.ending) return
+    beamOn(false)
+    this.ending = { won, t: 0 }
+    this.banner = null
+    this.slowmo = 0.8
+    if (won) sfx.win()
+    else sfx.lose()
+    const best = this.best[this.side] || 0
+    this.newBest = this.score > best
+    if (this.newBest) {
+      this.best[this.side] = this.score
+      try {
+        localStorage.setItem('avd-best-v1', JSON.stringify(this.best))
+      } catch {
+        // Saving the best score is only a nicety.
+      }
+    }
+  }
+
+  click(x, y) {
+    if (this.stopped) return
+    if (this.scene === 'menu') {
+      if (this.menuT < 0.6) return
+      const card = this.menuCards().find((c) => x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h)
+      if (card) this.choose(card.side)
+    } else if (this.scene === 'cutscene') {
+      this.skipCutscene()
+    } else if (this.scene === 'over') {
+      for (const b of this.overButtons()) {
+        if (x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h) {
+          sfx.click()
+          b.go()
+        }
+      }
+    } else if (this.scene === 'paused') {
+      this.scene = 'play'
+    }
+  }
+
+  // ---------- update ----------
+
+  update(realDt) {
+    this.time += realDt
+    if (!this.stopped && this.isStopTime()) {
+      this.stopped = true
+      beamOn(false)
+      this.fx.list = []
+      sfx.lose()
+    }
+    if (this.stopped) {
+      this.pressed.clear()
+      return
+    }
+    this.slowmo = Math.max(0, this.slowmo - realDt)
+    const dt = realDt * (this.slowmo > 0 ? 0.3 : 1)
+    this.shake = Math.max(0, this.shake - realDt * 40)
+    this.flash = Math.max(0, this.flash - realDt * 2.5)
+
+    if (this.scene === 'menu') this.updateMenu(realDt)
+    else if (this.scene === 'cutscene') this.updateCutscene(realDt)
+    else if (this.scene === 'play') {
+      if (this.pressed.has('pause')) {
+        this.scene = 'paused'
+        beamOn(false)
+      } else {
+        if (this.side === 'aliens') this.updateAliens(dt)
+        else this.updateDinos(dt)
+        this.updateCamera(dt)
+        if (this.banner) {
+          this.banner.t += dt
+          if (this.banner.t > 2.6) this.banner = null
+        }
+        if (this.ending) {
+          this.ending.t += realDt
+          if (this.ending.t > 1.4) {
+            const name = (this.side === 'aliens' ? 'alien' : 'dino') + (this.ending.won ? 'Win' : 'Lose')
+            this.startCutscene(name, () => {
+              this.scene = 'over'
+              this.overT = 0
+            })
+          }
+        }
+      }
+    } else if (this.scene === 'paused') {
+      if (this.pressed.has('pause') || this.pressed.has('enter') || this.pressed.has('action')) this.scene = 'play'
+    } else if (this.scene === 'over') {
+      this.overT += realDt
+      if (this.pressed.has('enter') || this.pressed.has('action')) this.overButtons()[0].go()
+      if (this.pressed.has('pause')) this.goMenu()
+    }
+    this.fx.update(dt)
+    this.pressed.clear()
+  }
+
+  updateCamera(dt) {
+    const p = this.side === 'aliens' ? this.ufo : this.rex
+    const lead = (p.vx || 0) * 0.35
+    const tx = clamp(p.x + lead, W / 2, WORLD - W / 2)
+    this.cam.x = approach(this.cam.x, tx, 4, dt)
+  }
+
+  updateMenu(dt) {
+    this.menuT += dt
+    const k = this.pressed
+    if (k.has('left')) {
+      this.menuPick = 0
+      sfx.click()
+    }
+    if (k.has('right')) {
+      this.menuPick = 1
+      sfx.click()
+    }
+    const hover = this.menuCards().findIndex((c) => this.mouse.x > c.x && this.mouse.x < c.x + c.w && this.mouse.y > c.y && this.mouse.y < c.y + c.h)
+    if (hover >= 0 && hover !== this.menuPick) this.menuPick = hover
+    if ((k.has('enter') || k.has('action')) && this.menuT > 0.6) this.choose(this.menuCards()[this.menuPick].side)
+    // drifting sparkles
+    if (Math.random() < dt * 12) {
+      this.fx.add({ x: rand(0, W), y: H + 10, vy: rand(-60, -30), vx: rand(-10, 10), life: 6, size: rand(1.5, 3.5), color: pick(['#7dffb0', '#ffe14a', '#ff8fb0']), type: 'dot', drag: 0 })
+    }
+  }
+
+  menuCards() {
+    return [
+      { side: 'aliens', x: 110, y: 170, w: 340, h: 280 },
+      { side: 'dinos', x: 510, y: 170, w: 340, h: 280 },
+    ]
+  }
+
+  overButtons() {
+    return [
+      { label: 'Play again', x: W / 2 - 230, y: 400, w: 210, h: 56, go: () => this.startPlay() },
+      { label: 'Switch side', x: W / 2 + 20, y: 400, w: 210, h: 56, go: () => this.goMenu() },
+    ]
+  }
+
+  // ---------- ALIENS mode: you fly the UFO ----------
+
+  setupAliens() {
+    this.ufo = { x: 600, y: 170, vx: 0, vy: 0, hp: 5, maxHp: 5, energy: 1, overheat: false, beaming: false, tilt: 0, inv: 0, laserCd: 0, face: 1, hurt: 0 }
+    this.dinos = []
+    for (let i = 0; i < 7; i++) this.dinos.push(new Dino(rand(200, WORLD - 200), pick(KIND_LIST)))
+    this.enemies = [new Saucer(WORLD - 200, -80)]
+    this.captured = 0
+    this.goal = 6
+    this.stolen = 0
+    this.enemyRespawn = []
+  }
+
+  updateAliens(dt) {
+    const p = this.ufo
+    const fx = this.fx
+    const k = this.keys
+    const alive = !this.ending
+
+    // smooth flying: push with the arrows, then glide to a stop
+    const ix = alive ? (k.right ? 1 : 0) - (k.left ? 1 : 0) : 0
+    const iy = alive ? (k.down ? 1 : 0) - (k.up ? 1 : 0) : 0
+    p.vx += ix * 1700 * dt
+    p.vy += iy * 1500 * dt
+    p.vx *= Math.exp(-3 * dt)
+    p.vy *= Math.exp(-3.5 * dt)
+    const sp = Math.hypot(p.vx, p.vy)
+    if (sp > 430) {
+      p.vx *= 430 / sp
+      p.vy *= 430 / sp
+    }
+    p.x += p.vx * dt
+    p.y += p.vy * dt
+    if (p.x < 60 || p.x > WORLD - 60) p.vx *= -0.3
+    if (p.y < 70 || p.y > 330) p.vy *= -0.3
+    p.x = clamp(p.x, 60, WORLD - 60)
+    p.y = clamp(p.y, 70, 330)
+    if (ix) p.face = ix
+    p.tilt = approach(p.tilt, p.vx / 430 * 0.3, 8, dt)
+    p.inv = Math.max(0, p.inv - dt)
+    p.hurt = Math.max(0, p.hurt - dt)
+    p.laserCd -= dt
+
+    if (this.ending && !this.ending.won) {
+      // crashing: spin and smoke
+      p.vy += 300 * dt
+      p.tilt += dt * 6
+      if (Math.random() < dt * 30) fx.add({ x: p.x, y: p.y, vx: rand(-30, 30), vy: -40, life: 1.2, size: 18, color: '#444', type: 'smoke', drag: 1 })
+    }
+
+    // tractor beam
+    const wantBeam = alive && k.action
+    if (p.overheat && p.energy > 0.35) p.overheat = false
+    p.beaming = wantBeam && !p.overheat && p.energy > 0
+    if (p.beaming) {
+      p.energy -= 0.2 * dt
+      if (p.energy <= 0) {
+        p.energy = 0
+        p.overheat = true
+        fx.text(p.x, p.y - 50, 'Beam recharging...', '#9fffd0', 18)
+      }
+      if (Math.random() < dt * 30) {
+        fx.add({ x: p.x + rand(-60, 60), y: GROUND - 4, vy: rand(-220, -120), life: 1, size: rand(2, 4), color: '#bfffe0', type: 'glow', drag: 0.5 })
+      }
+    } else {
+      p.energy = Math.min(1, p.energy + 0.28 * dt)
+    }
+    beamOn(p.beaming)
+
+    if (alive && this.pressed.has('fire') && p.laserCd <= 0) {
+      p.laserCd = 0.28
+      this.bolts.push({ x: p.x + p.face * 50, y: p.y + 4, vx: p.face * 950 + p.vx * 0.3, life: 0.9 })
+      fx.burst(p.x + p.face * 50, p.y + 4, 5, { speed: 120, life: 0.25, size: 4, color: '#9fffd0', type: 'spark' })
+      sfx.laser()
+    }
+
+    // dinos
+    for (const d of this.dinos) {
+      if (d.state === 'gone') continue
+      if (d.state === 'walk') this.dinoWander(d, dt, p.beaming ? 260 : 170, p)
+      if (d.state === 'lifted' && d.liftedBy === p) {
+        if (!p.beaming || !inBeam(p.x, p.y, d.x, d.y - 30)) {
+          d.state = 'fall'
+          d.liftedBy = null
+          d.vy = 0
+          d.vx = 0
+        } else {
+          d.y -= 150 * d.lift * dt
+          d.x = approach(d.x, p.x, 3, dt)
+          if (Math.random() < dt * 20) fx.add({ x: d.x + rand(-20, 20), y: d.y - 20, vy: 60, life: 0.5, size: 3, color: '#bfffe0', type: 'glow' })
+          if (d.y - 30 < p.y + 12) this.captureDino(d)
+        }
+      } else if (p.beaming && (d.state === 'walk' || d.state === 'fall') && inBeam(p.x, p.y, d.x, d.y - 30)) {
+        d.state = 'lifted'
+        d.liftedBy = p
+        sfx.squeak()
+        fx.text(d.x, d.y - 80, pick(['Eek!', 'Help!', 'Noooo!', 'Whoa!']), '#fff', 18)
+      }
+      d.physics(dt, fx)
+    }
+
+    // eggs hatch new dinos so there are always some to catch
+    const living = this.dinos.filter((d) => d.state !== 'gone').length + this.eggs.length
+    if (living < 7 && Math.random() < dt * 0.8) {
+      let x = rand(150, WORLD - 150)
+      if (Math.abs(x - p.x) < 300) x = clamp(x + 600, 150, WORLD - 150)
+      this.eggs.push({ x, t: 0 })
+    }
+    for (const egg of this.eggs) {
+      egg.t += dt
+      if (egg.t > 2) {
+        egg.done = true
+        const d = new Dino(egg.x, pick(KIND_LIST))
+        d.squash = 1
+        this.dinos.push(d)
+        fx.burst(egg.x, GROUND - 14, 14, { speed: 200, life: 0.6, size: 5, color: ['#fff3d6', '#7ccf73'], type: 'debris', g: 900, up: 150 })
+        fx.text(egg.x, GROUND - 60, 'Hatch!', '#fff3a0', 18)
+        sfx.hatch()
+      }
+    }
+    this.eggs = this.eggs.filter((e) => !e.done)
+    this.dinos = this.dinos.filter((d) => d.state !== 'gone')
+
+    // enemy UFOs
+    for (const e of this.enemies) this.enemyAliensAI(e, dt)
+    this.updateShots(dt)
+    this.enemies = this.enemies.filter((e) => !e.dead)
+    for (const r of this.enemyRespawn) r.t -= dt
+    for (let i = this.enemyRespawn.filter((r) => r.t <= 0).length; i > 0; i--) {
+      this.enemies.push(new Saucer(Math.random() < 0.5 ? this.cam.x - W / 2 - 100 : this.cam.x + W / 2 + 100, -60))
+      fx.text(clamp(p.x, 100, WORLD - 100), 90, 'Rival UFO incoming!', '#ff8fa0', 20)
+    }
+    this.enemyRespawn = this.enemyRespawn.filter((r) => r.t > 0)
+
+    // wave cleared?
+    if (alive && this.captured >= this.goal) {
+      if (this.wave >= WAVES) this.finish(true)
+      else this.nextWave()
+    }
+  }
+
+  dinoWander(d, dt, fearRange, ufo) {
+    d.think -= dt
+    const threats = [ufo, ...(this.enemies || [])].filter((u) => u && Math.abs(u.x - d.x) < fearRange && (u.beaming || u === ufo))
+    if (threats.length) {
+      const u = threats[0]
+      const dir = Math.sign(d.x - u.x) || 1
+      d.target = d.x + dir * 300
+      d.scared = 0.5
+      if (Math.random() < dt * 0.6 && d.y >= GROUND) {
+        d.state = 'fall'
+        d.vy = -420
+        d.vx = dir * 160
+      }
+    } else if (d.think <= 0) {
+      d.think = rand(1.5, 4)
+      d.target = clamp(d.x + rand(-300, 300), 60, WORLD - 60)
+    }
+    const fast = d.kind === 'raptor' ? 1.5 : d.kind === 'bronto' ? 0.7 : 1
+    const speed = (d.scared > 0 ? 190 : 60) * fast
+    const want = Math.abs(d.target - d.x) > 10 ? Math.sign(d.target - d.x) * speed : 0
+    d.vx = approach(d.vx, want, 6, dt)
+    if (d.state === 'walk') d.x += d.vx * dt
+    if (Math.abs(d.vx) > 5) d.face = Math.sign(d.vx)
+    d.walk += Math.abs(d.vx) * dt * 0.09
+  }
+
+  captureDino(d) {
+    const fx = this.fx
+    d.state = 'gone'
+    this.captured++
+    const pts = d.kind === 'bronto' ? 200 : 100
+    this.score += pts
+    fx.burst(this.ufo.x, this.ufo.y, 22, { speed: 260, life: 0.7, size: 7, color: ['#7dffb0', '#fff', '#ffe14a'], type: 'star' })
+    fx.ring(this.ufo.x, this.ufo.y, 90, '#7dffb0')
+    fx.text(this.ufo.x, this.ufo.y - 50, `+${pts}  ${this.captured}/${this.goal}`, '#7dffb0', 24)
+    sfx.capture()
+  }
+
+  enemyAliensAI(e, dt) {
+    const fx = this.fx
+    const p = this.ufo
+    e.hurt = Math.max(0, e.hurt - dt)
+    e.stun = Math.max(0, e.stun - dt)
+    e.shootCd -= dt
+    const valid = (d) => d && d.state !== 'gone' && !(d.state === 'lifted' && d.liftedBy !== e)
+    if (!valid(e.target)) {
+      e.target = null
+      let best = 1e9
+      for (const d of this.dinos) {
+        if (!valid(d) || d.state === 'lifted') continue
+        const dist = Math.abs(d.x - e.x)
+        if (dist < best) {
+          best = dist
+          e.target = d
+        }
+      }
+    }
+    const fast = 1 + (this.wave - 1) * 0.25
+    let tx = e.target ? e.target.x : p.x + 250
+    let ty = e.hoverY
+    if (e.stun > 0) {
+      tx = e.x
+      ty = e.y
+    }
+    e.vx = approach(e.vx, clamp((tx - e.x) * 2.5, -200 * fast, 200 * fast), 2.5, dt)
+    e.vy = approach(e.vy, clamp((ty - e.y) * 2.5, -180, 180), 2.5, dt)
+    e.x += e.vx * dt
+    e.y += e.vy * dt
+    e.tilt = approach(e.tilt, (e.vx / 300) * 0.3, 6, dt)
+
+    // beam the target once hovering over it
+    const over = e.target && Math.abs(e.target.x - e.x) < 30 && e.stun <= 0 && Math.abs(e.y - e.hoverY) < 40
+    e.timer = over ? e.timer + dt : 0
+    e.beaming = e.timer > 0.6
+    const d = e.target
+    if (e.beaming && d) {
+      if (d.state !== 'lifted' && inBeam(e.x, e.y, d.x, d.y - 30)) {
+        d.state = 'lifted'
+        d.liftedBy = e
+        sfx.squeak()
+      }
+      if (d.state === 'lifted' && d.liftedBy === e) {
+        d.y -= 85 * d.lift * dt
+        d.x = approach(d.x, e.x, 3, dt)
+        if (d.y - 30 < e.y + 12) {
+          d.state = 'gone'
+          this.stolen++
+          e.target = null
+          e.timer = 0
+          fx.burst(e.x, e.y, 16, { speed: 200, life: 0.6, size: 6, color: ['#ff6b8a', '#ffe14a'], type: 'star' })
+          fx.text(e.x, e.y - 50, 'Stolen!', '#ff8fa0', 22)
+          sfx.stolen()
+        }
+      }
+    } else if (d && d.state === 'lifted' && d.liftedBy === e) {
+      this.dropDino(d)
+    }
+
+    // shoot plasma at the player
+    const dx = p.x - e.x
+    const dy = p.y - e.y
+    const dist = Math.hypot(dx, dy)
+    if (!this.ending && e.shootCd <= 0 && dist < 560 && e.stun <= 0) {
+      e.shootCd = rand(2, 3.2) - (this.wave - 1) * 0.4
+      const s = 230 + this.wave * 25
+      this.plasma.push({ x: e.x, y: e.y + 8, vx: (dx / dist) * s, vy: (dy / dist) * s, life: 3.5 })
+      fx.ring(e.x, e.y + 8, 30, '#ff6b8a', 0.3, 4)
+      sfx.plasma()
+    }
+  }
+
+  dropDino(d) {
+    d.state = 'fall'
+    d.liftedBy = null
+    d.vy = 0
+    d.vx = 0
+  }
+
+  updateShots(dt) {
+    const fx = this.fx
+    const p = this.ufo
+    for (const b of this.bolts) {
+      b.x += b.vx * dt
+      b.life -= dt
+      for (const e of this.enemies) {
+        if (e.dead || b.life <= 0) continue
+        if (Math.abs(b.x - e.x) < 58 && Math.abs(b.y - e.y) < 26) {
+          b.life = 0
+          this.damageEnemy(e, Math.sign(b.vx))
+        }
+      }
+    }
+    this.bolts = this.bolts.filter((b) => b.life > 0)
+    for (const s of this.plasma) {
+      s.x += s.vx * dt
+      s.y += s.vy * dt
+      s.life -= dt
+      if (Math.random() < dt * 30) fx.add({ x: s.x, y: s.y, life: 0.3, size: 12, color: 'rgba(255,90,140,0.8)', type: 'glow' })
+      if (s.y > GROUND) {
+        s.life = 0
+        fx.burst(s.x, GROUND, 8, { speed: 150, life: 0.4, size: 4, color: '#ff8fb0', type: 'spark', up: 100 })
+      }
+      if (!this.ending && p.inv <= 0 && Math.hypot(s.x - p.x, s.y - p.y) < 40) {
+        s.life = 0
+        p.hp--
+        p.inv = 1.4
+        p.hurt = 0.2
+        p.vx += s.vx * 0.8
+        p.vy += s.vy * 0.8
+        this.shake = 14
+        this.flash = 0.5
+        fx.burst(p.x, p.y, 18, { speed: 300, life: 0.5, size: 5, color: ['#ff8fb0', '#fff'], type: 'spark' })
+        fx.text(p.x, p.y - 50, p.hp > 0 ? 'Ouch!' : 'Mayday!', '#ff8fa0', 24)
+        sfx.hurt()
+        if (p.hp <= 0) this.finish(false)
+      }
+    }
+    this.plasma = this.plasma.filter((s) => s.life > 0)
+  }
+
+  damageEnemy(e, dir) {
+    const fx = this.fx
+    e.hp--
+    e.hurt = 0.15
+    e.stun = 0.7
+    e.vx += dir * 260
+    e.timer = 0
+    if (e.target && e.target.state === 'lifted' && e.target.liftedBy === e) this.dropDino(e.target)
+    fx.burst(e.x, e.y, 14, { speed: 260, life: 0.4, size: 5, color: ['#ffe14a', '#fff'], type: 'spark' })
+    sfx.hit()
+    this.shake = Math.max(this.shake, 5)
+    if (e.hp <= 0) {
+      e.dead = true
+      fx.boom(e.x, e.y)
+      fx.text(e.x, e.y - 40, '+250', '#ffe14a', 28)
+      this.score += 250
+      this.shake = 18
+      this.slowmo = 0.25
+      sfx.boom()
+      this.enemyRespawn.push({ t: 6 })
+    }
+  }
+
+  nextWave() {
+    this.wave++
+    this.captured = 0
+    this.goal = 4 + this.wave * 2
+    this.banner = { text: `WAVE ${this.wave}`, sub: `Beam up ${this.goal} dinos! More rivals!`, t: 0 }
+    this.ufo.hp = Math.min(this.ufo.maxHp, this.ufo.hp + 1)
+    this.enemyRespawn.push({ t: 2 })
+    sfx.wave()
+  }
+
+  // ---------- DINOS mode: you are the T. rex ----------
+
+  setupDinos() {
+    this.rex = { x: 700, y: GROUND, vx: 0, vy: 0, face: 1, walk: 0, onGround: true, lives: 3, roarCd: 0, roarT: 0, liftedBy: null, inv: 0, squash: 0 }
+    this.babies = ['trike', 'stego', 'raptor', 'bronto'].map((kind, i) => {
+      const b = new Dino(560 + i * 90, kind, 0.55)
+      b.offset = [-170, -90, 90, 170][i]
+      return b
+    })
+    this.ufos = []
+    this.waveTime = 35
+    this.ufoSpawn = 1
+    this.ufoQuota = 2
+  }
+
+  updateDinos(dt) {
+    const r = this.rex
+    const fx = this.fx
+    const k = this.keys
+    const alive = !this.ending
+
+    r.inv = Math.max(0, r.inv - dt)
+    r.roarCd = Math.max(0, r.roarCd - dt)
+    r.roarT = Math.max(0, r.roarT - dt)
+    r.squash = Math.max(0, r.squash - dt * 4)
+
+    if (r.liftedBy) {
+      const u = r.liftedBy
+      // wiggle to struggle, but only a roar breaks free
+      r.y -= 52 * dt
+      r.x = approach(r.x, u.x + (k.left ? -10 : 0) + (k.right ? 10 : 0), 3, dt)
+      r.vx = 0
+      r.vy = 0
+      if (!u.beaming || u.state !== 'beam') this.releaseRex()
+      else if (!this.ending && r.y - 80 < u.y + 10) this.rexCaught(u)
+    } else {
+      const ix = alive ? (k.right ? 1 : 0) - (k.left ? 1 : 0) : 0
+      r.vx = approach(r.vx, ix * 300, r.onGround ? 8 : 3, dt)
+      if (ix) r.face = ix
+      if (alive && (this.pressed.has('up') || this.pressed.has('fire')) && r.onGround) {
+        r.vy = -640
+        r.onGround = false
+        r.squash = 0.6
+        fx.dust(r.x, GROUND, 6)
+        sfx.jump()
+      }
+      r.vy += 1700 * dt
+      r.x += r.vx * dt
+      r.y += r.vy * dt
+      if (r.y >= GROUND) {
+        if (!r.onGround) {
+          r.squash = 1
+          fx.dust(r.x, GROUND, 10)
+          sfx.land()
+          if (r.vy > 400) this.shake = Math.max(this.shake, 4)
+        }
+        r.y = GROUND
+        r.vy = 0
+        r.onGround = true
+      }
+      r.x = clamp(r.x, 50, WORLD - 50)
+      r.walk += Math.abs(r.vx) * dt * 0.07
+      if (r.onGround && Math.abs(r.vx) > 200 && Math.random() < dt * 8) fx.dust(r.x - r.face * 20, GROUND, 1)
+    }
+
+    if (alive && this.pressed.has('action') && r.roarCd <= 0) this.roar()
+
+    // babies follow you around
+    for (const b of this.babies) {
+      if (b.state === 'gone') continue
+      if (b.state === 'walk') {
+        b.think -= dt
+        if (b.think <= 0) {
+          b.think = rand(1, 3)
+          b.offset = clamp(b.offset + rand(-60, 60), -220, 220)
+        }
+        b.target = clamp(r.x + b.offset, 60, WORLD - 60)
+        const want = Math.abs(b.target - b.x) > 14 ? Math.sign(b.target - b.x) * Math.min(260, Math.abs(b.target - b.x) * 2) : 0
+        b.vx = approach(b.vx, want, 5, dt)
+        b.x += b.vx * dt
+        if (Math.abs(b.vx) > 5) b.face = Math.sign(b.vx)
+        b.walk += Math.abs(b.vx) * dt * 0.12
+      }
+      b.physics(dt, fx)
+    }
+
+    // leaves to munch for points and a quick roar refill
+    if (this.pickups.length < 4 && Math.random() < dt * 0.5) this.pickups.push({ x: rand(100, WORLD - 100), t: 0 })
+    for (const lf of this.pickups) {
+      lf.t += dt
+      if (!r.liftedBy && Math.abs(lf.x - r.x) < 40 && r.y > GROUND - 120) {
+        lf.done = true
+        this.score += 25
+        r.roarCd = 0
+        fx.burst(lf.x, GROUND - 20, 12, { speed: 160, life: 0.5, size: 6, color: ['#6fdc4f', '#c8ff9a'], type: 'star' })
+        fx.text(lf.x, GROUND - 70, '+25  Roar ready!', '#c8ff9a', 18)
+        sfx.pickup()
+      }
+    }
+    this.pickups = this.pickups.filter((lf) => !lf.done)
+
+    // alien UFOs arrive over time
+    if (alive && this.waveTime > 0) {
+      this.ufoSpawn -= dt
+      const active = this.ufos.filter((u) => u.state !== 'leave' && u.state !== 'crash').length
+      if (this.ufoSpawn <= 0 && active < this.ufoQuota) {
+        this.ufoSpawn = rand(2, 4)
+        const side = Math.random() < 0.5 ? -1 : 1
+        this.ufos.push(new Saucer(clamp(this.cam.x + side * (W / 2 + 120), -100, WORLD + 100), rand(-80, -40)))
+      }
+    }
+    for (const u of this.ufos) this.ufoDinoAI(u, dt)
+    this.ufos = this.ufos.filter((u) => !u.dead)
+
+    if (alive) {
+      this.waveTime -= dt
+      if (this.waveTime <= 0) {
+        for (const u of this.ufos) this.ufoLeave(u)
+        this.releaseRex()
+        if (this.wave >= WAVES) this.finish(true)
+        else {
+          this.wave++
+          this.waveTime = 35
+          this.ufoQuota = this.wave + 1
+          this.ufoSpawn = 3
+          this.score += 500
+          this.banner = { text: `WAVE ${this.wave}`, sub: `You survived! +500. Now ${this.ufoQuota} UFOs at once!`, t: 0 }
+          sfx.wave()
+        }
+      }
+    }
+  }
+
+  ufoDinoAI(u, dt) {
+    const fx = this.fx
+    const r = this.rex
+    u.hurt = Math.max(0, u.hurt - dt)
+    u.timer += dt
+    const fast = 1 + (this.wave - 1) * 0.3
+    const babies = this.babies.filter((b) => b.state !== 'gone')
+
+    if (u.state === 'crash') {
+      u.vy += 700 * dt
+      u.x += u.vx * dt
+      u.y += u.vy * dt
+      u.tilt += dt * 9
+      if (Math.random() < dt * 40) fx.add({ x: u.x, y: u.y, vx: rand(-30, 30), vy: -50, life: 1, size: 16, color: '#555', type: 'smoke', drag: 1 })
+      if (u.y > GROUND - 10) {
+        u.dead = true
+        fx.boom(u.x, GROUND - 20)
+        this.shake = 20
+        this.slowmo = 0.3
+        sfx.boom()
+      }
+      return
+    }
+    if (u.state === 'leave') {
+      u.vy = approach(u.vy, -420, 2, dt)
+      u.y += u.vy * dt
+      u.x += u.vx * dt
+      u.beaming = false
+      if (u.y < -150) u.dead = true
+      return
+    }
+    if (u.state === 'stunned') {
+      u.beaming = false
+      u.vx *= Math.exp(-2 * dt)
+      u.vy *= Math.exp(-2 * dt)
+      u.x += u.vx * dt
+      u.y += u.vy * dt
+      u.stun = Math.max(0, u.stun - dt)
+      if (u.stun <= 0) {
+        u.state = 'hunt'
+        u.timer = 0
+      }
+      return
+    }
+
+    // pick who to chase: you or one of the babies
+    if (!u.target || u.target.state === 'gone' || (u.target !== r && u.target.state === 'lifted' && u.target.liftedBy !== u)) {
+      u.target = babies.length && Math.random() < 0.6 ? pick(babies) : r
+      u.state = 'hunt'
+      u.timer = 0
+    }
+    const t = u.target
+    const tx = t.x
+    const ty = u.state === 'beam' ? Math.min(u.hoverY, u.y) : u.hoverY
+    const maxV = (u.state === 'hunt' ? 210 : 70) * fast
+    u.vx = approach(u.vx, clamp((tx - u.x) * 2, -maxV, maxV), 2.5, dt)
+    u.vy = approach(u.vy, clamp((ty - u.y) * 2.5, -200, 200), 2.5, dt)
+    u.x += u.vx * dt
+    u.y += u.vy * dt
+    u.tilt = approach(u.tilt, (u.vx / 300) * 0.3, 6, dt)
+
+    if (u.state === 'hunt') {
+      u.beaming = false
+      if (Math.abs(tx - u.x) < 40 && u.y > 60 && u.timer > 1) {
+        u.state = 'charge'
+        u.timer = 0
+        sfx.warn()
+      }
+    } else if (u.state === 'charge') {
+      if (Math.floor(u.timer * 4) !== Math.floor((u.timer - dt) * 4)) sfx.warn()
+      if (u.timer > 0.9 - (this.wave - 1) * 0.15) {
+        u.state = 'beam'
+        u.timer = 0
+      }
+    } else if (u.state === 'beam') {
+      u.beaming = true
+      // grab anyone standing in the beam
+      if (!r.liftedBy && r.inv <= 0 && !this.ending && inBeam(u.x, u.y, r.x, r.y - 40)) {
+        r.liftedBy = u
+        r.onGround = false
+        fx.text(r.x, r.y - 110, 'ROAR to escape!', '#ffe14a', 22)
+        sfx.squeak()
+      }
+      for (const b of babies) {
+        if (b.state !== 'lifted' && inBeam(u.x, u.y, b.x, b.y - 20)) {
+          b.state = 'lifted'
+          b.liftedBy = u
+          fx.text(b.x, b.y - 60, 'Help!', '#fff', 18)
+          sfx.squeak()
+        }
+        if (b.state === 'lifted' && b.liftedBy === u) {
+          b.y -= 60 * b.lift * dt
+          b.x = approach(b.x, u.x, 3, dt)
+          if (b.y - 20 < u.y + 12) this.babyTaken(b, u)
+        }
+      }
+      if (u.timer > 6) this.ufoCool(u)
+    }
+  }
+
+  ufoCool(u) {
+    u.beaming = false
+    u.state = 'hunt'
+    u.timer = -1
+    for (const b of this.babies) if (b.liftedBy === u) this.dropDino(b)
+    if (this.rex.liftedBy === u) this.releaseRex()
+  }
+
+  ufoLeave(u) {
+    if (u.state === 'crash') return
+    this.ufoCool(u)
+    u.state = 'leave'
+    u.vx = rand(-100, 100)
+  }
+
+  babyTaken(b, u) {
+    const fx = this.fx
+    b.state = 'gone'
+    fx.burst(u.x, u.y, 16, { speed: 200, life: 0.6, size: 6, color: ['#ff6b8a', '#ffe14a'], type: 'star' })
+    fx.text(u.x, u.y - 50, 'Baby taken!', '#ff8fa0', 24)
+    this.shake = 8
+    sfx.stolen()
+    this.ufoLeave(u)
+    if (this.babies.every((x) => x.state === 'gone')) this.finish(false)
+  }
+
+  releaseRex() {
+    const r = this.rex
+    if (!r.liftedBy) return
+    r.liftedBy = null
+    r.vy = 0
+    r.onGround = false
+  }
+
+  rexCaught(u) {
+    const r = this.rex
+    const fx = this.fx
+    r.lives--
+    r.liftedBy = null
+    this.flash = 0.8
+    this.shake = 14
+    sfx.hurt()
+    fx.burst(r.x, r.y - 60, 20, { speed: 260, life: 0.6, size: 6, color: ['#ff8fb0', '#fff'], type: 'star' })
+    if (r.lives <= 0) {
+      this.finish(false)
+      r.liftedBy = u
+      return
+    }
+    // the aliens can't handle a grumpy T. rex, so they spit you back out
+    fx.text(r.x, r.y - 120, 'Spat back out!', '#ffe14a', 24)
+    r.inv = 2.5
+    r.vy = 200
+    this.ufoLeave(u)
+  }
+
+  roar() {
+    const r = this.rex
+    const fx = this.fx
+    r.roarCd = 0.85
+    r.roarT = 0.6
+    const hx = r.x + r.face * 36
+    const hy = r.y - 70
+    for (let i = 0; i < 3; i++) fx.add({ x: hx, y: hy, size: 340, color: i ? 'rgba(255,240,180,0.8)' : '#fff', type: 'ring', life: 0.5 + i * 0.12, width: 10 - i * 3 })
+    fx.burst(hx, hy, 14, { speed: 380, life: 0.4, size: 5, color: '#fff7c0', type: 'spark' })
+    fx.text(hx + r.face * 40, hy - 30, 'ROAR!', '#ffe14a', 30)
+    this.shake = Math.max(this.shake, 9)
+    sfx.roar()
+    let hits = 0
+    for (const u of this.ufos) {
+      if (u.state === 'leave' || u.state === 'crash') continue
+      if (Math.hypot(u.x - hx, u.y - hy) > 340) continue
+      hits++
+      this.ufoCool(u)
+      const dir = Math.sign(u.x - r.x) || 1
+      u.vx = dir * 520
+      u.vy = -280
+      u.hp--
+      u.hurt = 0.15
+      this.score += 50
+      fx.burst(u.x, u.y, 12, { speed: 220, life: 0.5, size: 6, color: '#ffe14a', type: 'star' })
+      if (u.hp <= 0) {
+        u.state = 'crash'
+        u.vy = -200
+        fx.text(u.x, u.y - 50, 'CRASH! +300', '#ffe14a', 26)
+        this.score += 300
+      } else {
+        u.state = 'stunned'
+        u.stun = 1.6
+        fx.text(u.x, u.y - 50, 'POW!', '#fff', 24)
+      }
+    }
+    if (hits) {
+      sfx.stun()
+      this.slowmo = Math.max(this.slowmo, 0.12)
+    }
+  }
+
+  // ---------- cutscenes ----------
+
+  startCutscene(name, onDone) {
+    beamOn(false)
+    this.scene = 'cutscene'
+    this.fx.list = []
+    this.cut = { name, t: 0, onDone, events: new Set(), ...CUTSCENES[name] }
+    this.cut.setup?.(this.cut, this)
+  }
+
+  skipCutscene() {
+    if (this.cut.t < 0.4) return
+    this.cut.t = this.cut.dur
+  }
+
+  updateCutscene(dt) {
+    const c = this.cut
+    if (this.pressed.has('enter') || this.pressed.has('pause') || this.pressed.has('action')) this.skipCutscene()
+    const prev = c.t
+    c.t += dt
+    // run each scripted event once, when the clock passes its time
+    for (const [at, fn] of c.script || []) {
+      if (prev < at && c.t >= at) fn(c, this)
+    }
+    c.update?.(c, this, dt)
+    if (c.t >= c.dur) {
+      this.fx.list = []
+      c.onDone()
+    }
+  }
+
+  // ---------- drawing ----------
+
+  draw() {
+    const ctx = this.ctx
+    const dpr = this.canvas.width / W
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, W, H)
+    ctx.save()
+    if (this.shake > 0) ctx.translate(rand(-1, 1) * this.shake * 0.6, rand(-1, 1) * this.shake * 0.6)
+    if (this.scene === 'menu') this.drawMenu(ctx)
+    else if (this.scene === 'cutscene') this.drawCutscene(ctx)
+    else {
+      this.drawPlay(ctx)
+      if (this.scene === 'paused') this.drawPaused(ctx)
+      if (this.scene === 'over') this.drawOver(ctx)
+    }
+    ctx.restore()
+    if (this.flash > 0) {
+      ctx.fillStyle = `rgba(255,${this.side === 'aliens' ? 80 : 255},${this.side === 'aliens' ? 90 : 255},${this.flash * 0.5})`
+      ctx.fillRect(0, 0, W, H)
+    }
+    if (this.stopped) this.drawStopped(ctx)
+  }
+
+  // Draws the world through a camera: sky, parallax layers, the ground, then whatever `actors` draws.
+  drawWorld(ctx, theme, cam, actors) {
+    drawSky(ctx, theme, this.time)
+    ctx.save()
+    ctx.translate(W / 2, H / 2)
+    ctx.scale(cam.zoom, cam.zoom)
+    ctx.translate(-cam.x, -cam.y)
+    drawBackdrop(ctx, theme, cam.x, this.time)
+    drawGround(ctx, theme, cam.x, this.time)
+    actors()
+    this.fx.draw(ctx)
+    drawForeground(ctx, theme, cam.x, this.time)
+    ctx.restore()
+  }
+
+  drawPlay(ctx) {
+    const t = this.time
+    const theme = getTheme(this.side === 'aliens' ? 'aliens' : 'dinos')
+    this.drawWorld(ctx, theme, this.cam, () => {
+      if (this.side === 'aliens') this.drawAliensActors(ctx, t)
+      else this.drawDinosActors(ctx, t)
+    })
+    if (this.side === 'aliens') this.drawAliensHUD(ctx)
+    else this.drawDinosHUD(ctx)
+    this.drawEdgeArrows(ctx)
+    if (this.banner) this.drawBanner(ctx, this.banner)
+  }
+
+  drawAliensActors(ctx, t) {
+    const p = this.ufo
+    for (const egg of this.eggs) drawEgg(ctx, egg.x, GROUND, egg.t / 2, t)
+    for (const e of this.enemies) if (e.beaming) drawBeam(ctx, e.x, e.y + 10, GROUND, t, { enemy: true })
+    if (p.beaming) drawBeam(ctx, p.x, p.y + 12, GROUND, t, { power: 0.6 + p.energy * 0.4 })
+    for (const d of this.dinos) {
+      shadow(ctx, d.x, d.y, 34 * d.scale)
+      d.draw(ctx, t, { lookUp: Math.abs(p.x - d.x) < 200 })
+    }
+    for (const e of this.enemies) e.draw(ctx, t)
+    if (!(p.inv > 0 && Math.floor(t * 14) % 2 === 0)) {
+      ctx.save()
+      ctx.translate(p.x, p.y + Math.sin(t * 3) * 3)
+      drawUFO(ctx, { time: t, tilt: p.tilt, beam: p.beaming, hurt: p.hurt > 0, mood: this.ending && !this.ending.won ? 'dizzy' : 'happy' })
+      ctx.restore()
+    }
+    for (const b of this.bolts) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.strokeStyle = '#9fffd0'
+      ctx.lineWidth = 6
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(b.x, b.y)
+      ctx.lineTo(b.x - Math.sign(b.vx) * 40, b.y)
+      ctx.stroke()
+      ctx.strokeStyle = '#fff'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.restore()
+    }
+    for (const s of this.plasma) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 16)
+      g.addColorStop(0, '#fff')
+      g.addColorStop(0.4, '#ff5a8a')
+      g.addColorStop(1, 'rgba(255,60,120,0)')
+      ctx.fillStyle = g
+      circle(ctx, s.x, s.y, 16)
+      ctx.fill()
+      ctx.restore()
+    }
+  }
+
+  drawDinosActors(ctx, t) {
+    const r = this.rex
+    for (const lf of this.pickups) drawLeaf(ctx, lf.x, GROUND, t)
+    for (const u of this.ufos) {
+      if (u.state === 'charge') {
+        // warning: a thin flickering beam shows where it's about to grab
+        ctx.save()
+        ctx.globalAlpha = 0.4 + 0.4 * Math.sin(t * 30)
+        drawBeam(ctx, u.x, u.y + 10, GROUND, t, { enemy: true, width: 70, power: 0.35 })
+        ctx.restore()
+      }
+      if (u.beaming) drawBeam(ctx, u.x, u.y + 10, GROUND, t, { enemy: true })
+    }
+    for (const b of this.babies) {
+      if (b.state === 'gone') continue
+      shadow(ctx, b.x, GROUND, 22)
+      b.draw(ctx, t, { lookUp: this.ufos.some((u) => Math.abs(u.x - b.x) < 150) })
+    }
+    shadow(ctx, r.x, GROUND, 40 * clamp(1 - (GROUND - r.y) / 300, 0.3, 1))
+    if (!(r.inv > 0 && Math.floor(t * 12) % 2 === 0)) {
+      ctx.save()
+      ctx.translate(r.x, r.y)
+      if (r.liftedBy) ctx.rotate(Math.sin(t * 5) * 0.2)
+      const sq = Math.sin(r.squash * Math.PI) * 0.2
+      ctx.scale(r.face * 1.25 * (1 + sq), 1.25 * (1 - sq))
+      drawDino(ctx, 'rex', {
+        time: t,
+        walk: r.walk,
+        moving: r.onGround && Math.abs(r.vx) > 20,
+        roar: r.roarT > 0 ? Math.sin((r.roarT / 0.6) * Math.PI) : 0,
+        scared: !!r.liftedBy,
+        flail: !!r.liftedBy,
+        angry: r.roarT > 0,
+        blink: t % 3.7 < 0.12,
+      })
+      ctx.restore()
+    }
+    for (const u of this.ufos) u.draw(ctx, t)
+  }
+
+  drawEdgeArrows(ctx) {
+    // little arrows at the screen edge pointing at things you can't see
+    const list = this.side === 'aliens' ? this.enemies : this.ufos.filter((u) => u.state !== 'leave')
+    for (const e of list) {
+      const sx = e.x - this.cam.x + W / 2
+      if (sx > -20 && sx < W + 20) continue
+      const left = sx < 0
+      const y = clamp(e.y, 80, H - 80)
+      ctx.save()
+      ctx.translate(left ? 22 : W - 22, y)
+      ctx.scale(left ? -1 : 1, 1)
+      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(this.time * 8)
+      ctx.beginPath()
+      ctx.moveTo(10, 0)
+      ctx.lineTo(-8, -12)
+      ctx.lineTo(-8, 12)
+      ctx.closePath()
+      ctx.fillStyle = '#ff5a7a'
+      ctx.fill()
+      ctx.strokeStyle = INK
+      ctx.lineWidth = 2.5
+      ctx.stroke()
+      ctx.restore()
+    }
+  }
+
+  drawAliensHUD(ctx) {
+    const p = this.ufo
+    hudPanel(ctx, 14, 12, 250, 74)
+    text(ctx, 'SHIELD', 28, 34, 13, '#9fd8ff', 'left')
+    for (let i = 0; i < p.maxHp; i++) {
+      rrect(ctx, 92 + i * 32, 22, 26, 16, 5)
+      ctx.fillStyle = i < p.hp ? '#5ad1ff' : 'rgba(255,255,255,0.15)'
+      ctx.fill()
+    }
+    text(ctx, 'BEAM', 28, 66, 13, '#9fffd0', 'left')
+    bar(ctx, 92, 56, 154, 16, p.energy, p.overheat ? '#ff8f6b' : '#7dffb0')
+    hudPanel(ctx, W / 2 - 120, 12, 240, 74)
+    text(ctx, `Dinos ${this.captured} / ${this.goal}`, W / 2, 44, 24, '#fff')
+    text(ctx, `Wave ${this.wave} of ${WAVES}`, W / 2, 70, 14, '#c9c2ff')
+    hudPanel(ctx, W - 214, 12, 200, 74)
+    text(ctx, `${this.score}`, W - 114, 48, 28, '#ffe14a')
+    text(ctx, `Best ${this.best.aliens || 0}`, W - 114, 72, 13, '#c9c2ff')
+  }
+
+  drawDinosHUD(ctx) {
+    const r = this.rex
+    hudPanel(ctx, 14, 12, 250, 74)
+    text(ctx, 'LIVES', 28, 34, 13, '#ffb3c6', 'left')
+    for (let i = 0; i < 3; i++) text(ctx, '❤', 104 + i * 30, 37, 22, i < r.lives ? '#ff5a7a' : 'rgba(255,255,255,0.2)')
+    text(ctx, 'ROAR', 28, 66, 13, '#ffe14a', 'left')
+    bar(ctx, 92, 56, 154, 16, 1 - r.roarCd / 0.85, r.roarCd <= 0 ? '#ffe14a' : '#b89a3a')
+    hudPanel(ctx, W / 2 - 120, 12, 240, 74)
+    text(ctx, `${Math.max(0, Math.ceil(this.waveTime))}s left`, W / 2, 44, 24, this.waveTime < 6 ? '#ffe14a' : '#fff')
+    const babies = this.babies.filter((b) => b.state !== 'gone').length
+    text(ctx, `Wave ${this.wave} of ${WAVES}  ·  Babies safe: ${babies}`, W / 2, 70, 14, '#d5f5c8')
+    hudPanel(ctx, W - 214, 12, 200, 74)
+    text(ctx, `${this.score}`, W - 114, 48, 28, '#ffe14a')
+    text(ctx, `Best ${this.best.dinos || 0}`, W - 114, 72, 13, '#d5f5c8')
+  }
+
+  drawBanner(ctx, b) {
+    const a = b.t < 0.3 ? b.t / 0.3 : b.t > 2.2 ? (2.6 - b.t) / 0.4 : 1
+    const s = b.t < 0.3 ? 0.5 + easeOut(b.t / 0.3) * 0.5 : 1
+    ctx.save()
+    ctx.globalAlpha = clamp(a, 0, 1)
+    ctx.translate(W / 2, 200)
+    ctx.scale(s, s)
+    text(ctx, b.text, 0, 0, 64, '#ffe14a')
+    text(ctx, b.sub, 0, 44, 22, '#fff')
+    ctx.restore()
+  }
+
+  drawPaused(ctx) {
+    ctx.fillStyle = 'rgba(10,6,30,0.6)'
+    ctx.fillRect(0, 0, W, H)
+    text(ctx, 'PAUSED', W / 2, H / 2 - 10, 60, '#fff')
+    text(ctx, 'Press P, Space or tap to keep playing', W / 2, H / 2 + 36, 20, '#c9c2ff')
+  }
+
+  drawOver(ctx) {
+    const won = this.ending?.won
+    const a = clamp(this.overT * 3, 0, 1)
+    ctx.save()
+    ctx.globalAlpha = a
+    ctx.fillStyle = 'rgba(10,6,30,0.75)'
+    ctx.fillRect(0, 0, W, H)
+    const bounce = 1 + Math.sin(this.time * 3) * 0.03
+    ctx.save()
+    ctx.translate(W / 2, 140)
+    ctx.scale(bounce, bounce)
+    text(ctx, won ? 'YOU WIN!' : 'GAME OVER', 0, 0, 72, won ? '#ffe14a' : '#ff8fa0')
+    ctx.restore()
+    text(ctx, this.side === 'aliens' ? 'You played as the Aliens' : 'You played as the Dinos', W / 2, 200, 20, '#c9c2ff')
+    text(ctx, `Score: ${this.score}`, W / 2, 270, 44, '#fff')
+    text(ctx, this.newBest ? '★ New best score! ★' : `Best: ${this.best[this.side] || 0}`, W / 2, 320, 22, this.newBest ? '#ffe14a' : '#c9c2ff')
+    for (const [i, b] of this.overButtons().entries()) {
+      const hover = this.mouse.x > b.x && this.mouse.x < b.x + b.w && this.mouse.y > b.y && this.mouse.y < b.y + b.h
+      rrect(ctx, b.x, b.y + (hover ? -3 : 0), b.w, b.h, 28)
+      ctx.fillStyle = i === 0 ? '#ffe14a' : '#7dffb0'
+      ctx.fill()
+      ctx.lineWidth = 4
+      ctx.strokeStyle = INK
+      ctx.stroke()
+      text(ctx, b.label, b.x + b.w / 2, b.y + 36 + (hover ? -3 : 0), 22, INK, 'center', false)
+    }
+    text(ctx, 'Enter = play again   ·   Esc = menu', W / 2, 490, 15, '#a8a0d8')
+    ctx.restore()
+  }
+
+  drawStopped(ctx) {
+    const t = this.time
+    ctx.fillStyle = 'rgba(8,5,25,0.92)'
+    ctx.fillRect(0, 0, W, H)
+    ctx.save()
+    ctx.translate(W / 2 - 120, 250)
+    ctx.scale(-1.3, 1.3)
+    drawDino(ctx, 'rex', { time: t, blink: true })
+    ctx.restore()
+    ctx.save()
+    ctx.translate(W / 2 + 120, 190 + Math.sin(t * 2) * 6)
+    drawUFO(ctx, { time: t, mood: 'happy' })
+    ctx.restore()
+    text(ctx, "It's 18:15 — game time is over!", W / 2, 340, 34, '#ffe14a')
+    text(ctx, 'The aliens and dinos are going to sleep. See you tomorrow!', W / 2, 382, 20, '#fff')
+    text(ctx, 'Zzz...', W / 2 - 60 + Math.sin(t) * 6, 150 - ((t * 20) % 40), 26, '#c9c2ff')
+  }
+
+  drawMenu(ctx) {
+    const t = this.time
+    // split background: alien night on the left, dino day on the right
+    drawSky(ctx, getTheme('night'), t)
+    ctx.save()
+    ctx.beginPath()
+    ctx.moveTo(W / 2 + 40, 0)
+    ctx.lineTo(W, 0)
+    ctx.lineTo(W, H)
+    ctx.lineTo(W / 2 - 40, H)
+    ctx.clip()
+    drawSky(ctx, getTheme('dinos'), t)
+    ctx.restore()
+    ctx.save()
+    ctx.globalAlpha = 0.5
+    ctx.translate(0, 60)
+    drawBackdrop(ctx, getTheme('aliens'), W / 2 + Math.sin(t * 0.1) * 300, t)
+    ctx.restore()
+    this.fx.draw(ctx)
+
+    // bouncing title
+    const intro = easeOut(clamp(this.menuT / 0.8, 0, 1))
+    ctx.save()
+    ctx.translate(W / 2, 80 - (1 - intro) * 150)
+    ctx.rotate(Math.sin(t * 1.5) * 0.02)
+    const words = [
+      ['ALIENS', '#7dffb0', -190],
+      ['VS', '#ffe14a', 0],
+      ['DINOS', '#ffa94d', 180],
+    ]
+    for (const [i, [w, c, x]] of words.entries()) {
+      const s = 1 + Math.sin(t * 4 + i) * 0.04
+      ctx.save()
+      ctx.translate(x, Math.sin(t * 3 + i) * 4)
+      ctx.scale(s, s)
+      ctx.font = `900 ${i === 1 ? 44 : 64}px ${FONT}`
+      ctx.textAlign = 'center'
+      ctx.lineWidth = 10
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = INK
+      ctx.strokeText(w, 0, 20)
+      ctx.fillStyle = c
+      ctx.fillText(w, 0, 20)
+      ctx.restore()
+    }
+    ctx.restore()
+    text(ctx, 'Choose your side!', W / 2, 148, 22, '#fff')
+
+    for (const [i, c] of this.menuCards().entries()) {
+      const sel = this.menuPick === i
+      const pop = easeOut(clamp((this.menuT - 0.2 - i * 0.15) / 0.5, 0, 1))
+      ctx.save()
+      ctx.translate(c.x + c.w / 2, c.y + c.h / 2 + (1 - pop) * 400)
+      const s = sel ? 1.04 + Math.sin(t * 5) * 0.01 : 0.96
+      ctx.scale(s, s)
+      if (sel) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.shadowColor = i === 0 ? '#7dffb0' : '#ffa94d'
+        ctx.shadowBlur = 30
+        rrect(ctx, -c.w / 2, -c.h / 2, c.w, c.h, 22)
+        ctx.fillStyle = 'rgba(255,255,255,0.08)'
+        ctx.fill()
+        ctx.restore()
+      }
+      rrect(ctx, -c.w / 2, -c.h / 2, c.w, c.h, 22)
+      const g = ctx.createLinearGradient(0, -c.h / 2, 0, c.h / 2)
+      if (i === 0) {
+        g.addColorStop(0, '#2a1a5e')
+        g.addColorStop(1, '#5a2a7a')
+      } else {
+        g.addColorStop(0, '#5fbfff')
+        g.addColorStop(1, '#ffe3a6')
+      }
+      ctx.fillStyle = g
+      ctx.fill()
+      ctx.lineWidth = sel ? 6 : 4
+      ctx.strokeStyle = sel ? (i === 0 ? '#7dffb0' : '#ffa94d') : INK
+      ctx.stroke()
+      ctx.save()
+      rrect(ctx, -c.w / 2, -c.h / 2, c.w, c.h, 22)
+      ctx.clip()
+      ctx.fillStyle = i === 0 ? '#3b5a4a' : '#62c047'
+      ctx.fillRect(-c.w / 2, 50, c.w, 100)
+      if (i === 0) {
+        // UFO beaming up a dino
+        const bx = Math.sin(t * 1.3) * 50
+        drawBeam(ctx, bx, -60, 50, t, { width: 50 })
+        ctx.save()
+        ctx.translate(bx, 30 - ((t * 25) % 60))
+        ctx.rotate(Math.sin(t * 5) * 0.2)
+        ctx.scale(0.6, 0.6)
+        drawDino(ctx, 'trike', { time: t, flail: true, scared: true })
+        ctx.restore()
+        ctx.save()
+        ctx.translate(bx, -70 + Math.sin(t * 3) * 4)
+        drawUFO(ctx, { time: t, beam: true, mood: 'happy' })
+        ctx.restore()
+        ctx.save()
+        ctx.translate(120, -90 + Math.sin(t * 2) * 6)
+        ctx.scale(0.5, 0.5)
+        drawUFO(ctx, { time: t, enemy: true })
+        ctx.restore()
+      } else {
+        // roaring T. rex scaring a UFO
+        const roar = Math.max(0, Math.sin(t * 2))
+        ctx.save()
+        ctx.translate(-50, 52)
+        ctx.scale(1.1, 1.1)
+        drawDino(ctx, 'rex', { time: t, roar, angry: roar > 0.3, walk: t * 4, moving: false })
+        ctx.restore()
+        if (roar > 0.3) {
+          ctx.strokeStyle = `rgba(255,255,255,${roar * 0.7})`
+          ctx.lineWidth = 4
+          for (let k = 0; k < 3; k++) {
+            ctx.beginPath()
+            ctx.arc(-10, -30, 30 + k * 22 + roar * 10, -0.8, 0.4)
+            ctx.stroke()
+          }
+        }
+        ctx.save()
+        ctx.translate(100 + roar * 20, -80 - roar * 10)
+        ctx.scale(0.6, 0.6)
+        drawUFO(ctx, { time: t, enemy: true, stun: roar > 0.5 })
+        ctx.restore()
+        ctx.save()
+        ctx.translate(70, 52)
+        ctx.scale(-0.45, 0.45)
+        drawDino(ctx, 'stego', { time: t, lookUp: true })
+        ctx.restore()
+      }
+      ctx.restore()
+      text(ctx, i === 0 ? 'ALIENS' : 'DINOS', 0, -c.h / 2 + 40, 32, i === 0 ? '#7dffb0' : '#fff7d0')
+      text(ctx, i === 0 ? 'Fly a UFO and beam up dinos!' : 'Roar the UFOs away!', 0, c.h / 2 - 40, 17, '#fff')
+      text(ctx, i === 0 ? 'Watch out for enemy aliens!' : "Don't get picked up!", 0, c.h / 2 - 18, 15, i === 0 ? '#ffb3c6' : INK, 'center', i === 0)
+      ctx.restore()
+    }
+    text(ctx, '← → to pick · Enter or tap to play', W / 2, 490, 16, '#fff')
+    text(ctx, `Game stops at ${String(STOP_AT.h).padStart(2, '0')}:${String(STOP_AT.m).padStart(2, '0')}`, W / 2, 516, 13, 'rgba(255,255,255,0.7)')
+  }
+
+  drawCutscene(ctx) {
+    const c = this.cut
+    c.draw(ctx, c, this)
+    // fade in and out of each shot
+    for (const cut of c.cuts || []) {
+      const d = Math.abs(c.t - cut)
+      if (d < 0.3) {
+        ctx.fillStyle = `rgba(0,0,0,${1 - d / 0.3})`
+        ctx.fillRect(0, 0, W, H)
+      }
+    }
+    if (c.t < 0.4) {
+      ctx.fillStyle = `rgba(0,0,0,${1 - c.t / 0.4})`
+      ctx.fillRect(0, 0, W, H)
+    }
+    if (c.t > c.dur - 0.4) {
+      ctx.fillStyle = `rgba(0,0,0,${(c.t - (c.dur - 0.4)) / 0.4})`
+      ctx.fillRect(0, 0, W, H)
+    }
+    // movie letterbox bars
+    const bar = 56 * easeOut(clamp(c.t / 0.6, 0, 1))
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, W, bar)
+    ctx.fillRect(0, H - bar, W, bar)
+    const cap = (c.captions || []).find(([a, b]) => c.t >= a && c.t < b)
+    if (cap) {
+      const shown = Math.floor((c.t - cap[0]) * 40)
+      const words = cap[2].slice(0, shown)
+      text(ctx, words, W / 2, H - 22, 22, '#fff', 'center', false)
+    }
+    ctx.globalAlpha = 0.6
+    text(ctx, 'Enter / tap to skip ▸▸', W - 16, 34, 13, '#fff', 'right', false)
+    ctx.globalAlpha = 1
+  }
+}
+
+// ---------- little drawing helpers ----------
+
+function shadow(ctx, x, y, w) {
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'
+  ctx.beginPath()
+  ctx.ellipse(x, GROUND + 2, w, w * 0.22, 0, 0, TAU)
+  ctx.fill()
+}
+
+function text(ctx, str, x, y, size, color, align = 'center', outline = true) {
+  ctx.font = `900 ${size}px ${FONT}`
+  ctx.textAlign = align
+  ctx.lineJoin = 'round'
+  if (outline) {
+    ctx.lineWidth = Math.max(3, size / 5)
+    ctx.strokeStyle = INK
+    ctx.strokeText(str, x, y)
+  }
+  ctx.fillStyle = color
+  ctx.fillText(str, x, y)
+}
+
+function hudPanel(ctx, x, y, w, h) {
+  rrect(ctx, x, y, w, h, 14)
+  ctx.fillStyle = 'rgba(15,10,40,0.6)'
+  ctx.fill()
+  ctx.lineWidth = 2
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+  ctx.stroke()
+}
+
+function bar(ctx, x, y, w, h, f, color) {
+  rrect(ctx, x, y, w, h, h / 2)
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'
+  ctx.fill()
+  if (f > 0) {
+    rrect(ctx, x, y, Math.max(h, w * clamp(f, 0, 1)), h, h / 2)
+    ctx.fillStyle = color
+    ctx.fill()
+  }
+}
+
+// ---------- cutscene scripts ----------
+// Each cutscene draws itself from its clock `c.t`, so the same moment always looks the same.
+
+function camAt(x, y, zoom) {
+  return { x, y, zoom }
+}
+
+function spaceShot(ctx, game, t, drift = 0) {
+  ctx.fillStyle = '#05030f'
+  ctx.fillRect(0, 0, W, H)
+  drawSky(ctx, { sky: ['#05030f', '#0b0626', '#160a3a'], stars: 1 }, game.time)
+  // the dino planet
+  const px = W / 2 + drift
+  const py = H + 380
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  const glow = ctx.createRadialGradient(px, py, 540, px, py, 640)
+  glow.addColorStop(0, 'rgba(120,200,255,0.5)')
+  glow.addColorStop(1, 'rgba(120,200,255,0)')
+  ctx.fillStyle = glow
+  circle(ctx, px, py, 640)
+  ctx.fill()
+  ctx.restore()
+  circle(ctx, px, py, 560)
+  ctx.fillStyle = '#2f6fd0'
+  ctx.fill()
+  ctx.save()
+  circle(ctx, px, py, 560)
+  ctx.clip()
+  ctx.fillStyle = '#4fbf5a'
+  for (const [dx, dy, r] of [
+    [-260, -500, 120],
+    [-120, -540, 90],
+    [160, -520, 140],
+    [340, -440, 110],
+    [-420, -380, 100],
+    [40, -470, 70],
+  ]) {
+    circle(ctx, px + dx + t * 6, py + dy, r)
+    ctx.fill()
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  for (const [dx, dy, r] of [
+    [-200, -540, 30],
+    [100, -555, 40],
+    [300, -500, 26],
+  ]) {
+    circle(ctx, px + dx + t * 12, py + dy, r)
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
+const CUTSCENES = {
+  alienIntro: {
+    dur: 11,
+    cuts: [3.6, 7],
+    captions: [
+      [0.5, 3.4, '65 million years ago, a spaceship found a planet full of dinosaurs...'],
+      [3.8, 6.9, 'Your mission: beam them up for the Galactic Zoo!'],
+      [7.2, 9, 'Hold SPACE to beam. Arrow keys to fly.'],
+      [9, 11, 'But beware... rival aliens want them too! Press Z to zap them!'],
+    ],
+    draw(ctx, c, game) {
+      const t = c.t
+      const now = game.time
+      if (t < 3.6) {
+        spaceShot(ctx, game, t)
+        const mx = lerp(-300, W / 2, ease(seg(t, 0, 3.2)))
+        drawMothership(ctx, mx, 170, 0.8, now)
+      } else if (t < 7) {
+        const s = t - 3.6
+        spaceShot(ctx, game, t, -40)
+        const hatch = ease(seg(s, 0.2, 0.8))
+        drawMothership(ctx, W / 2, 170, 0.8 + s * 0.03, now, hatch)
+        const drop = ease(seg(s, 1, 3.2))
+        if (s > 0.9) {
+          ctx.save()
+          ctx.translate(W / 2 + Math.sin(s * 3) * 10 * drop, lerp(205, H - 40, drop))
+          const sc = lerp(0.5, 1.3, drop)
+          ctx.scale(sc, sc)
+          drawUFO(ctx, { time: now, tilt: Math.sin(s * 4) * 0.1, mood: 'happy' })
+          ctx.restore()
+        }
+      } else {
+        const s = t - 7
+        const cam = camAt(lerp(600, 680, ease(seg(s, 0, 4))), lerp(330, 300, seg(s, 0, 4)), lerp(1.5, 1.2, ease(seg(s, 0, 4))))
+        game.drawWorld(ctx, getTheme('aliens'), cam, () => {
+          const scared = s > 0.8
+          for (const [i, d] of c.dinos.entries()) {
+            shadow(ctx, d.x, GROUND, 30)
+            d.scared = scared ? 1 : 0
+            d.draw(ctx, now, { lookUp: scared, scared })
+            if (scared && s < 2.4) text(ctx, '!', d.x, GROUND - 100 - Math.sin(s * 10 + i) * 4, 34, '#ffe14a')
+          }
+          const swoop = ease(seg(s, 0.2, 1.4))
+          ctx.save()
+          ctx.translate(lerp(300, 620, swoop), lerp(-60, 230, swoop) + Math.sin(now * 3) * 4)
+          drawUFO(ctx, { time: now, tilt: (1 - swoop) * 0.5, mood: 'happy', beam: s > 1.5 })
+          ctx.restore()
+          if (s > 1.5 && s < 2.2) drawBeam(ctx, 620, 242, GROUND, now, { power: seg(s, 1.5, 1.7) })
+          const enemyIn = ease(seg(s, 2, 3))
+          if (s > 2) {
+            ctx.save()
+            ctx.translate(lerp(1200, 860, enemyIn), 200 + Math.sin(now * 2.5) * 5)
+            drawUFO(ctx, { time: now, enemy: true, tilt: (1 - enemyIn) * -0.4 })
+            ctx.restore()
+          }
+        })
+      }
+    },
+    setup(c) {
+      c.dinos = [new Dino(500, 'rex'), new Dino(620, 'trike'), new Dino(760, 'stego'), new Dino(880, 'raptor', 0.8)]
+      c.dinos[0].face = 1
+      c.dinos[2].face = -1
+    },
+    script: [
+      [0.3, () => sfx.whoosh()],
+      [4, () => sfx.select()],
+      [4.6, () => sfx.whoosh()],
+      [7.3, () => sfx.whoosh()],
+      [7.9, () => sfx.squeak()],
+      [9.2, () => sfx.plasma()],
+    ],
+  },
+
+  dinoIntro: {
+    dur: 11.5,
+    cuts: [3.6, 7],
+    captions: [
+      [0.5, 3.4, 'Long, long ago, in a peaceful valley...'],
+      [3.8, 6.9, '...the aliens came to steal the dinosaurs!'],
+      [7.2, 9.4, 'But they forgot about one thing...'],
+      [9.4, 11.5, 'You can ROAR! Press SPACE to roar, ↑ to jump.'],
+    ],
+    setup(c) {
+      c.babies = [new Dino(740, 'trike', 0.55), new Dino(800, 'stego', 0.55), new Dino(860, 'raptor', 0.55)]
+      c.babies.forEach((b) => (b.face = -1))
+    },
+    script: [
+      [3.8, () => sfx.whoosh()],
+      [5.4, () => sfx.warn()],
+      [5.6, () => sfx.squeak()],
+      [8.8, (c, game) => {
+        sfx.roar(true)
+        game.shake = 18
+        for (let i = 0; i < 4; i++) game.fx.add({ x: 700, y: 300, size: 500, color: '#fff', type: 'ring', life: 0.6 + i * 0.15, width: 12 - i * 2 })
+      }],
+      [9.1, () => sfx.stun()],
+    ],
+    draw(ctx, c, game) {
+      const t = c.t
+      const now = game.time
+      let theme = getTheme('dinos')
+      let cam = camAt(lerp(660, 720, t / 3.6), 340, 1.4)
+      if (t >= 3.6 && t < 7) {
+        theme = mixTheme('dinos', 'night', ease(seg(t, 3.6, 5)))
+        cam = camAt(720, lerp(300, 280, seg(t, 3.6, 7)), 1.05)
+      } else if (t >= 7) {
+        theme = getTheme('night')
+        const z = ease(seg(t, 7, 8.6))
+        cam = camAt(lerp(700, 660, z), lerp(290, 330, z), lerp(1, 1.9, z))
+        if (t > 9) cam = camAt(700, 300, lerp(1.9, 1.1, ease(seg(t, 9, 9.8))))
+      }
+      game.drawWorld(ctx, theme, cam, () => {
+        const night = t >= 3.6
+        const roar = t > 8.8 && t < 10 ? Math.sin(seg(t, 8.8, 10) * Math.PI) : 0
+        const knock = ease(seg(t, 8.8, 9.6))
+        // ufos
+        const ufos = [
+          [560, 0],
+          [840, 0.4],
+        ]
+        const ufoPos = ufos.map(([x, delay]) => {
+          const d = ease(seg(t, 3.8 + delay, 5.4 + delay))
+          const kx = x + (x < 700 ? -1 : 1) * knock * 260
+          return { x: kx, y: lerp(-80, 180, d) - knock * 120 }
+        })
+        // the baby being beamed
+        const beamOnNow = t > 5.6 && t < 8.8
+        if (beamOnNow) drawBeam(ctx, ufoPos[1].x, ufoPos[1].y + 10, GROUND, now, { enemy: true })
+        for (const [i, b] of c.babies.entries()) {
+          let y = GROUND - (night ? 0 : Math.abs(Math.sin(now * 5 + i)) * 14)
+          if (i === 1 && beamOnNow) y = GROUND - ease(seg(t, 5.6, 8.6)) * 120
+          if (i === 1 && t >= 8.8) y = Math.min(GROUND, GROUND - 120 + (t - 8.8) ** 2 * 900)
+          b.y = y
+          b.x = i === 1 && beamOnNow ? lerp(800, ufoPos[1].x, seg(t, 5.6, 6.5)) : b.x
+          b.state = i === 1 && beamOnNow ? 'lifted' : 'walk'
+          shadow(ctx, b.x, GROUND, 20)
+          b.draw(ctx, now, { lookUp: night, scared: night })
+        }
+        shadow(ctx, 640, GROUND, 44)
+        ctx.save()
+        ctx.translate(640, GROUND)
+        ctx.scale(1.3, 1.3)
+        const eating = !night ? Math.max(0, Math.sin(now * 4)) * 0.3 : 0
+        drawDino(ctx, 'rex', { time: now, roar: roar || eating, angry: t > 7.5, lookUp: night && t < 8.8 && !roar, blink: !night && now % 3 < 0.15 })
+        ctx.restore()
+        if (!night) drawLeaf(ctx, 690, GROUND - 60, now)
+        for (const [i, p] of ufoPos.entries()) {
+          if (t < 3.8) continue
+          ctx.save()
+          ctx.translate(p.x, p.y + Math.sin(now * 2.5 + i) * 4)
+          drawUFO(ctx, { time: now, enemy: true, stun: t > 8.8, tilt: knock * (i ? 0.8 : -0.8) * (1 - seg(t, 9.6, 10.5)) })
+          ctx.restore()
+        }
+      })
+    },
+  },
+
+  alienWin: {
+    dur: 9,
+    cuts: [4],
+    captions: [
+      [0.4, 3.9, 'Mission complete! What a fantastic dino collection!'],
+      [4.2, 9, 'The Galactic Zoo has amazing new friends. YOU WIN!'],
+    ],
+    script: [
+      [0.3, () => sfx.capture()],
+      [4, (c, game) => (game.fx.list = [])],
+      [4.6, () => sfx.whoosh()],
+      [6, () => sfx.firework()],
+      [6.6, () => sfx.firework()],
+      [7.2, () => sfx.firework()],
+    ],
+    update(c, game, dt) {
+      if (c.t > 4 && Math.random() < dt * 3) {
+        const x = rand(150, W - 150)
+        const y = rand(80, 260)
+        game.fx.burst(x, y, 40, { speed: 260, life: 1.2, size: 3, color: [pick(['#ff6b9a', '#7dffb0', '#ffe14a', '#6bb8ff'])], type: 'spark', g: 120, drag: 1.2 })
+      }
+    },
+    draw(ctx, c, game) {
+      const t = c.t
+      const now = game.time
+      if (t < 4) {
+        const rise = ease(seg(t, 0.4, 3.8))
+        const cam = camAt(640, lerp(330, 200, rise), lerp(1.4, 1.1, rise))
+        game.drawWorld(ctx, getTheme('aliens'), cam, () => {
+          const y = lerp(260, -60, rise)
+          ctx.save()
+          ctx.translate(640, y + Math.sin(now * 3) * 4)
+          // a glowing bubble full of happy captured dinos
+          circle(ctx, 0, 62, 50)
+          ctx.fillStyle = 'rgba(160,255,210,0.25)'
+          ctx.fill()
+          ctx.lineWidth = 3
+          ctx.strokeStyle = '#bfffe0'
+          ctx.stroke()
+          for (const [i, kind] of ['rex', 'trike', 'stego'].entries()) {
+            ctx.save()
+            ctx.translate(-26 + i * 26, 96 - Math.abs(Math.sin(now * 4 + i)) * 8)
+            ctx.scale(0.35, 0.35)
+            drawDino(ctx, kind, { time: now })
+            ctx.restore()
+          }
+          drawUFO(ctx, { time: now, mood: 'happy', beam: true })
+          ctx.restore()
+          if (Math.random() < 0.5) game.fx.add({ x: 640 + rand(-40, 40), y: y + 100, vy: 80, life: 0.8, size: 10, color: 'rgba(160,255,210,0.7)', type: 'glow' })
+        })
+      } else {
+        spaceShot(ctx, game, t, 60)
+        const s = t - 4
+        drawMothership(ctx, W / 2, 170, 0.85, now, 1 - seg(s, 2.6, 3.2))
+        const up = ease(seg(s, 0.2, 2.4))
+        ctx.save()
+        ctx.translate(W / 2 + Math.sin(s * 3) * 30 * (1 - up), lerp(H + 40, 210, up))
+        const sc = lerp(1.3, 0.3, up)
+        ctx.scale(sc, sc)
+        if (s < 2.5) drawUFO(ctx, { time: now, mood: 'happy' })
+        ctx.restore()
+        game.fx.draw(ctx)
+        text(ctx, '★ YOU WIN! ★', W / 2, 330 + Math.sin(now * 3) * 6, 56, '#ffe14a')
+      }
+    },
+  },
+
+  alienLose: {
+    dur: 8,
+    captions: [
+      [0.3, 3.4, 'Mayday! Mayday! Your UFO is going down!'],
+      [3.6, 8, 'The dinos are free... this time. GAME OVER'],
+    ],
+    script: [
+      [0.2, () => sfx.hurt()],
+      [2.4, (c, game) => {
+        sfx.boom()
+        game.shake = 22
+        game.fx.boom(660, GROUND - 20)
+      }],
+      [4.4, () => sfx.squeak()],
+    ],
+    update(c, game, dt) {
+      if (c.t < 2.4 && Math.random() < dt * 40) {
+        const f = ease(seg(c.t, 0.2, 2.4))
+        game.fx.add({ x: lerp(380, 660, f), y: lerp(140, GROUND - 20, f * f), vx: rand(-20, 20), vy: -30, life: 1.5, size: 20, color: '#555', type: 'smoke', drag: 1 })
+      }
+      if (c.t > 2.4 && Math.random() < dt * 8) game.fx.add({ x: 660 + rand(-20, 20), y: GROUND - 20, vy: -50, vx: rand(-10, 10), life: 2, size: 18, color: '#666', type: 'smoke', drag: 0.5 })
+    },
+    draw(ctx, c, game) {
+      const t = c.t
+      const now = game.time
+      const cam = camAt(lerp(520, 660, ease(seg(t, 0, 2.4))), lerp(270, 360, ease(seg(t, 0, 2.6))), lerp(1.1, 1.5, ease(seg(t, 2.4, 4))))
+      game.drawWorld(ctx, getTheme('aliens'), cam, () => {
+        if (t < 2.4) {
+          const f = ease(seg(t, 0.2, 2.4))
+          ctx.save()
+          ctx.translate(lerp(380, 660, f), lerp(140, GROUND - 20, f * f))
+          ctx.rotate(t * 7)
+          drawUFO(ctx, { time: now, mood: 'dizzy', hurt: Math.floor(now * 10) % 2 === 0 })
+          ctx.restore()
+        } else {
+          // the wreck and a dizzy little alien
+          ctx.save()
+          ctx.translate(660, GROUND - 6)
+          ctx.rotate(0.4)
+          ctx.globalAlpha = 0.9
+          drawUFO(ctx, { time: 0, mood: 'dizzy', tilt: 0 })
+          ctx.restore()
+          if (t > 4) drawAlien(ctx, 720, GROUND - 16 - Math.abs(Math.sin(now * 3)) * 3, { time: now, mood: 'dizzy' })
+          for (const [i, kind] of ['rex', 'trike', 'stego', 'raptor'].entries()) {
+            const x = [480, 560, 820, 900][i]
+            ctx.save()
+            ctx.translate(x, GROUND - Math.abs(Math.sin(now * 6 + i)) * 26 * seg(t, 3, 3.5))
+            ctx.scale(x < 660 ? 1 : -1, 1)
+            drawDino(ctx, kind, { time: now, walk: now * 6 })
+            ctx.restore()
+          }
+        }
+      })
+      if (t > 4.5) text(ctx, 'GAME OVER', W / 2, 150, 60, '#ff8fa0')
+    },
+  },
+
+  dinoWin: {
+    dur: 9,
+    captions: [
+      [0.3, 4, 'The aliens zoomed away in a panic!'],
+      [4.2, 9, 'The sun rises over a safe valley. YOU WIN!'],
+    ],
+    script: [
+      [0.4, () => sfx.whoosh()],
+      [3.2, (c, game) => {
+        sfx.roar(true)
+        game.shake = 10
+      }],
+      [5, () => sfx.win()],
+    ],
+    update(c, game, dt) {
+      if (c.t > 4 && Math.random() < dt * 6) game.fx.add({ x: rand(500, 900), y: GROUND - 80, vy: -70, vx: rand(-20, 20), life: 2, size: rand(18, 28), color: pick(['#ff5a7a', '#ff8fb0']), type: 'heart', drag: 0.5 })
+    },
+    draw(ctx, c, game) {
+      const t = c.t
+      const now = game.time
+      const theme = mixTheme('night', 'sunrise', ease(seg(t, 1, 6)))
+      const cam = camAt(700, lerp(270, 330, ease(seg(t, 0, 4))), lerp(1, 1.35, ease(seg(t, 2, 5))))
+      // the rising sun
+      const sunY = lerp(H + 80, 330, ease(seg(t, 1, 6)))
+      ctx.save()
+      drawSky(ctx, theme, now)
+      ctx.globalCompositeOperation = 'lighter'
+      const g = ctx.createRadialGradient(W / 2, sunY, 10, W / 2, sunY, 220)
+      g.addColorStop(0, 'rgba(255,240,170,0.9)')
+      g.addColorStop(0.3, 'rgba(255,190,90,0.5)')
+      g.addColorStop(1, 'rgba(255,150,60,0)')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, W, H)
+      ctx.restore()
+      ctx.save()
+      ctx.translate(W / 2, H / 2)
+      ctx.scale(cam.zoom, cam.zoom)
+      ctx.translate(-cam.x, -cam.y)
+      drawBackdrop(ctx, theme, cam.x, now)
+      drawGround(ctx, theme, cam.x, now)
+      for (let i = 0; i < 3; i++) {
+        const f = ease(seg(t, 0.2 + i * 0.3, 2.6 + i * 0.3))
+        ctx.save()
+        ctx.translate(lerp(560 + i * 140, 1100 + i * 120, f), lerp(170 + i * 20, -200, f))
+        ctx.scale(1 - f * 0.6, 1 - f * 0.6)
+        drawUFO(ctx, { time: now, enemy: true, mood: 'sad', tilt: 0.3 })
+        ctx.restore()
+      }
+      const roar = t > 3.2 && t < 4.4 ? Math.sin(seg(t, 3.2, 4.4) * Math.PI) : 0
+      shadow(ctx, 680, GROUND, 44)
+      ctx.save()
+      ctx.translate(680, GROUND - (t > 4.5 ? Math.abs(Math.sin(now * 4)) * 20 : 0))
+      ctx.scale(1.3, 1.3)
+      drawDino(ctx, 'rex', { time: now, roar, blink: now % 3 < 0.15 })
+      ctx.restore()
+      for (const [i, kind] of ['trike', 'stego', 'raptor', 'bronto'].entries()) {
+        const x = [560, 780, 840, 500][i]
+        ctx.save()
+        ctx.translate(x, GROUND - (t > 4 ? Math.abs(Math.sin(now * 6 + i)) * 24 : 0))
+        ctx.scale((x < 680 ? 1 : -1) * 0.55, 0.55)
+        drawDino(ctx, kind, { time: now, lookUp: t < 3 })
+        ctx.restore()
+      }
+      game.fx.draw(ctx)
+      drawForeground(ctx, theme, cam.x, now)
+      ctx.restore()
+      if (t > 5) text(ctx, '★ YOU WIN! ★', W / 2, 140 + Math.sin(now * 3) * 6, 56, '#ffe14a')
+    },
+  },
+
+  dinoLose: {
+    dur: 8,
+    captions: [
+      [0.3, 4, 'Oh no! The aliens beamed you up!'],
+      [4.2, 8, 'Off to the space zoo... GAME OVER'],
+    ],
+    script: [
+      [0.3, () => sfx.squeak()],
+      [4.3, () => sfx.whoosh()],
+    ],
+    draw(ctx, c, game) {
+      const t = c.t
+      const now = game.time
+      const cam = camAt(700, lerp(330, 240, ease(seg(t, 0, 4))), lerp(1.4, 1, ease(seg(t, 0, 4))))
+      game.drawWorld(ctx, getTheme('night'), cam, () => {
+        const zoom = ease(seg(t, 4.2, 5.4))
+        const ux = 700 + zoom * 500
+        const uy = 170 - zoom * 400
+        const lift = ease(seg(t, 0, 4))
+        if (t < 4.2) drawBeam(ctx, ux, uy + 10, GROUND, now, { enemy: true })
+        for (const [i, kind] of ['trike', 'stego'].entries()) {
+          ctx.save()
+          ctx.translate(560 + i * 300, GROUND)
+          ctx.scale((i ? -1 : 1) * 0.55, 0.55)
+          drawDino(ctx, kind, { time: now, lookUp: true, scared: true })
+          ctx.restore()
+        }
+        if (t < 4.2) {
+          ctx.save()
+          ctx.translate(lerp(700, ux, lift), lerp(GROUND, uy + 110, lift))
+          ctx.rotate(Math.sin(now * 5) * 0.25)
+          ctx.scale(1.1, 1.1)
+          drawDino(ctx, 'rex', { time: now, flail: true, scared: true })
+          ctx.restore()
+        }
+        ctx.save()
+        ctx.translate(ux, uy + Math.sin(now * 2.5) * 4)
+        drawUFO(ctx, { time: now, enemy: true, beam: t < 4.2, mood: 'happy' })
+        ctx.restore()
+      })
+      if (t > 5) text(ctx, 'GAME OVER', W / 2, 160, 60, '#ff8fa0')
+    },
+  },
+}
