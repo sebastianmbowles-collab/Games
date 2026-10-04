@@ -61,9 +61,15 @@ body.cine .hud,body.cine #objective,body.cine #cross,body.cine #touch,body.cine 
 #touch{position:fixed;inset:0;z-index:4;pointer-events:none}
 #stick{position:absolute;left:24px;bottom:calc(env(safe-area-inset-bottom,0px) + 30px);width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);pointer-events:auto}
 #knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,196,236,.75)}
-.tbtn{position:absolute;width:74px;height:74px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(255,111,200,.35);color:#fff;font:800 14px var(--f-display);pointer-events:auto;display:grid;place-items:center}
-#tJump{right:24px;bottom:calc(env(safe-area-inset-bottom,0px) + 60px)}
-#tPunch{right:110px;bottom:calc(env(safe-area-inset-bottom,0px) + 24px)}
+.tbtn{position:absolute;width:84px;height:84px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(255,111,200,.35);color:#fff;font:800 14px var(--f-display);pointer-events:auto;display:grid;place-items:center}
+#tJump{right:20px;bottom:calc(env(safe-area-inset-bottom,0px) + 70px)}
+#tPunch{right:116px;bottom:calc(env(safe-area-inset-bottom,0px) + 24px)}
+#tGlove{right:30px;bottom:calc(env(safe-area-inset-bottom,0px) + 170px);width:70px;height:70px;font-size:12px;background:rgba(176,127,255,.45)}
+#hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);z-index:5;pointer-events:none;display:flex;flex-wrap:wrap;justify-content:center;gap:6px 14px;max-width:calc(100% - 180px);background:var(--panel);border:1px solid var(--panel-line);border-radius:14px;padding:6px 14px;font:800 13px var(--f-body);transition:opacity .6s}
+#hint kbd{font:800 11px var(--f-body);background:rgba(255,255,255,.18);border-radius:5px;padding:1px 6px;margin-right:4px}
+body.cine #hint,body.title #hint{visibility:hidden}
+#pauseCtrls{font-size:13px}
+@media (max-width:760px),(max-height:420px){#hint{display:none!important}}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stat{background:var(--panel);border:1px solid var(--panel-line);border-radius:14px;padding:10px 6px}
 .stat b{display:block;font:800 28px var(--f-display);color:var(--pink);font-variant-numeric:tabular-nums}
@@ -111,6 +117,7 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
     <div class="chip">Keys <b id="hKeys">0</b>/10</div>
     <div class="chip">Gems <b id="hGems">0</b></div>
     <div class="chip">Kids <b id="hKids">0</b>/50</div>
+    <div class="chip">Night <b id="hNight">1</b></div>
   </div>
   <div>
     <div class="hearts" id="hHearts"></div>
@@ -125,11 +132,13 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 <div id="cinetext"></div>
 <button class="small" id="skip" hidden>Skip</button>
 <button class="small" id="muteBtn" hidden>Music: on</button>
+<div id="hint" hidden></div>
 
 <div id="touch" hidden>
   <div id="stick"><div id="knob"></div></div>
   <button class="tbtn" id="tJump">JUMP</button>
   <button class="tbtn" id="tPunch">PUNCH</button>
+  <button class="tbtn" id="tGlove" hidden>GLOVES</button>
 </div>
 
 <div id="fade"><span id="fadeText"></span></div>
@@ -165,17 +174,21 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
     <div class="sub" style="margin-top:6px">Controls</div>
     <div class="controls" id="ctrlDesk">
       <kbd>W A S D</kbd><span>Walk</span>
-      <kbd>Mouse</kbd><span>Look around</span>
-      <kbd>Space</kbd><span>Jump</span>
-      <kbd>Click</kbd><span>Punch (hold for a charge punch)</span>
+      <kbd>Mouse</kbd><span>Look around (or turn with the ← → arrow keys)</span>
+      <kbd>Space</kbd><span>Jump. Hold it while walking into a wall to climb</span>
+      <kbd>Click</kbd><span>Punch (or F). Hold for a charge punch</span>
+      <kbd>Click in the air</kbd><span>Ground slam</span>
+      <kbd>Right-click</kbd><span>Gravity gloves (or G), once you find them</span>
       <kbd>M</kbd><span>Music on or off</span>
       <kbd>Esc</kbd><span>Pause</span>
     </div>
     <div class="controls" id="ctrlTouch" hidden>
       <kbd>Left stick</kbd><span>Walk</span>
       <kbd>Drag</kbd><span>Look around</span>
-      <kbd>JUMP</kbd><span>Jump</span>
-      <kbd>PUNCH</kbd><span>Punch (hold for a charge punch)</span>
+      <kbd>JUMP</kbd><span>Jump. Hold it while walking into a wall to climb</span>
+      <kbd>PUNCH</kbd><span>Punch. Hold for a charge punch</span>
+      <kbd>PUNCH in the air</kbd><span>Ground slam</span>
+      <kbd>GLOVES</kbd><span>Gravity gloves, once you find them</span>
     </div>
     <button class="btn" data-close>Back</button>
   </div>
@@ -184,7 +197,9 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 <div class="screen" id="pauseScreen" hidden>
   <div class="card">
     <div class="logo" style="font-size:64px">Paused</div>
+    <div class="controls" id="pauseCtrls"></div>
     <button class="btn" id="resumeBtn">Keep dreaming</button>
+    <button class="small" id="quitBtn" style="justify-self:center">Back to the title screen</button>
   </div>
 </div>
 
@@ -197,7 +212,7 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
       <div class="stat"><b id="eGems">0</b><span>Gems</span></div>
       <div class="stat"><b id="eTime">0:00</b><span>Time</span></div>
     </div>
-    <p>Key 2 of 10 is yours. Tonight the world will shift again…</p>
+    <p id="eMsg">Key 2 of 10 is yours. Tonight the world will shift again…</p>
     <button class="btn" id="againBtn">Play again</button>
   </div>
 </div>
@@ -306,6 +321,8 @@ function hexIsland(r, x, top, z, color) {
 }
 
 // ---------- text notes (the dream self's hidden messages) ----------
+const messages = [];
+function addMessage(m, x, y, z) { messages.push({ m, x, y, z, found: false }); }
 function note(lines, w, h) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 300;
   const x = c.getContext('2d');
@@ -363,11 +380,21 @@ function drawing(paint, x, y, z, ry) {
   const m = mesh(new THREE.PlaneGeometry(.7, .7), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), side: THREE.DoubleSide }));
   const pivot = new THREE.Group(); pivot.position.set(x, y, z); pivot.rotation.y = ry; m.position.y = -.35; pivot.add(m); scene.add(pivot);
   drawings.push({ pivot, s: rand(0, 6) });
+  return pivot;
 }
 drawing(k => { k.strokeStyle = '#ff6fc8'; k.beginPath(); k.arc(64, 54, 26, 0, 7); k.stroke(); k.beginPath(); k.moveTo(64, 80); k.lineTo(64, 116); k.stroke(); }, -4.98, 3, 1.5, Math.PI / 2);
 drawing(k => { k.strokeStyle = '#5fc8ff'; k.strokeRect(30, 50, 68, 50); k.beginPath(); k.moveTo(24, 52); k.lineTo(64, 18); k.lineTo(104, 52); k.stroke(); }, -4.98, 3, -1, Math.PI / 2);
 drawing(k => { k.strokeStyle = '#ffb000'; k.beginPath(); for (let i = 0; i < 5; i++) { const a = i * 2.513 - 1.57; k.lineTo(64 + Math.cos(a) * 44, 64 + Math.sin(a) * 44); } k.closePath(); k.stroke(); }, 4.98, 3, 0, -Math.PI / 2);
 drawing(k => { k.strokeStyle = '#7a3fd0'; k.beginPath(); k.arc(44, 70, 16, 0, 7); k.arc(84, 70, 16, 0, 7); k.stroke(); k.fillStyle = '#7a3fd0'; k.fillRect(36, 30, 56, 8); }, -1.6, 3.1, -4.98, 0);
+// a new drawing appears after key 1 (the bedroom changes as the game goes on)
+const keyDrawing = drawing(k => { k.strokeStyle = '#ffb000'; k.beginPath(); k.arc(44, 64, 20, 0, 7); k.moveTo(64, 64); k.lineTo(112, 64); k.moveTo(100, 64); k.lineTo(100, 84); k.moveTo(88, 64); k.lineTo(88, 78); k.stroke(); }, 4.98, 3, 2.2, -Math.PI / 2);
+keyDrawing.visible = false;
+// the dream door: after the gate opens it takes you straight back there
+const dreamDoor = new THREE.Group();
+{ const ring = mesh(new THREE.TorusGeometry(1, .12, 6, 20), glow(0xff9ad5)); dreamDoor.add(ring);
+  const fill = mesh(new THREE.CircleGeometry(.95, 20), new THREE.MeshBasicMaterial({ color: 0xb07fff, transparent: true, opacity: .55, side: THREE.DoubleSide })); dreamDoor.add(fill);
+  dreamDoor.userData.fill = fill; }
+dreamDoor.position.set(4.85, 1.3, -1.6); dreamDoor.rotation.y = Math.PI / 2; dreamDoor.visible = false; scene.add(dreamDoor);
 // desk + lamp
 block(1.8, 0.9, 1, 0xffc6e0, 3.6, 0, -4.2);
 { const lamp = mesh(new THREE.ConeGeometry(0.3, 0.4, 6), glow(0xfff2a8)); lamp.position.set(4, 1.3, -4.3); scene.add(lamp);
@@ -375,7 +402,7 @@ block(1.8, 0.9, 1, 0xffc6e0, 3.6, 0, -4.2);
 // toy chest under the window: jump on it to climb out
 block(1.4, 0.8, 0.9, 0xff8fd0, 0, 0, 4.4);
 // note on the wall
-{ const n = note(['find the keys.', '— ?'], 1.6, 0.95); n.position.set(1.5, 2.2, -4.99); scene.add(n); }
+{ const n = note(['find the keys.', '— ?'], 1.6, 0.95); n.position.set(1.5, 2.2, -4.99); scene.add(n); addMessage(n, 1.5, 0, -4); }
 // floating toys
 const toys = [];
 function addToy(m, x, y, z) { m.position.set(x, y, z); scene.add(m); toys.push({ m, y, s: rand(0, 6) }); }
@@ -423,6 +450,10 @@ hexIsland(1.3, 6.5, 2.75, 11.8, 0xfff0fb);
     const d = mesh(new THREE.SphereGeometry(r, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xff7ad9)); d.position.set(x, -0.2, z); scene.add(d);
     solid(x - r * .8, 0, z - r * .8, x + r * .8, r * .8, z + r * .8);
   });
+  // a hidden message tucked behind the big dome
+  { const n = note(['the robots', 'were kids once.'], 1.8, 1.05); n.position.set(-24, 1.6, -.8); scene.add(n);
+    const post = mesh(boxG(.15, 1.1, .15), mat(0xffffff)); post.position.set(-24, .55, -.85); scene.add(post);
+    addMessage(n, -24, 0, 0); }
   // glass pyramid
   const py = mesh(new THREE.ConeGeometry(7, 10, 4), new THREE.MeshPhongMaterial({ color: 0x7fd0ff, transparent: true, opacity: .32, flatShading: true }));
   py.position.set(-18, 5, 9); py.rotation.y = Math.PI / 4; scene.add(py);
@@ -446,15 +477,15 @@ for (let x = -31; x <= 31; x += 1.5) {
   const c = mesh(new THREE.CylinderGeometry(r * .5, r, h, 5), mat(pick(crystals)));
   c.position.set(x + rand(-.3, .3), h / 2 - 0.5, 20 + rand(-.5, .5)); c.rotation.y = rand(0, 6); scene.add(c);
 }
-solid(-34, -5, 19.2, -2.3, 14, 20.8); solid(2.3, -5, 19.2, 34, 14, 20.8);
-block(1.2, 7.5, 1.6, 0xfff0fb, -2.9, -0.3, 20);
-block(1.2, 7.5, 1.6, 0xfff0fb, 2.9, -0.3, 20);
+solid(-34, -5, 19.2, -2.3, 14, 20.8).climb = false; solid(2.3, -5, 19.2, 34, 14, 20.8).climb = false;
+block(1.2, 7.5, 1.6, 0xfff0fb, -2.9, -0.3, 20); solids[solids.length - 1].climb = false;
+block(1.2, 7.5, 1.6, 0xfff0fb, 2.9, -0.3, 20); solids[solids.length - 1].climb = false;
 block(7, 1, 1.8, 0xffc4ec, 0, 7, 20, false);
 { const em = mesh(new THREE.OctahedronGeometry(.6, 0), glow(0xffe27f)); em.position.set(0, 7.5, 19); scene.add(em); }
 const gateBars = new THREE.Group();
 for (let i = 0; i < 5; i++) { const b = mesh(new THREE.CylinderGeometry(.13, .13, 6.8, 6), glow(0xff6fc8)); b.position.set(-1.7 + i * .85, 3.3, 20); gateBars.add(b); }
 scene.add(gateBars);
-const gateSolid = solid(-2.3, -1, 19.4, 2.3, 9, 20.6);
+const gateSolid = solid(-2.3, -1, 19.4, 2.3, 9, 20.6); gateSolid.climb = false;
 
 // ============ DESERT DECORATION ============
 const desertDecor = new THREE.Group(); scene.add(desertDecor);
@@ -470,8 +501,21 @@ const desertDecor = new THREE.Group(); scene.add(desertDecor);
   }
   const msg = note(['i just wanted', 'someone to stay.'], 2.2, 1.3);
   msg.position.set(-12, terrainH(-12, 42) + 1.5, 42); msg.rotation.y = Math.PI * .75; desertDecor.add(msg);
+  addMessage(msg, -12, terrainH(-12, 42), 42);
   const post = mesh(boxG(.2, 1.4, .2), mat(0xffffff)); post.position.set(-12, terrainH(-12, 42) + .4, 42); desertDecor.add(post);
 }
+
+// the tall pillar where the gravity gloves wait (climb it!)
+const PILLAR = { x: -19, z: 50 };
+PILLAR.base = terrainH(PILLAR.x, PILLAR.z) - .5; PILLAR.top = PILLAR.base + 5.5;
+block(2.6, 5.5, 2.6, 0xffc2e8, PILLAR.x, PILLAR.base, PILLAR.z);
+for (let i = 0; i < 5; i++) { const s = mesh(boxG(2.7, .12, 2.7), mat(0xff9ad5)); s.position.set(PILLAR.x, PILLAR.base + 1 + i, PILLAR.z); scene.add(s); }
+{ const n = note(['you are getting', 'strong. good.'], 1.4, .82); n.position.set(PILLAR.x, PILLAR.top + .9, PILLAR.z - .9); scene.add(n); addMessage(n, PILLAR.x, PILLAR.top, PILLAR.z); }
+const gloves = new THREE.Group();
+{ const gm = mat(0xb07fff, { emissive: 0x7f3fff, emissiveIntensity: .5, shininess: 60 });
+  [-.22, .22].forEach(x => { const h = mesh(boxG(.3, .3, .3), gm); h.position.x = x; gloves.add(h);
+    const c = mesh(boxG(.34, .1, .34), glow(0x7ff0d8)); c.position.set(x, -.18, 0); gloves.add(c); }); }
+gloves.position.set(PILLAR.x, PILLAR.top + .7, PILLAR.z); scene.add(gloves);
 
 // ============ FAR-AWAY DREAMLAND (seen from the title screen) ============
 {
@@ -527,22 +571,24 @@ const shadow = new THREE.Group();
 let shadowTarget = -30;
 
 // ============ PLAYER ============
-const P = { x: 0, y: 0, z: -1, vy: 0, yaw: Math.PI, pitch: 0, hp: 5, onGround: true, wasGround: true, hurtT: 0, kx: 0, kz: 0 };
+const P = { x: 0, y: 0, z: -1, vy: 0, yaw: Math.PI, pitch: 0, hp: 5, onGround: true, wasGround: true, hurtT: 0, kx: 0, kz: 0, airT: 0, gy: 0, slam: false, climbing: false };
 const R = 0.35, H = 1.6, STEP = 0.36, EYE = 1.5;
 const store = {
   get() { try { return JSON.parse(localStorage.getItem('dreamland-v1')) || {}; } catch (e) { return {}; } },
   set(o) { try { localStorage.setItem('dreamland-v1', JSON.stringify(o)); } catch (e) {} },
 };
 const saved = store.get(); saved.ach = saved.ach || []; saved.settings = saved.settings || {};
-const state = { mode: 'menu', keys: 0, gems: 0, kids: 0, gateOpen: false, bossSeen: false, bossDead: false, startTime: 0, buffs: { jump: 0, power: 0, beacon: 0 }, achievements: new Set() };
+saved.nights = saved.nights || 0; saved.beds = saved.beds || 0; saved.totalGems = saved.totalGems || 0; saved.messages = saved.messages || [];
+const state = { mode: 'menu', keys: 0, gems: 0, kids: 0, gateOpen: false, bossSeen: false, bossDead: false, startTime: 0, buffs: { jump: 0, power: 0, beacon: 0 }, achievements: new Set(saved.ach), hasGloves: false, glovesOnBoss: false, gloveCool: 0, shake: 0 };
 
-function collides(x, y, z) {
+function hitSolid(x, y, z) {
   for (const b of solids) {
     if (!b.on) continue;
-    if (x + R > b.x0 && x - R < b.x1 && z + R > b.z0 && z - R < b.z1 && y + H > b.y0 + 0.01 && y < b.y1 - STEP) return true;
+    if (x + R > b.x0 && x - R < b.x1 && z + R > b.z0 && z - R < b.z1 && y + H > b.y0 + 0.01 && y < b.y1 - STEP) return b;
   }
-  return false;
+  return null;
 }
+const collides = (x, y, z) => !!hitSolid(x, y, z);
 function groundAt(x, z, y) {
   let g = terrainH(x, z);
   for (const b of solids) {
@@ -565,7 +611,7 @@ function makeFist(side) {
   const g = new THREE.Group();
   const s = mesh(boxG(.16, .16, .4), sleeve); s.position.z = .22; g.add(s);
   const f = mesh(boxG(.17, .15, .17), skin); g.add(f);
-  g.userData.rest = new THREE.Vector3(side * .3, -.3, -.55);
+  g.userData.rest = new THREE.Vector3(side * .34, -.38, -.75);
   g.position.copy(g.userData.rest); camera.add(g);
   return g;
 }
@@ -583,15 +629,22 @@ function makeRobot(heart) {
   const visor = mesh(boxG(.6, .22, .05), glow(0x5ff6ff)); visor.position.set(0, 1.77, .31); g.add(visor);
   const ant = mesh(new THREE.CylinderGeometry(.03, .03, .35, 4), lav); ant.position.y = 2.2; g.add(ant);
   const tip = mesh(new THREE.IcosahedronGeometry(.08, 0), glow(0xff6fc8)); tip.position.y = 2.4; g.add(tip);
-  let heartM = null;
-  if (heart) { heartM = mesh(new THREE.IcosahedronGeometry(.17, 0), glow(0xff3fb0)); heartM.position.set(0, 1.08, .33); g.add(heartM); }
+  let heartM = null, marker = null;
+  if (heart) {
+    heartM = mesh(new THREE.IcosahedronGeometry(.17, 0), glow(0xff3fb0)); heartM.position.set(0, 1.08, .33); g.add(heartM);
+    // purple gem map reveal: a pink arrow floats over every robot with a kid inside
+    marker = mesh(new THREE.ConeGeometry(.3, .6, 4), new THREE.MeshBasicMaterial({ color: 0xff6fc8, fog: false, depthTest: false }));
+    marker.rotation.x = Math.PI; marker.position.y = 3.2; marker.renderOrder = 5; marker.visible = false; g.add(marker);
+  }
   scene.add(g);
-  return { g, body: white, visor, heartM };
+  return { g, body: white, visor, heartM, marker };
 }
 const robots = [];
 function addRobot(x, z, heart, zone, hidden) {
   const m = makeRobot(heart);
-  const r = { ...m, x, z, home: { x, z }, hp: 3, heart, zone, alive: true, active: !hidden, cool: 0, kx: 0, kz: 0, glitch: rand(1, 4), glitchOn: 0, flash: 0, wander: rand(0, 6) };
+  // robots get tougher after each gate opens
+  const maxHp = zone === 'desert' ? 4 : 3;
+  const r = { ...m, x, z, home: { x, z }, hp: maxHp, maxHp, heart, zone, alive: true, active: !hidden, cool: 0, kx: 0, kz: 0, lift: 0, lv: 0, flung: false, glitch: rand(1, 4), glitchOn: 0, flash: 0, wander: rand(0, 6) };
   m.g.visible = !hidden; robots.push(r); return r;
 }
 addRobot(-8, 13, false, 'meadow');
@@ -628,7 +681,8 @@ function addGem(type, x, z, y, hidden) {
   const m = mesh(new THREE.OctahedronGeometry(.28, 0), mat(GEMS[type], { emissive: GEMS[type], emissiveIntensity: .45, shininess: 60 }));
   const base = y ?? terrainH(x, z) + .7;
   m.position.set(x, base, z); m.visible = !hidden; scene.add(m);
-  pickups.push({ kind: 'gem', type, m, base, taken: false, active: !hidden });
+  const p = { kind: 'gem', type, m, base, taken: false, active: !hidden };
+  pickups.push(p); return p;
 }
 function makeKey(color = 0xffd36b) {
   const g = new THREE.Group(), m = mat(color, { emissive: color, emissiveIntensity: .5, shininess: 80 });
@@ -646,8 +700,20 @@ key2.m.visible = false; pickups.push(key2);
 // meadow gems
 addGem('pink', 3, 3, 0.7); addGem('blue', 2.2, 8.3, 2.3); addGem('green', 4.3, 9.9, 2.9);
 addGem('purple', -6, 9); addGem('pink', 12, 8); addGem('blue', -10, 16);
+// a secret rainbow gem on top of the biggest dome (climb it!)
+const rainbowGem = addGem('rainbow', 26, 16, 5.6);
 // desert gems (appear when the gate opens)
 [['pink', -3, 26], ['green', 8, 33], ['blue', -9, 40], ['pink', 0, 46], ['purple', 14, 52], ['green', -6, 57], ['pink', 4, 62], ['blue', -14, 68], ['pink', 9, 72], ['green', -2, 84]].forEach(([t, x, z]) => addGem(t, x, z, undefined, true));
+
+// ---------- world shift ----------
+// Dreamland rearranges itself every night: the desert robots and gems move to new spots.
+function shiftWorld() {
+  const spots = [];
+  const free = (x, z) => Math.hypot(x - PILLAR.x, z - PILLAR.z) > 3.5 && Math.abs(x) > 1.5 && spots.every(([a, b]) => Math.hypot(a - x, b - z) > 5);
+  const place = (z0, z1) => { for (let i = 0; i < 40; i++) { const x = rand(-26, 26), z = rand(z0, z1); if (free(x, z)) { spots.push([x, z]); return [x, z]; } } return [rand(-20, 20), rand(z0, z1)]; };
+  robots.forEach(r => { if (r.zone !== 'desert') return; const [x, z] = place(27, 70); r.x = r.home.x = x; r.z = r.home.z = z; });
+  pickups.forEach(p => { if (p.kind !== 'gem' || p.active || p.taken) return; const [x, z] = place(25, 88); p.base = terrainH(x, z) + .7; p.m.position.set(x, p.base, z); });
+}
 
 // beacon (purple gem shows the way)
 const beacon = mesh(new THREE.CylinderGeometry(.5, .5, 60, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xb07fff, transparent: true, opacity: .35, side: THREE.DoubleSide, depthWrite: false }));
@@ -731,7 +797,7 @@ function setMusic(on) {
 
 // ============ UI ============
 function hud() {
-  $('hKeys').textContent = state.keys; $('hGems').textContent = state.gems; $('hKids').textContent = state.kids;
+  $('hKeys').textContent = state.keys; $('hGems').textContent = state.gems; $('hKids').textContent = state.kids; $('hNight').textContent = Math.max(1, saved.nights);
   $('hHearts').innerHTML = Array.from({ length: 5 }, (_, i) => `<span class="${i < P.hp ? '' : 'off'}">♥</span>`).join('');
   const b = state.buffs, out = [];
   if (b.jump > 0) out.push(`<span class="buff" style="background:#5fc8ff;color:#122">Jump ${Math.ceil(b.jump)}</span>`);
@@ -813,6 +879,9 @@ function openGate() {
   state.gateOpen = true; gateSolid.on = false; gateBars.position.y = -6.6;
   robots.forEach(r => { if (r.zone === 'desert') { r.active = true; r.g.visible = true; } });
   pickups.forEach(p => { if (p.kind === 'gem' && !p.active) { p.active = true; p.m.visible = true; } });
+  // the bedroom changes: a new drawing, a door back to the gate, and the rocket flies off to point at a secret
+  keyDrawing.visible = true; dreamDoor.visible = true;
+  const rocket = toys[3]; rocket.point = true; rocket.y = 8.4; rocket.m.position.set(26, 8.4, 16); rocket.m.rotation.set(0, 0, Math.PI);
 }
 function bossCine() {
   state.bossSeen = true;
@@ -829,7 +898,7 @@ function bossDefeated() {
   key2.active = true; key2.m.visible = true; key2.base = terrainH(boss.x, boss.z) + 1.3; key2.m.position.set(boss.x, key2.base, boss.z);
   toast('Scorpion defeated!', 'The second key appeared');
   objective('Grab key 2');
-  achieve('Fists Only', 'Beat a boss without gravity gloves');
+  if (!state.glovesOnBoss) achieve('Fists Only', 'Beat a boss without gravity gloves');
 }
 function endingCine() {
   playCine([
@@ -839,6 +908,7 @@ function endingCine() {
   ], () => {
     state.mode = 'end';
     const s = Math.floor((performance.now() - state.startTime) / 1000);
+    $('eMsg').textContent = `Key 2 of 10 is yours. You found ${messages.filter(m => m.found).length} of ${messages.length} hidden messages. Tonight the world will shift again…`;
     $('eKids').textContent = state.kids; $('eGems').textContent = state.gems; $('eTime').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     $('endScreen').hidden = false; document.exitPointerLock?.();
   });
@@ -857,9 +927,12 @@ function hurt(n, fromX, fromZ) {
 function backToBed() {
   state.mode = 'dead';
   $('fadeText').textContent = 'Back to bed…'; $('fade').style.opacity = 1;
+  P.slam = false; saved.beds++; store.set(saved);
+  if (saved.beds >= 100) achieve('Sleepwalker', 'Go back to bed 100 times');
   setTimeout(() => {
     Object.assign(P, { x: 0, y: 0, z: -1, vy: 0, yaw: Math.PI, pitch: 0, hp: 5, kx: 0, kz: 0, hurtT: 1 });
-    robots.forEach(r => { if (r.alive) { r.x = r.home.x; r.z = r.home.z; r.hp = 3; } });
+    robots.forEach(r => { if (r.alive) { r.x = r.home.x; r.z = r.home.z; r.hp = r.maxHp; r.lift = r.lv = 0; r.flung = false; } });
+    if (state.gateOpen) toast('Back in your bedroom', 'The glowing door takes you back to the gate');
     if (!state.bossDead) { boss.hp = boss.maxHp; boss.x = 0; boss.z = 78; boss.mode = 'walk'; boss.cool = 2; }
     hud(); state.mode = 'play';
     $('fade').style.opacity = 0;
@@ -869,31 +942,71 @@ function doPunch(charged) {
   punchT = .22; punchSide *= -1; sfx(charged ? 'big' : 'punch');
   let dmg = charged ? 3 : 1; if (state.buffs.power > 0) dmg *= 2;
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+  // generous on purpose: you don't have to aim perfectly
   const tryHit = (tx, tz, ty, radius) => {
     const dx = tx - P.x, dz = tz - P.z, d = Math.hypot(dx, dz);
-    if (d > 1.7 + radius || Math.abs(ty - P.y) > 2.6) return false;
-    return d < radius + .3 || (dx * fx + dz * fz) / d > .55;
+    if (d > 2.3 + radius || Math.abs(ty - P.y) > 2.6) return false;
+    return d < radius + .6 || (dx * fx + dz * fz) / d > .3;
   };
   let hitAny = false;
   for (const r of robots) {
     if (!r.alive || !r.active) continue;
-    const ry = terrainH(r.x, r.z);
+    const ry = terrainH(r.x, r.z) + r.lift;
     if (tryHit(r.x, r.z, ry, .5)) {
-      hitAny = true; r.hp -= dmg; r.flash = .15;
-      const d = Math.hypot(r.x - P.x, r.z - P.z) || 1; const kb = charged ? 10 : 6;
-      r.kx = (r.x - P.x) / d * kb; r.kz = (r.z - P.z) / d * kb;
-      if (r.hp <= 0) killRobot(r);
+      hitAny = true; hitRobot(r, dmg, charged ? 10 : 6);
     }
   }
-  if (boss.active && tryHit(boss.x, boss.z, terrainH(boss.x, boss.z), 2.2)) {
-    hitAny = true; boss.hp -= dmg; boss.flash = .15; $('bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
-    if (boss.hp <= 0) bossDefeated();
-  }
+  if (boss.active && tryHit(boss.x, boss.z, terrainH(boss.x, boss.z), 2.2)) { hitAny = true; hitBoss(dmg); }
   if (hitAny) burst(P.x + fx * 1.2, P.y + 1.3, P.z + fz * 1.2, [0xffffff, 0xffe27f], charged ? 10 : 4);
+}
+function hitBoss(dmg) {
+  if (!boss.active) return;
+  boss.hp -= dmg; boss.flash = .15; $('bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
+  if (boss.hp <= 0) bossDefeated();
+}
+function hitRobot(r, dmg, kb) {
+  r.hp -= dmg; r.flash = .15;
+  const d = Math.hypot(r.x - P.x, r.z - P.z) || 1;
+  r.kx = (r.x - P.x) / d * kb; r.kz = (r.z - P.z) / d * kb;
+  if (r.hp <= 0) killRobot(r);
+}
+// ground slam: smash down and knock away everything around you
+function startSlam() { P.slam = true; P.vy = -22; charging = false; chargeT = 0; }
+function landSlam() {
+  P.slam = false; sfx('big'); state.shake = .3;
+  let dmg = 2; if (state.buffs.power > 0) dmg *= 2;
+  for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; burst(P.x + Math.cos(a) * 1.5, P.y + .2, P.z + Math.sin(a) * 1.5, [0xffffff, 0xff9ad5, 0xc9a6ff], 1); }
+  for (const r of robots) {
+    if (!r.alive || !r.active) continue;
+    if (Math.hypot(r.x - P.x, r.z - P.z) < 4 && Math.abs(terrainH(r.x, r.z) - P.y) < 2.5) { r.lv = 4; hitRobot(r, dmg, 9); }
+  }
+  if (boss.active && Math.hypot(boss.x - P.x, boss.z - P.z) < 5) hitBoss(dmg);
+}
+// gravity gloves: grab the robot you're looking at and fling it
+const gloveBeam = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xc9a6ff }));
+gloveBeam.visible = false; gloveBeam.frustumCulled = false; scene.add(gloveBeam);
+let beamT = 0;
+function useGloves() {
+  if (!state.hasGloves || state.gloveCool > 0 || state.mode !== 'play' || cine) return;
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+  let best = null, bestD = 11;
+  for (const r of robots) {
+    if (!r.alive || !r.active || r.flung) continue;
+    const dx = r.x - P.x, dz = r.z - P.z, d = Math.hypot(dx, dz);
+    if (d < bestD && (dx * fx + dz * fz) / (d || 1) > .5) { best = r; bestD = d; }
+  }
+  let bossHit = false;
+  if (!best && boss.active) { const dx = boss.x - P.x, dz = boss.z - P.z, d = Math.hypot(dx, dz); bossHit = d < 13 && (dx * fx + dz * fz) / (d || 1) > .4; }
+  if (!best && !bossHit) { toast('', 'Nothing to grab. Look at a robot!'); return; }
+  state.gloveCool = 1; sfx('gate');
+  const tx = best ? best.x : boss.x, tz = best ? best.z : boss.z;
+  gloveBeam.geometry.setFromPoints([new THREE.Vector3(P.x, P.y + 1.1, P.z), new THREE.Vector3(tx, terrainH(tx, tz) + 1.2, tz)]); gloveBeam.visible = true; beamT = .25;
+  if (best) { best.flung = true; best.lv = 8; best.kx = fx * 12; best.kz = fz * 12; best.flash = .3; }
+  else { state.glovesOnBoss = true; let dmg = 2; if (state.buffs.power > 0) dmg *= 2; hitBoss(dmg); }
 }
 function killRobot(r) {
   r.alive = false; r.g.visible = false; sfx('break');
-  const y = terrainH(r.x, r.z);
+  const y = terrainH(r.x, r.z) + r.lift;
   burst(r.x, y + 1.2, r.z, [0xf1ecff, 0xb9a6ff, 0x5ff6ff]);
   if (r.heart) {
     state.kids++; freeKid(r.x, y, r.z); sfx('kid');
@@ -909,12 +1022,14 @@ function collect(p) {
     if (p.n === 1) gateCine(); else endingCine();
     return;
   }
-  state.gems++; sfx('gem');
+  state.gems++; sfx('gem'); saved.totalGems++; store.set(saved);
+  if (saved.totalGems >= 1000) achieve('Gem Hoarder', 'Collect 1,000 gems');
   const b = state.buffs;
   if (p.type === 'pink') { P.hp = Math.min(5, P.hp + 1); toast('Pink gem', '+1 health'); }
   if (p.type === 'blue') { b.jump = 20; toast('Blue gem', 'Jump higher for 20 seconds'); }
   if (p.type === 'green') { b.power = 20; toast('Green gem', 'Super strength for 20 seconds'); }
-  if (p.type === 'purple') { b.beacon = 20; toast('Purple gem', 'Map reveal: follow the light'); }
+  if (p.type === 'purple') { b.beacon = 20; toast('Purple gem', 'Map reveal: follow the light. Pink arrows show trapped kids'); }
+  if (p.type === 'rainbow') { rainbow(); P.hp = 5; toast('RAINBOW GEM!', 'Every gem power at once'); }
   hud();
 }
 
@@ -922,21 +1037,35 @@ function collect(p) {
 const keys = {};
 let locked = false, mouseDown = null;
 const stick = { x: 0, y: 0, id: null }, look = { id: null, x: 0, y: 0 };
-let jumpQueued = false;
+// jumpBuf remembers a jump press for a moment, so pressing a tiny bit early still works
+let jumpBuf = 0, jumpHeld = false;
+// punching in the air (high enough) does a ground slam instead
+function punchDown() {
+  if (state.mode !== 'play' || cine) return;
+  if (!P.onGround && !P.climbing && P.y - P.gy > 1) { startSlam(); return; }
+  if (!charging) { charging = true; chargeT = 0; }
+}
 addEventListener('keydown', e => {
   keys[e.code] = true;
   if (state.mode !== 'play') return;
-  if (e.code === 'Space') { jumpQueued = true; e.preventDefault(); }
-  if (e.code === 'KeyF' && !charging) { charging = true; chargeT = 0; }
+  if (e.code === 'Space') { if (!e.repeat) jumpBuf = .15; e.preventDefault(); }
+  if ((e.code === 'KeyF' || e.code === 'KeyJ') && !e.repeat) punchDown();
+  if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !P.onGround && P.y - P.gy > 1) startSlam();
+  if (e.code === 'KeyG' || e.code === 'KeyK') useGloves();
   if (e.code === 'KeyM') setMusic(!musicOn);
+  if (e.code === 'KeyP') pause();
 });
-addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'KeyF' && charging) releasePunch(); });
+addEventListener('keyup', e => { keys[e.code] = false; if ((e.code === 'KeyF' || e.code === 'KeyJ') && charging) releasePunch(); });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 function releasePunch() { if (!charging) return; charging = false; if (!cine && state.mode === 'play') doPunch(chargeT > .6); chargeT = 0; }
+function pause() { if (state.mode !== 'play' || cine) return; state.mode = 'pause'; $('pauseScreen').hidden = false; charging = false; document.exitPointerLock?.(); }
 const cv = renderer.domElement;
+cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('mousedown', e => {
   if (state.mode !== 'play' || isTouch) return;
   if (!locked) { try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) {} }
-  mouseDown = { x: e.clientX, y: e.clientY, moved: 0 }; charging = true; chargeT = 0;
+  if (e.button === 2) { useGloves(); return; }
+  mouseDown = { x: e.clientX, y: e.clientY, moved: 0 }; punchDown();
 });
 addEventListener('mousemove', e => {
   if (state.mode !== 'play' || cine) return;
@@ -944,7 +1073,7 @@ addEventListener('mousemove', e => {
   else if (mouseDown) {
     const dx = e.clientX - mouseDown.x, dy = e.clientY - mouseDown.y;
     mouseDown.moved += Math.abs(dx) + Math.abs(dy); mouseDown.x = e.clientX; mouseDown.y = e.clientY;
-    P.yaw -= dx * .005; P.pitch = clamp(P.pitch - dy * .005, -1.4, 1.4);
+    P.yaw -= dx * .005 * sens; P.pitch = clamp(P.pitch - dy * .005 * sens, -1.4, 1.4);
   }
 });
 addEventListener('mouseup', () => {
@@ -954,9 +1083,10 @@ addEventListener('mouseup', () => {
 });
 document.addEventListener('pointerlockchange', () => {
   const was = locked; locked = document.pointerLockElement === cv;
-  if (was && !locked && state.mode === 'play' && !cine) { state.mode = 'pause'; $('pauseScreen').hidden = false; }
+  if (was && !locked) pause();
 });
-addEventListener('keydown', e => { if (e.code === 'Escape' && state.mode === 'play' && !locked && !isTouch) { state.mode = 'pause'; $('pauseScreen').hidden = false; } });
+addEventListener('keydown', e => { if (e.code === 'Escape' && !locked) { if (state.mode === 'play') pause(); else if (state.mode === 'pause') $('resumeBtn').click(); } });
+$('quitBtn').addEventListener('click', () => location.reload());
 $('resumeBtn').addEventListener('click', () => {
   $('pauseScreen').hidden = true; state.mode = 'play';
   if (!isTouch) { try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
@@ -986,13 +1116,25 @@ addEventListener('touchend', e => {
   }
 });
 cv.addEventListener('touchstart', e => { const t = e.changedTouches[0]; if (look.id === null) { look.id = t.identifier; look.x = t.clientX; look.y = t.clientY; } }, { passive: true });
-$('tJump').addEventListener('touchstart', e => { e.preventDefault(); jumpQueued = true; }, { passive: false });
-$('tPunch').addEventListener('touchstart', e => { e.preventDefault(); if (!charging) { charging = true; chargeT = 0; } }, { passive: false });
+$('tJump').addEventListener('touchstart', e => { e.preventDefault(); jumpBuf = .15; jumpHeld = true; }, { passive: false });
+$('tJump').addEventListener('touchend', e => { e.preventDefault(); jumpHeld = false; }, { passive: false });
+$('tPunch').addEventListener('touchstart', e => { e.preventDefault(); punchDown(); }, { passive: false });
+$('tGlove').addEventListener('touchstart', e => { e.preventDefault(); useGloves(); }, { passive: false });
 $('tPunch').addEventListener('touchend', e => { e.preventDefault(); releasePunch(); }, { passive: false });
 $('muteBtn').addEventListener('click', e => { e.stopPropagation(); setMusic(!musicOn); });
 
 // ============ TITLE SCREEN ============
 if (isTouch) { $('ctrlDesk').hidden = true; $('ctrlTouch').hidden = false; }
+$('pauseCtrls').innerHTML = $(isTouch ? 'ctrlTouch' : 'ctrlDesk').innerHTML;
+// the little help bar at the bottom of the screen
+let hintT = 0;
+function showHint() {
+  const k = (a, b) => `<span><kbd>${a}</kbd>${b}</span>`;
+  $('hint').innerHTML = isTouch
+    ? k('JUMP', 'jump (hold at a wall to climb)') + k('PUNCH', 'hold to charge') + (state.hasGloves ? k('GLOVES', 'fling robots') : '')
+    : k('WASD', 'walk') + k('Mouse / ← →', 'look') + k('Space', 'jump (hold at a wall to climb)') + k('Click', 'punch, hold to charge') + k('Click in air', 'slam') + (state.hasGloves ? k('Right-click / G', 'gloves') : '');
+  $('hint').hidden = false; $('hint').style.opacity = 1; hintT = 25;
+}
 document.body.classList.add('title');
 state.mode = 'title';
 const ACH = [
@@ -1003,7 +1145,7 @@ const ACH = [
   ['Sleepwalker', 'Go back to bed 100 times', 1], ['Eraser', 'Erase every wall in the Sketch House', 1],
   ['Jellyfish Friend', 'Get through the ocean without getting zapped', 1], ['Mirror Mirror', 'Find every boss glimpse in the mirror maze', 1],
   ['Pet Lover', 'Find every pixel animal in the forest', 1], ['Detention', 'Get caught by the robot principal 5 times', 1],
-  ['Toy Story', 'Find where every floating toy goes', 1], ['Sky Walker', 'Never fall in cloud city', 1],
+  ['Toy Tracker', 'Find where every floating toy goes', 1], ['Sky Walker', 'Never fall in cloud city', 1],
   ['The Achievement Master', 'Unlock every other achievement', 1], ['Lucid Dreamer', 'Beat the game without going back to bed once', 1],
 ];
 // logo with glitching letters
@@ -1067,12 +1209,16 @@ function newDream(cont) {
   if (isTouch) { $('touch').hidden = false; $('muteBtn').style.bottom = 'auto'; $('muteBtn').style.top = 'calc(env(safe-area-inset-top,0px) + 100px)'; }
   sebastian.visible = false; secondBed.visible = false; creep = null; $('speech').style.opacity = 0;
   state.mode = 'play'; state.startTime = performance.now();
+  // a new night: the world shifts
+  saved.nights++; store.set(saved); shiftWorld();
+  if (saved.nights >= 10) achieve('Night Owl', 'Survive 10 world shifts');
+  showHint();
   if (cont) {
     key1.taken = true; key1.m.visible = false; state.keys = 1;
     state.gems = saved.save.gems || 0; state.kids = saved.save.kids || 0;
     openGate(); gateBars.position.y = -6.6;
     Object.assign(P, { x: 0, y: 0, z: 16, yaw: Math.PI, pitch: 0 });
-    objective('Cross the pastel desert'); toast('Welcome back', 'The gate is still open'); hud();
+    objective('Cross the pastel desert'); toast('Night ' + saved.nights, 'The world shifted. The robots moved to new places!'); hud();
   } else { hud(); introCine(); }
 }
 const easeIO = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -1128,7 +1274,9 @@ function drawCharge() {
 function updatePlayer(dt) {
   let f = 0, s = 0;
   if (keys.KeyW || keys.ArrowUp) f += 1; if (keys.KeyS || keys.ArrowDown) f -= 1;
-  if (keys.KeyD || keys.ArrowRight) s += 1; if (keys.KeyA || keys.ArrowLeft) s -= 1;
+  if (keys.KeyD) s += 1; if (keys.KeyA) s -= 1;
+  // arrow keys turn, so you can play without a mouse
+  if (keys.ArrowLeft) P.yaw += 2.4 * sens * dt; if (keys.ArrowRight) P.yaw -= 2.4 * sens * dt;
   f -= stick.y; s += stick.x;
   const len = Math.hypot(f, s); if (len > 1) { f /= len; s /= len; }
   const sp = 5.2;
@@ -1138,13 +1286,19 @@ function updatePlayer(dt) {
   const nx = P.x + mx * dt; if (!collides(nx, P.y, P.z)) P.x = nx;
   const nz = P.z + mz * dt; if (!collides(P.x, P.y, nz)) P.z = nz;
   P.x = clamp(P.x, -30, 30); P.z = clamp(P.z, -12, 93);
-  if (jumpQueued && P.onGround) { P.vy = state.buffs.jump > 0 ? 9 : 6.3; P.onGround = false; sfx('jump'); }
-  jumpQueued = false;
-  P.vy -= 18 * dt;
+  // climbing: hold jump while walking into a wall
+  const wall = f > .3 ? hitSolid(P.x - Math.sin(P.yaw) * .3, P.y, P.z - Math.cos(P.yaw) * .3) : null;
+  P.climbing = !!wall && wall.climb !== false && (keys.Space || jumpHeld) && !P.slam;
+  // jumping is forgiving: it still works a moment after you walk off an edge
+  P.airT = P.onGround ? 0 : P.airT + dt;
+  jumpBuf = Math.max(0, jumpBuf - dt);
+  if (jumpBuf > 0 && P.airT < .12 && P.vy <= .1) { P.vy = state.buffs.jump > 0 ? 9 : 6.6; P.onGround = false; P.airT = 1; jumpBuf = 0; sfx('jump'); }
+  if (P.climbing) { P.vy = 3.6; bobT += dt * 6; }
+  else P.vy -= 18 * dt;
   let ny = P.y + P.vy * dt;
   if (P.vy > 0) { const c = ceilingHit(P.x, P.z, P.y, ny); if (c !== null) { ny = c - H; P.vy = 0; } }
-  const g = groundAt(P.x, P.z, Math.max(P.y, ny));
-  if (ny <= g) { ny = g; P.vy = 0; P.onGround = true; }
+  const g = groundAt(P.x, P.z, Math.max(P.y, ny)); P.gy = g;
+  if (ny <= g) { ny = g; P.vy = 0; P.onGround = true; if (P.slam) landSlam(); }
   else if (P.wasGround && P.vy <= 0 && ny - g < .45) { ny = g; P.vy = 0; P.onGround = true; }
   else P.onGround = false;
   P.wasGround = P.onGround; P.y = ny;
@@ -1152,7 +1306,9 @@ function updatePlayer(dt) {
   P.hurtT = Math.max(0, P.hurtT - dt);
   // camera + fists
   bobT += len > .1 && P.onGround ? dt * 9 : 0;
-  camera.position.set(P.x, P.y + EYE + Math.sin(bobT) * .04, P.z);
+  state.shake = Math.max(0, state.shake - dt);
+  const sh = state.shake > 0 ? state.shake * .5 : 0;
+  camera.position.set(P.x + rand(-sh, sh), P.y + EYE + Math.sin(bobT) * .04 + rand(-sh, sh), P.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
   if (charging) chargeT += dt;
   punchT = Math.max(0, punchT - dt);
@@ -1172,11 +1328,21 @@ function updateRobots(dt, time) {
     const dx = P.x - r.x, dz = P.z - r.z, d = Math.hypot(dx, dz);
     let vx = 0, vz = 0;
     const playing = state.mode === 'play' && !cine;
-    if (playing && d < 14 && Math.abs(P.y - terrainH(r.x, r.z)) < 3) {
+    // flying through the air (flung by the gloves or bounced by a slam)
+    if (r.lift > 0 || r.lv > 0) {
+      r.lv -= 18 * dt; r.lift = Math.max(0, r.lift + r.lv * dt);
+      r.g.rotation.x += r.flung ? dt * 10 : 0;
+      if (r.lift === 0) {
+        r.lv = 0; r.g.rotation.x = 0;
+        if (r.flung) { r.flung = false; sfx('break'); state.shake = .15; burst(r.x, terrainH(r.x, r.z) + .3, r.z, [0xc9a6ff, 0xffffff], 8); let dmg = 3; if (state.buffs.power > 0) dmg *= 2; r.hp -= dmg; r.flash = .2; if (r.hp <= 0) { killRobot(r); continue; } }
+      }
+    }
+    if (r.flung) { /* no walking while flying */ }
+    else if (playing && d < 14 && Math.abs(P.y - terrainH(r.x, r.z)) < 3) {
       if (d > 1.2) { vx = dx / d * 2.4; vz = dz / d * 2.4; }
       r.g.rotation.y = Math.atan2(dx, dz);
       r.cool -= dt;
-      if (d < 1.5 && r.cool <= 0) { r.cool = 1.3; hurt(1, r.x, r.z); }
+      if (d < 1.5 && r.cool <= 0 && r.lift < .5) { r.cool = 1.3; hurt(1, r.x, r.z); }
     } else {
       r.wander += dt * .5;
       vx = Math.cos(r.wander) * .8; vz = Math.sin(r.wander * .7) * .8;
@@ -1191,7 +1357,8 @@ function updateRobots(dt, time) {
     if (r.glitch <= 0) { r.glitchOn = .18; r.glitch = rand(1.5, 4); }
     r.glitchOn = Math.max(0, r.glitchOn - dt);
     const gx = r.glitchOn > 0 ? rand(-.25, .25) : 0;
-    r.g.position.set(r.x + gx, terrainH(r.x, r.z) + Math.abs(Math.sin(time * 8)) * .05 * (vx || vz ? 1 : 0), r.z);
+    r.g.position.set(r.x + gx, terrainH(r.x, r.z) + r.lift + Math.abs(Math.sin(time * 8)) * .05 * (vx || vz ? 1 : 0), r.z);
+    if (r.marker) { r.marker.visible = state.buffs.beacon > 0; r.marker.position.y = 3.2 + Math.sin(time * 4) * .2; }
     r.g.scale.set(1, r.glitchOn > 0 ? rand(.85, 1.1) : 1, 1);
     r.visor.material.color.setHex(r.glitchOn > 0 ? 0xff3fd0 : 0x5ff6ff);
     r.flash = Math.max(0, r.flash - dt);
@@ -1243,7 +1410,12 @@ function loop(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   const time = now / 1000;
   // ambient animation
-  toys.forEach(t => { t.m.position.y = t.y + Math.sin(time * 1.3 + t.s) * .18; t.m.rotation.y += dt * .4; t.m.rotation.x += dt * .2; });
+  toys.forEach(t => { t.m.position.y = t.y + Math.sin(time * 1.3 + t.s) * .18; if (!t.point) { t.m.rotation.y += dt * .4; t.m.rotation.x += dt * .2; } });
+  if (!rainbowGem.taken) rainbowGem.m.material.color.setHSL(time * .3 % 1, 1, .65), rainbowGem.m.material.emissive.setHSL(time * .3 % 1, 1, .4);
+  if (gloves.visible) { gloves.rotation.y += dt * 1.5; gloves.position.y = PILLAR.top + .7 + Math.sin(time * 2) * .12; }
+  if (dreamDoor.visible) { dreamDoor.rotation.z += dt; dreamDoor.userData.fill.material.opacity = .45 + Math.sin(time * 3) * .15; }
+  if (beamT > 0) { beamT -= dt; if (beamT <= 0) gloveBeam.visible = false; }
+  if (hintT > 0 && state.mode === 'play' && !cine) { hintT -= dt; if (hintT <= 0) $('hint').style.opacity = 0; }
   pickups.forEach(p => { if (!p.taken && p.active) { p.m.rotation.y += dt * 2; p.m.position.y = p.base + Math.sin(time * 2.5 + p.m.position.x) * .12; } });
   for (let i = parts.length - 1; i >= 0; i--) {
     const q = parts[i]; q.life -= dt; q.vy -= 14 * dt;
@@ -1272,6 +1444,26 @@ function loop(now) {
       if (p.taken || !p.active) continue;
       const pp = p.m.position;
       if (Math.hypot(pp.x - P.x, pp.z - P.z) < 1.1 && pp.y > P.y - .5 && pp.y < P.y + 2.4) collect(p);
+    }
+    // hidden messages: walk up close to read one
+    for (const m of messages) {
+      if (m.found || Math.hypot(m.x - P.x, m.z - P.z) > 3.2 || Math.abs(m.y - P.y) > 3) continue;
+      m.found = true; const n = messages.filter(q => q.found).length;
+      toast(`Hidden message ${n} of ${messages.length}`, 'Who keeps writing these?'); sfx('kid');
+      if (n === messages.length) achieve('Message Finder', 'Find every hidden message');
+    }
+    // the gravity gloves
+    if (gloves.visible && Math.hypot(gloves.position.x - P.x, gloves.position.z - P.z) < 1.4 && Math.abs(gloves.position.y - P.y - .7) < 1.5) {
+      gloves.visible = false; state.hasGloves = true; sfx('key'); burst(P.x, P.y + 1.2, P.z, [0xb07fff, 0x7ff0d8], 16);
+      if (isTouch) $('tGlove').hidden = false;
+      toast('GRAVITY GLOVES!', isTouch ? 'Tap GLOVES to grab a robot and fling it' : 'Right-click (or G) to grab a robot and fling it');
+      showHint();
+    }
+    state.gloveCool = Math.max(0, state.gloveCool - dt);
+    // the dream door in the bedroom goes back to the gate
+    if (dreamDoor.visible && Math.hypot(P.x - 4.6, P.z + 1.6) < 1 && P.y < 1) {
+      state.mode = 'dead'; $('fadeText').textContent = '✦'; $('fade').style.opacity = 1;
+      setTimeout(() => { Object.assign(P, { x: 0, y: 0, z: 16, vy: 0, yaw: Math.PI, pitch: 0, kx: 0, kz: 0 }); state.mode = 'play'; $('fade').style.opacity = 0; }, 700);
     }
     // boss trigger
     if (state.gateOpen && !state.bossSeen && P.z > 62) bossCine();
