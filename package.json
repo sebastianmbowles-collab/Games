@@ -8,7 +8,8 @@
     "build": "vite build",
     "build:standalone": "vite build --config vite.config.standalone.js",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:avd": "vite build --config vite.config.avd.js && cp standalone-avd/avd.html aliens-vs-dinos.html"
   },
   "dependencies": {
     "peerjs": "^1.5.5",

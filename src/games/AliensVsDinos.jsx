@@ -53,9 +53,11 @@ export default function AliensVsDinos({ game, onExit }) {
           <button className="exit-btn" onClick={toggleSound}>
             {muted ? 'Sound: off' : 'Sound: on'}
           </button>
-          <button className="exit-btn" onClick={onExit}>
-            Back to arcade
-          </button>
+          {onExit && (
+            <button className="exit-btn" onClick={onExit}>
+              Back to arcade
+            </button>
+          )}
         </div>
       </div>
       <canvas ref={canvasRef} className="avd-canvas" />
