@@ -1,7 +1,7 @@
 // The title screen (PLAY / SETTINGS / JUKEBOX), the settings page and the jukebox.
 
 import { W, H, TAU, INK, circle, rrect, text, drawDino, drawUFO, drawAlien, drawBeam, drawSky, drawBackdrop, mixTheme, getTheme } from './art'
-import { sfx } from './sound'
+import { sfx, audioRunning } from './sound'
 import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels } from './music'
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -276,6 +276,9 @@ function drawTitle(game, ctx) {
       ctx.restore()
     }
     ctx.restore()
+  }
+  if (!audioRunning() && Math.floor(t * 2) % 2 === 0) {
+    text(ctx, '♪ TAP OR PRESS A KEY FOR MUSIC ♪', W / 2, 470, 18, '#fee761')
   }
   const best = game.best
   text(ctx, `Best: Aliens ${best.aliens || 0}  ·  Dinos ${best.dinos || 0}`, W / 2, 512, 15, '#fff')

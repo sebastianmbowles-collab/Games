@@ -58,6 +58,28 @@ export function wakeAudio() {
   if (ctx.state === 'suspended') ctx.resume()
 }
 
+export function audioRunning() {
+  return !!ctx && ctx.state === 'running'
+}
+
+// Phones and tablets only allow sound to start during a real tap (when the finger lifts) or a key
+// press, so this runs on those. It also plays a tiny silent sound, which some iPads need before
+// they'll make any noise, and asks iPhones/iPads to play even when the silent switch is on.
+export function unlockAudio() {
+  wakeAudio()
+  if (!ctx) return
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = 'playback'
+  } catch {
+    // Older browsers don't have this; sound still works.
+  }
+  const b = ctx.createBuffer(1, 1, 22050)
+  const src = ctx.createBufferSource()
+  src.buffer = b
+  src.connect(ctx.destination)
+  src.start(0)
+}
+
 // The music player uses the same audio engine; this hands it over once it exists.
 export function getAudio() {
   return ctx ? { ctx, musicBus, analyser } : null
@@ -148,6 +170,19 @@ export function beamOn(on) {
 }
 
 export const sfx = {
+  // night-time sounds
+  cricket: () => {
+    const f = 4000 + Math.random() * 800
+    for (let i = 0; i < 3; i++) tone('sine', f, f * 1.03, 0.035, 0.018, i * 0.07)
+  },
+  owl: () => {
+    tone('sine', 430, 380, 0.3, 0.05)
+    tone('sine', 410, 350, 0.55, 0.05, 0.45)
+  },
+  step: () => {
+    tone('sine', 90, 45, 0.12, 0.14)
+    noise(0.08, 0.06, 'lowpass', 250)
+  },
   click: () => tone('square', 900, 600, 0.05, 0.06),
   select: () => {
     tone('triangle', 520, 1040, 0.15, 0.12)

@@ -29,7 +29,7 @@ import {
   drawMoon,
   text,
 } from './art'
-import { sfx, wakeAudio, beamOn, setVolumes } from './sound'
+import { sfx, wakeAudio, beamOn, setVolumes, unlockAudio } from './sound'
 import { playSong, stopMusic } from './music'
 import { PX, retroColors, flushText } from './pixel'
 
@@ -41,6 +41,7 @@ export { W, H }
 
 
 const WAVES = 3
+const UNLOCK_EVENTS = ['pointerup', 'touchend', 'click', 'keydown']
 const DIFF = {
   easy: { mul: 0.75, hp: 7, lives: 5 },
   normal: { mul: 1, hp: 5, lives: 3 },
@@ -382,6 +383,8 @@ export class AliensVsDinos {
     }
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
+    this.onUnlock = () => unlockAudio()
+    for (const ev of UNLOCK_EVENTS) window.addEventListener(ev, this.onUnlock, true)
     canvas.addEventListener('pointerdown', this.onPointerDown)
     canvas.addEventListener('pointermove', this.onPointerMove)
 
@@ -405,6 +408,7 @@ export class AliensVsDinos {
     beamOn(false)
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
+    for (const ev of UNLOCK_EVENTS) window.removeEventListener(ev, this.onUnlock, true)
     this.canvas.removeEventListener('pointerdown', this.onPointerDown)
     this.canvas.removeEventListener('pointermove', this.onPointerMove)
   }
@@ -552,6 +556,13 @@ export class AliensVsDinos {
     this.flash = Math.max(0, this.flash - realDt * 2.5)
 
     this.sceneT += realDt
+    // crickets chirping (and now and then an owl) all through the night
+    this.ambT = (this.ambT ?? 1) - realDt
+    if (this.ambT <= 0 && this.scene !== 'paused' && this.scene !== 'jukebox') {
+      this.ambT = rand(0.5, 1.8)
+      if (Math.random() < 0.06) sfx.owl()
+      else sfx.cricket()
+    }
     if (this.scene === 'title' || this.scene === 'settings' || this.scene === 'jukebox') updateScreen(this, realDt)
     else if (this.scene === 'menu') this.updateMenu(realDt)
     else if (this.scene === 'cutscene') this.updateCutscene(realDt)
@@ -1036,7 +1047,9 @@ export class AliensVsDinos {
         r.onGround = true
       }
       r.x = clamp(r.x, 50, WORLD - 50)
+      const step = Math.floor(r.walk / Math.PI)
       r.walk += Math.abs(r.vx) * dt * 0.07
+      if (r.onGround && Math.abs(r.vx) > 60 && Math.floor(r.walk / Math.PI) !== step) sfx.step()
       if (r.onGround && Math.abs(r.vx) > 200 && Math.random() < dt * 8) fx.dust(r.x - r.face * 20, GROUND, 1)
     }
 
