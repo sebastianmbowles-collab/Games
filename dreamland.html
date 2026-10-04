@@ -19,6 +19,8 @@
 html,body{height:100%;margin:0;overflow:hidden;background:#24124a;color:var(--cream);font-family:var(--f-body);-webkit-user-select:none;user-select:none;touch-action:none}
 canvas{display:block;width:100%;height:100%}
 #game{position:fixed;inset:0}
+/* soft dark corners, like an old dreamy photo */
+#game::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(30,8,70,.42) 100%)}
 .hud{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;pointer-events:none;z-index:5}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{background:var(--panel);border:1px solid var(--panel-line);border-radius:999px;padding:4px 12px;font:800 13px/1.4 var(--f-body);letter-spacing:.06em;text-transform:uppercase;font-variant-numeric:tabular-nums;backdrop-filter:blur(6px)}
@@ -377,20 +379,32 @@ function terrainH(x, z) {
 {
   let g = new THREE.PlaneGeometry(64, 112, 64, 112);
   g.rotateX(-Math.PI / 2); g.translate(0, 0, 41);
-  g = g.toNonIndexed();
+  // smooth rolling hills: colours blend softly from place to place instead of a checkerboard
   const p = g.attributes.position, cols = new Float32Array(p.count * 3);
-  const meadow = [0xd23fb4, 0xe455c8, 0xb8309f, 0xf06ad0, 0xc93cc0].map(c => new THREE.Color(c));
-  const desert = [0xffb3d9, 0xf4a6ea, 0xe6a8ff, 0xffc6e0, 0xffbfcf].map(c => new THREE.Color(c));
-  for (let i = 0; i < p.count; i++) p.setY(i, terrainH(p.getX(i), p.getZ(i)));
-  for (let f = 0; f < p.count; f += 3) {
-    const cz = (p.getZ(f) + p.getZ(f + 1) + p.getZ(f + 2)) / 3;
-    const t = clamp((cz - 19) / 6, 0, 1);
-    const c = pick(meadow).clone().lerp(pick(desert), t);
-    for (let k = 0; k < 3; k++) { cols[(f + k) * 3] = c.r; cols[(f + k) * 3 + 1] = c.g; cols[(f + k) * 3 + 2] = c.b; }
+  const mA = new THREE.Color(0xb8329f), mB = new THREE.Color(0xf070d0), mC = new THREE.Color(0x7a3ad0);
+  const dA = new THREE.Color(0xe07ab0), dB = new THREE.Color(0xb880e0), dC = new THREE.Color(0xf09a88);
+  const c = new THREE.Color(), d = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i), y = terrainH(x, z); p.setY(i, y);
+    const n1 = (Math.sin(x * .21 + z * .13) + Math.sin(x * .07 - z * .19)) * .25 + .5, n2 = clamp(noise(x * 1.7, z * 1.7) * .5 + .5, 0, 1);
+    c.copy(mA).lerp(mB, n1).lerp(mC, n2 * n2 * .7);
+    d.copy(dA).lerp(dB, n1).lerp(dC, n2 * .5);
+    c.lerp(d, clamp((z - 19) / 6, 0, 1));
+    const shade = .9 + rand(0, .1); // a tiny bit of speckle, like sand and grass
+    cols[i * 3] = c.r * shade; cols[i * 3 + 1] = c.g * shade; cols[i * 3 + 2] = c.b * shade;
   }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   g.computeVertexNormals();
-  scene.add(mesh(g, new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 0 })));
+  // a speckly picture painted over the ground, so it looks like soft grass and sand up close
+  const tc = document.createElement('canvas'); tc.width = tc.height = 256; const k = tc.getContext('2d');
+  k.fillStyle = '#e6e6e6'; k.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 1400; i++) {
+    const v = Math.floor(rand(185, 255)); k.fillStyle = `rgba(${v},${v},${v},${rand(.25, .6)})`;
+    k.beginPath(); k.ellipse(rand(0, 256), rand(0, 256), rand(1, 5), rand(1, 3), rand(0, 3), 0, 7); k.fill();
+  }
+  const tex = new THREE.CanvasTexture(tc); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(24, 42);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  scene.add(mesh(g, new THREE.MeshPhongMaterial({ vertexColors: true, map: tex, shininess: 6, specular: 0x2a1430 })));
 }
 
 // ---------- solids (collision boxes) ----------
