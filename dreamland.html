@@ -827,7 +827,7 @@ const boss = (() => {
     for (let i = 0; i < 5; i++) {
       const seg = new THREE.Group(); seg.position.set(0, i ? .55 : 0, i ? -.35 : 0); seg.rotation.x = -.38;
       const ball = model('TailSeg', { shell: sh }); ball.scale.setScalar(1 - i * .12); seg.add(ball);
-      prev.add(seg); prev = seg;
+      seg.userData.hitR = .55 - i * .06; prev.add(seg); prev = seg;
     }
     const sting = model('Sting'); sting.material = glow(0xff3fb0); sting.position.set(0, .3, .35); sting.rotation.x = 2.2; prev.add(sting);
     g.position.set(0, -4, 78); g.visible = false; scene.add(g);
@@ -846,7 +846,7 @@ const boss = (() => {
   for (let i = 0; i < 5; i++) {
     const seg = new THREE.Group(); seg.position.set(0, i ? .55 : 0, i ? -.35 : 0); seg.rotation.x = -.38;
     seg.add(mesh(new THREE.IcosahedronGeometry(.5 - i * .06, 0), i % 2 ? pink : shell));
-    prev.add(seg); prev = seg;
+    seg.userData.hitR = .55 - i * .06; prev.add(seg); prev = seg;
   }
   const sting = mesh(new THREE.ConeGeometry(.25, .8, 5), glow(0xff3fb0)); sting.position.set(0, .3, .35); sting.rotation.x = 2.2; prev.add(sting);
   g.position.set(0, -4, 78); g.visible = false; scene.add(g);
@@ -1118,7 +1118,7 @@ function bossCine() {
 function resetBoss() {
   Object.assign(boss, { hp: boss.maxHp, x: 0, z: 78, mode: 'walk', modeT: 0, cool: 2, charge: 4, phase: 1, under: false, hits: [], shotCool: 3, burrowCool: 6 });
   if (boss.active) boss.rise = 1;
-  boss.shell.color.setHex(0xc9a6ff); bossRing.visible = false;
+  boss.shell.color.setHex(0xc9a6ff); bossRing.visible = false; boss.tail.scale.setScalar(1); straighten(0);
   bossShots.forEach(s => scene.remove(s.m)); bossShots.length = 0;
   $('bossfill').style.width = '100%';
 }
@@ -1170,27 +1170,91 @@ function backToBed() {
     $('fade').style.opacity = 0;
   }, 1500);
 }
+// ============ HITBOXES ============
+// Every fighter has an invisible shape that counts for hits:
+//  - you: a capsule (a tall pill) from your feet to your head
+//  - robots: a pill the size of their body
+//  - the scorpion: a bunch of balls that follow its body, claws, tail and stinger
+// A punch is a short line from your eyes in the direction you look. It hits the
+// first thing it touches, and it can't go through walls. Press H to see them all!
+const HB = { you: .4, robot: .55 };
+// how far is point p from the line segment a-b?
+function segDist(ax, ay, az, bx, by, bz, px, py, pz) {
+  const vx = bx - ax, vy = by - ay, vz = bz - az, l2 = vx * vx + vy * vy + vz * vz;
+  const t = l2 ? clamp(((px - ax) * vx + (py - ay) * vy + (pz - az) * vz) / l2, 0, 1) : 0;
+  return Math.hypot(ax + vx * t - px, ay + vy * t - py, az + vz * t - pz);
+}
+// does a ball touch YOUR capsule?
+const touchesYou = (x, y, z, r) => segDist(P.x, P.y + .25, P.z, P.x, P.y + 1.45, P.z, x, y, z) < r + HB.you;
+// the robot's body capsule
+const robotDist = (r, x, y, z) => { const g = terrainH(r.x, r.z) + r.lift; return segDist(r.x, g + .45, r.z, r.x, g + 1.95, r.z, x, y, z); };
+// the scorpion's balls, worked out from where its real parts are right now
+const BOSS_PARTS = [[0, 1.1, -.4, 1.45], [0, 1.1, 1.0, 1.25], [0, 1.15, 2.15, .95], [1.7, 1, 3.3, .7], [-1.7, 1, 3.3, .7], [1.35, 1, 2.3, .45], [-1.35, 1, 2.3, .45], [1.9, .7, 0, .55], [-1.9, .7, 0, .55]];
+const _hv = new THREE.Vector3();
+function bossBalls() {
+  boss.g.updateMatrixWorld(true);
+  const out = BOSS_PARTS.map(([x, y, z, r]) => { boss.g.localToWorld(_hv.set(x, y, z)); return { x: _hv.x, y: _hv.y, z: _hv.z, r }; });
+  boss.tail.traverse(o => { if (o.userData.hitR) { o.getWorldPosition(_hv); out.push({ x: _hv.x, y: _hv.y, z: _hv.z, r: o.userData.hitR * boss.tail.scale.y, tail: true }); } });
+  boss.sting.getWorldPosition(_hv); out.push({ x: _hv.x, y: _hv.y, z: _hv.z, r: .55, tail: true, sting: true });
+  return out;
+}
+const insideSolid = (x, y, z) => solids.some(b => b.on && x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1 && z > b.z0 && z < b.z1);
+// press H to see the hitboxes
+const hbView = new THREE.Group(); hbView.visible = false; scene.add(hbView);
+const hbMat = new THREE.MeshBasicMaterial({ color: 0x7ff0d8, wireframe: true, transparent: true, opacity: .6, depthTest: false });
+const hbBall = new THREE.SphereGeometry(1, 10, 6), hbPill = new THREE.CylinderGeometry(1, 1, 1, 10, 1, true);
+const hbPool = [];
+function drawHitboxes() {
+  if (!hbView.visible) return;
+  let n = 0;
+  const get = geo => { let m = hbPool[n]; if (!m) { m = mesh(hbBall, hbMat); m.renderOrder = 9; hbPool.push(m); hbView.add(m); } m.geometry = geo; m.visible = true; n++; return m; };
+  for (const r of robots) if (r.alive && r.active) {
+    const g = terrainH(r.x, r.z) + r.lift;
+    get(hbPill).position.set(r.x, g + 1.2, r.z); hbPool[n - 1].scale.set(HB.robot, 1.5, HB.robot);
+    get(hbBall).position.set(r.x, g + .45, r.z); hbPool[n - 1].scale.setScalar(HB.robot);
+    get(hbBall).position.set(r.x, g + 1.95, r.z); hbPool[n - 1].scale.setScalar(HB.robot);
+  }
+  if (boss.g.visible && boss.active && !boss.under) for (const b of bossBalls()) { get(hbBall).position.set(b.x, b.y, b.z); hbPool[n - 1].scale.setScalar(b.r); }
+  for (const s of bossShots) { get(hbBall).position.set(s.x, s.y, s.z); hbPool[n - 1].scale.setScalar(.3); }
+  for (; n < hbPool.length; n++) hbPool[n].visible = false;
+}
+addEventListener('keydown', e => { if (e.code === 'KeyH' && state.mode === 'play') { hbView.visible = !hbView.visible; toast(hbView.visible ? 'Hitboxes ON' : 'Hitboxes OFF', 'press H to switch'); } });
+
 function doPunch(charged) {
   punchT = .22; punchSide *= -1; sfx(charged ? 'big' : 'punch'); sfx('swing');
   let dmg = charged ? 3 : 1; if (state.buffs.power > 0) dmg *= 2;
-  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
-  // generous on purpose: you don't have to aim perfectly
-  const tryHit = (tx, tz, ty, radius) => {
-    const dx = tx - P.x, dz = tz - P.z, d = Math.hypot(dx, dz);
-    if (d > 2.3 + radius || Math.abs(ty - P.y) > 2.6) return false;
-    return d < radius + .6 || (dx * fx + dz * fz) / d > .3;
-  };
-  let hitAny = false;
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), cp = Math.cos(P.pitch);
+  const dx = fx * cp, dy = Math.sin(P.pitch), dz = fz * cp;
+  // the punch: a line from your eyes, as long as your reach, with a fist-sized thickness
+  const reach = charged ? 2.9 : 2.4, fist = charged ? .55 : .42, ex = P.x, ey = P.y + EYE, ez = P.z;
+  const found = []; // [how far along the punch, what got hit]
+  let wall = reach;
+  for (let t = .3; t <= reach; t += .15) if (insideSolid(ex + dx * t, ey + dy * t, ez + dz * t)) { wall = t; break; }
+  const firstTouch = dist => { for (let t = 0; t <= wall; t += .1) if (dist(ex + dx * t, ey + dy * t, ez + dz * t) < fist) return t; return -1; };
   for (const r of robots) {
     if (!r.alive || !r.active) continue;
-    const ry = terrainH(r.x, r.z) + r.lift;
-    if (tryHit(r.x, r.z, ry, .5)) {
-      hitAny = true; hitRobot(r, dmg, charged ? 10 : 6);
-    }
+    const t = firstTouch((x, y, z) => robotDist(r, x, y, z) - HB.robot);
+    if (t >= 0) found.push([t, r]);
   }
-  if (boss.active && tryHit(boss.x, boss.z, terrainH(boss.x, boss.z), 2.2)) { hitAny = true; hitBoss(dmg); }
-  if (hitAny) sfx('hit');
-  if (hitAny) burst(P.x + fx * 1.2, P.y + 1.3, P.z + fz * 1.2, [0xffffff, 0xffe27f], charged ? 10 : 4);
+  if (boss.active && !boss.under) {
+    const balls = bossBalls();
+    const t = firstTouch((x, y, z) => Math.min(...balls.map(b => Math.hypot(b.x - x, b.y - y, b.z - z) - b.r)));
+    if (t >= 0) found.push([t, boss]);
+  }
+  // a little help aiming: if the line just missed, a robot almost straight ahead still counts
+  if (!found.length) for (const r of robots) {
+    if (!r.alive || !r.active) continue;
+    const ox = r.x - P.x, oz = r.z - P.z, od = Math.hypot(ox, oz) || 1;
+    if (od < reach + .3 && (ox * fx + oz * fz) / od > .82 && Math.abs(terrainH(r.x, r.z) + r.lift + 1 - (P.y + 1)) < 1.6 && od < wall + .6) found.push([od, r]);
+  }
+  found.sort((a, b) => a[0] - b[0]);
+  // a normal punch hits the first thing; a charged punch goes through everything in reach
+  const hits = charged ? found : found.slice(0, 1);
+  for (const [, who] of hits) { if (who === boss) hitBoss(dmg); else hitRobot(who, dmg, charged ? 10 : 6); }
+  if (hits.length) {
+    sfx('hit'); const t = hits[0][0];
+    burst(ex + dx * t, ey + dy * t, ez + dz * t, [0xffffff, 0xffe27f], charged ? 10 : 4);
+  } else if (wall < reach) { sfx('thud'); burst(ex + dx * wall, ey + dy * wall, ez + dz * wall, [0xffffff], 3); }
 }
 function hitBoss(dmg) {
   if (!boss.active || boss.under) return; // you can't punch it while it's under the sand
@@ -1220,7 +1284,7 @@ function landSlam() {
     if (!r.alive || !r.active) continue;
     if (Math.hypot(r.x - P.x, r.z - P.z) < 4 && Math.abs(terrainH(r.x, r.z) - P.y) < 2.5) { r.lv = 4; hitRobot(r, dmg, 9); }
   }
-  if (boss.active && Math.hypot(boss.x - P.x, boss.z - P.z) < 5) hitBoss(dmg);
+  if (boss.active && !boss.under && bossBalls().some(b => !b.tail && Math.hypot(b.x - P.x, b.z - P.z) < b.r + 2.5)) hitBoss(dmg);
 }
 // gravity gloves: grab the robot you're looking at and fling it
 const gloveBeam = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xc9a6ff }));
@@ -1659,6 +1723,12 @@ function updateRobots(dt, time) {
       }
     }
     r.repath -= dt; r.punch = Math.max(0, r.punch - dt);
+    // the fist lands about halfway through the swing: it only hurts if it really reaches you
+    if (r.punch > 0 && r.punch < .22 && !r.punched && !r.flung) {
+      r.punched = true;
+      const a = r.g.rotation.y, g = terrainH(r.x, r.z) + r.lift;
+      if (touchesYou(r.x + Math.sin(a) * 1.05, g + 1.15, r.z + Math.cos(a) * 1.05, .45)) hurt(1, r.x, r.z);
+    }
     const sees = playing && d < 15 && Math.abs(P.y - terrainH(r.x, r.z)) < 3.5;
     const zb = ZONES[r.zone], tx = clamp(P.x, zb.x0, zb.x1), tz = clamp(P.z, zb.z0, zb.z1); // as close to you as its area allows
     if (r.flung) { /* no walking while flying */ }
@@ -1670,7 +1740,7 @@ function updateRobots(dt, time) {
       else if (r.repath <= 0) { r.path = findPath(r.x, r.z, tx, tz, r.zone); r.repath = rand(.35, .6); }
       speed = 2.9;
       r.cool -= dt;
-      if (d < 1.6 && r.cool <= 0 && r.lift < .5) { r.cool = 1.3; r.punch = .3; hurt(1, r.x, r.z); }
+      if (d < 1.9 && r.cool <= 0 && r.lift < .5) { r.cool = 1.4; r.punch = .55; r.punched = false; } // wind up (you can dodge!)
       if (d < 3) r.face = Math.atan2(dx, dz);
     } else {
       // PATROL: walk to a spot, look around for a moment, then pick a new spot
@@ -1707,7 +1777,9 @@ function updateRobots(dt, time) {
     const sw = Math.sin(r.step) * .7 * moving;
     if (r.limbs) {
       r.limbs[0].rotation.x = sw; r.limbs[1].rotation.x = -sw;
-      r.limbs[2].rotation.x = -sw * .8; r.limbs[3].rotation.x = r.punch > 0 ? -1.6 * Math.sin(r.punch / .3 * Math.PI) : sw * .8;
+      // punching arm: pull back for the first part, then swing forward
+      const pt = 1 - r.punch / .55, swing = pt < .45 ? .8 * pt / .45 : -1.7 * Math.sin((pt - .45) / .55 * Math.PI);
+      r.limbs[2].rotation.x = -sw * .8; r.limbs[3].rotation.x = r.punch > 0 ? swing : sw * .8;
     }
     // glitch!
     r.glitch -= dt;
@@ -1760,6 +1832,7 @@ function updateBoss(dt, time) {
     if (d < 10) { mx += -dz / d * boss.strafe * .8; mz += dx / d * boss.strafe * .8; } // circle around you
     boss.x += mx * spd * dt; boss.z += mz * spd * dt;
     boss.tail.rotation.x = tailBase;
+    if (boss.modeT > .3 && boss.cool <= 0 && bossBalls().some(b => !b.tail && touchesYou(b.x, b.y, b.z, b.r - .1))) { hurt(1, boss.x, boss.z); boss.cool = .6; } // bumped into it
     if (boss.hits.length >= 4) { boss.hits = []; sfx('warn'); go(angry && boss.burrowCool <= 0 ? 'burrow' : 'spinup'); }
     else if (d < 4 && boss.cool <= 0) { sfx('warn'); go(behind ? 'spinup' : 'windup'); }
     else if (angry && boss.burrowCool <= 0 && d > 6) go('burrow');
@@ -1771,19 +1844,29 @@ function updateBoss(dt, time) {
     }
   } else if (boss.mode === 'windup') {
     boss.g.rotation.y = turnTo(facing, toYou, Math.min(1, dt * 4));
-    boss.tail.rotation.x = -.5 * Math.min(1, boss.modeT / .5);
+    // raises its tail high over its head...
+    boss.tail.rotation.x = tailPose(1.5, Math.min(1, boss.modeT / .4), dt);
     boss.sting.material.color.setHex(Math.floor(time * 12) % 2 ? 0xffffff : 0xff3fb0);
-    if (boss.modeT > (angry ? .45 : .6)) { go('strike'); if (d < 4.2) hurt(1, boss.x, boss.z); }
+    if (boss.modeT > (angry ? .45 : .6)) go('strike');
   } else if (boss.mode === 'strike') {
-    boss.tail.rotation.x = .7; boss.sting.material.color.setHex(0xff3fb0);
-    if (boss.modeT > .4) { go('walk'); boss.cool = angry ? 1 : 1.5; }
+    // ...then stabs it down in front, stretching and lunging forward. Only the stinger hurts!
+    const k = Math.min(1, boss.modeT / .15);
+    boss.tail.rotation.x = 1.5 + .55 * k; boss.tail.scale.setScalar(1 + .55 * k); straighten(k);
+    if (boss.modeT < .2) { boss.x += Math.sin(facing) * 6 * dt; boss.z += Math.cos(facing) * 6 * dt; }
+    boss.sting.material.color.setHex(0xff3fb0);
+    if (boss.modeT > .06 && boss.modeT < .3) { const st = bossBalls().find(b => b.sting); if (touchesYou(st.x, st.y, st.z, .9)) hurt(1, st.x, st.z); }
+    if (boss.modeT > .45) { go('walk'); boss.cool = angry ? 1 : 1.5; boss.tail.scale.setScalar(1); straighten(0); }
   } else if (boss.mode === 'spinup') {
     // shakes, then whirls its tail in a full circle: jump back!
     boss.g.position.x += rand(-.06, .06); boss.tail.rotation.x = -.6;
     if (boss.modeT > .45) go('spin');
   } else if (boss.mode === 'spin') {
-    boss.g.rotation.y += dt * 22; boss.tail.rotation.x = .3;
-    if (d < 4.6) hurt(1, boss.x, boss.z);
+    // the tail sweeps low in a circle: JUMP over it!
+    boss.g.rotation.y += dt * 18; boss.tail.rotation.x = -.9; straighten(1);
+    const low = P.y - terrainH(P.x, P.z) < .9;
+    if (low && bossBalls().some(b => b.tail && touchesYou(b.x, b.y, b.z, b.r + .35))) hurt(1, boss.x, boss.z);
+    else if (low && d < 4.4 && d > 1.5 && boss.modeT > .1) hurt(1, boss.x, boss.z); // the sweep is too fast to see every frame
+    if (boss.modeT > .6) straighten(0);
     if (boss.modeT > .6) { go('walk'); boss.cool = 1.2; }
   } else if (boss.mode === 'spit') {
     // spits blobs of pink goo where you're about to be
@@ -1797,7 +1880,7 @@ function updateBoss(dt, time) {
     if (boss.modeT < .5) { boss.g.position.x += rand(-.08, .08); boss.g.rotation.y = turnTo(facing, Math.atan2(boss.cdx, boss.cdz), Math.min(1, dt * 8)); }
     else {
       boss.x += boss.cdx * (angry ? 12 : 10) * dt; boss.z += boss.cdz * (angry ? 12 : 10) * dt;
-      if (d < 2.4) hurt(1, boss.x, boss.z);
+      if (bossBalls().some(b => !b.tail && touchesYou(b.x, b.y, b.z, b.r))) hurt(1, boss.x, boss.z);
     }
     if (boss.modeT > 1.3) {
       if (--boss.charges > 0) { // angry: turns round and charges again, aimed at where you're going
@@ -1824,12 +1907,15 @@ function updateBoss(dt, time) {
     if (boss.modeT > .8) {
       bossRing.visible = false; boss.under = false; boss.rise = 1; state.shake = .4; sfx('slam');
       burst(boss.x, terrainH(boss.x, boss.z) + .5, boss.z, [0xffc6e0, 0xffffff, 0xc9a6ff], 22);
-      if (d < 2.6) hurt(2, boss.x, boss.z);
+      if (Math.hypot(P.x - boss.x, P.z - boss.z) < 2.5 && P.y - terrainH(P.x, P.z) < 2) hurt(2, boss.x, boss.z); // the ring shows exactly where
       go('walk'); boss.cool = .8; boss.burrowCool = rand(7, 10);
     }
   }
   boss.x = clamp(boss.x, -26, 26); boss.z = clamp(boss.z, 60, 91);
 }
+// bend the tail segments: 0 = curled like normal, 1 = stretched straight
+function straighten(k) { boss.tail.traverse(o => { if (o.userData.hitR) o.rotation.x = -.38 * (1 - k); }); }
+function tailPose(target, k, dt) { return boss.tail.rotation.x + (target - boss.tail.rotation.x) * Math.min(1, k + dt * 6); }
 function sandPuff(x, z, dt) {
   boss.dustT -= dt; if (boss.dustT > 0) return; boss.dustT = .12;
   burst(x + rand(-.8, .8), terrainH(x, z) + .1, z + rand(-.8, .8), [0xffd6ec, 0xffffff], 2);
@@ -1848,9 +1934,10 @@ function updateBossShots(dt) {
     const s = bossShots[i];
     s.vy -= 14 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
     s.m.position.set(s.x, s.y, s.z);
-    if (s.y <= terrainH(s.x, s.z)) {
+    const direct = touchesYou(s.x, s.y, s.z, .3);
+    if (direct || s.y <= terrainH(s.x, s.z)) {
       burst(s.x, s.y + .2, s.z, [0xff5fc0, 0xffc6e0], 6);
-      if (Math.hypot(P.x - s.x, P.z - s.z) < 1.4 && P.y - terrainH(s.x, s.z) < 1.2) hurt(1, s.x, s.z);
+      if (direct || (Math.hypot(P.x - s.x, P.z - s.z) < 1.2 && P.y - terrainH(s.x, s.z) < .6)) hurt(1, s.x, s.z);
       scene.remove(s.m); bossShots.splice(i, 1);
     }
   }
@@ -1938,6 +2025,7 @@ function loop(now) {
   if (state.buffs.beacon > 0 && state.mode === 'play') { const t = objectiveTarget(); beacon.visible = true; beacon.position.set(t.x, 30, t.z); beacon.material.opacity = .25 + Math.sin(time * 4) * .1; }
   else beacon.visible = false;
   drawCharge();
+  drawHitboxes();
   // the sun's shadow box follows you around (snapped so shadows don't shimmer)
   sun.target.position.set(Math.round(camera.position.x * 4) / 4, 0, Math.round(camera.position.z * 4) / 4);
   sun.position.copy(sun.target.position).add(SUN_DIR);
