@@ -78,18 +78,24 @@ body.cine #hint,body.title #hint{visibility:hidden}
 #title{position:fixed;inset:0;z-index:9;display:flex;flex-direction:column;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 7vh) 16px calc(env(safe-area-inset-bottom,0px) + 24px);pointer-events:none;background:linear-gradient(rgba(20,8,48,.35),transparent 40%,transparent 60%,rgba(20,8,48,.5))}
 body:not(.title) #title{display:none}
 body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{display:none}
-.tlogo{font:800 clamp(56px,13vw,124px)/.9 var(--f-display);letter-spacing:.02em;color:#fff;text-shadow:0 0 18px rgba(255,150,220,.9),0 0 50px rgba(160,110,255,.7),0 6px 0 #4a1f9a;white-space:nowrap}
-.tlogo span{display:inline-block;animation:drift 4s ease-in-out infinite}
+.tlogo{font:800 clamp(52px,11vw,112px)/.9 var(--f-display);letter-spacing:.04em;color:#fff;filter:drop-shadow(0 0 14px rgba(255,150,220,.75)) drop-shadow(0 5px 0 #4a1f9a);white-space:nowrap}
+.tlogo span.glitch{-webkit-text-fill-color:#7ff0d8;background:none}
+.chapter{font:800 11px var(--f-body);letter-spacing:.4em;text-transform:uppercase;color:var(--mint);margin-bottom:6px;text-shadow:0 0 10px rgba(127,240,216,.6)}
+#title::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 50% 55%,transparent 45%,rgba(18,6,44,.55));pointer-events:none;z-index:-1}
+.tlogo span{display:inline-block;animation:drift 4s ease-in-out infinite;background:linear-gradient(180deg,#fff 25%,#ffd6f2 60%,#d9b8ff 95%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .tlogo span.glitch{color:#7ff0d8;transform:translateX(4px) skewX(-12deg);text-shadow:-3px 0 #ff3fb0,3px 0 #5ff6ff}
 @keyframes drift{50%{transform:translateY(-6px)}}
+@keyframes blink{50%{opacity:.25}}
 .tagline{font:800 13px var(--f-body);letter-spacing:.32em;text-transform:uppercase;color:#e9dcff;margin-top:6px;text-align:center}
-.menu{margin-top:auto;display:grid;gap:6px;justify-items:center;pointer-events:auto}
-.menu button{font:800 clamp(20px,3.6vw,28px) var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:none;border:0;color:rgba(255,244,251,.6);cursor:pointer;padding:2px 18px;transition:transform .35s cubic-bezier(.3,1.6,.5,1),color .2s}
-.menu button.sel{color:#fff;transform:translateY(-6px);text-shadow:0 0 16px rgba(255,111,200,.9)}
-.menu button.sel::before{content:"▶ ";color:var(--pink)}
-.menu button.off{color:rgba(255,244,251,.25)}
+.menu{position:absolute;left:max(24px,5vw);bottom:calc(env(safe-area-inset-bottom,0px) + 40px);display:grid;gap:8px;width:min(280px,calc(100% - 48px));padding:14px;border-radius:24px;background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(120,60,200,.18));border:1px solid rgba(255,220,245,.35);box-shadow:0 10px 40px rgba(20,6,50,.45),inset 0 1px 0 rgba(255,255,255,.25);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);pointer-events:auto}
+.menu button{display:flex;align-items:center;gap:12px;font:800 20px var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.06);border:1px solid transparent;border-radius:14px;color:rgba(255,244,251,.75);cursor:pointer;padding:8px 14px;text-align:left;transition:transform .3s cubic-bezier(.3,1.6,.5,1),background .2s,color .2s}
+.menu button i{font-style:normal;font-size:18px;width:24px;text-align:center}
+.menu button.sel{color:#2a1450;background:linear-gradient(90deg,#fff,#ffc4ec);transform:translateX(6px);box-shadow:0 4px 0 #c2408f,0 0 24px rgba(255,111,200,.55)}
+.menu button.off{color:rgba(255,244,251,.35)}
+.menu button.off.sel{color:#7a5a9a}
+@media (max-width:640px){.menu{left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 34px)}}
 .menu button:focus-visible{outline:2px solid var(--mint);border-radius:8px}
-#tapToWake{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);font:800 11px var(--f-body);letter-spacing:.2em;text-transform:uppercase;opacity:.6}
+#tapToWake{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);animation:blink 2.4s ease-in-out infinite;font:800 11px var(--f-body);letter-spacing:.2em;text-transform:uppercase;opacity:.6}
 #speech{position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:11;font:800 clamp(20px,3.6vw,30px) var(--f-display);color:#fff;text-shadow:0 0 20px #000,0 2px 0 #2a1450;pointer-events:none;text-align:center;width:calc(100% - 32px);opacity:0;transition:opacity .5s}
 #flicker{position:fixed;inset:0;z-index:12;background:#fff;opacity:0;pointer-events:none;mix-blend-mode:difference}
 .panel{z-index:13;background:rgba(26,10,60,.92)}
@@ -145,13 +151,14 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 
 <div id="title">
   <div id="tapToWake">Tap anywhere to start the dream</div>
+  <div class="chapter">Chapter 1 · The Pastel Desert</div>
   <div class="tlogo" id="tlogo" aria-label="Dreamland"></div>
   <div class="tagline">A dream can hide anything.</div>
   <nav class="menu" id="menu">
-    <button data-act="new">New Dream</button>
-    <button data-act="continue" id="mContinue">Continue</button>
-    <button data-act="ach">Achievements</button>
-    <button data-act="settings">Settings</button>
+    <button data-act="new"><i>☾</i><span>New Dream</span></button>
+    <button data-act="continue" id="mContinue"><i>✦</i><span>Continue</span></button>
+    <button data-act="ach"><i>★</i><span>Achievements</span></button>
+    <button data-act="settings"><i>⚙</i><span>Settings</span></button>
   </nav>
 </div>
 <div id="speech"></div>
@@ -236,7 +243,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 $('game').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xb88cf0, 40, 230);
+scene.fog = new THREE.Fog(0xc493f2, 40, 230);
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 500);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
@@ -246,7 +253,21 @@ addEventListener('resize', () => {
 });
 
 scene.add(new THREE.HemisphereLight(0xffd8f6, 0x7a2fb0, 0.95));
-const sun = new THREE.DirectionalLight(0xfff0e6, 0.75); sun.position.set(30, 50, 10); scene.add(sun);
+const sun = new THREE.DirectionalLight(0xfff0e6, 0.7); sun.position.set(30, 50, 10); scene.add(sun);
+// a cool moonlight from behind gives everything a soft blue edge
+const rim = new THREE.DirectionalLight(0x9fd0ff, 0.35); rim.position.set(-40, 30, -60); scene.add(rim);
+
+// a soft round glow picture, used for the moon, sparkles and gem halos
+const glowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const k = c.getContext('2d');
+  const g = k.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.25, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  k.fillStyle = g; k.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
+})();
+function halo(color, size, opacity = .7) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false }));
+  sp.scale.set(size, size, 1); return sp;
+}
 
 const mat = (c, o = {}) => new THREE.MeshPhongMaterial(Object.assign({ color: c, flatShading: true, shininess: 4 }, o));
 const glow = c => new THREE.MeshBasicMaterial({ color: c });
@@ -271,6 +292,27 @@ const boxG = (w, h, d) => new THREE.BoxGeometry(w, h, d);
   sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
   scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, fog: false })));
 }
+// big twinkly stars
+const bigStars = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ map: glowTex, color: 0xffe6fa, size: 7, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+{ const sp = []; for (let i = 0; i < 70; i++) { const a = rand(0, Math.PI * 2), e = rand(0.3, 1.3); sp.push(Math.cos(a) * Math.cos(e) * 270, Math.sin(e) * 270, Math.sin(a) * Math.cos(e) * 270); }
+  bigStars.geometry.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); scene.add(bigStars); }
+// the moon (it's always night in Dreamland)
+const moon = new THREE.Group();
+{ const m = mesh(new THREE.SphereGeometry(13, 20, 14), new THREE.MeshBasicMaterial({ color: 0xfff3fb, fog: false })); moon.add(m);
+  [[-4, 3, 3], [5, -2, 2.2], [1, -6, 1.6]].forEach(([x, y, r]) => { const c = mesh(new THREE.CircleGeometry(r, 12), new THREE.MeshBasicMaterial({ color: 0xf0d8f4, fog: false })); c.position.set(x, y, 12.6); moon.add(c); });
+  const h = halo(0xffb8ee, 90, .55); h.material.fog = false; moon.add(h); }
+moon.position.set(95, 70, -245); moon.lookAt(0, 10, 0); scene.add(moon);
+// shooting stars now and then
+const shooting = halo(0xffffff, 6, 1); shooting.material.fog = false; shooting.visible = false; scene.add(shooting);
+let shootT = 3, shootV = new THREE.Vector3();
+// dream dust: tiny glowing sparkles floating everywhere
+const dust = (() => {
+  const n = 450, pos = new Float32Array(n * 3), seed = [];
+  for (let i = 0; i < n; i++) { pos[i * 3] = rand(-32, 32); pos[i * 3 + 1] = rand(0, 14); pos[i * 3 + 2] = rand(-14, 95); seed.push(rand(0, 6)); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ map: glowTex, color: 0xffd6f6, size: .35, transparent: true, opacity: .85, depthWrite: false, blending: THREE.AdditiveBlending }));
+  scene.add(pts); return { pts, pos, seed, n };
+})();
 
 // ---------- terrain ----------
 function noise(x, z) { return Math.sin(x * .31 + z * .17) * .5 + Math.sin(x * .13 - z * .27) * .5 + Math.sin(x * .7 + z * .53) * .25; }
@@ -423,6 +465,19 @@ const toyCar = new THREE.Group();
 toyCar.position.set(0, 2.1, 4.6); scene.add(toyCar);
 
 // ============ OUTSIDE: THE WINDOW CLIMB ============
+// fairy lights hanging across the outside of the bedroom, and a frame around the window
+const fairy = [];
+{ const cols = [0xff8fd8, 0x8fe9ff, 0xffe27f, 0xb9a6ff, 0x9ff0c0];
+  for (let i = 0; i <= 16; i++) {
+    const x = -5 + i * 10 / 16, y = 3.9 - Math.sin(i / 16 * Math.PI) * .7 - Math.abs(Math.sin(i / 16 * Math.PI * 4)) * .25, c = cols[i % cols.length];
+    const b = mesh(new THREE.SphereGeometry(.08, 6, 4), glow(c)); b.position.set(x, y, 5.42); scene.add(b);
+    const h = halo(c, .9, .8); h.position.copy(b.position); scene.add(h); fairy.push({ h, s: i });
+  }
+  const trim = mat(0xffffff);
+  [[0, 3.0, 2.6, .18], [0, 0.98, 2.6, .18]].forEach(([x, y, w, hh]) => { const m = mesh(boxG(w, hh, .1), trim); m.position.set(x, y, 5.33); scene.add(m); });
+  [-1.2, 1.2].forEach(x => { const m = mesh(boxG(.18, 2.2, .1), trim); m.position.set(x, 2, 5.33); scene.add(m); });
+  [[-3.4, 2.2], [3.3, 1.4], [-2.6, .9], [4, 2.9]].forEach(([x, y], i) => { const st = mesh(new THREE.OctahedronGeometry(.22, 0), glow([0xfff2a8, 0xffc4ec][i % 2])); st.scale.z = .3; st.position.set(x, y, 5.34); scene.add(st); });
+}
 block(3, 0.4, 2, 0xe6c4ff, 0, 0.6, 6.3);       // ledge under the window
 block(1.2, 0.5, 1.2, 0xc9a6ff, -1.9, 0, 6.6);  // small step to climb back up
 hexIsland(0.9, 2.2, 1.55, 8.3, 0xffd2f0);
@@ -515,6 +570,7 @@ const gloves = new THREE.Group();
 { const gm = mat(0xb07fff, { emissive: 0x7f3fff, emissiveIntensity: .5, shininess: 60 });
   [-.22, .22].forEach(x => { const h = mesh(boxG(.3, .3, .3), gm); h.position.x = x; gloves.add(h);
     const c = mesh(boxG(.34, .1, .34), glow(0x7ff0d8)); c.position.set(x, -.18, 0); gloves.add(c); }); }
+gloves.add(halo(0xb07fff, 2.4, .7));
 gloves.position.set(PILLAR.x, PILLAR.top + .7, PILLAR.z); scene.add(gloves);
 
 // ============ FAR-AWAY DREAMLAND (seen from the title screen) ============
@@ -616,6 +672,7 @@ function makeFist(side) {
   return g;
 }
 const fists = [makeFist(-1), makeFist(1)];
+fists.forEach(f => f.visible = false); // no floating hands on the title screen
 let punchT = 0, punchSide = 1, charging = false, chargeT = 0, bobT = 0;
 
 // ============ ENEMIES ============
@@ -681,6 +738,7 @@ function addGem(type, x, z, y, hidden) {
   const m = mesh(new THREE.OctahedronGeometry(.28, 0), mat(GEMS[type], { emissive: GEMS[type], emissiveIntensity: .45, shininess: 60 }));
   const base = y ?? terrainH(x, z) + .7;
   m.position.set(x, base, z); m.visible = !hidden; scene.add(m);
+  m.add(halo(GEMS[type], 1.6, .55));
   const p = { kind: 'gem', type, m, base, taken: false, active: !hidden };
   pickups.push(p); return p;
 }
@@ -690,7 +748,8 @@ function makeKey(color = 0xffd36b) {
   const shaft = mesh(boxG(.08, .55, .08), m); g.add(shaft);
   const t1 = mesh(boxG(.18, .08, .08), m); t1.position.set(.09, -.2, 0); g.add(t1);
   const t2 = mesh(boxG(.13, .08, .08), m); t2.position.set(.07, -.05, 0); g.add(t2);
-  const halo = mesh(new THREE.TorusGeometry(.55, .03, 4, 16), glow(0xfff2a8)); halo.rotation.x = Math.PI / 2; halo.position.y = -.4; g.add(halo);
+  const ringH = mesh(new THREE.TorusGeometry(.55, .03, 4, 16), glow(0xfff2a8)); ringH.rotation.x = Math.PI / 2; ringH.position.y = -.4; g.add(ringH);
+  g.add(halo(color, 2.6, .7));
   scene.add(g); return g;
 }
 const key1 = { kind: 'key', n: 1, m: makeKey(), base: 3.8, taken: false, active: true };
@@ -789,6 +848,37 @@ function sfx(kind) {
   if (kind === 'kid') { [0, 7, 12, 16].forEach((s, i) => tone('sine', mtof(79 + s), t + i * .12, .6, .1, master)); }
   if (kind === 'gate') { const o = tone('sawtooth', 60, t, 2.5, .2, master, .5); o.frequency.linearRampToValueAtTime(30, t + 2.5); }
   if (kind === 'jump') { const o = tone('sine', 300, t, .15, .06, master); o.frequency.exponentialRampToValueAtTime(600, t + .15); }
+  // --- more sounds ---
+  if (kind === 'swing') hiss(t, .14, .07, 2400, 900, 'bandpass');
+  if (kind === 'hit') { tone('square', rand(520, 640), t, .08, .06, master); tone('triangle', 1250, t, .12, .05, master); hiss(t, .06, .12, 3000, 1500, 'highpass'); }
+  if (kind === 'charged') { tone('sine', mtof(84), t, .25, .06, master); tone('sine', mtof(91), t + .06, .3, .05, master); }
+  if (kind === 'step') hiss(t, .07, .035, rand(500, 800), 300, 'lowpass');
+  if (kind === 'land') { hiss(t, .12, .12, 600, 150, 'lowpass'); tone('sine', 90, t, .12, .12, master); }
+  if (kind === 'whoosh') hiss(t, .35, .12, 500, 3500, 'bandpass');
+  if (kind === 'slam') { hiss(t, .5, .3, 900, 80, 'lowpass'); tone('sine', 55, t, .6, .4, master); const o = tone('sawtooth', 120, t, .4, .12, master); o.frequency.exponentialRampToValueAtTime(40, t + .4); }
+  if (kind === 'glove') { const o = tone('sine', 200, t, .5, .1, master); o.frequency.exponentialRampToValueAtTime(1400, t + .4); tone('triangle', 900, t + .1, .3, .04, master); hiss(t, .4, .08, 800, 4000, 'bandpass'); }
+  if (kind === 'thud') { hiss(t, .25, .22, 400, 100, 'lowpass'); tone('sine', 70, t, .25, .25, master); }
+  if (kind === 'alert') { tone('square', 880, t, .07, .04, master); tone('square', 1320, t + .08, .09, .04, master); }
+  if (kind === 'warn') { [0, .12, .24].forEach(d => tone('square', 1500, t + d, .06, .05, master)); }
+  if (kind === 'roar') { const o = tone('sawtooth', 160, t, 1.4, .18, master, .2); o.frequency.exponentialRampToValueAtTime(55, t + 1.4); hiss(t, 1.3, .15, 300, 1200, 'bandpass'); }
+  if (kind === 'message') [0, 7, 12, 19].forEach((s, i) => tone('sine', mtof(81 + s), t + i * .1, 1.2, .06, master, .02));
+  if (kind === 'door') { const o = tone('sine', 300, t, .8, .1, master, .1); o.frequency.exponentialRampToValueAtTime(1200, t + .7); hiss(t, .7, .07, 1500, 5000, 'bandpass'); }
+  if (kind === 'fanfare') [[0, 0], [4, .12], [7, .24], [12, .36], [7, .5], [12, .62]].forEach(([s, d]) => { tone('triangle', mtof(72 + s), t + d, .35, .09, master); tone('sine', mtof(60 + s), t + d, .35, .06, master); });
+  if (kind === 'bed') [12, 7, 4, 0].forEach((s, i) => tone('sine', mtof(72 + s), t + i * .3, .9, .08, master, .05));
+  if (kind === 'climb') hiss(t, .09, .05, 1800, 900, 'bandpass');
+  if (kind === 'tick') tone('triangle', 1200, t, .05, .05, master);
+  if (kind === 'select') { tone('triangle', mtof(79), t, .15, .08, master); tone('triangle', mtof(86), t + .07, .25, .08, master); }
+  if (kind === 'pause') { tone('sine', 660, t, .15, .07, master); tone('sine', 440, t + .1, .2, .07, master); }
+}
+// a burst of filtered noise for whooshes, thuds and footsteps (the filter slides from f0 to f1)
+let noiseBuf = null;
+function hiss(t, dur, vol, f0, f1, type) {
+  if (!noiseBuf) { noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+  const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  src.buffer = noiseBuf; f.type = type; f.Q.value = type === 'bandpass' ? 1.2 : .7;
+  f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  src.connect(f); f.connect(g); g.connect(master); src.start(t, rand(0, .5)); src.stop(t + dur + .02);
 }
 function setMusic(on) {
   musicOn = on; if (musicBus) musicBus.gain.value = on ? .55 : 0;
@@ -817,7 +907,7 @@ function achieve(name, how) {
   if (state.achievements.has(name)) return;
   state.achievements.add(name); state.gems++;
   if (!saved.ach.includes(name)) { saved.ach.push(name); store.set(saved); }
-  setTimeout(() => { toast('Achievement: ' + name, how + ' · +1 rainbow gem'); sfx('key'); rainbow(); }, 1800);
+  setTimeout(() => { toast('Achievement: ' + name, how + ' · +1 rainbow gem'); sfx('fanfare'); rainbow(); }, 1800);
 }
 function rainbow() { state.buffs.jump = state.buffs.power = state.buffs.beacon = 12; }
 
@@ -885,7 +975,7 @@ function openGate() {
 }
 function bossCine() {
   state.bossSeen = true;
-  boss.g.visible = true;
+  boss.g.visible = true; setTimeout(() => sfx('roar'), 900);
   playCine([
     { text: 'The sand is moving…', d: 2.5, snap: true, pos: [7, 4, 64], look: [0, 1, 78] },
     { text: 'The PASTEL SCORPION guards the second key!', d: 3.5, pos: [4, 3, 68], look: [0, 2, 78], tick: dt => { boss.rise = Math.min(1, boss.rise + dt / 2); } },
@@ -927,7 +1017,7 @@ function hurt(n, fromX, fromZ) {
 function backToBed() {
   state.mode = 'dead';
   $('fadeText').textContent = 'Back to bed…'; $('fade').style.opacity = 1;
-  P.slam = false; saved.beds++; store.set(saved);
+  P.slam = false; saved.beds++; store.set(saved); sfx('bed');
   if (saved.beds >= 100) achieve('Sleepwalker', 'Go back to bed 100 times');
   setTimeout(() => {
     Object.assign(P, { x: 0, y: 0, z: -1, vy: 0, yaw: Math.PI, pitch: 0, hp: 5, kx: 0, kz: 0, hurtT: 1 });
@@ -939,7 +1029,7 @@ function backToBed() {
   }, 1500);
 }
 function doPunch(charged) {
-  punchT = .22; punchSide *= -1; sfx(charged ? 'big' : 'punch');
+  punchT = .22; punchSide *= -1; sfx(charged ? 'big' : 'punch'); sfx('swing');
   let dmg = charged ? 3 : 1; if (state.buffs.power > 0) dmg *= 2;
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
   // generous on purpose: you don't have to aim perfectly
@@ -957,6 +1047,7 @@ function doPunch(charged) {
     }
   }
   if (boss.active && tryHit(boss.x, boss.z, terrainH(boss.x, boss.z), 2.2)) { hitAny = true; hitBoss(dmg); }
+  if (hitAny) sfx('hit');
   if (hitAny) burst(P.x + fx * 1.2, P.y + 1.3, P.z + fz * 1.2, [0xffffff, 0xffe27f], charged ? 10 : 4);
 }
 function hitBoss(dmg) {
@@ -971,9 +1062,9 @@ function hitRobot(r, dmg, kb) {
   if (r.hp <= 0) killRobot(r);
 }
 // ground slam: smash down and knock away everything around you
-function startSlam() { P.slam = true; P.vy = -22; charging = false; chargeT = 0; }
+function startSlam() { sfx('whoosh'); P.slam = true; P.vy = -22; charging = false; chargeT = 0; }
 function landSlam() {
-  P.slam = false; sfx('big'); state.shake = .3;
+  P.slam = false; sfx('slam'); state.shake = .3;
   let dmg = 2; if (state.buffs.power > 0) dmg *= 2;
   for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; burst(P.x + Math.cos(a) * 1.5, P.y + .2, P.z + Math.sin(a) * 1.5, [0xffffff, 0xff9ad5, 0xc9a6ff], 1); }
   for (const r of robots) {
@@ -998,7 +1089,7 @@ function useGloves() {
   let bossHit = false;
   if (!best && boss.active) { const dx = boss.x - P.x, dz = boss.z - P.z, d = Math.hypot(dx, dz); bossHit = d < 13 && (dx * fx + dz * fz) / (d || 1) > .4; }
   if (!best && !bossHit) { toast('', 'Nothing to grab. Look at a robot!'); return; }
-  state.gloveCool = 1; sfx('gate');
+  state.gloveCool = 1; sfx('glove');
   const tx = best ? best.x : boss.x, tz = best ? best.z : boss.z;
   gloveBeam.geometry.setFromPoints([new THREE.Vector3(P.x, P.y + 1.1, P.z), new THREE.Vector3(tx, terrainH(tx, tz) + 1.2, tz)]); gloveBeam.visible = true; beamT = .25;
   if (best) { best.flung = true; best.lv = 8; best.kx = fx * 12; best.kz = fz * 12; best.flash = .3; }
@@ -1058,7 +1149,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; if ((e.code === 'KeyF' || e.code === 'KeyJ') && charging) releasePunch(); });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 function releasePunch() { if (!charging) return; charging = false; if (!cine && state.mode === 'play') doPunch(chargeT > .6); chargeT = 0; }
-function pause() { if (state.mode !== 'play' || cine) return; state.mode = 'pause'; $('pauseScreen').hidden = false; charging = false; document.exitPointerLock?.(); }
+function pause() { if (state.mode !== 'play' || cine) return; sfx('pause'); state.mode = 'pause'; $('pauseScreen').hidden = false; charging = false; document.exitPointerLock?.(); }
 const cv = renderer.domElement;
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('mousedown', e => {
@@ -1160,7 +1251,7 @@ setInterval(() => {
 // menu
 const btns = [...$('menu').querySelectorAll('button')];
 let sel = 0;
-function setSel(i) { sel = (i + btns.length) % btns.length; btns.forEach((b, k) => b.classList.toggle('sel', k === sel)); }
+function setSel(i) { const was = sel; sel = (i + btns.length) % btns.length; if (was !== sel) sfx('tick'); btns.forEach((b, k) => b.classList.toggle('sel', k === sel)); }
 setSel(0);
 if (!saved.save) $('mContinue').classList.add('off');
 btns.forEach((b, i) => {
@@ -1177,9 +1268,9 @@ addEventListener('keydown', e => {
 });
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { b.closest('.screen').hidden = true; }));
 function menuAct(a) {
-  wake();
+  wake(); sfx('select');
   if (a === 'new') newDream(false);
-  if (a === 'continue') { if (saved.save) newDream(true); else { $('mContinue').textContent = 'No dream saved yet'; setTimeout(() => $('mContinue').textContent = 'Continue', 1600); } }
+  if (a === 'continue') { if (saved.save) newDream(true); else { $('mContinue').lastChild.textContent = 'No dream saved yet'; setTimeout(() => $('mContinue').lastChild.textContent = 'Continue', 1600); } }
   if (a === 'ach') {
     $('achList').innerHTML = ACH.map(([n, how, secret]) => {
       const got = saved.ach.includes(n);
@@ -1208,6 +1299,7 @@ function newDream(cont) {
   $('muteBtn').hidden = false; setMusic(musicOn);
   if (isTouch) { $('touch').hidden = false; $('muteBtn').style.bottom = 'auto'; $('muteBtn').style.top = 'calc(env(safe-area-inset-top,0px) + 100px)'; }
   sebastian.visible = false; secondBed.visible = false; creep = null; $('speech').style.opacity = 0;
+  fists.forEach(f => f.visible = true);
   state.mode = 'play'; state.startTime = performance.now();
   // a new night: the world shifts
   saved.nights++; store.set(saved); shiftWorld();
@@ -1293,24 +1385,26 @@ function updatePlayer(dt) {
   P.airT = P.onGround ? 0 : P.airT + dt;
   jumpBuf = Math.max(0, jumpBuf - dt);
   if (jumpBuf > 0 && P.airT < .12 && P.vy <= .1) { P.vy = state.buffs.jump > 0 ? 9 : 6.6; P.onGround = false; P.airT = 1; jumpBuf = 0; sfx('jump'); }
-  if (P.climbing) { P.vy = 3.6; bobT += dt * 6; }
+  if (P.climbing) P.vy = 3.6;
   else P.vy -= 18 * dt;
   let ny = P.y + P.vy * dt;
   if (P.vy > 0) { const c = ceilingHit(P.x, P.z, P.y, ny); if (c !== null) { ny = c - H; P.vy = 0; } }
   const g = groundAt(P.x, P.z, Math.max(P.y, ny)); P.gy = g;
-  if (ny <= g) { ny = g; P.vy = 0; P.onGround = true; if (P.slam) landSlam(); }
+  if (ny <= g) { if (!P.onGround && P.vy < -6 && !P.slam) sfx('land'); ny = g; P.vy = 0; P.onGround = true; if (P.slam) landSlam(); }
   else if (P.wasGround && P.vy <= 0 && ny - g < .45) { ny = g; P.vy = 0; P.onGround = true; }
   else P.onGround = false;
   P.wasGround = P.onGround; P.y = ny;
   if (P.y < -15) backToBed();
   P.hurtT = Math.max(0, P.hurtT - dt);
   // camera + fists
-  bobT += len > .1 && P.onGround ? dt * 9 : 0;
+  const stepBefore = Math.floor(bobT / Math.PI);
+  bobT += len > .1 && P.onGround ? dt * 9 : P.climbing ? dt * 6 : 0;
+  if (Math.floor(bobT / Math.PI) !== stepBefore) sfx(P.climbing ? 'climb' : 'step');
   state.shake = Math.max(0, state.shake - dt);
   const sh = state.shake > 0 ? state.shake * .5 : 0;
   camera.position.set(P.x + rand(-sh, sh), P.y + EYE + Math.sin(bobT) * .04 + rand(-sh, sh), P.z);
   camera.rotation.set(P.pitch, P.yaw, 0);
-  if (charging) chargeT += dt;
+  if (charging) { const before = chargeT; chargeT += dt; if (before < .6 && chargeT >= .6) sfx('charged'); }
   punchT = Math.max(0, punchT - dt);
   fists.forEach((fi, i) => {
     const side = i ? 1 : -1, rest = fi.userData.rest;
@@ -1334,16 +1428,18 @@ function updateRobots(dt, time) {
       r.g.rotation.x += r.flung ? dt * 10 : 0;
       if (r.lift === 0) {
         r.lv = 0; r.g.rotation.x = 0;
-        if (r.flung) { r.flung = false; sfx('break'); state.shake = .15; burst(r.x, terrainH(r.x, r.z) + .3, r.z, [0xc9a6ff, 0xffffff], 8); let dmg = 3; if (state.buffs.power > 0) dmg *= 2; r.hp -= dmg; r.flash = .2; if (r.hp <= 0) { killRobot(r); continue; } }
+        if (r.flung) { r.flung = false; sfx('thud'); state.shake = .15; burst(r.x, terrainH(r.x, r.z) + .3, r.z, [0xc9a6ff, 0xffffff], 8); let dmg = 3; if (state.buffs.power > 0) dmg *= 2; r.hp -= dmg; r.flash = .2; if (r.hp <= 0) { killRobot(r); continue; } }
       }
     }
     if (r.flung) { /* no walking while flying */ }
     else if (playing && d < 14 && Math.abs(P.y - terrainH(r.x, r.z)) < 3) {
+      if (!r.alerted) { r.alerted = true; sfx('alert'); }
       if (d > 1.2) { vx = dx / d * 2.4; vz = dz / d * 2.4; }
       r.g.rotation.y = Math.atan2(dx, dz);
       r.cool -= dt;
       if (d < 1.5 && r.cool <= 0 && r.lift < .5) { r.cool = 1.3; hurt(1, r.x, r.z); }
     } else {
+      if (d > 18) r.alerted = false;
       r.wander += dt * .5;
       vx = Math.cos(r.wander) * .8; vz = Math.sin(r.wander * .7) * .8;
       r.g.rotation.y = Math.atan2(vx, vz);
@@ -1381,8 +1477,8 @@ function updateBoss(dt, time) {
     boss.g.rotation.y = Math.atan2(dx, dz);
     if (d > 3) { boss.x += dx / d * 2.4 * dt; boss.z += dz / d * 2.4 * dt; }
     boss.tail.rotation.x = tailBase;
-    if (d < 3.6 && boss.cool <= 0) { boss.mode = 'windup'; boss.modeT = 0; }
-    else if (boss.charge <= 0 && d < 16) { boss.mode = 'charge'; boss.modeT = 0; boss.cdx = dx / d; boss.cdz = dz / d; }
+    if (d < 3.6 && boss.cool <= 0) { boss.mode = 'windup'; boss.modeT = 0; sfx('warn'); }
+    else if (boss.charge <= 0 && d < 16) { sfx('roar'); boss.mode = 'charge'; boss.modeT = 0; boss.cdx = dx / d; boss.cdz = dz / d; }
   } else if (boss.mode === 'windup') {
     boss.tail.rotation.x = -.5 * Math.min(1, boss.modeT / .6);
     boss.sting.material.color.setHex(Math.floor(time * 12) % 2 ? 0xffffff : 0xff3fb0);
@@ -1431,6 +1527,13 @@ function loop(now) {
   }
   if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').style.opacity = 0; }
 
+  fairy.forEach(f => f.h.material.opacity = .45 + Math.sin(time * 2.2 + f.s * 1.3) * .35);
+  bigStars.material.opacity = .65 + Math.sin(time * 1.7) * .25;
+  { const q = dust.pos; for (let i = 0; i < dust.n; i++) { q[i * 3 + 1] += dt * .25; q[i * 3] += Math.sin(time * .6 + dust.seed[i]) * dt * .15; if (q[i * 3 + 1] > 14) q[i * 3 + 1] = 0; }
+    dust.pts.geometry.attributes.position.needsUpdate = true; dust.pts.material.opacity = .6 + Math.sin(time * 2) * .2; }
+  shootT -= dt;
+  if (shootT <= 0) { shootT = rand(4, 9); shooting.visible = true; shooting.position.set(rand(-150, 150), rand(110, 160), rand(-240, -160)); shootV.set(rand(-1, 1) > 0 ? 160 : -160, -60, 0); shooting.userData.t = 0; }
+  if (shooting.visible) { shooting.position.addScaledVector(shootV, dt); shooting.userData.t += dt; shooting.material.opacity = Math.max(0, 1 - shooting.userData.t / 1.1); if (shooting.userData.t > 1.1) shooting.visible = false; }
   drawings.forEach(d => { d.pivot.rotation.x = Math.sin(time * 1.1 + d.s) * .12; d.pivot.rotation.z = Math.sin(time * .8 + d.s) * .05; });
   toyCar.position.x = Math.sin(time * .35) * 3.6; toyCar.position.y = 2.1 + Math.sin(time * .9) * .15;
   toyCar.rotation.y = Math.cos(time * .35) > 0 ? 0 : Math.PI;
@@ -1449,7 +1552,7 @@ function loop(now) {
     for (const m of messages) {
       if (m.found || Math.hypot(m.x - P.x, m.z - P.z) > 3.2 || Math.abs(m.y - P.y) > 3) continue;
       m.found = true; const n = messages.filter(q => q.found).length;
-      toast(`Hidden message ${n} of ${messages.length}`, 'Who keeps writing these?'); sfx('kid');
+      toast(`Hidden message ${n} of ${messages.length}`, 'Who keeps writing these?'); sfx('message');
       if (n === messages.length) achieve('Message Finder', 'Find every hidden message');
     }
     // the gravity gloves
@@ -1462,7 +1565,7 @@ function loop(now) {
     state.gloveCool = Math.max(0, state.gloveCool - dt);
     // the dream door in the bedroom goes back to the gate
     if (dreamDoor.visible && Math.hypot(P.x - 4.6, P.z + 1.6) < 1 && P.y < 1) {
-      state.mode = 'dead'; $('fadeText').textContent = '✦'; $('fade').style.opacity = 1;
+      state.mode = 'dead'; sfx('door'); $('fadeText').textContent = '✦'; $('fade').style.opacity = 1;
       setTimeout(() => { Object.assign(P, { x: 0, y: 0, z: 16, vy: 0, yaw: Math.PI, pitch: 0, kx: 0, kz: 0 }); state.mode = 'play'; $('fade').style.opacity = 0; }, 700);
     }
     // boss trigger
