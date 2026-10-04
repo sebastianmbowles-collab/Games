@@ -39,8 +39,6 @@ import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_
 
 export { W, H }
 
-// The game switches itself off at this time of day (the player asked for it to stop at 18:15).
-const STOP_AT = { h: 18, m: 15 }
 
 const WAVES = 3
 const DIFF = {
@@ -359,7 +357,6 @@ export class AliensVsDinos {
     this.menuPick = 0
     this.menuT = 0
     this.cam = { x: W / 2, y: H / 2, zoom: 1 }
-    this.stopped = false
 
     this.onKeyDown = (e) => {
       const k = KEYMAP[e.code]
@@ -424,11 +421,6 @@ export class AliensVsDinos {
     this.keys[k] = down
   }
 
-  isStopTime() {
-    const d = new Date()
-    return d.getHours() * 60 + d.getMinutes() >= STOP_AT.h * 60 + STOP_AT.m
-  }
-
   // ---------- flow between screens ----------
 
   get diff() {
@@ -446,10 +438,6 @@ export class AliensVsDinos {
     } catch {
       // Settings just won't be remembered next time.
     }
-  }
-
-  stopText() {
-    return `${String(STOP_AT.h).padStart(2, '0')}:${String(STOP_AT.m).padStart(2, '0')}`
   }
 
   goScene(name) {
@@ -529,7 +517,6 @@ export class AliensVsDinos {
   }
 
   click(x, y) {
-    if (this.stopped) return
     if (this.scene === 'title' || this.scene === 'settings' || this.scene === 'jukebox') {
       clickScreen(this, { x, y })
     } else if (this.scene === 'menu') {
@@ -559,17 +546,6 @@ export class AliensVsDinos {
 
   update(realDt) {
     this.time += realDt
-    if (!this.stopped && this.isStopTime()) {
-      this.stopped = true
-      beamOn(false)
-      this.fx.list = []
-      sfx.lose()
-      playSong('lullaby')
-    }
-    if (this.stopped) {
-      this.pressed.clear()
-      return
-    }
     this.slowmo = Math.max(0, this.slowmo - realDt)
     const dt = realDt * (this.slowmo > 0 ? 0.3 : 1)
     this.shake = Math.max(0, this.shake - realDt * 40)
@@ -1394,10 +1370,6 @@ export class AliensVsDinos {
       ctx.fillStyle = `rgba(255,${this.side === 'aliens' ? 80 : 255},${this.side === 'aliens' ? 90 : 255},${this.flash * 0.5})`
       ctx.fillRect(0, 0, W, H)
     }
-    if (this.stopped) {
-      this.flushLayer()
-      this.drawStopped(ctx)
-    }
     this.flushLayer()
   }
 
@@ -1628,24 +1600,6 @@ export class AliensVsDinos {
     }
     text(ctx, 'Enter = play again   ·   Esc = title screen', W / 2, 530, 13, '#a8a0d8')
     ctx.restore()
-  }
-
-  drawStopped(ctx) {
-    const t = this.time
-    ctx.fillStyle = 'rgba(8,5,25,0.92)'
-    ctx.fillRect(0, 0, W, H)
-    ctx.save()
-    ctx.translate(W / 2 - 120, 250)
-    ctx.scale(-1.3, 1.3)
-    drawDino(ctx, 'rex', { time: t, blink: true })
-    ctx.restore()
-    ctx.save()
-    ctx.translate(W / 2 + 120, 190 + Math.sin(t * 2) * 6)
-    drawUFO(ctx, { time: t, mood: 'happy' })
-    ctx.restore()
-    text(ctx, `It's ${this.stopText()} — game time is over!`, W / 2, 340, 34, '#ffe14a')
-    text(ctx, 'The aliens and dinos are going to sleep. See you tomorrow!', W / 2, 382, 20, '#fff')
-    text(ctx, 'Zzz...', W / 2 - 60 + Math.sin(t) * 6, 150 - ((t * 20) % 40), 26, '#c9c2ff')
   }
 
   drawMenu(ctx) {

@@ -279,7 +279,7 @@ function drawTitle(game, ctx) {
   }
   const best = game.best
   text(ctx, `Best: Aliens ${best.aliens || 0}  ·  Dinos ${best.dinos || 0}`, W / 2, 512, 15, '#fff')
-  text(ctx, `↑ ↓ to choose · Enter or tap · Game stops at ${game.stopText()}`, W / 2, 532, 12, 'rgba(255,255,255,0.8)')
+  text(ctx, '↑ ↓ to choose · Enter or tap to pick', W / 2, 532, 12, 'rgba(255,255,255,0.8)')
 }
 
 // ---------- settings ----------
