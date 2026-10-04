@@ -41,6 +41,9 @@ export { W, H }
 
 
 const WAVES = 3
+// How fast the action runs: 1 is normal speed, bigger is faster.
+const GAME_SPEED = 1.3
+const WAVE_SECONDS = 25
 const UNLOCK_EVENTS = ['pointerup', 'touchend', 'click', 'keydown']
 const DIFF = {
   easy: { mul: 0.75, hp: 7, lives: 5 },
@@ -478,7 +481,7 @@ export class AliensVsDinos {
     this.fx.list = []
     this.score = 0
     this.wave = 1
-    this.banner = { text: 'WAVE 1', sub: this.side === 'aliens' ? 'Beam up 6 dinos!' : 'Survive 35 seconds!', t: 0 }
+    this.banner = { text: 'WAVE 1', sub: this.side === 'aliens' ? 'Beam up 6 dinos!' : `Survive ${WAVE_SECONDS} seconds!`, t: 0 }
     this.pickups = []
     this.eggs = []
     this.bolts = []
@@ -551,7 +554,7 @@ export class AliensVsDinos {
   update(realDt) {
     this.time += realDt
     this.slowmo = Math.max(0, this.slowmo - realDt)
-    const dt = realDt * (this.slowmo > 0 ? 0.3 : 1)
+    const dt = realDt * (this.slowmo > 0 ? 0.3 : 1) * (this.scene === 'play' ? GAME_SPEED : 1)
     this.shake = Math.max(0, this.shake - realDt * 40)
     this.flash = Math.max(0, this.flash - realDt * 2.5)
 
@@ -996,7 +999,7 @@ export class AliensVsDinos {
       return b
     })
     this.ufos = []
-    this.waveTime = 35
+    this.waveTime = WAVE_SECONDS
     this.ufoSpawn = 1
     this.ufoQuota = 2
   }
@@ -1103,14 +1106,14 @@ export class AliensVsDinos {
     this.ufos = this.ufos.filter((u) => !u.dead)
 
     if (alive) {
-      this.waveTime -= dt
+      this.waveTime -= dt / GAME_SPEED
       if (this.waveTime <= 0) {
         for (const u of this.ufos) this.ufoLeave(u)
         this.releaseRex()
         if (this.wave >= WAVES) this.finish(true)
         else {
           this.wave++
-          this.waveTime = 35
+          this.waveTime = WAVE_SECONDS
           this.ufoQuota = this.wave + 1
           this.ufoSpawn = 3
           this.score += 500
