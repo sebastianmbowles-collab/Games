@@ -66,6 +66,8 @@ body.cine .hud,body.cine #objective,body.cine #cross,body.cine #touch,body.cine 
 .tbtn{position:absolute;width:84px;height:84px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(255,111,200,.35);color:#fff;font:800 14px var(--f-display);pointer-events:auto;display:grid;place-items:center}
 #tJump{right:20px;bottom:calc(env(safe-area-inset-bottom,0px) + 70px)}
 #tPunch{right:116px;bottom:calc(env(safe-area-inset-bottom,0px) + 24px)}
+#tPillow{right:110px;bottom:calc(env(safe-area-inset-bottom,0px) + 170px);width:70px;height:70px;font-size:12px;background:rgba(127,200,255,.45)}
+#ammo{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 64px);z-index:5;font:800 13px var(--f-body);letter-spacing:.08em;color:#fff;padding:6px 12px;border-radius:999px;background:rgba(42,20,80,.55);pointer-events:none}
 #tGlove{right:30px;bottom:calc(env(safe-area-inset-bottom,0px) + 170px);width:70px;height:70px;font-size:12px;background:rgba(176,127,255,.45)}
 #hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);z-index:5;pointer-events:none;display:flex;flex-wrap:wrap;justify-content:center;gap:6px 14px;max-width:calc(100% - 180px);background:var(--panel);border:1px solid var(--panel-line);border-radius:14px;padding:6px 14px;font:800 13px var(--f-body);transition:opacity .6s}
 #hint kbd{font:800 11px var(--f-body);background:rgba(255,255,255,.18);border-radius:5px;padding:1px 6px;margin-right:4px}
@@ -141,12 +143,14 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 <button class="small" id="skip" hidden>Skip</button>
 <button class="small" id="muteBtn" hidden>Music: on</button>
 <div id="hint" hidden></div>
+<div id="ammo" hidden></div>
 
 <div id="touch" hidden>
   <div id="stick"><div id="knob"></div></div>
   <button class="tbtn" id="tJump">JUMP</button>
   <button class="tbtn" id="tPunch">PUNCH</button>
   <button class="tbtn" id="tGlove" hidden>GLOVES</button>
+  <button class="tbtn" id="tPillow" hidden>PILLOW</button>
 </div>
 
 <div id="fade"><span id="fadeText"></span></div>
@@ -721,7 +725,7 @@ const store = {
 };
 const saved = store.get(); saved.ach = saved.ach || []; saved.settings = saved.settings || {};
 saved.nights = saved.nights || 0; saved.beds = saved.beds || 0; saved.totalGems = saved.totalGems || 0; saved.messages = saved.messages || [];
-const state = { mode: 'menu', keys: 0, gems: 0, kids: 0, gateOpen: false, bossSeen: false, bossDead: false, startTime: 0, buffs: { jump: 0, power: 0, beacon: 0 }, achievements: new Set(saved.ach), hasGloves: false, glovesOnBoss: false, gloveCool: 0, shake: 0 };
+const state = { mode: 'menu', keys: 0, gems: 0, kids: 0, gateOpen: false, bossSeen: false, bossDead: false, startTime: 0, buffs: { jump: 0, power: 0, beacon: 0 }, achievements: new Set(saved.ach), hasGloves: false, hasPillow: false, pillows: 6, pillowCool: 0, pillowFluff: 0, glovesOnBoss: false, gloveCool: 0, shake: 0 };
 
 function hitSolid(x, y, z) {
   for (const b of solids) {
@@ -1287,6 +1291,74 @@ function landSlam() {
   if (boss.active && !boss.under && bossBalls().some(b => !b.tail && Math.hypot(b.x - P.x, b.z - P.z) < b.r + 2.5)) hitBoss(dmg);
 }
 // gravity gloves: grab the robot you're looking at and fling it
+// ============ THE PILLOW GUN ============
+// It's waiting on your bed. It shoots soft, puffy pillows: they don't hurt much,
+// but they reach far and knock robots back. It holds 6 and refills itself.
+const PILLOW_MAX = 6;
+const pillowG = new THREE.SphereGeometry(.3, 12, 8); pillowG.scale(1.25, .5, .9);
+const pillowMats = [0xffffff, 0xffd6ee, 0xd6ecff].map(c => new THREE.MeshPhongMaterial({ color: c, shininess: 20 }));
+const pillowGun = new THREE.Group(); // the one you hold
+{ const body = mesh(boxG(.16, .16, .42), mat(0x8fc8ff, { flatShading: false, shininess: 60 })); pillowGun.add(body);
+  const grip = mesh(boxG(.1, .2, .12), mat(0xff9ad5)); grip.position.set(0, -.15, .1); grip.rotation.x = -.3; pillowGun.add(grip);
+  const barrel = mesh(new THREE.CylinderGeometry(.11, .13, .18, 12), mat(0xffd6ee, { flatShading: false })); barrel.rotation.x = Math.PI / 2; barrel.position.z = -.28; pillowGun.add(barrel);
+  const tip = mesh(pillowG, pillowMats[0]); tip.scale.setScalar(.35); tip.position.z = -.38; pillowGun.add(tip);
+  pillowGun.userData.rest = new THREE.Vector3(.3, -.28, -.6); pillowGun.position.copy(pillowGun.userData.rest);
+  pillowGun.visible = false; camera.add(pillowGun); }
+// the one on your bed
+const pillowPickup = new THREE.Group();
+{ const g = pillowGun.clone(); g.position.set(0, 0, 0); g.visible = true; g.scale.setScalar(2); pillowPickup.add(g); pillowPickup.add(halo(0x8fc8ff, 2.2, .7)); }
+pillowPickup.position.set(-3.4, 1.35, -2.6); scene.add(pillowPickup);
+const pillows = [];
+function firePillow() {
+  if (!state.hasPillow || state.mode !== 'play' || cine || state.pillowCool > 0) return;
+  if (state.pillows <= 0) { sfx('tick'); return; }
+  state.pillows--; state.pillowCool = .28; pillowHud();
+  const cp = Math.cos(P.pitch), dx = -Math.sin(P.yaw) * cp, dy = Math.sin(P.pitch), dz = -Math.cos(P.yaw) * cp;
+  const m = mesh(pillowG, pick(pillowMats)); m.castShadow = true; scene.add(m);
+  // starts at the gun, a little to the right of your eyes
+  const sx = P.x + dx * .6 - dz * .25, sy = P.y + EYE - .2 + dy * .6, sz = P.z + dz * .6 + dx * .25;
+  pillows.push({ m, x: sx, y: sy, z: sz, vx: dx * 24, vy: dy * 24 + 1, vz: dz * 24, life: 1.6, spin: rand(-8, 8) });
+  pillowGun.position.z = pillowGun.userData.rest.z + .12; // kick!
+  sfx('whoosh');
+}
+function pillowHud() { $('ammo').hidden = !state.hasPillow; $('ammo').textContent = 'PILLOWS ' + '●'.repeat(state.pillows) + '○'.repeat(PILLOW_MAX - state.pillows); }
+function updatePillows(dt) {
+  if (state.hasPillow) {
+    state.pillowCool = Math.max(0, state.pillowCool - dt);
+    pillowGun.visible = state.mode === 'play' && !cine;
+    if (pillowGun.visible) fists[1].visible = false; // your right hand holds the gun
+    pillowGun.position.lerp(pillowGun.userData.rest, Math.min(1, dt * 10));
+    // the gun slowly fluffs up new pillows
+    if (state.pillows < PILLOW_MAX) { state.pillowFluff += dt; if (state.pillowFluff > .7) { state.pillowFluff = 0; state.pillows++; pillowHud(); } }
+  } else if (pillowPickup.visible) {
+    pillowPickup.rotation.y += dt * 1.5; pillowPickup.position.y = 1.35 + Math.sin(performance.now() / 400) * .08;
+    if (state.mode === 'play' && Math.hypot(P.x + 3.4, P.z + 2.6) < 1.3) {
+      state.hasPillow = true; pillowPickup.visible = false; sfx('key'); burst(-3.4, 1.4, -2.6, [0xffffff, 0x8fc8ff], 14);
+      toast('Pillow gun!', isTouch ? 'Tap PILLOW to shoot soft pillows' : 'Press E to shoot soft pillows');
+      if (isTouch) $('tPillow').hidden = false; pillowHud(); showHint();
+    }
+  }
+  for (let i = pillows.length - 1; i >= 0; i--) {
+    const q = pillows[i];
+    q.vy -= 6 * dt; q.life -= dt;
+    q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
+    q.m.position.set(q.x, q.y, q.z); q.m.rotation.y += q.spin * dt; q.m.rotation.z += q.spin * .5 * dt;
+    let hit = null;
+    for (const r of robots) if (r.alive && r.active && robotDist(r, q.x, q.y, q.z) < HB.robot + .3) { hit = r; break; }
+    if (!hit && boss.active && !boss.under && bossBalls().some(b => Math.hypot(b.x - q.x, b.y - q.y, b.z - q.z) < b.r + .3)) hit = boss;
+    const ground = q.y < terrainH(q.x, q.z) + .1, wall = insideSolid(q.x, q.y, q.z);
+    if (hit || ground || wall || q.life <= 0) {
+      burst(q.x, q.y, q.z, [0xffffff, 0xffeefa], hit ? 10 : 5); // feathers!
+      if (hit === boss) { hitBoss(1); sfx('hit'); }
+      else if (hit) {
+        let dmg = 1; if (state.buffs.power > 0) dmg *= 2;
+        const sp = Math.hypot(q.vx, q.vz) || 1;
+        hitRobot(hit, dmg, 0); hit.kx = q.vx / sp * 7; hit.kz = q.vz / sp * 7; sfx('hit');
+      } else sfx('thud');
+      scene.remove(q.m); pillows.splice(i, 1);
+    }
+  }
+}
 const gloveBeam = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xc9a6ff }));
 gloveBeam.visible = false; gloveBeam.frustumCulled = false; scene.add(gloveBeam);
 let beamT = 0;
@@ -1356,6 +1428,7 @@ addEventListener('keydown', e => {
   if ((e.code === 'KeyF' || e.code === 'KeyJ') && !e.repeat) punchDown();
   if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !P.onGround && P.y - P.gy > 1) startSlam();
   if (e.code === 'KeyG' || e.code === 'KeyK') useGloves();
+  if (e.code === 'KeyE' || e.code === 'KeyL') firePillow();
   if (e.code === 'KeyM') setMusic(!musicOn);
   if (e.code === 'KeyP') pause();
 });
@@ -1424,6 +1497,7 @@ $('tJump').addEventListener('touchstart', e => { e.preventDefault(); jumpBuf = .
 $('tJump').addEventListener('touchend', e => { e.preventDefault(); jumpHeld = false; }, { passive: false });
 $('tPunch').addEventListener('touchstart', e => { e.preventDefault(); punchDown(); }, { passive: false });
 $('tGlove').addEventListener('touchstart', e => { e.preventDefault(); useGloves(); }, { passive: false });
+$('tPillow').addEventListener('touchstart', e => { e.preventDefault(); firePillow(); }, { passive: false });
 $('tPunch').addEventListener('touchend', e => { e.preventDefault(); releasePunch(); }, { passive: false });
 $('muteBtn').addEventListener('click', e => { e.stopPropagation(); setMusic(!musicOn); });
 
@@ -1435,8 +1509,8 @@ let hintT = 0;
 function showHint() {
   const k = (a, b) => `<span><kbd>${a}</kbd>${b}</span>`;
   $('hint').innerHTML = isTouch
-    ? k('JUMP', 'jump (hold at a wall to climb)') + k('PUNCH', 'hold to charge') + (state.hasGloves ? k('GLOVES', 'fling robots') : '')
-    : k('WASD', 'walk') + k('Mouse / ← →', 'look') + k('Space', 'jump (hold at a wall to climb)') + k('Click', 'punch, hold to charge') + k('Click in air', 'slam') + (state.hasGloves ? k('Right-click / G', 'gloves') : '');
+    ? k('JUMP', 'jump (hold at a wall to climb)') + k('PUNCH', 'hold to charge') + (state.hasGloves ? k('GLOVES', 'fling robots') : '') + (state.hasPillow ? k('PILLOW', 'shoot pillows') : '')
+    : k('WASD', 'walk') + k('Mouse / ← →', 'look') + k('Space', 'jump (hold at a wall to climb)') + k('Click', 'punch, hold to charge') + k('Click in air', 'slam') + (state.hasGloves ? k('Right-click / G', 'gloves') : '') + (state.hasPillow ? k('E', 'pillow gun') : '');
   $('hint').hidden = false; $('hint').style.opacity = 1; hintT = 25;
 }
 document.body.classList.add('title');
@@ -2026,6 +2100,7 @@ function loop(now) {
   else beacon.visible = false;
   drawCharge();
   drawHitboxes();
+  updatePillows(dt);
   // the sun's shadow box follows you around (snapped so shadows don't shimmer)
   sun.target.position.set(Math.round(camera.position.x * 4) / 4, 0, Math.round(camera.position.z * 4) / 4);
   sun.position.copy(sun.target.position).add(SUN_DIR);
