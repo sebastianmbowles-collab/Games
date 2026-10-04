@@ -645,23 +645,25 @@ export function drawLeaf(ctx, x, y, time) {
 // ---------- the prehistoric world ----------
 
 const THEMES = {
+  // a purple alien night
   aliens: {
-    sky: ['#1b1140', '#5a2a7a', '#e0708a'],
-    far: '#4a2f6e',
-    mid: '#3b5a4a',
-    near: '#2f7a46',
-    ground: '#6b4a2e',
-    grass: '#4f9e3a',
+    sky: ['#0a0620', '#24124a', '#4a2266'],
+    far: '#2e1d4e',
+    mid: '#22403a',
+    near: '#1f5a36',
+    ground: '#4a3220',
+    grass: '#2f7a30',
     stars: 1,
   },
+  // a blue moonlit dino night
   dinos: {
-    sky: ['#4fb3ff', '#9ad8ff', '#ffe3a6'],
-    far: '#8aa6c8',
-    mid: '#5c9a6a',
-    near: '#3f8f4a',
-    ground: '#8a6038',
-    grass: '#62c047',
-    stars: 0,
+    sky: ['#050a1e', '#10224a', '#24407a'],
+    far: '#1e2c56',
+    mid: '#1d4440',
+    near: '#1b5a38',
+    ground: '#45301e',
+    grass: '#2f7a30',
+    stars: 1,
   },
   night: {
     sky: ['#06040f', '#1a1236', '#3a2050'],
@@ -672,14 +674,15 @@ const THEMES = {
     grass: '#356e2a',
     stars: 1,
   },
-  sunrise: {
-    sky: ['#3a6fd8', '#ff9a7a', '#ffe08a'],
-    far: '#a080b0',
-    mid: '#5c8a6a',
-    near: '#3f8f4a',
-    ground: '#8a6038',
-    grass: '#62c047',
-    stars: 0.3,
+  // the brightest night: a full moon after the aliens have gone
+  moonlit: {
+    sky: ['#0a1430', '#1d3a70', '#3a64a0'],
+    far: '#2a3c6e',
+    mid: '#24584a',
+    near: '#22703e',
+    ground: '#55402a',
+    grass: '#3a8a36',
+    stars: 1,
   },
 }
 
@@ -729,13 +732,40 @@ export function drawSky(ctx, theme, time) {
   ctx.fillStyle = g
   ctx.fillRect(0, 0, W, H)
   if (theme.stars > 0) {
+    // each star is exactly one chunky pixel, and some twinkle off and on
     for (const s of STARS) {
-      ctx.globalAlpha = theme.stars * (0.5 + 0.5 * Math.sin(time * 2 + s.p))
-      ctx.fillStyle = '#fff'
-      ctx.fillRect(s.x, s.y, s.r * 2, s.r * 2)
+      if (Math.sin(time * 2 + s.p) < -0.6) continue
+      ctx.globalAlpha = theme.stars
+      ctx.fillStyle = s.r > 1.5 ? '#fff6c0' : '#ffffff'
+      const size = s.r > 1.7 ? 6 : 3
+      ctx.fillRect(Math.floor(s.x / 3) * 3, Math.floor(s.y / 3) * 3, size, size)
     }
     ctx.globalAlpha = 1
   }
+  if (theme.stars > 0.5 && theme.moon !== false) drawMoon(ctx, 884, 156)
+}
+
+export function drawMoon(ctx, x, y) {
+  ctx.save()
+  const g = ctx.createRadialGradient(x, y, 30, x, y, 110)
+  g.addColorStop(0, 'rgba(255,250,210,0.35)')
+  g.addColorStop(1, 'rgba(255,250,210,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(x - 110, y - 110, 220, 220)
+  circle(ctx, x, y, 36)
+  ctx.fillStyle = '#fff6c8'
+  ctx.fill()
+  ctx.fillStyle = '#e0d79a'
+  for (const [dx, dy, r] of [
+    [-12, -8, 8],
+    [10, 10, 6],
+    [14, -14, 4],
+    [-6, 16, 4],
+  ]) {
+    circle(ctx, x + dx, y + dy, r)
+    ctx.fill()
+  }
+  ctx.restore()
 }
 
 // Each layer moves at its own speed (parallax): far things slide slower than near things.
@@ -746,7 +776,7 @@ export function drawBackdrop(ctx, theme, camX, time) {
   ctx.globalAlpha = 0.85 - theme.stars * 0.5
   for (const c of CLOUDS) {
     const x = ((c.x + time * c.v) % 3400) - 300 + par(0.15)
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = theme.stars > 0.5 ? '#5a6496' : '#ffffff'
     for (const [dx, dy, r] of [
       [0, 0, 26],
       [24, -10, 30],
@@ -892,15 +922,4 @@ export function drawForeground(ctx, theme, camX, time) {
   ctx.lineCap = 'butt'
 }
 
-export function text(ctx, str, x, y, size, color, align = 'center', outline = true) {
-  ctx.font = `900 ${size}px ${FONT}`
-  ctx.textAlign = align
-  ctx.lineJoin = 'round'
-  if (outline) {
-    ctx.lineWidth = Math.max(3, size / 5)
-    ctx.strokeStyle = INK
-    ctx.strokeText(str, x, y)
-  }
-  ctx.fillStyle = color
-  ctx.fillText(str, x, y)
-}
+export { text } from './pixel'

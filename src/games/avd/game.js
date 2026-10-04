@@ -7,7 +7,6 @@ import {
   GROUND,
   WORLD,
   TAU,
-  FONT,
   INK,
   DINO_KINDS,
   KIND_LIST,
@@ -27,10 +26,12 @@ import {
   drawForeground,
   getTheme,
   mixTheme,
+  drawMoon,
   text,
 } from './art'
 import { sfx, wakeAudio, beamOn, setVolumes } from './sound'
 import { playSong, stopMusic } from './music'
+import { PX, retroColors, flushText } from './pixel'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
 
 export { W, H }
@@ -218,21 +219,12 @@ class FX {
           break
         case 'heart':
           ctx.globalAlpha = a
-          ctx.fillStyle = p.color
-          ctx.font = `${p.size}px ${FONT}`
-          ctx.textAlign = 'center'
-          ctx.fillText('❤', p.x, p.y)
+          text(ctx, '❤', p.x, p.y, p.size, p.color)
           break
         case 'text': {
           ctx.globalAlpha = Math.min(1, a * 2)
           const s = p.size * (f < 0.15 ? 0.6 + (f / 0.15) * 0.6 : 1.2 - Math.min(0.2, f))
-          ctx.font = `900 ${s}px ${FONT}`
-          ctx.textAlign = 'center'
-          ctx.lineWidth = 5
-          ctx.strokeStyle = INK
-          ctx.strokeText(p.text, p.x, p.y)
-          ctx.fillStyle = p.color
-          ctx.fillText(p.text, p.x, p.y)
+          text(ctx, p.text, p.x, p.y, s, p.color)
           break
         }
       }
@@ -352,6 +344,11 @@ export class AliensVsDinos {
   constructor(canvas) {
     this.canvas = canvas
     this.ctx = canvas.getContext('2d')
+    // everything is drawn on this tiny screen first, then blown up into chunky 8-bit pixels
+    this.lo = document.createElement('canvas')
+    this.lo.width = W / PX
+    this.lo.height = H / PX
+    this.lctx = this.lo.getContext('2d', { willReadFrequently: true })
     this.time = 0
     this.fx = new FX()
     this.keys = {}
@@ -597,6 +594,9 @@ export class AliensVsDinos {
         if (this.side === 'aliens') this.updateAliens(dt)
         else this.updateDinos(dt)
         this.updateCamera(dt)
+        if (Math.random() < dt * 5) {
+          this.fx.add({ x: this.cam.x + rand(-W / 2, W / 2), y: GROUND - rand(10, 160), vx: rand(-20, 20), vy: rand(-15, 15), life: rand(2, 4), size: 7, color: '#d8ff6a', type: 'glow', drag: 0 })
+        }
         if (this.banner) {
           this.banner.t += dt
           if (this.banner.t > 2.6) this.banner = null
@@ -1370,26 +1370,59 @@ export class AliensVsDinos {
   // ---------- drawing ----------
 
   draw() {
-    const ctx = this.ctx
-    const dpr = this.canvas.width / W
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    const main = this.ctx
+    main.setTransform(1, 0, 0, 1, 0, 0)
+    main.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    const ctx = this.lctx
+    ctx.setTransform(1 / PX, 0, 0, 1 / PX, 0, 0)
     ctx.clearRect(0, 0, W, H)
+    this.layer = 0
     ctx.save()
-    if (this.shake > 0 && this.settings.shake) ctx.translate(rand(-1, 1) * this.shake * 0.6, rand(-1, 1) * this.shake * 0.6)
+    if (this.shake > 0 && this.settings.shake) {
+      // shake in whole chunky pixels so the picture stays sharp
+      ctx.translate(Math.round(rand(-1, 1) * this.shake * 0.2) * PX, Math.round(rand(-1, 1) * this.shake * 0.2) * PX)
+    }
     if (this.scene === 'title' || this.scene === 'settings' || this.scene === 'jukebox') drawScreen(this, ctx)
     else if (this.scene === 'menu') this.drawMenu(ctx)
     else if (this.scene === 'cutscene') this.drawCutscene(ctx)
     else {
       this.drawPlay(ctx)
-      if (this.scene === 'paused') this.drawPaused(ctx)
-      if (this.scene === 'over') this.drawOver(ctx)
+      if (this.scene === 'paused') {
+        this.flushLayer()
+        this.drawPaused(ctx)
+      }
+      if (this.scene === 'over') {
+        this.flushLayer()
+        this.drawOver(ctx)
+      }
     }
     ctx.restore()
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(255,${this.side === 'aliens' ? 80 : 255},${this.side === 'aliens' ? 90 : 255},${this.flash * 0.5})`
       ctx.fillRect(0, 0, W, H)
     }
-    if (this.stopped) this.drawStopped(ctx)
+    if (this.stopped) {
+      this.flushLayer()
+      this.drawStopped(ctx)
+    }
+    this.flushLayer()
+  }
+
+  // Blows the tiny screen up onto the real canvas, then paints the queued pixel-font text on top.
+  // Drawing can carry on afterwards as a new layer (used for fades and overlays that cover text).
+  flushLayer() {
+    const lo = this.lctx
+    if (this.layer === 0) retroColors(lo, this.lo.width, this.lo.height)
+    this.layer++
+    const main = this.ctx
+    main.setTransform(1, 0, 0, 1, 0, 0)
+    main.imageSmoothingEnabled = false
+    main.drawImage(this.lo, 0, 0, this.canvas.width, this.canvas.height)
+    flushText(main, this.canvas.width / this.lo.width)
+    lo.save()
+    lo.setTransform(1, 0, 0, 1, 0, 0)
+    lo.clearRect(0, 0, this.lo.width, this.lo.height)
+    lo.restore()
   }
 
   // Draws the world through a camera: sky, parallax layers, the ground, then whatever `actors` draws.
@@ -1664,18 +1697,9 @@ export class AliensVsDinos {
       ['DINOS', '#ffa94d', 180],
     ]
     for (const [i, [w, c, x]] of words.entries()) {
-      const s = 1 + Math.sin(t * 4 + i) * 0.04
       ctx.save()
       ctx.translate(x, Math.sin(t * 3 + i) * 4)
-      ctx.scale(s, s)
-      ctx.font = `900 ${i === 1 ? 44 : 64}px ${FONT}`
-      ctx.textAlign = 'center'
-      ctx.lineWidth = 10
-      ctx.lineJoin = 'round'
-      ctx.strokeStyle = INK
-      ctx.strokeText(w, 0, 20)
-      ctx.fillStyle = c
-      ctx.fillText(w, 0, 20)
+      text(ctx, w, 0, 26, i === 1 ? 44 : 64, c)
       ctx.restore()
     }
     ctx.restore()
@@ -1704,8 +1728,8 @@ export class AliensVsDinos {
         g.addColorStop(0, '#2a1a5e')
         g.addColorStop(1, '#5a2a7a')
       } else {
-        g.addColorStop(0, '#5fbfff')
-        g.addColorStop(1, '#ffe3a6')
+        g.addColorStop(0, '#0e1d48')
+        g.addColorStop(1, '#2c4f8a')
       }
       ctx.fillStyle = g
       ctx.fill()
@@ -1715,7 +1739,7 @@ export class AliensVsDinos {
       ctx.save()
       rrect(ctx, -c.w / 2, -c.h / 2, c.w, c.h, 22)
       ctx.clip()
-      ctx.fillStyle = i === 0 ? '#3b5a4a' : '#62c047'
+      ctx.fillStyle = i === 0 ? '#2a4a3a' : '#2f6e30'
       ctx.fillRect(-c.w / 2, 50, c.w, 100)
       if (i === 0) {
         // UFO beaming up a dino
@@ -1767,7 +1791,7 @@ export class AliensVsDinos {
       ctx.restore()
       text(ctx, i === 0 ? 'ALIENS' : 'DINOS', 0, -c.h / 2 + 40, 32, i === 0 ? '#7dffb0' : '#fff7d0')
       text(ctx, i === 0 ? 'Fly a UFO and beam up dinos!' : 'Roar the UFOs away!', 0, c.h / 2 - 40, 17, '#fff')
-      text(ctx, i === 0 ? 'Watch out for enemy aliens!' : "Don't get picked up!", 0, c.h / 2 - 18, 15, i === 0 ? '#ffb3c6' : INK, 'center', i === 0)
+      text(ctx, i === 0 ? 'Watch out for enemy aliens!' : "Don't get picked up!", 0, c.h / 2 - 18, 15, i === 0 ? '#ffb3c6' : '#ffe14a')
       ctx.restore()
     }
     text(ctx, '← → to pick · Enter or tap to play', W / 2, 490, 16, '#fff')
@@ -1778,6 +1802,7 @@ export class AliensVsDinos {
   drawCutscene(ctx) {
     const c = this.cut
     c.draw(ctx, c, this)
+    this.flushLayer()
     // fade in and out of each shot
     for (const cut of c.cuts || []) {
       const d = Math.abs(c.t - cut)
@@ -1971,7 +1996,7 @@ const CUTSCENES = {
     dur: 11.5,
     cuts: [3.6, 7],
     captions: [
-      [0.5, 3.4, 'Long, long ago, in a peaceful valley...'],
+      [0.5, 3.4, 'One quiet night, long, long ago...'],
       [3.8, 6.9, '...the aliens came to steal the dinosaurs!'],
       [7.2, 9.4, 'But they forgot about one thing...'],
       [9.4, 11.5, 'You can ROAR! Press SPACE to roar, ↑ to jump.'],
@@ -2179,7 +2204,7 @@ const CUTSCENES = {
     dur: 9,
     captions: [
       [0.3, 4, 'The aliens zoomed away in a panic!'],
-      [4.2, 9, 'The sun rises over a safe valley. YOU WIN!'],
+      [4.2, 9, 'The moon shines over a safe valley. YOU WIN!'],
     ],
     script: [
       [0.4, () => sfx.whoosh()],
@@ -2195,20 +2220,11 @@ const CUTSCENES = {
     draw(ctx, c, game) {
       const t = c.t
       const now = game.time
-      const theme = mixTheme('night', 'sunrise', ease(seg(t, 1, 6)))
+      const theme = mixTheme('night', 'moonlit', ease(seg(t, 1, 6)))
       const cam = camAt(700, lerp(270, 330, ease(seg(t, 0, 4))), lerp(1, 1.35, ease(seg(t, 2, 5))))
-      // the rising sun
-      const sunY = lerp(H + 80, 330, ease(seg(t, 1, 6)))
-      ctx.save()
-      drawSky(ctx, theme, now)
-      ctx.globalCompositeOperation = 'lighter'
-      const g = ctx.createRadialGradient(W / 2, sunY, 10, W / 2, sunY, 220)
-      g.addColorStop(0, 'rgba(255,240,170,0.9)')
-      g.addColorStop(0.3, 'rgba(255,190,90,0.5)')
-      g.addColorStop(1, 'rgba(255,150,60,0)')
-      ctx.fillStyle = g
-      ctx.fillRect(0, 0, W, H)
-      ctx.restore()
+      // the moon comes out from behind the clouds
+      drawSky(ctx, { ...theme, moon: false }, now)
+      drawMoon(ctx, W / 2, lerp(H + 60, 150, ease(seg(t, 1, 6))))
       ctx.save()
       ctx.translate(W / 2, H / 2)
       ctx.scale(cam.zoom, cam.zoom)

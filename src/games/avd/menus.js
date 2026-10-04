@@ -1,6 +1,6 @@
 // The title screen (PLAY / SETTINGS / JUKEBOX), the settings page and the jukebox.
 
-import { W, H, TAU, INK, FONT, circle, rrect, text, drawDino, drawUFO, drawAlien, drawBeam, drawSky, drawBackdrop, mixTheme, getTheme } from './art'
+import { W, H, TAU, INK, circle, rrect, text, drawDino, drawUFO, drawAlien, drawBeam, drawSky, drawBackdrop, mixTheme, getTheme } from './art'
 import { sfx } from './sound'
 import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels } from './music'
 
@@ -9,7 +9,7 @@ const rand = (a, b) => a + Math.random() * (b - a)
 const easeOut = (t) => 1 - (1 - t) ** 3
 const inside = (p, r) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h
 
-const DUSK = mixTheme('aliens', 'sunrise', 0.45)
+const DUSK = mixTheme('aliens', 'dinos', 0.5)
 
 // ---------- the title screen: a big hill with dinos walking about and UFOs trying to grab them ----------
 
@@ -126,14 +126,14 @@ function drawTitleWorld(game, ctx) {
     if (u.beam > 0 && u.target) drawBeam(ctx, u.x, u.y + 10, hillY(u.x), t, { enemy: u.enemy, width: 55 })
   }
   // far hill then the big hill
-  ctx.fillStyle = '#3d7a45'
+  ctx.fillStyle = '#1f4a34'
   ctx.beginPath()
   ctx.ellipse(120, 560, 420, 170, 0, 0, TAU)
   ctx.ellipse(900, 570, 380, 160, 0, 0, TAU)
   ctx.fill()
   const g = ctx.createLinearGradient(0, HILL.cy - HILL.ry, 0, H)
-  g.addColorStop(0, '#6fd14f')
-  g.addColorStop(1, '#2f7a36')
+  g.addColorStop(0, '#3a8a3a')
+  g.addColorStop(1, '#123a20')
   ctx.beginPath()
   ctx.ellipse(HILL.cx, HILL.cy, HILL.rx, HILL.ry, 0, 0, TAU)
   ctx.fillStyle = g
@@ -193,18 +193,9 @@ function drawLogo(ctx, t, y, intro = 1, size = 1) {
     ['DINOS', '#ffa94d', 185],
   ]
   for (const [i, [w, c, x]] of words.entries()) {
-    const s = 1 + Math.sin(t * 4 + i) * 0.04
     ctx.save()
     ctx.translate(x, Math.sin(t * 3 + i) * 4)
-    ctx.scale(s, s)
-    ctx.font = `900 ${i === 1 ? 44 : 66}px ${FONT}`
-    ctx.textAlign = 'center'
-    ctx.lineWidth = 11
-    ctx.lineJoin = 'round'
-    ctx.strokeStyle = INK
-    ctx.strokeText(w, 0, 20)
-    ctx.fillStyle = c
-    ctx.fillText(w, 0, 20)
+    text(ctx, w, 0, 26, i === 1 ? 44 : 66, c)
     ctx.restore()
   }
   ctx.restore()
