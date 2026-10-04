@@ -891,3 +891,16 @@ export function drawForeground(ctx, theme, camX, time) {
   }
   ctx.lineCap = 'butt'
 }
+
+export function text(ctx, str, x, y, size, color, align = 'center', outline = true) {
+  ctx.font = `900 ${size}px ${FONT}`
+  ctx.textAlign = align
+  ctx.lineJoin = 'round'
+  if (outline) {
+    ctx.lineWidth = Math.max(3, size / 5)
+    ctx.strokeStyle = INK
+    ctx.strokeText(str, x, y)
+  }
+  ctx.fillStyle = color
+  ctx.fillText(str, x, y)
+}

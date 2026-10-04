@@ -1,8 +1,15 @@
 // Sound effects for Aliens VS Dinos, made on the fly with the Web Audio API (no sound files).
 
 let ctx = null
+let master = null
+let sfxBus = null
+let musicBus = null
+let analyser = null
 let muted = false
 let beamHum = null
+let sfxVol = 0.8
+let musicVol = 0.6
+const readyFns = []
 
 export function isMuted() {
   return muted
@@ -11,6 +18,22 @@ export function isMuted() {
 export function setMuted(m) {
   muted = m
   if (m) beamOn(false)
+  applyVolumes()
+}
+
+// Volumes go from 0 to 1. Music and sound effects each have their own volume knob.
+export function setVolumes(sfx, music) {
+  sfxVol = sfx
+  musicVol = music
+  applyVolumes()
+}
+
+function applyVolumes() {
+  if (!ctx) return
+  const t = ctx.currentTime
+  master.gain.setTargetAtTime(muted ? 0 : 1, t, 0.02)
+  sfxBus.gain.setTargetAtTime(sfxVol, t, 0.02)
+  musicBus.gain.setTargetAtTime(musicVol * 0.9, t, 0.02)
 }
 
 // Browsers only allow sound after the player touches the page, so this is called on the first key or tap.
@@ -19,14 +42,36 @@ export function wakeAudio() {
     const AC = window.AudioContext || window.webkitAudioContext
     if (!AC) return
     ctx = new AC()
+    master = ctx.createGain()
+    master.connect(ctx.destination)
+    sfxBus = ctx.createGain()
+    sfxBus.connect(master)
+    musicBus = ctx.createGain()
+    analyser = ctx.createAnalyser()
+    analyser.fftSize = 64
+    analyser.smoothingTimeConstant = 0.7
+    musicBus.connect(analyser)
+    analyser.connect(master)
+    applyVolumes()
+    readyFns.splice(0).forEach((fn) => fn())
   }
   if (ctx.state === 'suspended') ctx.resume()
+}
+
+// The music player uses the same audio engine; this hands it over once it exists.
+export function getAudio() {
+  return ctx ? { ctx, musicBus, analyser } : null
+}
+
+export function onAudioReady(fn) {
+  if (ctx) fn()
+  else readyFns.push(fn)
 }
 
 function out(gain = 0.2) {
   const g = ctx.createGain()
   g.gain.value = gain
-  g.connect(ctx.destination)
+  g.connect(sfxBus)
   return g
 }
 

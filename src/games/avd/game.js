@@ -27,8 +27,11 @@ import {
   drawForeground,
   getTheme,
   mixTheme,
+  text,
 } from './art'
-import { sfx, wakeAudio, beamOn } from './sound'
+import { sfx, wakeAudio, beamOn, setVolumes } from './sound'
+import { playSong, stopMusic } from './music'
+import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
 
 export { W, H }
 
@@ -36,6 +39,20 @@ export { W, H }
 const STOP_AT = { h: 18, m: 15 }
 
 const WAVES = 3
+const DIFF = {
+  easy: { mul: 0.75, hp: 7, lives: 5 },
+  normal: { mul: 1, hp: 5, lives: 3 },
+  hard: { mul: 1.3, hp: 3, lives: 2 },
+}
+const DEFAULT_SETTINGS = { music: 6, sound: 8, difficulty: 'normal', shake: true, cutscenes: true }
+
+function loadSettings() {
+  try {
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem('avd-settings-v1')) }
+  } catch {
+    return { ...DEFAULT_SETTINGS }
+  }
+}
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const lerp = (a, b, t) => a + (b - a) * t
 const rand = (a, b) => a + Math.random() * (b - a)
@@ -344,7 +361,10 @@ export class AliensVsDinos {
     this.slowmo = 0
     this.flash = 0
     this.best = loadBest()
-    this.scene = 'menu'
+    this.scene = 'title'
+    this.sceneT = 0
+    this.settings = loadSettings()
+    initTitle(this)
     this.side = null
     this.menuPick = 0
     this.menuT = 0
@@ -371,6 +391,7 @@ export class AliensVsDinos {
     }
     this.onPointerMove = (e) => {
       this.mouse = this.toCanvas(e)
+      this.mouseMoved = true
     }
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
@@ -386,10 +407,14 @@ export class AliensVsDinos {
       this.raf = requestAnimationFrame(loop)
     }
     this.raf = requestAnimationFrame(loop)
+    wakeAudio()
+    this.applySettings()
+    playSong('title')
   }
 
   destroy() {
     cancelAnimationFrame(this.raf)
+    stopMusic()
     beamOn(false)
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
@@ -416,16 +441,53 @@ export class AliensVsDinos {
 
   // ---------- flow between screens ----------
 
-  goMenu() {
+  get diff() {
+    return DIFF[this.settings.difficulty] || DIFF.normal
+  }
+
+  applySettings() {
+    setVolumes(this.settings.sound / 10, this.settings.music / 10)
+  }
+
+  saveSettings() {
+    this.applySettings()
+    try {
+      localStorage.setItem('avd-settings-v1', JSON.stringify(this.settings))
+    } catch {
+      // Settings just won't be remembered next time.
+    }
+  }
+
+  stopText() {
+    return `${String(STOP_AT.h).padStart(2, '0')}:${String(STOP_AT.m).padStart(2, '0')}`
+  }
+
+  goScene(name) {
     beamOn(false)
-    this.scene = 'menu'
-    this.menuT = 0
+    this.scene = name
+    this.sceneT = 0
     this.fx.list = []
+  }
+
+  goTitle() {
+    this.goScene('title')
+    if (!this.userSong) playSong('title')
+  }
+
+  goMenu() {
+    this.goScene('menu')
+    this.menuT = 0
   }
 
   choose(side) {
     sfx.select()
     this.side = side
+    this.userSong = false
+    playSong(side === 'aliens' ? 'ufo' : 'stomp')
+    if (!this.settings.cutscenes) {
+      this.startPlay()
+      return
+    }
     this.startCutscene(side === 'aliens' ? 'alienIntro' : 'dinoIntro', () => this.startPlay())
   }
 
@@ -445,6 +507,8 @@ export class AliensVsDinos {
     this.cam.x = clamp(this.playerX(), W / 2, WORLD - W / 2)
     this.cam.y = H / 2
     this.cam.zoom = 1
+    this.userSong = false
+    playSong(this.side === 'aliens' ? 'ufo' : 'stomp')
     sfx.wave()
   }
 
@@ -461,6 +525,7 @@ export class AliensVsDinos {
     this.slowmo = 0.8
     if (won) sfx.win()
     else sfx.lose()
+    playSong(won ? 'victory' : 'lullaby')
     const best = this.best[this.side] || 0
     this.newBest = this.score > best
     if (this.newBest) {
@@ -475,7 +540,14 @@ export class AliensVsDinos {
 
   click(x, y) {
     if (this.stopped) return
-    if (this.scene === 'menu') {
+    if (this.scene === 'title' || this.scene === 'settings' || this.scene === 'jukebox') {
+      clickScreen(this, { x, y })
+    } else if (this.scene === 'menu') {
+      if (x > MENU_BACK.x && x < MENU_BACK.x + MENU_BACK.w && y > MENU_BACK.y && y < MENU_BACK.y + MENU_BACK.h) {
+        sfx.click()
+        this.goTitle()
+        return
+      }
       if (this.menuT < 0.6) return
       const card = this.menuCards().find((c) => x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h)
       if (card) this.choose(card.side)
@@ -502,6 +574,7 @@ export class AliensVsDinos {
       beamOn(false)
       this.fx.list = []
       sfx.lose()
+      playSong('lullaby')
     }
     if (this.stopped) {
       this.pressed.clear()
@@ -512,7 +585,9 @@ export class AliensVsDinos {
     this.shake = Math.max(0, this.shake - realDt * 40)
     this.flash = Math.max(0, this.flash - realDt * 2.5)
 
-    if (this.scene === 'menu') this.updateMenu(realDt)
+    this.sceneT += realDt
+    if (this.scene === 'title' || this.scene === 'settings' || this.scene === 'jukebox') updateScreen(this, realDt)
+    else if (this.scene === 'menu') this.updateMenu(realDt)
     else if (this.scene === 'cutscene') this.updateCutscene(realDt)
     else if (this.scene === 'play') {
       if (this.pressed.has('pause')) {
@@ -530,10 +605,12 @@ export class AliensVsDinos {
           this.ending.t += realDt
           if (this.ending.t > 1.4) {
             const name = (this.side === 'aliens' ? 'alien' : 'dino') + (this.ending.won ? 'Win' : 'Lose')
-            this.startCutscene(name, () => {
+            const toResults = () => {
               this.scene = 'over'
               this.overT = 0
-            })
+            }
+            if (this.settings.cutscenes) this.startCutscene(name, toResults)
+            else toResults()
           }
         }
       }
@@ -542,10 +619,11 @@ export class AliensVsDinos {
     } else if (this.scene === 'over') {
       this.overT += realDt
       if (this.pressed.has('enter') || this.pressed.has('action')) this.overButtons()[0].go()
-      if (this.pressed.has('pause')) this.goMenu()
+      if (this.pressed.has('pause')) this.goTitle()
     }
     this.fx.update(dt)
     this.pressed.clear()
+    this.mouseMoved = false
   }
 
   updateCamera(dt) {
@@ -567,7 +645,11 @@ export class AliensVsDinos {
       sfx.click()
     }
     const hover = this.menuCards().findIndex((c) => this.mouse.x > c.x && this.mouse.x < c.x + c.w && this.mouse.y > c.y && this.mouse.y < c.y + c.h)
-    if (hover >= 0 && hover !== this.menuPick) this.menuPick = hover
+    if (this.mouseMoved && hover >= 0 && hover !== this.menuPick) this.menuPick = hover
+    if (k.has('pause')) {
+      this.goTitle()
+      return
+    }
     if ((k.has('enter') || k.has('action')) && this.menuT > 0.6) this.choose(this.menuCards()[this.menuPick].side)
     // drifting sparkles
     if (Math.random() < dt * 12) {
@@ -586,13 +668,14 @@ export class AliensVsDinos {
     return [
       { label: 'Play again', x: W / 2 - 230, y: 400, w: 210, h: 56, go: () => this.startPlay() },
       { label: 'Switch side', x: W / 2 + 20, y: 400, w: 210, h: 56, go: () => this.goMenu() },
+      { label: 'Title screen', x: W / 2 - 105, y: 470, w: 210, h: 44, go: () => this.goTitle() },
     ]
   }
 
   // ---------- ALIENS mode: you fly the UFO ----------
 
   setupAliens() {
-    this.ufo = { x: 600, y: 170, vx: 0, vy: 0, hp: 5, maxHp: 5, energy: 1, overheat: false, beaming: false, tilt: 0, inv: 0, laserCd: 0, face: 1, hurt: 0 }
+    this.ufo = { x: 600, y: 170, vx: 0, vy: 0, hp: this.diff.hp, maxHp: this.diff.hp, energy: 1, overheat: false, beaming: false, tilt: 0, inv: 0, laserCd: 0, face: 1, hurt: 0 }
     this.dinos = []
     for (let i = 0; i < 7; i++) this.dinos.push(new Dino(rand(200, WORLD - 200), pick(KIND_LIST)))
     this.enemies = [new Saucer(WORLD - 200, -80)]
@@ -787,7 +870,7 @@ export class AliensVsDinos {
         }
       }
     }
-    const fast = 1 + (this.wave - 1) * 0.25
+    const fast = (1 + (this.wave - 1) * 0.25) * this.diff.mul
     let tx = e.target ? e.target.x : p.x + 250
     let ty = e.hoverY
     if (e.stun > 0) {
@@ -833,7 +916,7 @@ export class AliensVsDinos {
     const dy = p.y - e.y
     const dist = Math.hypot(dx, dy)
     if (!this.ending && e.shootCd <= 0 && dist < 560 && e.stun <= 0) {
-      e.shootCd = rand(2, 3.2) - (this.wave - 1) * 0.4
+      e.shootCd = (rand(2, 3.2) - (this.wave - 1) * 0.4) / this.diff.mul
       const s = 230 + this.wave * 25
       this.plasma.push({ x: e.x, y: e.y + 8, vx: (dx / dist) * s, vy: (dy / dist) * s, life: 3.5 })
       fx.ring(e.x, e.y + 8, 30, '#ff6b8a', 0.3, 4)
@@ -926,7 +1009,7 @@ export class AliensVsDinos {
   // ---------- DINOS mode: you are the T. rex ----------
 
   setupDinos() {
-    this.rex = { x: 700, y: GROUND, vx: 0, vy: 0, face: 1, walk: 0, onGround: true, lives: 3, roarCd: 0, roarT: 0, liftedBy: null, inv: 0, squash: 0 }
+    this.rex = { x: 700, y: GROUND, vx: 0, vy: 0, face: 1, walk: 0, onGround: true, lives: this.diff.lives, maxLives: this.diff.lives, roarCd: 0, roarT: 0, liftedBy: null, inv: 0, squash: 0 }
     this.babies = ['trike', 'stego', 'raptor', 'bronto'].map((kind, i) => {
       const b = new Dino(560 + i * 90, kind, 0.55)
       b.offset = [-170, -90, 90, 170][i]
@@ -952,7 +1035,7 @@ export class AliensVsDinos {
     if (r.liftedBy) {
       const u = r.liftedBy
       // wiggle to struggle, but only a roar breaks free
-      r.y -= 52 * dt
+      r.y -= 52 * this.diff.mul * dt
       r.x = approach(r.x, u.x + (k.left ? -10 : 0) + (k.right ? 10 : 0), 3, dt)
       r.vx = 0
       r.vy = 0
@@ -1061,7 +1144,7 @@ export class AliensVsDinos {
     const r = this.rex
     u.hurt = Math.max(0, u.hurt - dt)
     u.timer += dt
-    const fast = 1 + (this.wave - 1) * 0.3
+    const fast = (1 + (this.wave - 1) * 0.3) * this.diff.mul
     const babies = this.babies.filter((b) => b.state !== 'gone')
 
     if (u.state === 'crash') {
@@ -1126,7 +1209,7 @@ export class AliensVsDinos {
       }
     } else if (u.state === 'charge') {
       if (Math.floor(u.timer * 4) !== Math.floor((u.timer - dt) * 4)) sfx.warn()
-      if (u.timer > 0.9 - (this.wave - 1) * 0.15) {
+      if (u.timer > (0.9 - (this.wave - 1) * 0.15) / this.diff.mul) {
         u.state = 'beam'
         u.timer = 0
       }
@@ -1292,8 +1375,9 @@ export class AliensVsDinos {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, W, H)
     ctx.save()
-    if (this.shake > 0) ctx.translate(rand(-1, 1) * this.shake * 0.6, rand(-1, 1) * this.shake * 0.6)
-    if (this.scene === 'menu') this.drawMenu(ctx)
+    if (this.shake > 0 && this.settings.shake) ctx.translate(rand(-1, 1) * this.shake * 0.6, rand(-1, 1) * this.shake * 0.6)
+    if (this.scene === 'title' || this.scene === 'settings' || this.scene === 'jukebox') drawScreen(this, ctx)
+    else if (this.scene === 'menu') this.drawMenu(ctx)
     else if (this.scene === 'cutscene') this.drawCutscene(ctx)
     else {
       this.drawPlay(ctx)
@@ -1452,7 +1536,7 @@ export class AliensVsDinos {
     hudPanel(ctx, 14, 12, 250, 74)
     text(ctx, 'SHIELD', 28, 34, 13, '#9fd8ff', 'left')
     for (let i = 0; i < p.maxHp; i++) {
-      rrect(ctx, 92 + i * 32, 22, 26, 16, 5)
+      rrect(ctx, 92 + i * (160 / p.maxHp), 22, 160 / p.maxHp - 6, 16, 5)
       ctx.fillStyle = i < p.hp ? '#5ad1ff' : 'rgba(255,255,255,0.15)'
       ctx.fill()
     }
@@ -1470,7 +1554,7 @@ export class AliensVsDinos {
     const r = this.rex
     hudPanel(ctx, 14, 12, 250, 74)
     text(ctx, 'LIVES', 28, 34, 13, '#ffb3c6', 'left')
-    for (let i = 0; i < 3; i++) text(ctx, '❤', 104 + i * 30, 37, 22, i < r.lives ? '#ff5a7a' : 'rgba(255,255,255,0.2)')
+    for (let i = 0; i < r.maxLives; i++) text(ctx, '❤', 104 + i * 30, 37, 22, i < r.lives ? '#ff5a7a' : 'rgba(255,255,255,0.2)')
     text(ctx, 'ROAR', 28, 66, 13, '#ffe14a', 'left')
     bar(ctx, 92, 56, 154, 16, 1 - r.roarCd / 0.85, r.roarCd <= 0 ? '#ffe14a' : '#b89a3a')
     hudPanel(ctx, W / 2 - 120, 12, 240, 74)
@@ -1520,14 +1604,14 @@ export class AliensVsDinos {
     for (const [i, b] of this.overButtons().entries()) {
       const hover = this.mouse.x > b.x && this.mouse.x < b.x + b.w && this.mouse.y > b.y && this.mouse.y < b.y + b.h
       rrect(ctx, b.x, b.y + (hover ? -3 : 0), b.w, b.h, 28)
-      ctx.fillStyle = i === 0 ? '#ffe14a' : '#7dffb0'
+      ctx.fillStyle = ['#ffe14a', '#7dffb0', '#6bb8ff'][i]
       ctx.fill()
       ctx.lineWidth = 4
       ctx.strokeStyle = INK
       ctx.stroke()
-      text(ctx, b.label, b.x + b.w / 2, b.y + 36 + (hover ? -3 : 0), 22, INK, 'center', false)
+      text(ctx, b.label, b.x + b.w / 2, b.y + b.h / 2 + 8 + (hover ? -3 : 0), 22, INK, 'center', false)
     }
-    text(ctx, 'Enter = play again   ·   Esc = menu', W / 2, 490, 15, '#a8a0d8')
+    text(ctx, 'Enter = play again   ·   Esc = title screen', W / 2, 530, 13, '#a8a0d8')
     ctx.restore()
   }
 
@@ -1544,7 +1628,7 @@ export class AliensVsDinos {
     ctx.translate(W / 2 + 120, 190 + Math.sin(t * 2) * 6)
     drawUFO(ctx, { time: t, mood: 'happy' })
     ctx.restore()
-    text(ctx, "It's 18:15 — game time is over!", W / 2, 340, 34, '#ffe14a')
+    text(ctx, `It's ${this.stopText()} — game time is over!`, W / 2, 340, 34, '#ffe14a')
     text(ctx, 'The aliens and dinos are going to sleep. See you tomorrow!', W / 2, 382, 20, '#fff')
     text(ctx, 'Zzz...', W / 2 - 60 + Math.sin(t) * 6, 150 - ((t * 20) % 40), 26, '#c9c2ff')
   }
@@ -1687,7 +1771,8 @@ export class AliensVsDinos {
       ctx.restore()
     }
     text(ctx, '← → to pick · Enter or tap to play', W / 2, 490, 16, '#fff')
-    text(ctx, `Game stops at ${String(STOP_AT.h).padStart(2, '0')}:${String(STOP_AT.m).padStart(2, '0')}`, W / 2, 516, 13, 'rgba(255,255,255,0.7)')
+    text(ctx, 'Esc = back to the title screen', W / 2, 516, 13, 'rgba(255,255,255,0.7)')
+    drawBackButton(ctx, this)
   }
 
   drawCutscene(ctx) {
@@ -1735,18 +1820,6 @@ function shadow(ctx, x, y, w) {
   ctx.fill()
 }
 
-function text(ctx, str, x, y, size, color, align = 'center', outline = true) {
-  ctx.font = `900 ${size}px ${FONT}`
-  ctx.textAlign = align
-  ctx.lineJoin = 'round'
-  if (outline) {
-    ctx.lineWidth = Math.max(3, size / 5)
-    ctx.strokeStyle = INK
-    ctx.strokeText(str, x, y)
-  }
-  ctx.fillStyle = color
-  ctx.fillText(str, x, y)
-}
 
 function hudPanel(ctx, x, y, w, h) {
   rrect(ctx, x, y, w, h, 14)
