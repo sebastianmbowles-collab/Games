@@ -159,11 +159,15 @@ def robot():
     l[-1].scale = (1, .72, 1)
     l.append(torus(.2, .035, (0, 1.06, .31), LAV, rot=(math.pi / 2, 0, 0)))            # heart window
     for s in (-1, 1):
-        l.append(cyl(.12, .45, (s * .22, .32, 0), LAV, bevel=.04))                    # legs
-        w.append(box((.28, .14, .38), (s * .22, .07, .05), WHITE, bevel=.06))          # feet
+        side = 'L' if s < 0 else 'R'
+        # legs and arms are their own pieces, turning at the hip and shoulder, so they can swing
+        join([cyl(.12, .45, (s * .22, .32, 0), LAV, bevel=.04),                      # leg
+              box((.28, .14, .38), (s * .22, .07, .05), WHITE, bevel=.06)],           # foot
+             'Leg' + side, root, origin=(s * .22, .55, 0))
         l.append(ball(.15, (s * .55, 1.25, 0), LAV))                                  # shoulders
-        w.append(cyl(.1, .5, (s * .6, .95, 0), WHITE, bevel=.04))                     # arms
-        l.append(ball(.12, (s * .6, .66, 0), LAV, scale=(1, 1, 1.2)))                 # hands
+        join([cyl(.1, .5, (s * .6, .95, 0), WHITE, bevel=.04),                       # arm
+              ball(.12, (s * .6, .66, 0), LAV, scale=(1, 1, 1.2))],                   # hand
+             'Arm' + side, root, origin=(s * .6, 1.22, 0))
         l.append(cyl(.09, .1, (s * .41, 1.75, 0), LAV, rot=(0, math.pi / 2, 0)))       # ear bolts
     w.append(box((.78, .56, .62), (0, 1.75, 0), WHITE, bevel=.18))                     # head
     l.append(cyl(.025, .35, (0, 2.18, 0), LAV))                                        # antenna
