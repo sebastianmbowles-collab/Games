@@ -804,7 +804,7 @@ const boss = (() => {
     }
     const sting = model('Sting'); sting.material = glow(0xff3fb0); sting.position.set(0, .3, .35); sting.rotation.x = 2.2; prev.add(sting);
     g.position.set(0, -4, 78); g.visible = false; scene.add(g);
-    return { g, tail, sting, shell: sh, x: 0, z: 78, hp: 14, maxHp: 14, active: false, cool: 2, mode: 'walk', modeT: 0, charge: 4, flash: 0, rise: 0 };
+    return { g, tail, sting, shell: sh, x: 0, z: 78, hp: 24, maxHp: 24, active: false, cool: 2, mode: 'walk', modeT: 0, charge: 4, flash: 0, rise: 0 };
   }
   const body = mesh(new THREE.DodecahedronGeometry(1.4, 0), shell); body.scale.set(1.3, .6, 1.6); body.position.y = 1.1; g.add(body);
   const head = mesh(new THREE.IcosahedronGeometry(.8, 0), shell); head.scale.set(1.2, .7, 1); head.position.set(0, 1.1, 2.1); g.add(head);
@@ -823,8 +823,16 @@ const boss = (() => {
   }
   const sting = mesh(new THREE.ConeGeometry(.25, .8, 5), glow(0xff3fb0)); sting.position.set(0, .3, .35); sting.rotation.x = 2.2; prev.add(sting);
   g.position.set(0, -4, 78); g.visible = false; scene.add(g);
-  return { g, tail, sting, shell, x: 0, z: 78, hp: 14, maxHp: 14, active: false, cool: 2, mode: 'walk', modeT: 0, charge: 4, flash: 0, rise: 0 };
+  return { g, tail, sting, shell, x: 0, z: 78, hp: 24, maxHp: 24, active: false, cool: 2, mode: 'walk', modeT: 0, charge: 4, flash: 0, rise: 0 };
 })();
+
+// the scorpion's brain: what it remembers while it fights
+Object.assign(boss, { phase: 1, under: false, hits: [], shotCool: 3, burrowCool: 6, strafe: 1, strafeT: 0, lpx: 0, lpz: 0, pvx: 0, pvz: 0, dustT: 0 });
+const bossShots = [];
+const goo = new THREE.SphereGeometry(.28, 10, 8);
+// a pink ring on the sand warns you where the scorpion will burst out
+const bossRing = mesh(new THREE.RingGeometry(1.9, 2.5, 32), new THREE.MeshBasicMaterial({ color: 0xff3fb0, transparent: true, opacity: .7, side: THREE.DoubleSide, depthWrite: false }));
+bossRing.rotation.x = -Math.PI / 2; bossRing.visible = false; scene.add(bossRing);
 
 // ============ PICKUPS ============
 const GEMS = { pink: 0xff5fc0, blue: 0x5fc8ff, green: 0x6ff09a, purple: 0xb07fff, rainbow: 0xffffff };
@@ -1078,9 +1086,17 @@ function bossCine() {
   playCine([
     { text: 'The sand is moving…', d: 2.5, snap: true, pos: [7, 4, 64], look: [0, 1, 78] },
     { text: 'The PASTEL SCORPION guards the second key!', d: 3.5, pos: [4, 3, 68], look: [0, 2, 78], tick: dt => { boss.rise = Math.min(1, boss.rise + dt / 2); } },
-  ], () => { boss.rise = 1; boss.active = true; $('bossbar').hidden = false; objective('Beat the Pastel Scorpion'); });
+  ], () => { boss.rise = 1; boss.active = true; boss.lpx = P.x; boss.lpz = P.z; $('bossbar').hidden = false; objective('Beat the Pastel Scorpion'); });
+}
+function resetBoss() {
+  Object.assign(boss, { hp: boss.maxHp, x: 0, z: 78, mode: 'walk', modeT: 0, cool: 2, charge: 4, phase: 1, under: false, hits: [], shotCool: 3, burrowCool: 6 });
+  if (boss.active) boss.rise = 1;
+  boss.shell.color.setHex(0xc9a6ff); bossRing.visible = false;
+  bossShots.forEach(s => scene.remove(s.m)); bossShots.length = 0;
+  $('bossfill').style.width = '100%';
 }
 function bossDefeated() {
+  bossShots.forEach(s => scene.remove(s.m)); bossShots.length = 0; bossRing.visible = false;
   state.bossDead = true; boss.active = false; $('bossbar').hidden = true;
   burst(boss.x, terrainH(boss.x, boss.z) + 1.5, boss.z, [0xc9a6ff, 0xff9ad5, 0xfff0fb, 0xffd36b], 40); sfx('big');
   boss.g.visible = false;
@@ -1122,7 +1138,7 @@ function backToBed() {
     Object.assign(P, { x: 0, y: 0, z: -1, vy: 0, yaw: Math.PI, pitch: 0, hp: 5, kx: 0, kz: 0, hurtT: 1 });
     robots.forEach(r => { if (r.alive) { r.x = r.home.x; r.z = r.home.z; r.hp = r.maxHp; r.lift = r.lv = 0; r.flung = false; } });
     if (state.gateOpen) toast('Back in your bedroom', 'The glowing door takes you back to the gate');
-    if (!state.bossDead) { boss.hp = boss.maxHp; boss.x = 0; boss.z = 78; boss.mode = 'walk'; boss.cool = 2; }
+    if (!state.bossDead) resetBoss();
     hud(); state.mode = 'play';
     $('fade').style.opacity = 0;
   }, 1500);
@@ -1150,9 +1166,16 @@ function doPunch(charged) {
   if (hitAny) burst(P.x + fx * 1.2, P.y + 1.3, P.z + fz * 1.2, [0xffffff, 0xffe27f], charged ? 10 : 4);
 }
 function hitBoss(dmg) {
-  if (!boss.active) return;
+  if (!boss.active || boss.under) return; // you can't punch it while it's under the sand
   boss.hp -= dmg; boss.flash = .15; $('bossfill').style.width = Math.max(0, boss.hp / boss.maxHp * 100) + '%';
-  if (boss.hp <= 0) bossDefeated();
+  boss.hits.push(performance.now());
+  if (boss.hp <= 0) { bossDefeated(); return; }
+  // at half health it gets ANGRY: faster, pinker, and it learns new tricks
+  if (boss.phase === 1 && boss.hp <= boss.maxHp / 2) {
+    boss.phase = 2; boss.shell.color.setHex(0xff8fd0); sfx('roar'); state.shake = .4;
+    toast('The Scorpion is ANGRY!', 'Keep moving: it can dig under the sand now');
+    boss.mode = 'burrow'; boss.modeT = 0;
+  }
 }
 function hitRobot(r, dmg, kb) {
   r.hp -= dmg; r.flash = .15;
@@ -1674,7 +1697,15 @@ function updateRobots(dt, time) {
   }
 }
 
+// The Pastel Scorpion thinks every frame. It:
+//  - turns slowly, so sneaking behind it is a real trick... but if you stand
+//    behind it, it spins its tail all the way round!
+//  - circles you like a hunter instead of walking straight at you
+//  - aims its charges and goo blobs at where you are GOING, not where you are
+//  - spins away if you punch it too many times in a row
+//  - at half health, digs under the sand, follows you, and bursts out under you
 function updateBoss(dt, time) {
+  updateBossShots(dt);
   if (!boss.g.visible) return;
   const gy = terrainH(boss.x, boss.z);
   boss.g.position.set(boss.x, gy - 4 * (1 - boss.rise), boss.z);
@@ -1683,32 +1714,119 @@ function updateBoss(dt, time) {
   const tailBase = Math.sin(time * 2) * .1;
   if (!boss.active || state.mode !== 'play' || cine) { boss.tail.rotation.x = tailBase; return; }
   const dx = P.x - boss.x, dz = P.z - boss.z, d = Math.hypot(dx, dz) || 1;
-  boss.modeT += dt; boss.cool -= dt; boss.charge -= dt;
+  const angry = boss.phase === 2, spd = angry ? 3.4 : 2.6;
+  // watch how you move, so it can guess where you'll be
+  boss.pvx += ((P.x - boss.lpx) / dt - boss.pvx) * Math.min(1, dt * 4); boss.pvz += ((P.z - boss.lpz) / dt - boss.pvz) * Math.min(1, dt * 4);
+  boss.pvx = clamp(boss.pvx, -12, 12); boss.pvz = clamp(boss.pvz, -12, 12);
+  boss.lpx = P.x; boss.lpz = P.z;
+  const lead = t => ({ x: clamp(P.x + boss.pvx * t, -26, 26), z: clamp(P.z + boss.pvz * t, 60, 91) });
+  boss.modeT += dt; boss.cool -= dt; boss.charge -= dt; boss.shotCool -= dt; boss.burrowCool -= dt;
+  const now = performance.now(); boss.hits = boss.hits.filter(t => now - t < 2500);
+  const facing = boss.g.rotation.y, toYou = Math.atan2(dx, dz);
+  const behind = Math.abs(Math.atan2(Math.sin(toYou - facing), Math.cos(toYou - facing))) > 1.2;
+  const go = m => { boss.mode = m; boss.modeT = 0; };
   if (boss.mode === 'walk') {
-    boss.g.rotation.y = Math.atan2(dx, dz);
-    if (d > 3) { boss.x += dx / d * 2.4 * dt; boss.z += dz / d * 2.4 * dt; }
+    boss.g.rotation.y = turnTo(facing, toYou, Math.min(1, dt * (angry ? 3 : 2)));
+    boss.strafeT -= dt; if (boss.strafeT <= 0) { boss.strafe = -boss.strafe; boss.strafeT = rand(1.5, 3); }
+    let mx = 0, mz = 0;
+    if (d > 4.5) { mx = dx / d; mz = dz / d; }
+    if (d < 10) { mx += -dz / d * boss.strafe * .8; mz += dx / d * boss.strafe * .8; } // circle around you
+    boss.x += mx * spd * dt; boss.z += mz * spd * dt;
     boss.tail.rotation.x = tailBase;
-    if (d < 3.6 && boss.cool <= 0) { boss.mode = 'windup'; boss.modeT = 0; sfx('warn'); }
-    else if (boss.charge <= 0 && d < 16) { sfx('roar'); boss.mode = 'charge'; boss.modeT = 0; boss.cdx = dx / d; boss.cdz = dz / d; }
-  } else if (boss.mode === 'windup') {
-    boss.tail.rotation.x = -.5 * Math.min(1, boss.modeT / .6);
-    boss.sting.material.color.setHex(Math.floor(time * 12) % 2 ? 0xffffff : 0xff3fb0);
-    if (boss.modeT > .7) {
-      boss.mode = 'strike'; boss.modeT = 0;
-      if (d < 3.9) hurt(1, boss.x, boss.z);
+    if (boss.hits.length >= 4) { boss.hits = []; sfx('warn'); go(angry && boss.burrowCool <= 0 ? 'burrow' : 'spinup'); }
+    else if (d < 4 && boss.cool <= 0) { sfx('warn'); go(behind ? 'spinup' : 'windup'); }
+    else if (angry && boss.burrowCool <= 0 && d > 6) go('burrow');
+    else if (d > 7 && boss.shotCool <= 0) go('spit');
+    else if (boss.charge <= 0 && d < 18 && d > 4) {
+      sfx('roar'); go('charge');
+      const t = lead(d / 11); const cx = t.x - boss.x, cz = t.z - boss.z, cd = Math.hypot(cx, cz) || 1;
+      boss.cdx = cx / cd; boss.cdz = cz / cd; boss.charges = angry ? 2 : 1;
     }
+  } else if (boss.mode === 'windup') {
+    boss.g.rotation.y = turnTo(facing, toYou, Math.min(1, dt * 4));
+    boss.tail.rotation.x = -.5 * Math.min(1, boss.modeT / .5);
+    boss.sting.material.color.setHex(Math.floor(time * 12) % 2 ? 0xffffff : 0xff3fb0);
+    if (boss.modeT > (angry ? .45 : .6)) { go('strike'); if (d < 4.2) hurt(1, boss.x, boss.z); }
   } else if (boss.mode === 'strike') {
     boss.tail.rotation.x = .7; boss.sting.material.color.setHex(0xff3fb0);
-    if (boss.modeT > .4) { boss.mode = 'walk'; boss.cool = 1.6; }
+    if (boss.modeT > .4) { go('walk'); boss.cool = angry ? 1 : 1.5; }
+  } else if (boss.mode === 'spinup') {
+    // shakes, then whirls its tail in a full circle: jump back!
+    boss.g.position.x += rand(-.06, .06); boss.tail.rotation.x = -.6;
+    if (boss.modeT > .45) go('spin');
+  } else if (boss.mode === 'spin') {
+    boss.g.rotation.y += dt * 22; boss.tail.rotation.x = .3;
+    if (d < 4.6) hurt(1, boss.x, boss.z);
+    if (boss.modeT > .6) { go('walk'); boss.cool = 1.2; }
+  } else if (boss.mode === 'spit') {
+    // spits blobs of pink goo where you're about to be
+    boss.g.rotation.y = turnTo(facing, toYou, Math.min(1, dt * 5));
+    boss.tail.rotation.x = -.3 - Math.sin(boss.modeT * 10) * .2;
+    const n = angry ? 5 : 3, every = .32;
+    const k = Math.floor(boss.modeT / every);
+    if (k < n && k >= (boss.shots || 0)) { boss.shots = k + 1; spitGoo(k, n, lead(1.1)); }
+    if (boss.modeT > n * every + .3) { boss.shots = 0; go('walk'); boss.shotCool = rand(3.5, 5.5) - (angry ? 1.2 : 0); }
   } else if (boss.mode === 'charge') {
-    if (boss.modeT < .5) { boss.g.position.x += rand(-.08, .08); }
+    if (boss.modeT < .5) { boss.g.position.x += rand(-.08, .08); boss.g.rotation.y = turnTo(facing, Math.atan2(boss.cdx, boss.cdz), Math.min(1, dt * 8)); }
     else {
-      boss.x += boss.cdx * 10 * dt; boss.z += boss.cdz * 10 * dt;
+      boss.x += boss.cdx * (angry ? 12 : 10) * dt; boss.z += boss.cdz * (angry ? 12 : 10) * dt;
       if (d < 2.4) hurt(1, boss.x, boss.z);
     }
-    if (boss.modeT > 1.3) { boss.mode = 'walk'; boss.charge = rand(5, 8); }
+    if (boss.modeT > 1.3) {
+      if (--boss.charges > 0) { // angry: turns round and charges again, aimed at where you're going
+        sfx('roar'); go('charge'); boss.modeT = .2;
+        const t = lead(d / 12); const cx = t.x - boss.x, cz = t.z - boss.z, cd = Math.hypot(cx, cz) || 1;
+        boss.cdx = cx / cd; boss.cdz = cz / cd;
+      } else { go('walk'); boss.charge = rand(4.5, 7) - (angry ? 1.5 : 0); }
+    }
+  } else if (boss.mode === 'burrow') {
+    // dig down...
+    boss.rise = Math.max(0, 1 - boss.modeT / .7); sandPuff(boss.x, boss.z, dt);
+    if (boss.modeT > .7) { boss.under = true; go('under'); }
+  } else if (boss.mode === 'under') {
+    // ...follow you under the sand (watch for the moving dust!)...
+    const t = lead(.6), ux = t.x - boss.x, uz = t.z - boss.z, ud = Math.hypot(ux, uz) || 1;
+    if (ud > .3) { boss.x += ux / ud * 7 * dt; boss.z += uz / ud * 7 * dt; }
+    sandPuff(boss.x, boss.z, dt);
+    if (boss.modeT > 2.4) { go('erupt'); bossRing.visible = true; sfx('warn'); }
+  } else if (boss.mode === 'erupt') {
+    // ...stop, show the warning ring, then BURST OUT
+    bossRing.position.set(boss.x, terrainH(boss.x, boss.z) + .08, boss.z);
+    bossRing.material.opacity = .4 + Math.abs(Math.sin(boss.modeT * 14)) * .5;
+    sandPuff(boss.x, boss.z, dt);
+    if (boss.modeT > .8) {
+      bossRing.visible = false; boss.under = false; boss.rise = 1; state.shake = .4; sfx('slam');
+      burst(boss.x, terrainH(boss.x, boss.z) + .5, boss.z, [0xffc6e0, 0xffffff, 0xc9a6ff], 22);
+      if (d < 2.6) hurt(2, boss.x, boss.z);
+      go('walk'); boss.cool = .8; boss.burrowCool = rand(7, 10);
+    }
   }
   boss.x = clamp(boss.x, -26, 26); boss.z = clamp(boss.z, 60, 91);
+}
+function sandPuff(x, z, dt) {
+  boss.dustT -= dt; if (boss.dustT > 0) return; boss.dustT = .12;
+  burst(x + rand(-.8, .8), terrainH(x, z) + .1, z + rand(-.8, .8), [0xffd6ec, 0xffffff], 2);
+}
+function spitGoo(k, n, t) {
+  // spread the blobs out a little so you have to really move
+  const spread = (k - (n - 1) / 2) * 1.6, ax = t.x - boss.x, az = t.z - boss.z, ad = Math.hypot(ax, az) || 1;
+  const tx = t.x + -az / ad * spread, tz = t.z + ax / ad * spread;
+  const y0 = terrainH(boss.x, boss.z) + 3, T = 1.1, ty = terrainH(tx, tz);
+  const m = mesh(goo, glow(0xff5fc0)); m.add(halo(0xff5fc0, 1.6, .7)); scene.add(m);
+  bossShots.push({ m, x: boss.x, y: y0, z: boss.z, vx: (tx - boss.x) / T, vz: (tz - boss.z) / T, vy: (ty - y0 + 7 * T * T) / T });
+  sfx('whoosh');
+}
+function updateBossShots(dt) {
+  for (let i = bossShots.length - 1; i >= 0; i--) {
+    const s = bossShots[i];
+    s.vy -= 14 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
+    s.m.position.set(s.x, s.y, s.z);
+    if (s.y <= terrainH(s.x, s.z)) {
+      burst(s.x, s.y + .2, s.z, [0xff5fc0, 0xffc6e0], 6);
+      if (Math.hypot(P.x - s.x, P.z - s.z) < 1.4 && P.y - terrainH(s.x, s.z) < 1.2) hurt(1, s.x, s.z);
+      scene.remove(s.m); bossShots.splice(i, 1);
+    }
+  }
 }
 
 let last = performance.now();
