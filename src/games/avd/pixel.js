@@ -171,9 +171,32 @@ export function flushText(ctx, k) {
 export const PX = 3 // every chunky pixel is 3x3 normal pixels
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => v / 16 - 0.47)
 
-// Squash every colour into real "8-bit colour": 3 bits of red, 3 of green and 2 of blue, which makes
-// 256 colours in total. A checkerboard "dither" turns smooth skies into retro dotty patterns.
-const LEVELS = [7, 7, 3]
+// Every pixel on screen is snapped to the nearest colour in the Endesga 32 palette (a favourite of
+// pixel artists), with a tiny checkerboard "dither" where colours blend, like real pixel art.
+const PALETTE = [
+  '#be4a2f', '#d77643', '#ead4aa', '#e4a672', '#b86f50', '#733e39', '#3e2731', '#a22633',
+  '#e43b44', '#f77622', '#feae34', '#fee761', '#63c74d', '#3e8948', '#265c42', '#193c3e',
+  '#124e89', '#0099db', '#2ce8f5', '#ffffff', '#c0cbdc', '#8b9bb4', '#5a6988', '#3a4466',
+  '#262b44', '#181425', '#ff0044', '#68386c', '#b55088', '#f6757a', '#e8b796', '#c28569',
+].map((h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)])
+const lut = new Int16Array(32768).fill(-1)
+
+function nearest(key) {
+  const r = ((key >> 10) & 31) * 8 + 4
+  const g = ((key >> 5) & 31) * 8 + 4
+  const b = (key & 31) * 8 + 4
+  let best = 0
+  let bestD = Infinity
+  PALETTE.forEach(([pr, pg, pb], i) => {
+    const d = 2 * (r - pr) ** 2 + 4 * (g - pg) ** 2 + 3 * (b - pb) ** 2
+    if (d < bestD) {
+      bestD = d
+      best = i
+    }
+  })
+  lut[key] = best
+  return best
+}
 
 export function retroColors(lctx, w, h) {
   const img = lctx.getImageData(0, 0, w, h)
@@ -181,12 +204,17 @@ export function retroColors(lctx, w, h) {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4
-      const t = BAYER[(y & 3) * 4 + (x & 3)] * 0.55
-      for (let c = 0; c < 3; c++) {
-        const n = LEVELS[c]
-        const v = Math.round((d[i + c] / 255) * n + t)
-        d[i + c] = Math.round(((v < 0 ? 0 : v > n ? n : v) * 255) / n)
-      }
+      const t = BAYER[(y & 3) * 4 + (x & 3)] * 22
+      const r = Math.max(0, Math.min(255, d[i] + t))
+      const g = Math.max(0, Math.min(255, d[i + 1] + t))
+      const b = Math.max(0, Math.min(255, d[i + 2] + t))
+      const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)
+      let idx = lut[key]
+      if (idx < 0) idx = nearest(key)
+      const c = PALETTE[idx]
+      d[i] = c[0]
+      d[i + 1] = c[1]
+      d[i + 2] = c[2]
     }
   }
   lctx.putImageData(img, 0, 0)

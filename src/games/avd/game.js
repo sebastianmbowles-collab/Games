@@ -32,6 +32,9 @@ import {
 import { sfx, wakeAudio, beamOn, setVolumes } from './sound'
 import { playSong, stopMusic } from './music'
 import { PX, retroColors, flushText } from './pixel'
+
+// Snap a position to the chunky pixel grid.
+const snap = (v) => Math.round(v / PX) * PX
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
 
 export { W, H }
@@ -149,32 +152,23 @@ class FX {
       const a = 1 - f
       ctx.save()
       switch (p.type) {
-        case 'dot':
+        case 'dot': {
           ctx.globalAlpha = a
           ctx.fillStyle = p.color
-          circle(ctx, p.x, p.y, p.size * (1 - f * 0.5))
-          ctx.fill()
-          break
-        case 'glow': {
-          ctx.globalCompositeOperation = 'lighter'
-          ctx.globalAlpha = a
-          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size)
-          g.addColorStop(0, p.color)
-          g.addColorStop(1, 'rgba(0,0,0,0)')
-          ctx.fillStyle = g
-          ctx.fillRect(p.x - p.size, p.y - p.size, p.size * 2, p.size * 2)
+          const s = Math.max(PX, snap(p.size * (1 - f * 0.5)))
+          ctx.fillRect(snap(p.x - s / 2), snap(p.y - s / 2), s, s)
           break
         }
-        case 'spark':
-          ctx.globalCompositeOperation = 'lighter'
+        case 'glow':
           ctx.globalAlpha = a
-          ctx.strokeStyle = p.color
-          ctx.lineWidth = p.size * (1 - f)
-          ctx.lineCap = 'round'
-          ctx.beginPath()
-          ctx.moveTo(p.x, p.y)
-          ctx.lineTo(p.x - p.vx * 0.04, p.y - p.vy * 0.04)
-          ctx.stroke()
+          ctx.fillStyle = p.color
+          ctx.fillRect(snap(p.x), snap(p.y), p.size > 9 ? PX * 2 : PX, p.size > 9 ? PX * 2 : PX)
+          break
+        case 'spark':
+          ctx.globalAlpha = a
+          ctx.fillStyle = p.color
+          ctx.fillRect(snap(p.x), snap(p.y), PX, PX)
+          if (f < 0.6) ctx.fillRect(snap(p.x - p.vx * 0.025), snap(p.y - p.vy * 0.025), PX, PX)
           break
         case 'smoke':
           ctx.globalAlpha = a * 0.7
@@ -201,16 +195,15 @@ class FX {
           ctx.fill()
           break
         }
-        case 'debris':
+        case 'debris': {
           ctx.globalAlpha = Math.min(1, a * 3)
-          ctx.translate(p.x, p.y)
-          ctx.rotate(p.rot)
+          const s = Math.max(PX, snap(p.size * 0.7))
+          ctx.fillStyle = INK
+          ctx.fillRect(snap(p.x) - PX, snap(p.y) - PX, s + PX * 2, s + PX * 2)
           ctx.fillStyle = p.color
-          ctx.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66)
-          ctx.strokeStyle = INK
-          ctx.lineWidth = 1.5
-          ctx.strokeRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66)
+          ctx.fillRect(snap(p.x), snap(p.y), s, s)
           break
+        }
         case 'star':
           ctx.globalAlpha = a
           ctx.translate(p.x, p.y)
@@ -1429,9 +1422,7 @@ export class AliensVsDinos {
   drawWorld(ctx, theme, cam, actors) {
     drawSky(ctx, theme, this.time)
     ctx.save()
-    ctx.translate(W / 2, H / 2)
-    ctx.scale(cam.zoom, cam.zoom)
-    ctx.translate(-cam.x, -cam.y)
+    applyCam(ctx, cam)
     drawBackdrop(ctx, theme, cam.x, this.time)
     drawGround(ctx, theme, cam.x, this.time)
     actors()
@@ -1470,31 +1461,22 @@ export class AliensVsDinos {
       ctx.restore()
     }
     for (const b of this.bolts) {
-      ctx.save()
-      ctx.globalCompositeOperation = 'lighter'
-      ctx.strokeStyle = '#9fffd0'
-      ctx.lineWidth = 6
-      ctx.lineCap = 'round'
-      ctx.beginPath()
-      ctx.moveTo(b.x, b.y)
-      ctx.lineTo(b.x - Math.sign(b.vx) * 40, b.y)
-      ctx.stroke()
-      ctx.strokeStyle = '#fff'
-      ctx.lineWidth = 2
-      ctx.stroke()
-      ctx.restore()
+      // a pixel laser: a cyan bar with a white-hot middle
+      const x = snap(Math.min(b.x, b.x - Math.sign(b.vx) * 36))
+      ctx.fillStyle = '#2ce8f5'
+      ctx.fillRect(x, snap(b.y) - PX, 36, PX * 2)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(x + PX * 2, snap(b.y) - PX, 36 - PX * 4, PX)
     }
     for (const s of this.plasma) {
-      ctx.save()
-      ctx.globalCompositeOperation = 'lighter'
-      const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 16)
-      g.addColorStop(0, '#fff')
-      g.addColorStop(0.4, '#ff5a8a')
-      g.addColorStop(1, 'rgba(255,60,120,0)')
-      ctx.fillStyle = g
-      circle(ctx, s.x, s.y, 16)
-      ctx.fill()
-      ctx.restore()
+      // a pixel plasma ball that pulses
+      const big = Math.floor(this.time * 12) % 2 ? PX : 0
+      ctx.fillStyle = '#ff0044'
+      ctx.fillRect(snap(s.x) - PX * 2 - big, snap(s.y) - PX * 2 - big, PX * 4 + big * 2, PX * 4 + big * 2)
+      ctx.fillStyle = '#f6757a'
+      ctx.fillRect(snap(s.x) - PX, snap(s.y) - PX, PX * 2, PX * 2)
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(snap(s.x) - PX, snap(s.y) - PX, PX, PX)
     }
   }
 
@@ -1869,6 +1851,13 @@ function bar(ctx, x, y, w, h, f, color) {
 // ---------- cutscene scripts ----------
 // Each cutscene draws itself from its clock `c.t`, so the same moment always looks the same.
 
+// Cameras move in whole pixels and only zoom to exactly 1x or 2x, so pixel art never gets smeared.
+function applyCam(ctx, cam) {
+  const z = cam.zoom < 1.5 ? 1 : 2
+  ctx.translate(snap(W / 2 - cam.x * z), snap(H / 2 - cam.y * z))
+  ctx.scale(z, z)
+}
+
 function camAt(x, y, zoom) {
   return { x, y, zoom }
 }
@@ -1952,7 +1941,7 @@ const CUTSCENES = {
         }
       } else {
         const s = t - 7
-        const cam = camAt(lerp(600, 680, ease(seg(s, 0, 4))), lerp(330, 300, seg(s, 0, 4)), lerp(1.5, 1.2, ease(seg(s, 0, 4))))
+        const cam = camAt(lerp(600, 680, ease(seg(s, 0, 4))), lerp(330, 300, seg(s, 0, 4)), lerp(1.4, 1.2, ease(seg(s, 0, 4))))
         game.drawWorld(ctx, getTheme('aliens'), cam, () => {
           const scared = s > 0.8
           for (const [i, d] of c.dinos.entries()) {
@@ -2027,7 +2016,7 @@ const CUTSCENES = {
       } else if (t >= 7) {
         theme = getTheme('night')
         const z = ease(seg(t, 7, 8.6))
-        cam = camAt(lerp(700, 660, z), lerp(290, 330, z), lerp(1, 1.9, z))
+        cam = camAt(lerp(700, 660, z), lerp(290, 372, z), lerp(1, 1.9, z))
         if (t > 9) cam = camAt(700, 300, lerp(1.9, 1.1, ease(seg(t, 9, 9.8))))
       }
       game.drawWorld(ctx, theme, cam, () => {
@@ -2168,7 +2157,7 @@ const CUTSCENES = {
     draw(ctx, c, game) {
       const t = c.t
       const now = game.time
-      const cam = camAt(lerp(520, 660, ease(seg(t, 0, 2.4))), lerp(270, 360, ease(seg(t, 0, 2.6))), lerp(1.1, 1.5, ease(seg(t, 2.4, 4))))
+      const cam = camAt(lerp(520, 660, ease(seg(t, 0, 2.4))), lerp(270, 360, ease(seg(t, 0, 2.6))), lerp(1.1, 1.45, ease(seg(t, 2.4, 4))))
       game.drawWorld(ctx, getTheme('aliens'), cam, () => {
         if (t < 2.4) {
           const f = ease(seg(t, 0.2, 2.4))
@@ -2226,9 +2215,7 @@ const CUTSCENES = {
       drawSky(ctx, { ...theme, moon: false }, now)
       drawMoon(ctx, W / 2, lerp(H + 60, 150, ease(seg(t, 1, 6))))
       ctx.save()
-      ctx.translate(W / 2, H / 2)
-      ctx.scale(cam.zoom, cam.zoom)
-      ctx.translate(-cam.x, -cam.y)
+      applyCam(ctx, cam)
       drawBackdrop(ctx, theme, cam.x, now)
       drawGround(ctx, theme, cam.x, now)
       for (let i = 0; i < 3; i++) {
