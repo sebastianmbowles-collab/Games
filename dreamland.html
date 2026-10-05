@@ -1470,19 +1470,36 @@ function hurt(n, fromX, fromZ) {
   hud();
   if (P.hp <= 0) backToBed();
 }
-function backToBed() {
+// CHECKPOINTS: when you run out of hearts you don't go all the way back to bed.
+// You get back up at the nearest checkpoint you've already reached.
+function checkpoint() {
+  const spots = [{ x: 0, z: -1, yaw: Math.PI }];                                    // your bedroom (only if you never left)
+  if (P.z > 5 || state.keys > 0) spots.push({ x: 0, z: 8.6, yaw: Math.PI });        // just outside the window
+  if (P.z > 14 || state.gateOpen) spots.push({ x: 0, z: 16.5, yaw: Math.PI });      // in front of the gate
+  if (state.gateOpen) { spots.push({ x: 0, z: 24, yaw: Math.PI }); if (P.z > 40) spots.push({ x: 3, z: 44, yaw: Math.PI }); }
+  if (state.bossSeen && !state.bossDead) spots.push({ x: 0, z: 61, yaw: Math.PI }); // just outside the scorpion's arena
+  let best = spots[0];
+  for (const c of spots) if (c.z <= P.z + 1 && c.z >= best.z) best = c;
+  if (P.z > 5 && best.z < 8) best = spots[1] || best; // once you're outside, never back in the bedroom
+  return best;
+}
+function backToBed() { // (the name stayed, but you don't go back to bed any more!)
   state.mode = 'dead';
-  $('fadeText').textContent = 'Back to bed…'; $('fade').style.opacity = 1;
+  const cp = checkpoint();
+  $('fadeText').textContent = pick(['Shake it off!', 'Get back up!', 'Not this time…', 'Try again!']); $('fade').style.opacity = 1;
   P.slam = false; saved.beds++; store.set(saved); sfx('bed');
-  if (saved.beds >= 100) achieve('Sleepwalker', 'Go back to bed 100 times');
+  if (saved.beds >= 100) achieve('Sleepwalker', 'Get back up 100 times');
   setTimeout(() => {
-    Object.assign(P, { x: 0, y: 0, z: -1, vy: 0, yaw: Math.PI, pitch: 0, hp: 5, kx: 0, kz: 0, hurtT: 1 });
-    robots.forEach(r => { if (r.alive) { r.x = r.home.x; r.z = r.home.z; r.hp = r.maxHp; r.lift = r.lv = 0; r.flung = false; } });
-    if (state.gateOpen) toast('Back in your bedroom', 'The glowing door takes you back to the gate');
-    if (!state.bossDead) resetBoss();
+    Object.assign(P, { x: cp.x, y: terrainH(cp.x, cp.z) + .2, z: cp.z, vy: 0, yaw: cp.yaw, pitch: 0, hp: 5, kx: 0, kz: 0, hurtT: 2.5 });
+    // robots step back a bit so you have room to breathe (they keep their damage!)
+    robots.forEach(r => { if (r.alive) { r.lift = r.lv = 0; r.flung = false; r.path = []; r.alerted = false;
+      if (Math.hypot(r.x - P.x, r.z - P.z) < 8) { r.x = r.home.x; r.z = r.home.z; } } });
+    // the scorpion goes back to the middle of its arena but stays hurt
+    if (!state.bossDead && boss.active) { Object.assign(boss, { x: 0, z: 78, mode: 'walk', modeT: 0, cool: 2, under: false, rise: 1 }); bossRing.visible = false; boss.tail.scale.setScalar(1); straighten(0); }
+    toast('Back on your feet!', 'You have all your hearts again');
     hud(); state.mode = 'play';
     $('fade').style.opacity = 0;
-  }, 1500);
+  }, 1300);
 }
 // ============ HITBOXES ============
 // Every fighter has an invisible shape that counts for hits:
@@ -1840,7 +1857,7 @@ const ACH = [
   ['Ghost Student', 'Finish the school without getting caught'], ['Gem Hoarder', 'Collect 1,000 gems'],
   ['Message Finder', 'Find every hidden message'], ['Night Owl', 'Survive 10 world shifts'],
   ['Unbreakable', 'Beat the ocean without going back to bed'], ['Know Yourself', 'Beat the final boss'],
-  ['Sleepwalker', 'Go back to bed 100 times', 1], ['Eraser', 'Erase every wall in the Sketch House', 1],
+  ['Sleepwalker', 'Get back up 100 times', 1], ['Eraser', 'Erase every wall in the Sketch House', 1],
   ['Jellyfish Friend', 'Get through the ocean without getting zapped', 1], ['Mirror Mirror', 'Find every boss glimpse in the mirror maze', 1],
   ['Pet Lover', 'Find every pixel animal in the forest', 1], ['Detention', 'Get caught by the robot principal 5 times', 1],
   ['Toy Tracker', 'Find where every floating toy goes', 1], ['Sky Walker', 'Never fall in cloud city', 1],
