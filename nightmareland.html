@@ -2753,6 +2753,20 @@ function updateStalker(dt, lightOn, nearLight, fx, fz) {
     state.shake = .5; P.hurtT = 0; hurt(2, g.position.x, g.position.z); NM.fear = 70;
   }
 }
+// --- the crowd: dark figures on the hills that you only see when lightning flashes ---
+NM.crowd = new THREE.Group(); scene.add(NM.crowd); NM.crowd.visible = false;
+{ const sh = new THREE.MeshBasicMaterial({ color: 0x000000, fog: false });
+  for (let i = 0; i < 40; i++) {
+    const a = rand(0, Math.PI * 2), R = rand(150, 210), x = Math.cos(a) * R, z = Math.sin(a) * R + 40, f = new THREE.Group();
+    const b = mesh(new THREE.CylinderGeometry(1.2, 1.6, 8, 6), sh); b.position.y = 4; f.add(b);
+    const h = mesh(new THREE.SphereGeometry(1.5, 8, 6), sh); h.position.y = 9.2; f.add(h);
+    f.position.set(x, rand(0, 6), z); f.lookAt(0, f.position.y, 40); NM.crowd.add(f);
+  } }
+// --- the giant shadow on the horizon gets closer as the night goes on, with red eyes ---
+shadow.traverse(o => { if (o.material && o.material.color && o.material.color.getHex() === 0xff4fc0) o.material.color.setHex(0xff1010); });
+// --- an out-of-tune music box in the bedroom ---
+NM.boxT = 0; NM.boxI = 0;
+const BOX = [76, 74, 71, 74, 76, 79, 76, 74, 71, 69, 71, 74, 72, 71];
 // --- sounds: a low hum, your heartbeat, and footsteps that aren't yours ---
 NM.beatT = 1; NM.stepsT = 18;
 function nmSound(dt) {
@@ -2763,6 +2777,12 @@ function nmSound(dt) {
     lp.connect(NM.drone); NM.drone.connect(master);
   }
   NM.drone.gain.value = .035 + NM.fear / 100 * .05;
+  // the music box: only when you're near the bedroom, slowing down and going wrong
+  const nearRoom = Math.max(0, 1 - Math.hypot(P.x, P.z) / 14);
+  if (nearRoom > 0) { NM.boxT -= dt;
+    if (NM.boxT <= 0) { NM.boxT = .42 + Math.random() * .12 + (NM.boxI % 14 === 13 ? 1.6 : 0);
+      const m = BOX[NM.boxI++ % BOX.length] + (Math.random() < .2 ? rand(-.6, .6) : -.3); // a little out of tune
+      const t = ac.currentTime; tone('triangle', 440 * Math.pow(2, (m - 69) / 12), t, .9, .05 * nearRoom, master, .002); tone('sine', 880 * Math.pow(2, (m - 69) / 12), t, .4, .02 * nearRoom, master, .002); } }
   // heartbeat: faster and louder the more scared you are
   if (NM.fear > 20 && state.mode === 'play') {
     NM.beatT -= dt;
@@ -2789,7 +2809,9 @@ function nightmareTick(dt, time) {
   NM.torch.intensity = NM.flash && NM.battery > 0 ? ((NM.fear > 70 || lowBat) && Math.random() < (lowBat ? .2 : .08) ? .25 : 1.7 * Math.min(1, .45 + NM.battery / 60)) : 0;
   // lightning now and then
   NM.boltT -= dt; if (NM.boltT <= 0) { NM.boltT = rand(9, 20); NM.bolt = .35; if (ac) setTimeout(() => sfx('thud'), 400); }
-  NM.bolt = Math.max(0, NM.bolt - dt); hemi.intensity = .42 + (NM.bolt > .2 || (NM.bolt > 0 && NM.bolt < .1) ? 1.3 : 0);
+  NM.bolt = Math.max(0, NM.bolt - dt); NM.crowd.visible = NM.bolt > 0;
+  // the shadow steps closer as you go further in
+  { const goal = -185 + clamp(P.z, 0, 90) * .9 + (state.keys ? 20 : 0); shadow.position.z += (goal - shadow.position.z) * Math.min(1, dt * .2); } hemi.intensity = .42 + (NM.bolt > .2 || (NM.bolt > 0 && NM.bolt < .1) ? 1.3 : 0);
   // broken fairy lights flicker
   fairy.forEach(f => { if (!f.broken) f.h.material.opacity = Math.random() < .1 ? .1 : .8; });
   // lanterns breathe
