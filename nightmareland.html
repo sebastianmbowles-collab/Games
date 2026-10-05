@@ -1555,7 +1555,7 @@ function checkpoint() {
 function backToBed() { // (the name stayed, but you don't go back to bed any more!)
   state.mode = 'dead';
   const cp = checkpoint();
-  $('fadeText').textContent = pick(['Shake it off!', 'Get back up!', 'Not this time…', 'Try again!']); $('fade').style.opacity = 1;
+  $('fadeText').textContent = pick(['You can\'t wake up.', 'Again.', 'It\'s not over.', 'Stay.']); $('fade').style.opacity = 1;
   P.slam = false; saved.beds++; store.set(saved); sfx('bed');
   if (saved.beds >= 100) achieve('Sleepwalker', 'Get back up 100 times');
   setTimeout(() => {
@@ -1565,7 +1565,7 @@ function backToBed() { // (the name stayed, but you don't go back to bed any mor
       if (Math.hypot(r.x - P.x, r.z - P.z) < 8) { r.x = r.home.x; r.z = r.home.z; } } });
     // the scorpion goes back to the middle of its arena but stays hurt
     if (!state.bossDead && boss.active) { Object.assign(boss, { x: 0, z: 78, mode: 'walk', modeT: 0, cool: 2, under: false, rise: 1 }); bossRing.visible = false; boss.tail.scale.setScalar(1); straighten(0); }
-    toast('Back on your feet!', 'You have all your hearts again');
+    toast('Get up, Sebastian.', 'You have all your hearts again');
     hud(); state.mode = 'play';
     $('fade').style.opacity = 0;
   }, 1300);
@@ -2431,7 +2431,7 @@ function updateBoss(dt, time) {
     bossRing.material.opacity = .4 + Math.abs(Math.sin(boss.modeT * 14)) * .5;
     sandPuff(boss.x, boss.z, dt);
     if (boss.modeT > .8) {
-      bossRing.visible = false; boss.under = false; boss.rise = 1; state.shake = .4; sfx('slam'); dustRing(boss.x, terrainH(boss.x, boss.z), boss.z, 5, 0xffd6ec);
+      bossRing.visible = false; boss.under = false; boss.rise = 1; state.shake = .6; sfx('slam'); if (ac) { const t = ac.currentTime; hiss(t, .9, .35, 4000, 600, 'bandpass'); tone('sawtooth', 220, t, .6, .12, master); tone('sawtooth', 233, t, .6, .12, master); } // SCREECH dustRing(boss.x, terrainH(boss.x, boss.z), boss.z, 5, 0xffd6ec);
       burst(boss.x, terrainH(boss.x, boss.z) + .5, boss.z, [0xffc6e0, 0xffffff, 0xc9a6ff], 22);
       if (Math.hypot(P.x - boss.x, P.z - boss.z) < 2.5 && P.y - terrainH(P.x, P.z) < 2) hurt(2, boss.x, boss.z); // the ring shows exactly where
       go('walk'); boss.cool = .8; boss.burrowCool = rand(7, 10);
@@ -2805,7 +2805,7 @@ const wordEl = document.createElement('div'); wordEl.id = 'nmword'; document.bod
 addEventListener('keydown', e => { if (e.code === 'KeyL' && state.mode === 'play') { NM.flash = !NM.flash; sfx('tick'); toast(NM.flash ? 'Flashlight on' : 'Flashlight off', NM.flash ? '' : 'It gets scary in the dark…'); } });
 function nightmareTick(dt, time) {
   // flashlight (with a little flicker when you're scared)
-  const lowBat = NM.battery < 20;
+  const lowBat = NM.battery < 20 || (boss.under && Math.random() < .7); // the scorpion underground makes your light fail
   NM.torch.intensity = NM.flash && NM.battery > 0 ? ((NM.fear > 70 || lowBat) && Math.random() < (lowBat ? .2 : .08) ? .25 : 1.7 * Math.min(1, .45 + NM.battery / 60)) : 0;
   // lightning now and then
   NM.boltT -= dt; if (NM.boltT <= 0) { NM.boltT = rand(9, 20); NM.bolt = .35; if (ac) setTimeout(() => sfx('thud'), 400); }
