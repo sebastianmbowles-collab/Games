@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dreamland</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&family=Caveat:wght@700&display=swap">
 <style>
 /* Layout: full-screen 3D game canvas with a floating HUD and overlay screens */
 :root{
@@ -256,7 +256,8 @@ function loadModels(done) {
     sc.onload = () => next(i + 1); sc.onerror = () => (THREE.GLTFLoader ? ready() : finish(null)); // no bloom? still fine
     document.head.appendChild(sc);
   };
-  next(0);
+  // wait (a little) for the handwriting font, then load the helpers
+  Promise.race([document.fonts ? document.fonts.load('700 64px Caveat') : Promise.resolve(), new Promise(r => setTimeout(r, 2000))]).catch(() => {}).then(() => next(0));
   const ready = () => {
     try {
       const txt = atob(document.getElementById('models').textContent.trim()), bin = new Uint8Array(txt.length);
@@ -528,8 +529,9 @@ function note(lines, w, h) {
   const x = c.getContext('2d');
   x.fillStyle = '#fff3fb'; x.fillRect(0, 0, 512, 300);
   x.strokeStyle = '#ffb3e0'; x.lineWidth = 10; x.strokeRect(10, 10, 492, 280);
-  x.fillStyle = '#5a24a8'; x.textAlign = 'center'; x.font = 'bold 48px "Baloo 2", "Comic Sans MS", sans-serif';
-  lines.forEach((l, i) => x.fillText(l, 256, 110 + i * 64 - (lines.length - 1) * 20));
+  x.fillStyle = '#5a24a8'; x.textAlign = 'center'; x.font = '700 64px Caveat, "Comic Sans MS", cursive'; // handwriting: the dream self wrote these
+  // each line sits a little crooked, like it was written by hand
+  lines.forEach((l, i) => { x.save(); x.translate(256, 110 + i * 64 - (lines.length - 1) * 20); x.rotate(Math.sin(i * 2.1 + l.length) * .04); x.fillText(l, 0, 0); x.restore(); });
   return mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c) }));
 }
 
@@ -637,7 +639,7 @@ const projector = { o: new THREE.Vector3(2.9, 1.15, -4.1), stars: [] };
   const dome = mesh(new THREE.SphereGeometry(.15, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xfff2c8 })); dome.position.set(2.9, 1.02, -4.1); scene.add(dome);
   const h = halo(0xfff2c8, 1.4, .8); h.position.set(2.9, 1.12, -4.1); scene.add(h);
   for (let i = 0; i < 46; i++) {
-    const st = halo(pick([0xfff2a8, 0xffd6f6, 0xc8f0ff]), rand(.22, .42), .9);
+    const st = halo(pick([0xfff2a8, 0xffd6f6, 0xc8f0ff]), rand(.16, .28), .5);
     scene.add(st); projector.stars.push({ st, a: rand(0, Math.PI * 2), e: rand(-.15, .9) });
   } }
 function updateProjector(time) {
