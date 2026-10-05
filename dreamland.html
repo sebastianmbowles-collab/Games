@@ -35,6 +35,9 @@ canvas{display:block;width:100%;height:100%}
 .buffs{display:flex;gap:6px;justify-content:flex-end;margin-top:4px}
 .buff{font:800 11px var(--f-body);padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em}
 #objective{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 58px);background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;padding:6px 14px;font:800 14px var(--f-body);pointer-events:none;z-index:5;max-width:calc(100% - 32px);text-align:center}
+#compass{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:2px;font:800 11px var(--f-body);color:#ffe27f}
+#needle{display:inline-block;font-size:16px;line-height:1;color:#ffe27f;text-shadow:0 0 8px rgba(255,226,127,.8);transition:transform .08s linear}
+#dist{font-style:normal;opacity:.85}
 #objective small{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mint)}
 #cross{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(42,20,80,.5);pointer-events:none;z-index:4}
 #charge{position:fixed;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;pointer-events:none;z-index:4}
@@ -163,7 +166,7 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
     <div class="buffs" id="hBuffs"></div>
   </div>
 </div>
-<div id="objective"><small>Goal</small><span id="objText">Find the key outside your window</span></div>
+<div id="objective"><small>Goal</small><span id="objText">Find the key outside your window</span><div id="compass"><b id="needle">➤</b><i id="dist"></i></div></div>
 <div id="cross"></div>
 <canvas id="charge" width="80" height="80"></canvas>
 <div id="toast"></div>
@@ -1168,11 +1171,11 @@ function updateRings(dt) {
 }
 // sparkly bits: little twinkling diamonds, each with a soft glow
 const partG = new THREE.OctahedronGeometry(.11, 0);
-function burst(x, y, z, colors, n = 12) {
+function burst(x, y, z, colors, n = 12, spread = 1) {
   for (let i = 0; i < n; i++) {
     const c = pick(colors), m = mesh(partG, glow(c)); m.position.set(x, y, z); scene.add(m);
     if (i % 2 === 0) m.add(halo(c, 1.1, .6));
-    parts.push({ m, vx: rand(-4, 4), vy: rand(2, 7), vz: rand(-4, 4), life: rand(.7, 1.2), spin: rand(-12, 12) });
+    parts.push({ m, vx: rand(-4, 4) * spread, vy: rand(2, 7) * (spread > 1 ? rand(-.6, 1) : 1) * spread, vz: rand(-4, 4) * spread, life: rand(.7, 1.2) * (spread > 1 ? 1.4 : 1), spin: rand(-12, 12) });
   }
 }
 function freeKid(x, y, z) {
@@ -1376,7 +1379,27 @@ function resetBoss() {
   bossShots.forEach(s => scene.remove(s.m)); bossShots.length = 0;
   $('bossfill').style.width = '100%';
 }
+// FIREWORKS: little rockets whoosh up and pop into sparkles
+const fireworks = [];
+function launchFireworks(x, z, n) {
+  for (let i = 0; i < n; i++) setTimeout(() => {
+    const c = pick([0xff6fc8, 0x7ff0d8, 0xffe27f, 0xb07fff, 0x8fe9ff]), h = halo(c, 1.6, 1);
+    h.position.set(x + rand(-6, 6), terrainH(x, z) + 1, z + rand(-6, 6)); scene.add(h);
+    fireworks.push({ h, c, vy: rand(13, 17), t: rand(.7, 1) }); sfx('whoosh');
+  }, i * 380);
+}
+function updateFireworks(dt) {
+  for (let i = fireworks.length - 1; i >= 0; i--) {
+    const f = fireworks[i]; f.t -= dt; f.h.position.y += f.vy * dt; f.vy -= 6 * dt;
+    if (f.t <= 0) {
+      const q = f.h.position;
+      burst(q.x, q.y, q.z, [f.c, 0xffffff, f.c], 26, 2.2); sfx('hit');
+      scene.remove(f.h); fireworks.splice(i, 1);
+    }
+  }
+}
 function bossDefeated() {
+  launchFireworks(boss.x, boss.z, 9);
   bossShots.forEach(s => scene.remove(s.m)); bossShots.length = 0; bossRing.visible = false;
   state.bossDead = true; boss.active = false; $('bossbar').hidden = true;
   burst(boss.x, terrainH(boss.x, boss.z) + 1.5, boss.z, [0xc9a6ff, 0xff9ad5, 0xfff0fb, 0xffd36b], 40); sfx('big');
@@ -2405,7 +2428,15 @@ function loop(now) {
   else beacon.visible = false;
   drawCharge();
   drawHitboxes();
+  // compass: the arrow points to where your goal is (up = straight ahead)
+  if (state.mode === 'play') {
+    const t = objectiveTarget(), dx = t.x - P.x, dz = t.z - P.z;
+    const rel = Math.atan2(Math.sin(Math.atan2(-dx, -dz) - P.yaw), Math.cos(Math.atan2(-dx, -dz) - P.yaw));
+    $('needle').style.transform = `rotate(${-90 - rel * 180 / Math.PI}deg)`;
+    $('dist').textContent = Math.round(Math.hypot(dx, dz)) + ' m';
+  }
   updateRings(dt);
+  updateFireworks(dt);
   updateFar(time);
   updateAurora(time);
   updateProjector(time);
