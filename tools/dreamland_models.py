@@ -263,12 +263,13 @@ def fist():
     join(sl, 'FistSleeve', root)
 
 def flower():
-    s = [cyl(.025, .55, (0, .27, 0), STEM, verts=6), ball(.09, (.08, .2, 0), STEM, scale=(1.4, .3, .6), seg=8)]
+    s = [cyl(.025, .55, (0, .27, 0), STEM, verts=5), ball(.09, (.08, .2, 0), STEM, scale=(1.4, .3, .6), seg=6)]
     join(s, 'FlowerStem', origin=(0, 0, 0))
-    h = [ball(.06, (0, .58, 0), PETAL, seg=10)]
+    # kept very simple: there are hundreds of these in the meadow
+    h = [ball(.06, (0, .58, 0), PETAL, seg=6)]
     for i in range(5):
         a = i * 2 * math.pi / 5
-        h.append(ball(.07, (math.cos(a) * .1, .58, math.sin(a) * .1), PETAL, scale=(1.3, .35, 1), seg=10))
+        h.append(ball(.07, (math.cos(a) * .1, .58, math.sin(a) * .1), PETAL, scale=(1.3, .35, 1), seg=6))
     join(h, 'FlowerHead', origin=(0, 0, 0))
 
 def crystal():
