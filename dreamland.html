@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dreamland</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&family=Caveat:wght@700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&family=Caveat:wght@700&family=Caveat+Brush&family=Patrick+Hand&display=swap">
 <style>
 /* Layout: full-screen 3D game canvas with a floating HUD and overlay screens */
 :root{
@@ -94,6 +94,7 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 .tlogo span{display:inline-block;animation:drift 4s ease-in-out infinite;background:linear-gradient(180deg,#fff 25%,#ffd6f2 60%,#d9b8ff 95%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .tlogo span.glitch{color:#7ff0d8;transform:translateX(4px) skewX(-12deg);text-shadow:-3px 0 #ff3fb0,3px 0 #5ff6ff}
 @keyframes drift{50%{transform:translateY(-6px)}}
+
 @keyframes blink{50%{opacity:.25}}
 .tagline{font:800 13px var(--f-body);letter-spacing:.32em;text-transform:uppercase;color:#e9dcff;margin-top:6px;text-align:center}
 .menu{position:absolute;left:max(24px,5vw);bottom:calc(env(safe-area-inset-bottom,0px) + 40px);display:grid;gap:8px;width:min(280px,calc(100% - 48px));padding:14px;border-radius:24px;background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(120,60,200,.18));border:1px solid rgba(255,220,245,.35);box-shadow:0 10px 40px rgba(20,6,50,.45),inset 0 1px 0 rgba(255,255,255,.25);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);pointer-events:auto}
@@ -119,6 +120,28 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 .controls input[type=range]{width:100%;accent-color:#ff6fc8}
 .controls input[type=checkbox]{width:22px;height:22px;accent-color:#ff6fc8;justify-self:start}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* ---- hand-drawn title screen ---- */
+.doodles{position:absolute;inset:0;width:100%;height:100%;z-index:-1;filter:url(#wobble)}
+.doodles path{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-width:5;stroke-dasharray:900;stroke-dashoffset:900;animation:drawIn 2.4s ease-out forwards}
+.doodles .d1{stroke:#fff2a8;stroke-width:6;fill:rgba(255,242,168,.18)}
+.doodles .d2{stroke:#ffd6f6;animation-delay:.4s}.doodles .d3{stroke:#c8f0ff;animation-delay:.7s}
+.doodles .d4{stroke:#7ff0d8;animation-delay:1s;opacity:.7}.doodles .d5{stroke:#ffb3e6;animation-delay:1.2s}
+.doodles .d6{stroke:#fff2a8;animation-delay:.9s}.doodles .d7{stroke:#ffffff;animation-delay:1.4s;opacity:.6}
+@keyframes drawIn{to{stroke-dashoffset:0}}
+.tlogo{font-family:"Caveat Brush","Comic Sans MS","Chalkboard SE","Baloo 2",system-ui,sans-serif;font-weight:400;letter-spacing:.02em;font-size:clamp(64px,13vw,136px);filter:url(#wobbleBig) drop-shadow(3px 4px 0 #4a1f9a) drop-shadow(0 0 16px rgba(255,150,220,.6))}
+.tlogo span{-webkit-text-stroke:2px #4a1f9a;paint-order:stroke fill}
+.tlogo span:nth-child(odd){transform:rotate(-3deg)}.tlogo span:nth-child(even){transform:rotate(2.5deg) translateY(4px)}
+.chapter,.tagline{font-family:"Patrick Hand","Comic Sans MS","Chalkboard SE","Nunito",system-ui,sans-serif;font-weight:400;letter-spacing:.18em;font-size:18px}
+.tagline{font-size:20px;letter-spacing:.08em;text-transform:none;color:#fff;transform:rotate(-1.5deg)}
+.menu{background:#fff8ec;border:0;border-radius:6px 18px 8px 22px/18px 6px 20px 8px;box-shadow:4px 6px 0 rgba(42,20,80,.55);transform:rotate(-1.2deg);filter:url(#wobble);
+  background-image:repeating-linear-gradient(0deg,transparent 0 27px,rgba(120,160,255,.25) 27px 28px);padding:16px 14px}
+.menu::before{content:"";position:absolute;top:-12px;left:40%;width:90px;height:24px;background:rgba(255,214,246,.75);transform:rotate(-4deg);border-radius:2px} /* a bit of sticky tape */
+.menu button{font-family:"Patrick Hand","Comic Sans MS","Chalkboard SE","Nunito",system-ui,sans-serif;font-weight:400;font-size:24px;letter-spacing:.04em;text-transform:none;color:#5a3a8a;background:transparent;border:2.5px solid transparent;border-radius:255px 15px 225px 15px/15px 225px 15px 255px}
+.menu button:nth-child(2){transform:rotate(.8deg)}.menu button:nth-child(3){transform:rotate(-.6deg)}
+.menu button.sel{color:#2a1450;background:#ffe27f;border-color:#2a1450;box-shadow:3px 3px 0 #2a1450;transform:translateX(6px) rotate(-1deg)}
+.menu button.off{color:rgba(90,58,138,.4);text-decoration:line-through 2px rgba(90,58,138,.3)}
+.menu button.off.sel{color:#7a5a9a}
+.menu button i{font-style:normal}
 </style>
 </head>
 <body>
@@ -161,6 +184,19 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 <div id="fade"><span id="fadeText"></span></div>
 
 <div id="title">
+  <!-- hand-drawn look: this filter makes edges wobble like pencil lines; the game changes its seed a few times a second so the lines "boil" -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="wobble"><feTurbulence id="wobbleNoise" type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="1"/><feDisplacementMap in="SourceGraphic" scale="5"/></filter>
+    <filter id="wobbleBig"><feTurbulence id="wobbleNoise2" type="fractalNoise" baseFrequency=".02" numOctaves="2" seed="1"/><feDisplacementMap in="SourceGraphic" scale="9"/></filter></svg>
+  <!-- crayon doodles around the title: they draw themselves when the game starts -->
+  <svg class="doodles" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <path class="d1" d="M120 120 a52 52 0 1 0 60 -62 a40 40 0 1 1 -60 62z" />
+    <path class="d2" d="M850 90 l14 30 32 4 -24 22 7 32 -29 -16 -29 16 7 -32 -24 -22 32 -4z" />
+    <path class="d3" d="M770 230 l8 16 17 2 -12 12 3 17 -16 -8 -15 8 3 -17 -12 -12 17 -2z" />
+    <path class="d4" d="M60 330 c40 -40 80 40 120 0 s80 40 120 0" />
+    <path class="d5" d="M640 70 c10 -20 30 -20 40 0 c10 20 30 20 40 0" />
+    <path class="d6" d="M230 60 l4 9 10 1 -7 7 2 10 -9 -5 -9 5 2 -10 -7 -7 10 -1z" />
+    <path class="d7" d="M900 330 q-30 -40 -60 -10 q-30 -40 -60 0 q-20 30 30 40 h60 q50 -10 30 -30z" />
+  </svg>
   <div id="tapToWake">Tap anywhere to start the dream</div>
   <div class="chapter">Chapter 1 · The Pastel Desert</div>
   <div class="tlogo" id="tlogo" aria-label="Dreamland"></div>
@@ -1711,6 +1747,9 @@ function showHint() {
   $('hint').hidden = false; $('hint').style.opacity = 1; hintT = 25;
 }
 document.body.classList.add('title');
+// "boiling" lines: like a hand-drawn cartoon, the wobble changes a few times a second
+{ let seed = 1; setInterval(() => { if (!document.body.classList.contains('title')) return; seed = seed % 3 + 1;
+  $('wobbleNoise').setAttribute('seed', seed); $('wobbleNoise2').setAttribute('seed', seed); }, 140); }
 state.mode = 'title';
 const ACH = [
   ['Full Rescue', 'Free all 50 kids'], ['Fists Only', 'Beat a boss without gravity gloves'],
