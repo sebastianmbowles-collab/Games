@@ -159,6 +159,15 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 #objective{border-radius:255px 14px 225px 14px/14px 225px 14px 255px}
 .screen .logo{font-family:"Caveat Brush","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;font-weight:400;-webkit-text-fill-color:#7a3fd0;background:none;filter:none;transform:rotate(-2deg)}
 .screen .btn.small,.screen .small{font-family:"Patrick Hand","Comic Sans MS",system-ui,sans-serif}
+/* loading screen, shown while the dream (the 3D models) loads */
+#loading{position:fixed;inset:0;z-index:50;display:grid;place-content:center;justify-items:center;gap:8px;background:radial-gradient(ellipse at 50% 40%,#6a3fd0,#24124a 70%);color:#fff8ec;font-family:"Caveat Brush","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;transition:opacity .6s}
+#loading.done{opacity:0;pointer-events:none}
+.lmoon{font-size:90px;color:#fff2a8;text-shadow:0 0 30px rgba(255,242,168,.7);animation:rock 2.4s ease-in-out infinite}
+.ltext{font-size:40px;letter-spacing:.02em}.ltext span{animation:blink 1.2s infinite}.ltext span:nth-child(2){animation-delay:.2s}.ltext span:nth-child(3){animation-delay:.4s}
+.lz{position:absolute;left:calc(50% + 40px);top:calc(50% - 120px);font-size:28px;color:#c8f0ff}
+.lz b{display:inline-block;font-weight:400;animation:zfloat 2.4s ease-out infinite;opacity:0}.lz b:nth-child(2){animation-delay:.8s;font-size:34px}.lz b:nth-child(3){animation-delay:1.6s;font-size:42px}
+@keyframes rock{50%{transform:rotate(-12deg)}}
+@keyframes zfloat{0%{opacity:0;transform:translate(0,10px)}30%{opacity:1}100%{opacity:0;transform:translate(24px,-40px)}}
 </style>
 </head>
 <body>
@@ -200,6 +209,7 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 
 <div id="fade"><span id="fadeText"></span></div>
 
+<div id="loading"><div class="lmoon">☾</div><div class="ltext">Falling asleep<span>.</span><span>.</span><span>.</span></div><div class="lz"><b>z</b><b>z</b><b>Z</b></div></div>
 <div id="title">
   <!-- hand-drawn look: this filter makes edges wobble like pencil lines; the game changes its seed a few times a second so the lines "boil" -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="wobble"><feTurbulence id="wobbleNoise" type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="1"/><feDisplacementMap in="SourceGraphic" scale="5"/></filter>
@@ -303,19 +313,19 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 function loadModels(done) {
   let finished = false;
   const finish = m => { if (!finished) { finished = true; done(m); } };
-  setTimeout(() => finish(null), 8000);
+  setTimeout(() => finish(null), 20000); // slow internet? after 20 seconds, play with simple shapes
   // load the helpers one after another: the model loader, then the glow (bloom) effect
   const EX = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/';
   const files = ['loaders/GLTFLoader.js', 'shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js',
     'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js'];
-  const next = i => {
-    if (i === files.length) return ready();
-    const sc = document.createElement('script'); sc.src = EX + files[i];
-    sc.onload = () => next(i + 1); sc.onerror = () => (THREE.GLTFLoader ? ready() : finish(null)); // no bloom? still fine
-    document.head.appendChild(sc);
+  // download them all at the same time, but run them in order (async = false)
+  const next = () => {
+    let left = files.length;
+    const one = () => { if (--left === 0) THREE.GLTFLoader ? ready() : finish(null); }; // a missing glow file is fine
+    files.forEach(f => { const sc = document.createElement('script'); sc.src = EX + f; sc.async = false; sc.onload = sc.onerror = one; document.head.appendChild(sc); });
   };
   // wait (a little) for the handwriting font, then load the helpers
-  Promise.race([document.fonts ? document.fonts.load('700 64px Caveat') : Promise.resolve(), new Promise(r => setTimeout(r, 2000))]).catch(() => {}).then(() => next(0));
+  Promise.race([document.fonts ? document.fonts.load('700 64px Caveat') : Promise.resolve(), new Promise(r => setTimeout(r, 2000))]).catch(() => {}).then(() => next());
   const ready = () => {
     try {
       const txt = atob(document.getElementById('models').textContent.trim()), bin = new Uint8Array(txt.length);
@@ -325,6 +335,7 @@ function loadModels(done) {
   };
 }
 loadModels(MODELS => {
+setTimeout(() => { const l = document.getElementById('loading'); l.classList.add('done'); setTimeout(() => l.remove(), 700); }, 50);
 
 const $ = id => document.getElementById(id);
 const isTouch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
