@@ -119,6 +119,7 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 .controls label{font-weight:800}
 .controls input[type=range]{width:100%;accent-color:#ff6fc8}
 .controls input[type=checkbox]{width:22px;height:22px;accent-color:#ff6fc8;justify-self:start}
+.controls select{font:700 14px var(--f-body);color:#2a1450;background:#fff8ec;border:0;border-radius:10px;padding:6px 8px;justify-self:start;max-width:100%}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* ---- hand-drawn title screen ---- */
 .doodles{position:absolute;inset:0;width:100%;height:100%;z-index:-1;filter:url(#wobble)}
@@ -224,11 +225,13 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
     <div class="controls">
       <label for="setMusic">Music</label><input type="checkbox" id="setMusic" checked>
       <label for="setSens">Look speed</label><input type="range" id="setSens" min="0.4" max="2" step="0.1" value="1">
+      <label for="setLook">Look around with</label><select id="setLook"><option value="mouse">Mouse (it follows your mouse)</option><option value="arrows">Arrow keys (WASD walks)</option></select>
     </div>
     <div class="sub" style="margin-top:6px">Controls</div>
     <div class="controls" id="ctrlDesk">
       <kbd>W A S D</kbd><span>Walk</span>
-      <kbd>Mouse</kbd><span>Look around (or turn with the ← → arrow keys)</span>
+      <kbd>Mouse</kbd><span>Look around: the view follows your mouse (push it to the edge to keep turning)</span>
+      <kbd>Arrow keys</kbd><span>Or look with the arrow keys instead. Pick in Settings, or press C to switch</span>
       <kbd>Space</kbd><span>Jump. Hold it while walking into a wall to climb</span>
       <kbd>Click</kbd><span>Punch (or F). Hold for a charge punch</span>
       <kbd>Click in the air</kbd><span>Ground slam</span>
@@ -1673,13 +1676,18 @@ const cv = renderer.domElement;
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('mousedown', e => {
   if (state.mode !== 'play' || isTouch) return;
-  if (!locked) { try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) {} }
+  if (!locked && lookMode === 'mouse') { try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) {} }
   if (e.button === 2) { useGloves(); return; }
   mouseDown = { x: e.clientX, y: e.clientY, moved: 0 }; punchDown();
 });
 addEventListener('mousemove', e => {
   if (state.mode !== 'play' || cine) return;
-  if (locked) { P.yaw -= e.movementX * .0025 * sens; P.pitch = clamp(P.pitch - e.movementY * .0025 * sens, -1.4, 1.4); }
+  if (locked) { if (lookMode === 'mouse') { P.yaw -= e.movementX * .0025 * sens; P.pitch = clamp(P.pitch - e.movementY * .0025 * sens, -1.4, 1.4); } }
+  else if (lookMode === 'mouse' && !isTouch && !mouseDown) {
+    // no clicking needed: the view just follows your mouse
+    if (lastMouse) { P.yaw -= (e.clientX - lastMouse.x) * .004 * sens; P.pitch = clamp(P.pitch - (e.clientY - lastMouse.y) * .004 * sens, -1.4, 1.4); }
+    lastMouse = { x: e.clientX, y: e.clientY };
+  }
   else if (mouseDown) {
     const dx = e.clientX - mouseDown.x, dy = e.clientY - mouseDown.y;
     mouseDown.moved += Math.abs(dx) + Math.abs(dy); mouseDown.x = e.clientX; mouseDown.y = e.clientY;
@@ -1743,7 +1751,7 @@ function showHint() {
   const k = (a, b) => `<span><kbd>${a}</kbd>${b}</span>`;
   $('hint').innerHTML = isTouch
     ? k('JUMP', 'jump (hold at a wall to climb)') + k('PUNCH', 'hold to charge') + (state.hasGloves ? k('GLOVES', 'fling robots') : '') + (state.hasPillow ? k('PILLOW', 'shoot pillows') : '')
-    : k('WASD', 'walk') + k('Mouse / ← →', 'look') + k('Space', 'jump (hold at a wall to climb)') + k('Click', 'punch, hold to charge') + k('Click in air', 'slam') + (state.hasGloves ? k('Right-click / G', 'gloves') : '') + (state.hasPillow ? k('E', 'pillow gun') : '');
+    : k('WASD', 'walk') + (lookMode === 'arrows' ? k('Arrows', 'look') : k('Mouse', 'look')) + k('C', 'switch') + k('Space', 'jump (hold at a wall to climb)') + k('Click', 'punch, hold to charge') + k('Click in air', 'slam') + (state.hasGloves ? k('Right-click / G', 'gloves') : '') + (state.hasPillow ? k('E', 'pillow gun') : '');
   $('hint').hidden = false; $('hint').style.opacity = 1; hintT = 25;
 }
 document.body.classList.add('title');
@@ -1806,6 +1814,18 @@ function menuAct(a) {
 $('setMusic').checked = saved.settings.music !== false;
 $('setSens').value = saved.settings.sens || 1;
 let sens = +$('setSens').value;
+// how you look around: 'mouse' (the view follows your mouse) or 'arrows' (arrow keys look, WASD walks)
+let lookMode = saved.settings.look === 'arrows' ? 'arrows' : 'mouse', lastMouse = null;
+$('setLook').value = lookMode;
+function setLook(m, tell) {
+  lookMode = m; saved.settings.look = m; store.set(saved); $('setLook').value = m;
+  if (m === 'arrows' && locked) document.exitPointerLock?.();
+  if (tell) toast(m === 'mouse' ? 'Look with the mouse' : 'Look with the arrow keys', m === 'mouse' ? 'Move the mouse to look around' : '← → turn, ↑ ↓ look up and down');
+  showHint();
+}
+$('setLook').addEventListener('change', e => setLook(e.target.value, false));
+addEventListener('keydown', e => { if (e.code === 'KeyC' && !e.repeat && state.mode === 'play' && !cine) setLook(lookMode === 'mouse' ? 'arrows' : 'mouse', true); });
+document.addEventListener('mouseleave', () => { lastMouse = null; });
 $('setMusic').addEventListener('change', e => { setMusic(e.target.checked); saved.settings.music = e.target.checked; store.set(saved); });
 $('setSens').addEventListener('input', e => { sens = +e.target.value; saved.settings.sens = sens; store.set(saved); });
 let woke = false;
@@ -1888,10 +1908,18 @@ function drawCharge() {
 
 function updatePlayer(dt) {
   let f = 0, s = 0;
-  if (keys.KeyW || keys.ArrowUp) f += 1; if (keys.KeyS || keys.ArrowDown) f -= 1;
+  const arrows = lookMode === 'arrows';
+  if (keys.KeyW || (!arrows && keys.ArrowUp)) f += 1; if (keys.KeyS || (!arrows && keys.ArrowDown)) f -= 1;
   if (keys.KeyD) s += 1; if (keys.KeyA) s -= 1;
-  // arrow keys turn, so you can play without a mouse
+  // arrow keys turn (and in arrow-key mode, ↑ ↓ look up and down)
   if (keys.ArrowLeft) P.yaw += 2.4 * sens * dt; if (keys.ArrowRight) P.yaw -= 2.4 * sens * dt;
+  if (arrows && keys.ArrowUp) P.pitch = clamp(P.pitch + 1.6 * sens * dt, -1.4, 1.4);
+  if (arrows && keys.ArrowDown) P.pitch = clamp(P.pitch - 1.6 * sens * dt, -1.4, 1.4);
+  // mouse mode without the mouse grabbed: hold the pointer near an edge to keep turning
+  if (!arrows && !locked && lastMouse && !isTouch && !cine) {
+    const ex = lastMouse.x / innerWidth;
+    if (ex < .06) P.yaw += 2 * sens * dt * (1 - ex / .06); else if (ex > .94) P.yaw -= 2 * sens * dt * ((ex - .94) / .06);
+  }
   f -= stick.y; s += stick.x;
   const len = Math.hypot(f, s); if (len > 1) { f /= len; s /= len; }
   const sp = 5.2;
