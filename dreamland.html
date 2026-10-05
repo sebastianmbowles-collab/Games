@@ -962,11 +962,13 @@ beacon.visible = false; scene.add(beacon);
 
 // ---------- effects ----------
 const parts = [], kids = [];
-const partG = boxG(.18, .18, .18);
+// sparkly bits: little twinkling diamonds, each with a soft glow
+const partG = new THREE.OctahedronGeometry(.11, 0);
 function burst(x, y, z, colors, n = 12) {
   for (let i = 0; i < n; i++) {
-    const m = mesh(partG, glow(pick(colors))); m.position.set(x, y, z); scene.add(m);
-    parts.push({ m, vx: rand(-4, 4), vy: rand(2, 7), vz: rand(-4, 4), life: rand(.7, 1.2) });
+    const c = pick(colors), m = mesh(partG, glow(c)); m.position.set(x, y, z); scene.add(m);
+    if (i % 2 === 0) m.add(halo(c, 1.1, .6));
+    parts.push({ m, vx: rand(-4, 4), vy: rand(2, 7), vz: rand(-4, 4), life: rand(.7, 1.2), spin: rand(-12, 12) });
   }
 }
 function freeKid(x, y, z) {
@@ -2078,7 +2080,7 @@ function loop(now) {
   for (let i = parts.length - 1; i >= 0; i--) {
     const q = parts[i]; q.life -= dt; q.vy -= 14 * dt;
     q.m.position.x += q.vx * dt; q.m.position.y += q.vy * dt; q.m.position.z += q.vz * dt;
-    q.m.scale.setScalar(Math.max(0, q.life));
+    q.m.scale.setScalar(Math.max(0, q.life) * (1 + Math.sin(q.life * 30) * .25)); q.m.rotation.y += q.spin * dt; q.m.rotation.x += q.spin * .7 * dt;
     if (q.life <= 0) { scene.remove(q.m); parts.splice(i, 1); }
   }
   for (let i = kids.length - 1; i >= 0; i--) {
