@@ -146,6 +146,19 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 .menu button.off{color:rgba(90,58,138,.4);text-decoration:line-through 2px rgba(90,58,138,.3)}
 .menu button.off.sel{color:#7a5a9a}
 .menu button i{font-style:normal}
+/* ---- the rest of the menus match the hand-drawn title ---- */
+.screen .card{background:#fff8ec;color:#3a2160;padding:22px 20px;border-radius:6px 20px 8px 24px/20px 6px 22px 8px;box-shadow:5px 7px 0 rgba(20,6,50,.6);transform:rotate(-.6deg);
+  background-image:repeating-linear-gradient(0deg,transparent 0 29px,rgba(120,160,255,.22) 29px 30px)}
+.screen .sub{font:400 26px "Caveat Brush","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;letter-spacing:.04em;text-transform:none;color:#7a3fd0}
+.screen .controls,.screen .ach,.screen .stat{background:rgba(255,255,255,.6);border:2px solid rgba(58,33,96,.25);border-radius:255px 12px 225px 12px/12px 225px 12px 255px;color:#3a2160}
+.screen kbd{background:#ffe27f;color:#2a1450;border-radius:4px;padding:1px 6px;font-weight:800;box-shadow:1px 2px 0 #2a1450}
+.btn{font-family:"Patrick Hand","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;font-weight:400;font-size:22px;background:#ffe27f;color:#2a1450;border:2.5px solid #2a1450;border-radius:255px 15px 225px 15px/15px 225px 15px 255px;box-shadow:3px 4px 0 #2a1450}
+.btn:active{transform:translate(2px,3px);box-shadow:1px 1px 0 #2a1450}
+#toast{font-family:"Caveat Brush","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;font-weight:400;font-size:clamp(30px,5vw,48px);letter-spacing:.02em}
+#toast small{font-family:"Patrick Hand","Comic Sans MS",system-ui,sans-serif;font-weight:400;font-size:18px;letter-spacing:.04em}
+#objective{border-radius:255px 14px 225px 14px/14px 225px 14px 255px}
+.screen .logo{font-family:"Caveat Brush","Comic Sans MS","Chalkboard SE",system-ui,sans-serif;font-weight:400;-webkit-text-fill-color:#7a3fd0;background:none;filter:none;transform:rotate(-2deg)}
+.screen .btn.small,.screen .small{font-family:"Patrick Hand","Comic Sans MS",system-ui,sans-serif}
 </style>
 </head>
 <body>
@@ -240,6 +253,8 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
       <kbd>Click</kbd><span>Punch (or F). Hold for a charge punch</span>
       <kbd>Click in the air</kbd><span>Ground slam</span>
       <kbd>Right-click</kbd><span>Gravity gloves (or G), once you find them</span>
+      <kbd>E</kbd><span>Pillow gun, once you find it on your bed</span>
+      <kbd>H</kbd><span>Show the hitboxes</span>
       <kbd>M</kbd><span>Music on or off</span>
       <kbd>Esc</kbd><span>Pause</span>
     </div>
@@ -1616,6 +1631,7 @@ function updatePillows(dt) {
     q.vy -= 6 * dt; q.life -= dt;
     q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
     q.m.position.set(q.x, q.y, q.z); q.m.rotation.y += q.spin * dt; q.m.rotation.z += q.spin * .5 * dt;
+    if ((q.trail = (q.trail || 0) + dt) > .05) { q.trail = 0; burst(q.x, q.y, q.z, [0xffffff, 0xd6ecff], 1, .25); } // a sparkle trail
     let hit = null;
     for (const r of robots) if (r.alive && r.active && robotDist(r, q.x, q.y, q.z) < HB.robot + .3) { hit = r; break; }
     if (!hit && boss.active && !boss.under && bossBalls().some(b => Math.hypot(b.x - q.x, b.y - q.y, b.z - q.z) < b.r + .3)) hit = boss;
