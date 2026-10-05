@@ -444,19 +444,44 @@ function note(lines, w, h) {
 
 // ============ THE BEDROOM ============
 const WALL = 0xcbb9ff, TRIM = 0xffffff;
-block(10.6, 0.5, 10.6, 0x8f6fd6, 0, -0.5, 0);                 // floor
-block(10.6, 4, 0.3, WALL, 0, 0, -5.15);                        // back
-block(0.3, 4, 10.6, WALL, -5.15, 0, 0);                        // left
-block(0.3, 4, 10.6, WALL, 5.15, 0, 0);                         // right
-block(4.2, 4, 0.3, WALL, -3.2, 0, 5.15);                       // front left
-block(4.2, 4, 0.3, WALL, 3.2, 0, 5.15);                        // front right
+// pictures painted in code for the bedroom: wallpaper, wooden floor, starry ceiling, blanket
+function paint(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t; }
+const paperTex = paint(128, 128, (k, w, h) => {
+  k.fillStyle = '#cbb9ff'; k.fillRect(0, 0, w, h);
+  k.fillStyle = '#d8caff'; for (let x = 0; x < w; x += 32) k.fillRect(x, 0, 14, h);           // soft stripes
+  const star = (x, y, r, c) => { k.fillStyle = c; k.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? r * .45 : r; k.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } k.fill(); };
+  star(24, 30, 9, '#fff4b8'); star(88, 94, 9, '#ffd6f0'); k.fillStyle = '#ffffff';
+  [[70, 22], [16, 90], [110, 56], [52, 66]].forEach(([x, y]) => { k.beginPath(); k.arc(x, y, 3, 0, 7); k.fill(); });
+});
+function paper(len, h) { const t = paperTex.clone(); t.needsUpdate = true; t.repeat.set(len / 1.6, h / 1.6); return new THREE.MeshPhongMaterial({ map: t, shininess: 4 }); }
+const floorTex = paint(256, 256, (k, w, h) => {
+  for (let i = 0; i < 8; i++) { const v = 150 + (i * 37 % 40); k.fillStyle = `rgb(${v - 25},${v - 75},${v + 15})`; k.fillRect(0, i * 32, w, 32);
+    k.fillStyle = 'rgba(60,20,90,.35)'; k.fillRect(0, i * 32, w, 2); k.fillRect((i * 97) % w, i * 32, 2, 32); }
+  for (let i = 0; i < 90; i++) { k.fillStyle = 'rgba(255,255,255,.06)'; k.fillRect(Math.random() * w, Math.random() * h, 30, 1); }  // wood grain
+});
+floorTex.repeat.set(3, 3);
+const ceilTex = paint(256, 256, (k, w, h) => {
+  k.fillStyle = '#5a3fb8'; k.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++) { const x = Math.random() * w, y = Math.random() * h, r = 2 + Math.random() * 5;
+    k.fillStyle = Math.random() < .5 ? '#d8ffb0' : '#fff6a8'; k.beginPath();
+    for (let j = 0; j < 10; j++) { const a = j * Math.PI / 5, rr = j % 2 ? r * .45 : r; k.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } k.fill(); }
+});
+ceilTex.repeat.set(2, 2);
+block(10.6, 0.5, 10.6, new THREE.MeshPhongMaterial({ map: floorTex, shininess: 30, specular: 0x302040 }), 0, -0.5, 0); // floor
+block(10.6, 4, 0.3, paper(10.6, 4), 0, 0, -5.15);              // back
+block(0.3, 4, 10.6, paper(10.6, 4), -5.15, 0, 0);              // left
+block(0.3, 4, 10.6, paper(10.6, 4), 5.15, 0, 0);               // right
+block(4.2, 4, 0.3, paper(4.2, 4), -3.2, 0, 5.15);              // front left
+block(4.2, 4, 0.3, paper(4.2, 4), 3.2, 0, 5.15);               // front right
 block(2.2, 1.0, 0.3, TRIM, 0, 0, 5.15);                        // window sill
-block(2.2, 1.1, 0.3, WALL, 0, 2.9, 5.15);                      // above window
-block(10.6, 0.3, 10.6, 0xb7a3ff, 0, 4, 0).userData.noShadow = true; // ceiling
+block(2.2, 1.1, 0.3, paper(2.2, 1.1), 0, 2.9, 5.15);                     // above window
+block(10.6, 0.3, 10.6, new THREE.MeshPhongMaterial({ map: ceilTex, emissive: 0x2a1a60, emissiveMap: ceilTex, emissiveIntensity: .8 }), 0, 4, 0).userData.noShadow = true; // ceiling with glow-in-the-dark stars
 { const rug = mesh(new THREE.CylinderGeometry(2, 2, 0.04, 8), mat(0xff9ad8)); rug.position.set(0, 0.02, 0); scene.add(rug); }
 // bed
 block(2.2, 0.5, 3.4, TRIM, -3.4, 0, -3.1);
-block(2.1, 0.3, 2.6, 0x7fd8ff, -3.4, 0.5, -2.7, false);
+block(2.1, 0.3, 2.6, new THREE.MeshPhongMaterial({ map: (() => { const t = paint(128, 128, (k, w, h) => {
+  k.fillStyle = '#7fd8ff'; k.fillRect(0, 0, w, h); k.fillStyle = '#9fe4ff'; for (let i = 0; i < 4; i++) k.fillRect(0, i * 32 + 16, w, 8);
+  k.fillStyle = '#fff4b8'; for (let i = 0; i < 6; i++) { k.beginPath(); k.arc(16 + (i * 41) % 110, 12 + (i * 23) % 100, 5, 0, 7); k.fill(); } }); t.repeat.set(2, 2); return t; })(), shininess: 10 }), -3.4, 0.5, -2.7, false); // starry blanket
 block(1.6, 0.25, 0.7, 0xfff0fb, -3.4, 0.5, -4.3, false);
 block(2.2, 1.4, 0.2, TRIM, -3.4, 0, -4.85);
 // the second bed (it should not be here...)
