@@ -1200,11 +1200,22 @@ const partG = new THREE.OctahedronGeometry(.11, 0);
 function burst(x, y, z, colors, n = 12, spread = 1) {
   for (let i = 0; i < n; i++) {
     const c = pick(colors), m = mesh(partG, glow(c)); m.position.set(x, y, z); scene.add(m);
-    if (i % 2 === 0) m.add(halo(c, 1.1, .6));
+    if (i % 2 === 0) m.add(halo(c, 1, .4));
     parts.push({ m, vx: rand(-4, 4) * spread, vy: rand(2, 7) * (spread > 1 ? rand(-.6, 1) : 1) * spread, vz: rand(-4, 4) * spread, life: rand(.7, 1.2) * (spread > 1 ? 1.4 : 1), spin: rand(-12, 12) });
   }
 }
 function freeKid(x, y, z) {
+  // a freed kid: a smaller Blender kid in their own coloured pajamas, who waves and floats home
+  const pjC = pick([0x7fd8ff, 0xffe27f, 0x9ff0a0, 0xffa8e4, 0xc8a6ff]);
+  const kid = model('Sebastian', { pj: mat(pjC, { flatShading: false }), pj2: mat(new THREE.Color(pjC).multiplyScalar(.8).getHex(), { flatShading: false }),
+    hair: mat(pick([0x5a3a22, 0x2a1a10, 0xd8a050, 0xa04a20]), { flatShading: false }), skin: mat(pick([0xffd2b0, 0xe0ac80, 0xa8704a]), { flatShading: false }) });
+  if (kid) {
+    kid.scale.setScalar(.7); kid.position.set(x, y, z); scene.add(kid); kid.add(halo(pjC, 1.8, .35));
+    kid.traverse(o => { if (o.material) { o.material = o.material.clone(); o.material.transparent = true; } });
+    const heart = mesh(new THREE.SphereGeometry(.18, 10, 8), glow(0xff6fc8)); heart.position.y = 2.6; kid.add(heart);
+    kids.push({ g: kid, t: 0, y, wave: true }); burst(x, y + 1, z, [pjC, 0xff6fc8], 8);
+    return;
+  }
   const g = new THREE.Group();
   const head = mesh(new THREE.IcosahedronGeometry(.24, 1), mat(pick([0xffd2b0, 0xe0ac80, 0xa8704a])));
   head.position.y = .85; g.add(head);
@@ -2389,7 +2400,8 @@ function loop(now) {
   }
   for (let i = kids.length - 1; i >= 0; i--) {
     const k = kids[i]; k.t += dt;
-    k.g.position.y = k.y + k.t * 1.2; k.g.rotation.y += dt * 3;
+    k.g.position.y = k.y + k.t * 1.2; k.g.rotation.y += dt * (k.wave ? 1.5 : 3);
+    if (k.wave) k.g.rotation.z = Math.sin(k.t * 8) * .12; // a happy little wiggle
     k.g.traverse(o => { if (o.material) o.material.opacity = Math.max(0, 1 - k.t / 2.6); });
     if (k.t > 2.6) { scene.remove(k.g); kids.splice(i, 1); }
   }
