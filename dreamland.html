@@ -18,8 +18,13 @@
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;overflow:hidden;background:#24124a;color:var(--cream);font-family:var(--f-body);-webkit-user-select:none;user-select:none;touch-action:none}
 canvas{display:block;width:100%;height:100%}
-#game{position:fixed;inset:0}
+#game{position:fixed;inset:0;overflow:hidden}
 /* soft dark corners, like an old dreamy photo */
+/* a soft film grain over everything, so it feels crafted rather than plasticky */
+#game::before{content:"";position:absolute;inset:-50%;z-index:1;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain .5s steps(4) infinite}
+@keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}100%{transform:translate(1%,3%)}}
 #game::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(30,8,70,.42) 100%)}
 .hud{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;pointer-events:none;z-index:5}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -241,17 +246,24 @@ function loadModels(done) {
   let finished = false;
   const finish = m => { if (!finished) { finished = true; done(m); } };
   setTimeout(() => finish(null), 8000);
-  const s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
-  s.onerror = () => finish(null);
-  s.onload = () => {
+  // load the helpers one after another: the model loader, then the glow (bloom) effect
+  const EX = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/';
+  const files = ['loaders/GLTFLoader.js', 'shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js',
+    'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js'];
+  const next = i => {
+    if (i === files.length) return ready();
+    const sc = document.createElement('script'); sc.src = EX + files[i];
+    sc.onload = () => next(i + 1); sc.onerror = () => (THREE.GLTFLoader ? ready() : finish(null)); // no bloom? still fine
+    document.head.appendChild(sc);
+  };
+  next(0);
+  const ready = () => {
     try {
       const txt = atob(document.getElementById('models').textContent.trim()), bin = new Uint8Array(txt.length);
       for (let i = 0; i < txt.length; i++) bin[i] = txt.charCodeAt(i);
       new THREE.GLTFLoader().parse(bin.buffer, '', g => finish(g.scene), () => finish(null));
     } catch (e) { finish(null); }
   };
-  document.head.appendChild(s);
 }
 loadModels(MODELS => {
 
@@ -274,8 +286,17 @@ scene.fog = new THREE.Fog(0xc493f2, 40, 230);
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 500);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
+// BLOOM: bright, glowing things softly light up the air around them
+let composer = null;
+if (THREE.EffectComposer && THREE.UnrealBloomPass) {
+  try {
+    composer = new THREE.EffectComposer(renderer);
+    composer.addPass(new THREE.RenderPass(scene, camera));
+    composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .45, .35, .97));
+  } catch (e) { composer = null; }
+}
 addEventListener('resize', () => {
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth, innerHeight); if (composer) composer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
 });
 
@@ -324,7 +345,30 @@ function model(name, over = {}) {
     m.material = over[n] || looks[n];
     m.castShadow = true;
   });
-  return o;
+  return ink(o);
+}
+// INK OUTLINES: a slightly bigger, inside-out copy of a shape, painted dark,
+// peeks out around the edges like the ink line in a cartoon someone drew by hand
+const inkMat = new THREE.ShaderMaterial({
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { ink: { value: new THREE.Color(0x2a1450) }, thick: { value: .022 } }]),
+  vertexShader: `uniform float thick;
+    #include <fog_pars_vertex>
+    void main() { vec4 mvPosition = modelViewMatrix * vec4(position + normal * thick, 1.0); gl_Position = projectionMatrix * mvPosition;
+    #include <fog_vertex>
+    }`,
+  fragmentShader: `uniform vec3 ink;
+    #include <fog_pars_fragment>
+    void main() { gl_FragColor = vec4(ink, 1.0);
+    #include <fog_fragment>
+    }`,
+  side: THREE.BackSide, fog: true,
+});
+function ink(obj, thick) {
+  const m = thick ? inkMat.clone() : inkMat; if (thick) m.uniforms.thick.value = thick;
+  const add = [];
+  obj.traverse(o => { if (o.isMesh && !o.isInstancedMesh && !o.userData.isInk && o.geometry.attributes.normal && !(o.material.isMeshBasicMaterial || o.material.isSpriteMaterial)) add.push(o); });
+  add.forEach(o => { const e = new THREE.Mesh(o.geometry, m); e.userData.isInk = true; e.castShadow = false; e.raycast = () => {}; o.add(e); });
+  return obj;
 }
 // just the shape of a Blender model (for gems, flowers and crystals)
 const shape = name => { const m = MODELS && MODELS.getObjectByName(name); return m && m.isMesh ? m.geometry : null; };
@@ -2263,11 +2307,13 @@ function loop(now) {
   sun.position.copy(sun.target.position).add(SUN_DIR);
   // Sebastian blinks on the title screen
   if (sebastian.visible && sebastian.userData.eyes) sebastian.userData.eyes.scale.y = (time % 3.7) < .13 ? .15 : 1;
-  renderer.render(scene, camera);
+  if (composer) composer.render(); else renderer.render(scene, camera);
 }
 // everything solid casts and catches shadows (glowing things and the sky don't)
-scene.traverse(o => { if (o.isMesh && !o.material.isMeshBasicMaterial) { o.castShadow = !o.userData.noShadow; o.receiveShadow = true; } });
+scene.traverse(o => { if (o.isMesh && !o.material.isMeshBasicMaterial && !o.userData.isInk) { o.castShadow = !o.userData.noShadow; o.receiveShadow = true; } });
 fists.forEach(f => f.traverse(o => { o.castShadow = false; }));
+clouds.forEach(c => c.g.traverse(o => { o.castShadow = o.receiveShadow = false; })); // clouds are too far away for crisp shadows
+clouds.forEach(c => ink(c.g, .12)); // and they get a soft cartoon outline too
 camera.position.set(0, 1.7, 3.7); camera.lookAt(0, 1.3, -2);
 hud();
 requestAnimationFrame(loop);
