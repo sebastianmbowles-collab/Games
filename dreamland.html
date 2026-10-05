@@ -748,6 +748,37 @@ const desertDecor = new THREE.Group(); scene.add(desertDecor);
   const post = mesh(boxG(.2, 1.4, .2), mat(0xffffff)); post.position.set(-12, terrainH(-12, 42) + .4, 42); desertDecor.add(post);
 }
 
+// dream jellyfish: glowing lanterns that float slowly over the desert
+const jellies = [];
+{ const domeG = new THREE.SphereGeometry(.7, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+  for (let i = 0; i < 9; i++) {
+    const c = pick([0xff9ad5, 0x8fe9ff, 0xc8a6ff, 0xffe27f]), g = new THREE.Group();
+    const dome = mesh(domeG, new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .55, side: THREE.DoubleSide, depthWrite: false })); g.add(dome);
+    const core = mesh(new THREE.SphereGeometry(.25, 10, 8), glow(0xffffff)); core.position.y = .2; g.add(core);
+    g.add(halo(c, 4, .55));
+    const tent = [];
+    for (let k = 0; k < 5; k++) {
+      const pts = Array.from({ length: 8 }, (_, j) => new THREE.Vector3(0, -j * .28, 0));
+      const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: .8 }));
+      const a = k / 5 * Math.PI * 2; ln.position.set(Math.cos(a) * .4, 0, Math.sin(a) * .4); g.add(ln); tent.push(ln);
+    }
+    const x = rand(-24, 24), z = rand(30, 90);
+    g.position.set(x, terrainH(x, z) + rand(4, 8), z); desertDecor.add(g);
+    jellies.push({ g, tent, x, z, y: g.position.y, s: rand(0, 6) });
+  } }
+function updateJellies(time) {
+  if (!desertDecor.visible) return;
+  for (const j of jellies) {
+    const t = time + j.s, pulse = Math.sin(t * 2.2);
+    j.g.position.set(j.x + Math.sin(t * .2) * 3, j.y + Math.sin(t * .6) * .8 + pulse * .15, j.z + Math.cos(t * .17) * 3);
+    j.g.scale.set(1 + pulse * .08, 1 - pulse * .1, 1 + pulse * .08); // squish and stretch as it swims
+    for (const [k, ln] of j.tent.entries()) {
+      const p = ln.geometry.attributes.position;
+      for (let i = 1; i < p.count; i++) p.setX(i, Math.sin(t * 2.5 - i * .6 + k) * .08 * i);
+      p.needsUpdate = true;
+    }
+  }
+}
 // the tall pillar where the gravity gloves wait (climb it!)
 const PILLAR = { x: -19, z: 50 };
 PILLAR.base = terrainH(PILLAR.x, PILLAR.z) - .5; PILLAR.top = PILLAR.base + 5.5;
@@ -2224,6 +2255,7 @@ function loop(now) {
   updateFar(time);
   updateAurora(time);
   updateProjector(time);
+  updateJellies(time);
   updateButterflies(time);
   updatePillows(dt);
   // the sun's shadow box follows you around (snapped so shadows don't shimmer)
