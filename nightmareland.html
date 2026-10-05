@@ -284,6 +284,7 @@ body.title #fear,body.cine #fear{display:none}
     <div class="sub">Settings</div>
     <div class="controls">
       <label for="setMusic">Music</label><input type="checkbox" id="setMusic" checked>
+      <label for="setScare">Scariness</label><select id="setScare"><option value="full">Full nightmare</option><option value="less">Less scary (no stalker or jump scares)</option></select>
       <label for="setGfx">Graphics</label><select id="setGfx"><option value="auto">Auto (picks for your computer)</option><option value="fancy">Fancy (glow + shadows)</option><option value="fast">Fast (for slower computers)</option></select>
       <label for="setSens">Look speed</label><input type="range" id="setSens" min="0.4" max="2" step="0.1" value="1">
       <label for="setLook">Look around with</label><select id="setLook"><option value="mouse">Mouse (it follows your mouse)</option><option value="arrows">Arrow keys (WASD walks)</option></select>
@@ -332,7 +333,7 @@ body.title #fear,body.cine #fear{display:none}
       <div class="stat"><b id="eGems">0</b><span>Gems</span></div>
       <div class="stat"><b id="eTime">0:00</b><span>Time</span></div>
     </div>
-    <p id="eMsg">Key 4 of 10 is yours. But who broke Dreamland…?</p>
+    <p id="eMsg">Key 4 of 10 is yours.</p>
     <button class="btn" id="againBtn">Play again</button>
   </div>
 </div>
@@ -1519,11 +1520,19 @@ function endingCine() {
   playCine([
     { text: 'KEY 4 of 10!', d: 2.5, snap: true, pos: [P.x + 3, P.y + 2.5, P.z + 3], look: [P.x, P.y + 1, P.z] },
     { text: 'Far away, the one who looks just like Sebastian is not watching any more…', d: 4, pos: [0, 30, 60], look: [0, 0, 30], speed: .6 },
-    { text: '…he is coming. What happened to Dreamland?', d: 3.8, pos: [0, 40, 40], look: [0, 0, 40], speed: .6 },
+    { text: '…he is coming.', d: 2.6, pos: [0, 40, 40], look: [0, 0, 40], speed: .6 },
+    { text: 'Sebastian turns around.', d: 2.2, snap: true, pos: [P.x, P.y + 1.5, P.z], look: [P.x, P.y + 1.4, P.z + 5],
+      on: () => { const t = NM.stalker.g; t.position.set(P.x, terrainH(P.x, P.z + 2.6), P.z + 2.6); t.rotation.y = Math.PI; t.visible = true; NM.stalker.on = false; NM.endTwin = true; } },
+    { text: '"You left me here, alone."', d: 3, pos: [P.x, P.y + 1.5, P.z + .6], look: [P.x, P.y + 1.6, P.z + 2.6], speed: .4,
+      on: () => { if (ac) { const t = ac.currentTime; tone('sine', 98, t, 2.5, .2, master, .5); hiss(t, 2.5, .08, 300, 100, 'lowpass'); } } },
+    { text: '"So I made Dreamland look like how I feel."', d: 3.4, pos: [P.x, P.y + 1.5, P.z + 1], look: [P.x, P.y + 1.6, P.z + 2.6], speed: .3 },
+    { text: '"See you next chapter, Sebastian."', d: 3, pos: [P.x, P.y + 1.5, P.z + 1.3], look: [P.x, P.y + 1.6, P.z + 2.6], speed: .3,
+      on: () => { setTimeout(() => { NM.stalker.g.visible = false; burst(P.x, P.y + 1.5, P.z + 2.6, [0x000000, 0xff1010], 30); sfx('whoosh'); }, 2400); } },
   ], () => {
+    NM.endTwin = false; NM.stalker.g.visible = false;
     state.mode = 'end';
     const s = Math.floor((performance.now() - state.startTime) / 1000);
-    $('eMsg').textContent = `Key 4 of 10 is yours. You found ${messages.filter(m => m.found).length} of ${messages.length} hidden messages. Who broke Dreamland…?`;
+    $('eMsg').textContent = `Key 4 of 10 is yours. You found ${messages.filter(m => m.found).length} of ${messages.length} hidden messages. Now you know who broke Dreamland.`;
     $('eKids').textContent = state.kids; $('eGems').textContent = state.gems; $('eTime').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     $('endScreen').hidden = false; document.exitPointerLock?.();
   });
@@ -1786,7 +1795,11 @@ function killRobot(r) {
   burst(r.x, y + 1.2, r.z, [0xf1ecff, 0xb9a6ff, 0x5ff6ff]);
   if (r.heart) {
     state.kids++; freeKid(r.x, y, r.z); sfx('kid');
-    toast('You freed a kid!', 'They are waking up in the real world');
+    toast('You freed a kid!', 'They left you a little light');
+    { const x = r.x, z = r.z, g = new THREE.Group(), y = terrainH(x, z); // hope: a new warm lantern where they were
+      const lamp = mesh(new THREE.SphereGeometry(.16, 10, 8), glow(0xfff0b0)); lamp.position.y = 1.2; g.add(lamp);
+      const h = halo(0xffd080, 3, .8); h.position.y = 1.2; g.add(h); const l = new THREE.PointLight(0xffc070, 1, 7, 1.6); l.position.y = 1.3; g.add(l);
+      g.position.set(x, y, z); scene.add(g); NM.lanterns.push({ x, z, g, l, h }); }
   }
   hud();
 }
@@ -2721,8 +2734,12 @@ NM.stalker = { g: null, on: false, t: 0 };
   st.traverse(o => { if (o.isMesh && !o.userData.isInk) o.material = sh; if (o.userData.isInk) o.visible = false; });
   [-.09, .09].forEach(x => { const e = halo(0xff1010, .2, 1); e.material.fog = false; e.position.set(x, 1.5, .25); st.add(e); });
   st.scale.setScalar(1.25); st.visible = false; scene.add(st); NM.stalker.g = st; }
+NM.less = saved.settings.scare === 'less';
+$('setScare').value = NM.less ? 'less' : 'full';
+$('setScare').addEventListener('change', e => { NM.less = e.target.value === 'less'; saved.settings.scare = e.target.value; store.set(saved); });
 function updateStalker(dt, lightOn, nearLight, fx, fz) {
-  const S = NM.stalker, g = S.g;
+  if (NM.less && !NM.endTwin) { NM.stalker.g.visible = NM.stalker.on = false; return; }
+  const S = NM.stalker, g = S.g; if (NM.endTwin) return;
   const hunting = !lightOn && nearLight > 3.2 && P.z > 6 && !boss.active;
   if (!S.on) {
     if (hunting && (S.wait = (S.wait || 4) - dt) <= 0) { // it waits a few seconds in the dark first
@@ -2824,6 +2841,7 @@ function nightmareTick(dt, time) {
   NM.sparkT -= dt; if (NM.sparkT <= 0) { NM.sparkT = rand(.3, .9); const r = pick(robots.filter(r => r.alive && r.active)); if (r && Math.hypot(r.x - P.x, r.z - P.z) < 25) burst(r.x + rand(-.3, .3), terrainH(r.x, r.z) + rand(1, 2), r.z, [0xffa020, 0xffe080], 3, .6); }
   nmSound(dt);
   // title screen: now and then, for a blink, it isn't Sebastian standing there
+  if (document.body.classList.contains('title')) $('tlogo').style.opacity = Math.random() < .03 ? .2 : 1; // the title flickers like a dying bulb
   if (NM.twin && document.body.classList.contains('title')) {
     NM.twinT -= dt; const on = NM.twinT < 0 && NM.twinT > -.14; NM.twin.visible = on; sebastian.visible = !on;
     if (NM.twinT < -.14) NM.twinT = rand(3, 7);
@@ -2856,7 +2874,7 @@ function nightmareTick(dt, time) {
   for (const h of NM.figures) {
     if (!h.g.visible) {
       // the more scared you are, the more often one appears: at the edge of what you can see
-      if (NM.fear > 35 && Math.random() < dt * (NM.fear - 30) / 260) {
+      if (!NM.less && NM.fear > 35 && Math.random() < dt * (NM.fear - 30) / 260) {
         const side = Math.random() < .5 ? -1 : 1, a = Math.atan2(fx, fz) + side * rand(.55, .85), dist = rand(9, 16);
         const x = P.x + Math.sin(a) * dist, z = P.z + Math.cos(a) * dist;
         h.g.position.set(x, terrainH(x, z), z); h.g.rotation.y = Math.atan2(P.x - x, P.z - z); h.g.visible = true; h.t = 0; h.leaving = false;
@@ -2900,7 +2918,7 @@ function nightmareTick(dt, time) {
   NM.whisperT -= dt * (NM.fear / 50);
   if (NM.whisperT <= 0) { NM.whisperT = rand(5, 10); if (ac) { const t = ac.currentTime; hiss(t, 1.4, .06, 600, 2200, 'bandpass'); hiss(t + .5, 1.1, .05, 1400, 500, 'bandpass'); } }
   // words flash on the screen
-  NM.wordT -= dt * (NM.fear > 60 ? 1 : 0);
+  NM.wordT -= dt * (NM.fear > 60 && !NM.less ? 1 : 0);
   if (NM.wordT <= 0) { NM.wordT = rand(6, 12); wordEl.textContent = pick(['you left', 'why did you go', 'it was you', 'wake up', 'stay', 'look behind you']);
     wordEl.style.left = rand(15, 70) + '%'; wordEl.style.top = rand(20, 70) + '%'; wordEl.style.opacity = .85; setTimeout(() => wordEl.style.opacity = 0, 450); }
 }
