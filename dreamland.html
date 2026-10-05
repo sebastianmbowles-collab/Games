@@ -360,6 +360,53 @@ moon.position.set(95, 70, -245); moon.lookAt(0, 10, 0); scene.add(moon);
 // shooting stars now and then
 const shooting = halo(0xffffff, 6, 1); shooting.material.fog = false; shooting.visible = false; scene.add(shooting);
 let shootT = 3, shootV = new THREE.Vector3();
+const clouds = []; // puffy clouds that drift across the sky (filled in later)
+// aurora: wavy ribbons of coloured light across the sky, like the northern lights
+const auroras = [];
+{ const fade = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 64; const k = c.getContext('2d');
+    const g = k.createLinearGradient(0, 0, 0, 64); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.7, 'rgba(255,255,255,.9)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    k.fillStyle = g; k.fillRect(0, 0, 4, 64); return new THREE.CanvasTexture(c); })();
+  [[0x7ff0d8, -2.2, 1.3, 95, 0], [0xff8fd8, -1.4, 1.1, 110, 2], [0xb08fff, .2, 1.2, 85, 4]].forEach(([color, a0, span, h, seed]) => {
+    const n = 48, pos = new Float32Array((n + 1) * 2 * 3), uv = [], idx = [];
+    for (let i = 0; i <= n; i++) { uv.push(i / n, 0, i / n, 1); if (i < n) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    const m = mesh(g, new THREE.MeshBasicMaterial({ map: fade, color, transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    m.frustumCulled = false; scene.add(m); auroras.push({ m, pos, n, a0, span, h, seed });
+  });
+}
+function updateAurora(time) {
+  for (const au of auroras) {
+    for (let i = 0; i <= au.n; i++) {
+      const u = i / au.n, a = au.a0 + u * au.span, R = 240 + Math.sin(u * 9 + time * .3 + au.seed) * 12;
+      const y = au.h + Math.sin(u * 7 + time * .5 + au.seed) * 8, tall = 42 + Math.sin(u * 13 - time * .7 + au.seed) * 14;
+      const x = Math.cos(a) * R, z = Math.sin(a) * R;
+      au.pos.set([x, y, z, x, y + tall, z], i * 6);
+    }
+    au.m.geometry.attributes.position.needsUpdate = true;
+    au.m.material.opacity = .5 + Math.sin(time * .4 + au.seed) * .15;
+  }
+}
+// glowing butterflies flutter around the meadow
+const butterflies = [];
+{ const wingG = new THREE.CircleGeometry(.22, 8); wingG.translate(.2, 0, 0);
+  for (let i = 0; i < 18; i++) {
+    const c = pick([0xffe27f, 0x8fe9ff, 0xff9ad5, 0xc8a6ff]), g = new THREE.Group(), wm = new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide, transparent: true, opacity: .9 });
+    const l = mesh(wingG, wm), r = mesh(wingG, wm); r.scale.x = -1; l.rotation.x = r.rotation.x = -Math.PI / 2; g.add(l, r); g.add(halo(c, 1.2, .55));
+    const home = { x: rand(-26, 26), z: rand(-10, 18) };
+    if (Math.abs(home.x) < 7 && home.z < 8) home.x += 14 * Math.sign(home.x || 1);
+    scene.add(g); butterflies.push({ g, l, r, home, s: rand(0, 6), sp: rand(.5, 1) });
+  } }
+function updateButterflies(time) {
+  for (const b of butterflies) {
+    const t = time * b.sp + b.s;
+    const x = b.home.x + Math.sin(t * .7) * 3 + Math.sin(t * 1.9) * .6, z = b.home.z + Math.cos(t * .5) * 3;
+    const y = terrainH(x, z) + 1.2 + Math.sin(t * 1.3) * .5;
+    b.g.rotation.y = Math.atan2(x - b.g.position.x, z - b.g.position.z);
+    b.g.position.set(x, y, z);
+    const flap = Math.sin(time * 18 + b.s) * .9; b.l.rotation.y = flap; b.r.rotation.y = -flap;
+  }
+  for (const c of clouds) { c.g.position.x += c.speed * .016; if (c.g.position.x > 60) c.g.position.x = -60; }
+}
 // dream dust: tiny glowing sparkles floating everywhere
 const dust = (() => {
   const n = 450, pos = new Float32Array(n * 3), seed = [];
@@ -636,7 +683,7 @@ hexIsland(1.3, 6.5, 2.75, 11.8, 0xfff0fb);
   [[-30, 30, 20, 0xffffff], [10, 34, -30, 0xffc6ec], [-10, 28, 60, 0xffd8f4], [30, 26, 70, 0xffb3e6], [-35, 22, 85, 0xfff0fb]].forEach(([x, y, z, c]) => {
     const g = new THREE.Group();
     for (let i = 0; i < 5; i++) { const b = mesh(new THREE.IcosahedronGeometry(rand(3, 6), 2), mat(c, { flatShading: false })); b.position.set(rand(-6, 6), rand(-1.5, 1.5), rand(-3, 3)); g.add(b); }
-    g.position.set(x, y, z); scene.add(g);
+    g.position.set(x, y, z); scene.add(g); clouds.push({ g, speed: rand(.4, 1) });
   });
 }
 
@@ -2153,6 +2200,8 @@ function loop(now) {
   drawCharge();
   drawHitboxes();
   updateFar(time);
+  updateAurora(time);
+  updateButterflies(time);
   updatePillows(dt);
   // the sun's shadow box follows you around (snapped so shadows don't shimmer)
   sun.target.position.set(Math.round(camera.position.x * 4) / 4, 0, Math.round(camera.position.z * 4) / 4);
