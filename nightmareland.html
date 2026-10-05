@@ -176,6 +176,8 @@ body::before{content:"";position:fixed;inset:0;z-index:4;pointer-events:none;bac
 #fear{position:fixed;right:16px;top:calc(env(safe-area-inset-top,0px) + 74px);z-index:5;display:flex;align-items:center;gap:8px;font:800 12px var(--f-body);letter-spacing:.14em;color:#e8dcd4;pointer-events:none}
 #fear .track{width:110px;height:10px;border-radius:999px;background:rgba(0,0,0,.5);border:1px solid rgba(255,90,90,.4);overflow:hidden}
 #fearFill{height:100%;width:0;background:linear-gradient(90deg,#7a5aa0,#ff3040);transition:width .2s}
+#batFill{height:100%;width:100%;background:linear-gradient(90deg,#ffb050,#ffe2b8);transition:width .2s}
+#fear{display:grid;grid-template-columns:auto 110px;gap:4px 8px}
 #fear.high span{color:#ff4a5a;animation:blink .5s infinite}
 body.title #fear,body.cine #fear{display:none}
 #nmword{position:fixed;z-index:7;pointer-events:none;font:400 clamp(26px,5vw,52px) "Caveat Brush","Comic Sans MS",system-ui,sans-serif;color:#ff2a3a;text-shadow:0 0 12px #000;opacity:0;transition:opacity .25s;transform:rotate(-4deg)}
@@ -2258,7 +2260,7 @@ function updateRobots(dt, time) {
       if (d < 1.3) r.path = [];
       else if (clearLine(r.x, r.z, tx, tz, r.zone)) r.path = [{ x: tx, z: tz }];
       else if (r.repath <= 0) { r.path = findPath(r.x, r.z, tx, tz, r.zone); r.repath = rand(.35, .6); }
-      speed = 3.3; // scrap robots are faster
+      speed = r.lit ? 1.2 : 3.3; // scrap robots are fast… but the flashlight slows them down
       r.cool -= dt;
       if (d < 1.9 && r.cool <= 0 && r.lift < .5) { r.cool = 1.4; r.punch = .55; r.punched = false; } // wind up (you can dodge!)
       if (d < 3) r.face = Math.atan2(dx, dz);
@@ -2303,7 +2305,7 @@ function updateRobots(dt, time) {
     }
     // glitch!
     r.glitch -= dt;
-    if (r.glitch <= 0) { r.glitchOn = .18; r.glitch = rand(1.5, 4); }
+    if (r.glitch <= 0) { r.glitchOn = .18; r.glitch = rand(.6, 2); } // scrap robots twitch a lot
     r.glitchOn = Math.max(0, r.glitchOn - dt);
     const gx = r.glitchOn > 0 ? rand(-.25, .25) : 0;
     r.g.position.set(r.x + gx, terrainH(r.x, r.z) + r.lift + Math.abs(Math.sin(r.step)) * .07 * moving, r.z);
@@ -2312,7 +2314,7 @@ function updateRobots(dt, time) {
     // far-away robots skip their ink outline (too small to see, and it saves work)
     const near = Math.hypot(r.x - camera.position.x, r.z - camera.position.z) < 32;
     if (r.g.userData.inks && r.g.userData.inkOn !== near) { r.g.userData.inkOn = near; r.g.userData.inks.forEach(e => e.visible = near); }
-    r.visor.material.color.setHex(r.glitchOn > 0 ? 0xffffff : r.alerted ? 0xffa020 : 0xff2a2a); // red eyes, orange when they see you
+    r.visor.material.color.setHex(r.glitchOn > 0 || (r.lit && Math.random() < .3) ? 0xffffff : r.alerted ? 0xffa020 : 0xff2a2a); // red eyes, orange when they see you
     if (r.visor.userData.halo) r.visor.userData.halo.material.color.copy(r.visor.material.color);
     r.flash = Math.max(0, r.flash - dt);
     r.body.emissive.setHex(r.flash > 0 ? 0xff6fc8 : 0x000000);
@@ -2587,7 +2589,7 @@ function loop(now) {
 // =====================================================================
 // Everything above builds the old Dreamland. This part turns it into the nightmare:
 // dark colours, thick fog, ruins and rubble, scrap robots, a flashlight, fear and hallucinations.
-const NM = { fear: 0, flash: true, figures: [], whisperT: 4, boltT: 8, bolt: 0, sparkT: 0, wordT: 6 };
+const NM = { fear: 0, flash: true, battery: 100, figures: [], whisperT: 4, boltT: 8, bolt: 0, sparkT: 0, wordT: 6 };
 {
   // --- the dark ---
   scene.fog.color.setHex(0x120818); scene.fog.near = 6; scene.fog.far = 62;
@@ -2684,15 +2686,55 @@ const NM = { fear: 0, flash: true, figures: [], whisperT: 4, boltT: 8, bolt: 0, 
     NM.figures.push({ g: f, shade, eyes, t: 0, life: 0 });
   }
 }
+// --- EYES IN THE DARK: pairs of red eyes blink in the fog, and vanish when you come close or shine your light on them ---
+NM.eyes = Array.from({ length: 7 }, () => {
+  const g = new THREE.Group();
+  [-.2, .2].forEach(x => { const e = halo(0xff1a1a, .75, 0); e.material.fog = false; e.position.x = x; g.add(e); });
+  g.visible = false; scene.add(g); return { g, t: 0, life: 0 };
+});
+// --- the teddy bear: it always seems to be facing you… but only moves when you're not looking ---
+NM.teddy = toys[4];
+if (NM.teddy) { NM.teddy.still = true; NM.teddy.m.rotation.set(0, 0, 0); NM.teddy.m.position.set(-4.1, .95, -1.7); NM.teddy.m.rotation.y = .9; // sitting on the corner of the bed
+  NM.teddyEyes = [-.08, .08].map(x => { const e = halo(0xff2020, .22, 0); e.position.set(x, .44, .27); NM.teddy.m.add(e); return e; }); }
+// --- the dark twin flickers in for a moment on the title screen ---
+NM.twin = model('Sebastian');
+if (NM.twin) { const sh = new THREE.MeshBasicMaterial({ color: 0x050208 }); NM.twin.traverse(o => { if (o.isMesh && !o.userData.isInk) o.material = sh; });
+  [-.09, .09].forEach(x => { const e = mesh(new THREE.SphereGeometry(.04, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff1a1a, fog: false })); e.position.set(x, 1.5, -.23); NM.twin.add(e); });
+  NM.twin.position.copy(sebastian.position); NM.twin.rotation.y = 0; NM.twin.visible = false; scene.add(NM.twin); NM.twinT = 3; }
+// --- sounds: a low hum, your heartbeat, and footsteps that aren't yours ---
+NM.beatT = 1; NM.stepsT = 18;
+function nmSound(dt) {
+  if (!ac) return;
+  if (!NM.drone) {
+    NM.drone = ac.createGain(); NM.drone.gain.value = .05; const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 180;
+    [55, 55.6, 82.4].forEach(f => { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.connect(lp); o.start(); });
+    lp.connect(NM.drone); NM.drone.connect(master);
+  }
+  NM.drone.gain.value = .035 + NM.fear / 100 * .05;
+  // heartbeat: faster and louder the more scared you are
+  if (NM.fear > 20 && state.mode === 'play') {
+    NM.beatT -= dt;
+    if (NM.beatT <= 0) { NM.beatT = 1.15 - NM.fear / 100 * .65; const t = ac.currentTime, v = .12 + NM.fear / 100 * .25;
+      tone('sine', 60, t, .14, v, master, .005); tone('sine', 48, t + .18, .16, v * .8, master, .005); }
+  }
+  // footsteps behind you, then nothing there
+  NM.stepsT -= dt;
+  if (NM.stepsT <= 0 && state.mode === 'play' && !cine && P.z > 6) {
+    NM.stepsT = rand(16, 30); const t = ac.currentTime;
+    for (let i = 0; i < 4; i++) hiss(t + i * .42, .12, .05 + i * .03, 320, 120, 'lowpass');
+    NM.fear = Math.min(100, NM.fear + 8);
+  }
+}
 // FEAR: goes up in the dark, near scrap robots and when you get hurt; goes down near lanterns.
 // The more scared you are, the more the nightmare plays tricks on you.
 const fearEl = document.createElement('div'); fearEl.id = 'fear';
-fearEl.innerHTML = '<span>FEAR</span><div class="track"><div id="fearFill"></div></div>'; document.body.appendChild(fearEl);
+fearEl.innerHTML = '<span>FEAR</span><div class="track"><div id="fearFill"></div></div><span>LIGHT</span><div class="track"><div id="batFill"></div></div>'; document.body.appendChild(fearEl);
 const wordEl = document.createElement('div'); wordEl.id = 'nmword'; document.body.appendChild(wordEl);
 addEventListener('keydown', e => { if (e.code === 'KeyL' && state.mode === 'play') { NM.flash = !NM.flash; sfx('tick'); toast(NM.flash ? 'Flashlight on' : 'Flashlight off', NM.flash ? '' : 'It gets scary in the dark…'); } });
 function nightmareTick(dt, time) {
   // flashlight (with a little flicker when you're scared)
-  NM.torch.intensity = NM.flash ? (NM.fear > 70 && Math.random() < .08 ? .3 : 1.7) : 0;
+  const lowBat = NM.battery < 20;
+  NM.torch.intensity = NM.flash && NM.battery > 0 ? ((NM.fear > 70 || lowBat) && Math.random() < (lowBat ? .2 : .08) ? .25 : 1.7 * Math.min(1, .45 + NM.battery / 60)) : 0;
   // lightning now and then
   NM.boltT -= dt; if (NM.boltT <= 0) { NM.boltT = rand(9, 20); NM.bolt = .35; if (ac) setTimeout(() => sfx('thud'), 400); }
   NM.bolt = Math.max(0, NM.bolt - dt); hemi.intensity = .42 + (NM.bolt > .2 || (NM.bolt > 0 && NM.bolt < .1) ? 1.3 : 0);
@@ -2700,14 +2742,31 @@ function nightmareTick(dt, time) {
   fairy.forEach(f => { if (!f.broken) f.h.material.opacity = Math.random() < .1 ? .1 : .8; });
   // lanterns breathe
   NM.lanterns.forEach((L, i) => { L.l.intensity = 1 + Math.sin(time * 3 + i) * .12; });
+  // scrap robots flinch away when your flashlight hits them
+  { const cfx = -Math.sin(P.yaw), cfz = -Math.cos(P.yaw), on = NM.flash && NM.battery > 0;
+    robots.forEach(r => { if (!r.alive || !r.active) return; const rx = r.x - P.x, rz = r.z - P.z, rd = Math.hypot(rx, rz);
+      r.lit = on && rd < 13 && (rx * cfx + rz * cfz) / rd > .9; }); }
   // scrap robots throw sparks
   NM.sparkT -= dt; if (NM.sparkT <= 0) { NM.sparkT = rand(.3, .9); const r = pick(robots.filter(r => r.alive && r.active)); if (r && Math.hypot(r.x - P.x, r.z - P.z) < 25) burst(r.x + rand(-.3, .3), terrainH(r.x, r.z) + rand(1, 2), r.z, [0xffa020, 0xffe080], 3, .6); }
+  nmSound(dt);
+  // title screen: now and then, for a blink, it isn't Sebastian standing there
+  if (NM.twin && document.body.classList.contains('title')) {
+    NM.twinT -= dt; const on = NM.twinT < 0 && NM.twinT > -.14; NM.twin.visible = on; sebastian.visible = !on;
+    if (NM.twinT < -.14) NM.twinT = rand(3, 7);
+  } else if (NM.twin) NM.twin.visible = false;
   if (state.mode !== 'play' || cine) return;
   // --- fear ---
   let nearLight = 99; NM.lanterns.forEach(L => nearLight = Math.min(nearLight, Math.hypot(L.x - P.x, L.z - P.z)));
+  // --- flashlight battery: it runs down, and lanterns charge it back up ---
+  if (nearLight < 3.2) NM.battery = Math.min(100, NM.battery + 30 * dt);
+  else if (NM.flash && P.z > 5.2) { const was = NM.battery; NM.battery = Math.max(0, NM.battery - 1.6 * dt);
+    if (was > 20 && NM.battery <= 20) toast('Flashlight running low', 'Charge it at a warm lantern');
+    if (was > 0 && NM.battery <= 0) { toast('The light went out…', 'Find a lantern!'); sfx('tick'); } }
+  $('batFill').style.width = NM.battery + '%';
+  const lightOn = NM.flash && NM.battery > 0;
   let nearRobot = 99; robots.forEach(r => { if (r.alive && r.active) nearRobot = Math.min(nearRobot, Math.hypot(r.x - P.x, r.z - P.z)); });
   const indoors = P.z < 5.2; // your old room still feels a little safe
-  let d = (NM.flash ? 1.2 : 6) + (nearRobot < 8 ? 5 : 0) + (boss.active ? 3 : 0) - (indoors ? 4 : 0);
+  let d = (lightOn ? 1.2 : 6) + (nearRobot < 8 ? 5 : 0) + (boss.active ? 3 : 0) - (indoors ? 4 : 0);
   if (nearLight < 3.2) d = -14;
   NM.fear = clamp(NM.fear + d * dt, 0, 100);
   if (P.hurtT > .75) NM.fear = Math.min(100, NM.fear + 30 * dt);
@@ -2738,6 +2797,29 @@ function nightmareTick(dt, time) {
     h.shade.opacity = op; h.eyes.children.forEach(e => e.material.opacity = op);
     h.g.rotation.y = Math.atan2(P.x - h.g.position.x, P.z - h.g.position.z); // always facing you
     if (h.leaving && op <= 0) { h.g.visible = false; burst(h.g.position.x, h.g.position.y + 1, h.g.position.z, [0x150a1a, 0x2a1030], 6); }
+  }
+  // eyes in the fog
+  for (const E of NM.eyes) {
+    if (!E.g.visible) {
+      if (P.z > 6 && Math.random() < dt * (.05 + NM.fear / 600)) {
+        const a = rand(0, Math.PI * 2), dist = rand(18, 30), x = P.x + Math.sin(a) * dist, z = P.z + Math.cos(a) * dist;
+        E.g.position.set(x, terrainH(x, z) + rand(1, 2.4), z); E.g.visible = true; E.t = 0; E.life = rand(4, 9);
+      }
+      continue;
+    }
+    E.t += dt; E.g.lookAt(camera.position);
+    const ex = E.g.position.x - P.x, ez = E.g.position.z - P.z, ed = Math.hypot(ex, ez);
+    const lit = NM.flash && NM.battery > 0 && (ex * fx + ez * fz) / ed > .97;
+    const blink = (E.t % 2.6) < .12 ? 0 : 1, op = Math.min(1, E.t) * blink * (E.t > E.life ? 0 : 1);
+    E.g.children.forEach(c => c.material.opacity = op);
+    if (ed < 11 || lit || E.t > E.life) { if (lit || ed < 11) { E.g.children.forEach(c => c.material.opacity = 0); } E.g.visible = false; }
+  }
+  // the teddy turns to face you whenever you look away
+  if (NM.teddy && P.z < 6) {
+    const tp = NM.teddy.m.position, tx = tp.x - P.x, tz = tp.z - P.z, td = Math.hypot(tx, tz);
+    const seen = (tx * fx + tz * fz) / td > .5;
+    if (!seen) NM.teddy.m.rotation.y = Math.atan2(P.x - tp.x, P.z - tp.z);
+    NM.teddyEyes.forEach(e => e.material.opacity = NM.fear > 40 ? .9 : 0);
   }
   // whispers in the dark
   NM.whisperT -= dt * (NM.fear / 50);
