@@ -3022,6 +3022,177 @@ function updateBolts(dt) {
   };
 }
 
+// ===================== 6. THE UPSIDE-DOWN SCHOOL =====================
+// Desks and lamps hang from the ceiling. Robot teachers patrol with their flashlight
+// eyes: if one sees you, it's DETENTION and back to the entrance. Sneak to the gym,
+// where the ROBOT PRINCIPAL guards key 6.
+{
+  const a = makeArea('school', {
+    title: 'The Upside-Down School', sub: 'Sneak past the robot teachers. Don\'t get caught!', goal: 'Sneak to the gym',
+    fog: [0x3a2a5a, 14, 80], next: 'sketch', robotHp: 4, h: () => 0,
+    keyText: 'The bell rings one last time. A portal to the SKETCH HOUSE opens.',
+  });
+  a.start = { x: 0, z: 2, yaw: Math.PI };
+  a.caught = 0; a.detentions = 0;
+  zoneOf('school', { x0: -19, x1: 19, z0: 9, z1: 52 });
+  const H = 5;
+  // floor (shiny lino) and the "floor" on the ceiling
+  const lino = paint(128, 128, k => { k.fillStyle = '#a89070'; k.fillRect(0, 0, 128, 128); k.fillStyle = '#8a7458'; k.fillRect(0, 0, 64, 64); k.fillRect(64, 64, 64, 64); }); lino.repeat.set(14, 22);
+  { const f = mesh(new THREE.PlaneGeometry(56, 90), new THREE.MeshPhongMaterial({ map: lino, shininess: 20, specular: 0x201810 })); f.rotation.x = -Math.PI / 2; f.position.set(0, 0, 40); f.receiveShadow = true; a.group.add(f);
+    const wood = paint(128, 128, k => { for (let i = 0; i < 8; i++) { k.fillStyle = i % 2 ? '#a07040' : '#b8844c'; k.fillRect(0, i * 16, 128, 16); } }); wood.repeat.set(12, 18);
+    const c = mesh(new THREE.PlaneGeometry(56, 90), new THREE.MeshPhongMaterial({ map: wood, side: THREE.DoubleSide })); c.rotation.x = Math.PI / 2; c.position.set(0, H, 40); a.group.add(c); c.userData.noShadow = true; }
+  const wallM = mat(0xc8a088), lockerM = mat(0x5f9fd8, { shininess: 40 }), trimM = mat(0x8a5a9a);
+  // a wall from (x0,z0) to (x1,z1), straight along x or z
+  const seg = (x0, z0, x1, z1, m = wallM) => { const w = Math.abs(x1 - x0) || .3, d = Math.abs(z1 - z0) || .3; const o = aBox(a, w, H, d, null, (x0 + x1) / 2, 0, (z0 + z1) / 2, true, m); a.solids[a.solids.length - 1].climb = false; return o; };
+  // the outside walls
+  seg(-20, 0, 20, 0); seg(-20, 0, -20, 82); seg(20, 0, 20, 82); seg(-20, 82, 20, 82);
+  // the entrance hall ends with a wall and a doorway into the corridor
+  seg(-20, 8, -1.6, 8); seg(1.6, 8, 20, 8);
+  // the corridor walls (lockers!) with doorways into the classrooms
+  const doors = [13, 23, 33, 43];
+  [-3, 3].forEach(x => { let z = 8; doors.forEach(dz => { seg(x, z, x, dz - 1.2, lockerM); z = dz + 1.2; }); seg(x, z, x, 52, lockerM); });
+  // classrooms: walls between them, with a few side doors so you can sneak room to room
+  [18, 28, 38].forEach((z, i) => { seg(-20, z, -3, z); if (i === 1) { seg(3, z, 10, z); seg(13, z, 20, z); } else seg(3, z, 20, z); });
+  seg(-20, 52, -1.6, 52); seg(1.6, 52, 20, 52); // the gym doors
+  // locker details on the corridor walls
+  for (let z = 9; z < 52; z += 1.1) { if (doors.some(dz => Math.abs(z - dz) < 1.6)) continue; [-2.82, 2.82].forEach(x => { const l = mesh(boxG(.06, 1.9, .9), mat(pick([0x5f9fd8, 0x4f8fc8, 0x6fafe8]))); l.position.set(x, 1, z); a.group.add(l); const vent = mesh(boxG(.07, .2, .5), mat(0x3a5a8a)); vent.position.set(x, 1.7, z); a.group.add(vent); }); }
+  // classrooms: desks (on the floor AND upside down on the ceiling), blackboards with writing
+  const boardTex = lines => paint(256, 128, k => { k.fillStyle = '#2a4a3a'; k.fillRect(0, 0, 256, 128); k.strokeStyle = '#a07040'; k.lineWidth = 10; k.strokeRect(0, 0, 256, 128); k.fillStyle = '#f0f0e0'; k.font = '24px "Caveat","Comic Sans MS",cursive'; lines.forEach((l, i) => k.fillText(l, 18, 40 + i * 32)); });
+  const boards = [['2 + 2 = 5', 'it is a dream'], ['today: being', 'upside down'], ['nobody sat', 'next to me.'], ['homework:', 'wake up'], ['robots = kids?', 'shh'], ['DON\'T GET', 'CAUGHT']];
+  const rooms = [[-11.5, 13], [11.5, 13], [-11.5, 23], [11.5, 23], [-11.5, 33], [11.5, 33], [-11.5, 45], [11.5, 45]];
+  rooms.forEach(([x, z], ri) => {
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) {
+      const dx = x + (c - 1) * 3.2, dz = z - 1.5 + r * 3;
+      aBox(a, 1.4, .75, .9, 0xc8945c, dx, 0, dz); const ch = mesh(boxG(.6, .5, .6), mat(0x5f9fd8)); ch.position.set(dx, .25, dz + .8); a.group.add(ch);
+      const up = mesh(boxG(1.4, .75, .9), mat(0xc8945c)); up.position.set(dx + .5, H - .375, dz + .3); a.group.add(up); // the upside-down desk on the ceiling
+      const uc = mesh(boxG(.6, .5, .6), mat(0x5f9fd8)); uc.position.set(dx + .5, H - .25, dz + 1.1); a.group.add(uc);
+    }
+    const side = x < 0 ? -1 : 1, bd = mesh(new THREE.PlaneGeometry(4, 2), new THREE.MeshBasicMaterial({ map: boardTex(boards[ri % boards.length]), color: 0xcccccc }));
+    bd.position.set(x + side * 8.3, 2.3, z); bd.rotation.y = -side * Math.PI / 2; a.group.add(bd);
+    if (ri === 2) messages.push({ m: bd, x: x + side * 7, y: 0, z, found: false, area: a.name }); // a hidden message on a blackboard
+  });
+  // hanging lamps (hanging UP from the floor of the ceiling world… and real ones on the real ceiling)
+  for (let z = 4; z < 80; z += 6) for (const x of [-12, 0, 12]) { const lamp = mesh(new THREE.CylinderGeometry(.5, .2, .3, 10), glow(0xd8c8a0)); lamp.position.set(x, H - .2, z); a.group.add(lamp); lamp.add(at(halo(0xfff2c8, 1.6, .25), 0, -.3, 0)); }
+  
+  // upside-down clocks and a sign
+  [[0, 3.4, .3, 0], [0, 3.4, 51.7, Math.PI]].forEach(([x, y, z, ry]) => { const c = mesh(new THREE.CylinderGeometry(.7, .7, .1, 20), mat(0xffffff)); c.rotation.x = Math.PI / 2; c.position.set(x, y, z); a.group.add(c);
+    const hand = mesh(boxG(.05, .5, .05), glow(0x2a1450)); hand.position.set(x, y - .15, z + (ry ? -.06 : .06)); a.group.add(hand); a.clockHands = (a.clockHands || []).concat(hand); });
+  { const sign = mesh(new THREE.PlaneGeometry(8, 1.4), new THREE.MeshBasicMaterial({ map: paint(512, 96, k => { k.fillStyle = '#ffd36b'; k.fillRect(0, 0, 512, 96); k.fillStyle = '#2a1450'; k.font = 'bold 56px "Baloo 2",sans-serif'; k.textAlign = 'center'; k.fillText('DREAMLAND SCHOOL', 256, 68); }), side: THREE.DoubleSide }));
+    sign.position.set(0, 3.7, 7.8); sign.rotation.z = Math.PI; a.group.add(sign); } // upside down, of course
+  // gems and robots with kids hiding in classrooms
+  [['pink', -11, 10], ['blue', 11, 20], ['green', -14, 30], ['purple', 14, 36], ['pink', -8, 46], ['rainbow', 16, 49]].forEach(([t, x, z]) => aGem(a, t, x, z, .9));
+  [[-14, 22, 1], [14, 32, 1], [-14, 44, 1], [12, 14, 0]].forEach(([x, z, h]) => aRobot(a, x, z, !!h));
+  // ---------- ROBOT TEACHERS ----------
+  a.teachers = [];
+  const teacher = (path) => {
+    const m = makeRobot(false); scene.remove(m.g); a.group.add(m.g); m.g.scale.setScalar(1.15);
+    const hat = mesh(boxG(.9, .08, .9), mat(0x2a2a3a)); hat.position.y = 2.15; m.g.add(hat); const hb = mesh(boxG(.4, .2, .4), mat(0x2a2a3a)); hb.position.y = 2.05; m.g.add(hb);
+    const tassel = mesh(boxG(.05, .3, .05), glow(0xffd36b)); tassel.position.set(.35, 1.95, .35); m.g.add(tassel);
+    const ruler = mesh(boxG(.08, .9, .03), mat(0xffe27f)); ruler.position.set(.6, .8, .25); m.g.add(ruler);
+    const cone = mesh(new THREE.CircleGeometry(7, 24, -0.45, .9), new THREE.MeshBasicMaterial({ color: 0xfff27f, transparent: true, opacity: .16, depthWrite: false, side: THREE.DoubleSide }));
+    cone.rotation.x = -Math.PI / 2; cone.position.y = .04; a.group.add(cone);
+    const t = { ...m, path, i: 0, x: path[0][0], z: path[0][1], face: 0, cone, stun: 0, look: 0, step: 0 };
+    a.teachers.push(t); return t;
+  };
+  teacher([[0, 10], [0, 50]]); teacher([[0, 50], [0, 10]]);
+  teacher([[-17, 11], [-6, 11], [-6, 16], [-17, 16]]); teacher([[6, 21], [17, 21], [17, 26], [6, 26]]);
+  teacher([[-17, 31], [-6, 31], [-6, 36], [-17, 36]]); teacher([[6, 41], [17, 41], [17, 49], [6, 49]]); teacher([[-6, 4], [6, 4]]);
+  const seesYou = t => {
+    const dx = P.x - t.x, dz = P.z - t.z, d = Math.hypot(dx, dz); if (d > 7 || d < .1) return false;
+    const ang = Math.atan2(Math.sin(Math.atan2(dx, dz) - t.face), Math.cos(Math.atan2(dx, dz) - t.face)); if (Math.abs(ang) > .45) return false;
+    for (let k = 1; k < 12; k++) { const q = k / 12; if (insideSolid(t.x + dx * q, 1.2, t.z + dz * q)) return false; } // a wall is in the way
+    return true;
+  };
+  // ---------- THE ROBOT PRINCIPAL ----------
+  const G = { x: 0, z: 68 };
+  const PR = { name: 'Robot Principal', maxHp: 26, hp: 26, active: false, x: G.x, z: G.z, mode: 'walk', t: 0, cool: 2, flash: 0, face: 0 };
+  { const m = makeRobot(false); scene.remove(m.g); a.group.add(m.g); m.g.scale.setScalar(2.3); PR.m = m; PR.g = m.g;
+    const hat = mesh(boxG(1, .1, 1), mat(0x1a1a2a)); hat.position.y = 2.15; m.g.add(hat); const hb = mesh(boxG(.45, .22, .45), mat(0x1a1a2a)); hb.position.y = 2.03; m.g.add(hb);
+    const tas = mesh(boxG(.06, .35, .06), glow(0xffd36b)); tas.position.set(.4, 1.95, .4); m.g.add(tas);
+    [-.17, .17].forEach(x => { const gl = mesh(new THREE.TorusGeometry(.12, .025, 6, 16), mat(0x1a1a2a)); gl.position.set(x, 1.8, .34); m.g.add(gl); });
+    const tie = mesh(boxG(.15, .4, .04), mat(0xff3f5f)); tie.position.set(0, 1.2, .32); m.g.add(tie);
+    const bell = mesh(new THREE.ConeGeometry(.25, .35, 12), mat(0xffd36b, { shininess: 90 })); bell.position.set(-.65, .55, .2); m.g.add(bell); PR.bell = bell;
+    m.g.position.set(G.x, 0, G.z); }
+  PR.balls = () => [{ x: PR.x, y: 1.6, z: PR.z, r: 1.4 }, { x: PR.x, y: 4.1, z: PR.z, r: 1.1 }];
+  PR.die = () => {
+    for (let i = 0; i < 6; i++) setTimeout(() => { burst(PR.x + rand(-1, 1), rand(1, 4), PR.z + rand(-1, 1), [0xf1ecff, 0xffd36b, 0x5ff6ff], 16); sfx('break'); }, i * 200);
+    setTimeout(() => { PR.g.visible = false; a.key.active = true; a.key.m.visible = true; toast('Principal defeated!', 'Class dismissed! Key 6 appeared'); objective('Grab key 6'); }, 1300);
+    if (a.caught === 0) achieve('Ghost Student', 'Finish the school without getting caught');
+  };
+  aKey(a, 6, 0xffd36b, G.x, 1.4, G.z); a.key.active = false; a.key.m.visible = false;
+  a.portal = makePortal(0xffd36b); a.portal.position.set(0, 0, 78); a.group.add(a.portal);
+  // gym decoration: basketball hoops (upside down on the ceiling), bleachers, a stage
+  [-15, 15].forEach(x => { const b = aBox(a, 5, 1.2, 14, 0xb8844c, x, 0, 68); for (let k = 0; k < 3; k++) { const st = mesh(boxG(5, .3, 14 - k * 3), mat(0xc8945c)); st.position.set(x, 1.35 + k * .3, 68); a.group.add(st); } });
+  [-1, 1].forEach(k => { const hoop = mesh(new THREE.TorusGeometry(.5, .05, 8, 20), mat(0xff7a3a)); hoop.position.set(0, H - 1.6, 68 + k * 12); hoop.rotation.x = Math.PI / 2; a.group.add(hoop);
+    const bb = mesh(boxG(1.8, 1.2, .1), mat(0xffffff)); bb.position.set(0, H - 1, 68 + k * 12.6); a.group.add(bb); });
+  a.rulers = []; a.waves = [];
+  const caught = (by) => { // DETENTION!
+    a.caught++; a.detentions += by === 'principal' ? 1 : 0; sfx('alert'); state.mode = 'dead';
+    $('fadeText').textContent = 'DETENTION!'; $('fade').style.opacity = 1;
+    if (a.detentions >= 5) achieve('Detention', 'Get caught by the robot principal 5 times');
+    setTimeout(() => { const st = by === 'principal' ? { x: 0, z: 54.5 } : a.start; Object.assign(P, { x: st.x, z: st.z, y: 0, vy: 0, yaw: Math.PI, pitch: 0, kx: 0, kz: 0, hurtT: 1.5 }); state.mode = 'play'; $('fade').style.opacity = 0; toast('Caught!', by === 'principal' ? 'The principal sent you out. Try again!' : 'Back to the entrance. Stay out of their light!'); }, 900);
+  };
+  a.onRespawn = () => { a.rulers.forEach(r => a.group.remove(r.m)); a.rulers = []; a.waves.forEach(w => a.group.remove(w.m)); a.waves = []; };
+  a.leave = () => { aBoss = null; $('bossbar').hidden = true; };
+  a.update = (dt, time) => {
+    a.clockHands.forEach((h, i) => h.rotation.z = -time * (i ? 3 : 1)); // the clocks run backwards… and too fast
+    // teachers patrol, sweep their eyes, and catch you if you step into their light
+    for (const t of a.teachers) {
+      if (t.stun > 0) { t.stun -= dt; t.visor.material.color.setHex(0x5a5a7a); t.cone.visible = false; t.g.rotation.z = Math.sin(time * 20) * .05; continue; }
+      t.cone.visible = true; t.g.rotation.z = 0; t.visor.material.color.setHex(0xfff27f);
+      const [tx, tz] = t.path[t.i], dx = tx - t.x, dz = tz - t.z, d = Math.hypot(dx, dz);
+      if (d < .2) { t.i = (t.i + 1) % t.path.length; t.look = 1.2; } // stop and look around at each corner
+      else if (t.look <= 0) { t.x += dx / d * 1.7 * dt; t.z += dz / d * 1.7 * dt; t.face = Math.atan2(dx, dz); t.step += dt * 8; }
+      if (t.look > 0) { t.look -= dt; t.face += Math.sin(time * 2.5) * dt * 1.6; }
+      t.g.position.set(t.x, Math.abs(Math.sin(t.step)) * .05, t.z); t.g.rotation.y = t.face;
+      if (t.limbs) { const sw = Math.sin(t.step) * .5 * (t.look > 0 ? 0 : 1); t.limbs[0].rotation.x = sw; t.limbs[1].rotation.x = -sw; t.limbs[2].rotation.x = -sw; t.limbs[3].rotation.x = sw; }
+      t.cone.position.set(t.x, .04, t.z); t.cone.rotation.z = t.face - Math.PI / 2;
+      const sees = state.mode === 'play' && !cine && seesYou(t);
+      t.cone.material.color.setHex(sees ? 0xff4040 : 0xfff27f); t.cone.material.opacity = sees ? .3 : .16;
+      if (sees) caught('teacher');
+      // a punch from behind stuns them for a few seconds
+      if (punchT > .2 && Math.hypot(P.x - t.x, P.z - t.z) < 2) { t.stun = 4; sfx('hit'); burst(t.x, 1.8, t.z, [0xfff27f, 0xffffff], 8); }
+    }
+    // entering the gym starts the fight
+    if (!PR.active && PR.hp > 0 && P.z > 55 && state.mode === 'play' && !cine) { startABoss(PR); sfx('alert'); toast('THE ROBOT PRINCIPAL', 'Jump over the bell waves and dodge the rulers!'); }
+    // ---- the principal's brain ----
+    if (!PR.g.visible) return;
+    PR.m.body.emissive.setHex(PR.flash > 0 ? 0xff6fc8 : 0); PR.flash = Math.max(0, PR.flash - dt);
+    PR.m.visor.material.color.setHex(PR.mode === 'grab' ? 0xff3040 : 0x5ff6ff);
+    if (!PR.active) return;
+    const angry = PR.hp < PR.maxHp / 2, dx = P.x - PR.x, dz = P.z - PR.z, d = Math.hypot(dx, dz) || 1;
+    PR.t += dt; PR.cool -= dt;
+    PR.face = turnTo(PR.face, Math.atan2(dx, dz), Math.min(1, dt * 3)); PR.g.rotation.y = PR.face;
+    if (PR.mode === 'walk') {
+      if (d > 4) { PR.x += dx / d * (angry ? 2.6 : 1.9) * dt; PR.z += dz / d * (angry ? 2.6 : 1.9) * dt; }
+      if (PR.cool <= 0) { const r = Math.random(); PR.mode = d < 5 ? 'grab' : r < .5 ? 'rulers' : 'bell'; PR.t = 0; if (PR.mode === 'grab') sfx('warn'); }
+    } else if (PR.mode === 'rulers') { // throws a fan of rulers
+      if (PR.t > .4 && !PR.thrown) { PR.thrown = true; const n = angry ? 7 : 5;
+        for (let k = 0; k < n; k++) { const an = PR.face + (k - (n - 1) / 2) * .18, r = mesh(boxG(.12, .05, .9), mat(0xffe27f)); r.position.set(PR.x, 2.2, PR.z); a.group.add(r); a.rulers.push({ m: r, vx: Math.sin(an) * 11, vz: Math.cos(an) * 11, life: 2.5 }); }
+        sfx('whoosh'); }
+      if (PR.t > 1) { PR.mode = 'walk'; PR.thrown = false; PR.cool = angry ? .9 : 1.6; }
+    } else if (PR.mode === 'bell') { // rings the bell: a shockwave rolls along the floor. JUMP!
+      PR.bell.rotation.z = Math.sin(PR.t * 40) * .5;
+      if (PR.t > .5 && !PR.rung) { PR.rung = true; const w = mesh(new THREE.TorusGeometry(1, .12, 6, 48), glow(0xffd36b)); w.rotation.x = Math.PI / 2; w.position.set(PR.x, .2, PR.z); a.group.add(w); a.waves.push({ m: w, r: 1, x: PR.x, z: PR.z, hit: false });
+        if (ac) { const t0 = ac.currentTime; tone('triangle', 880, t0, .8, .2, master); tone('triangle', 1320, t0, .6, .1, master); } }
+      if (PR.t > 1.1) { PR.mode = 'walk'; PR.rung = false; PR.cool = angry ? .8 : 1.5; }
+    } else if (PR.mode === 'grab') { // lunges to grab you and send you to detention
+      if (PR.t > .6 && PR.t < 1) { PR.x += Math.sin(PR.face) * 9 * dt; PR.z += Math.cos(PR.face) * 9 * dt;
+        if (d < 2.2 && state.mode === 'play') { caught('principal'); PR.mode = 'walk'; PR.cool = 2.5; } }
+      if (PR.t > 1.3) { PR.mode = 'walk'; PR.cool = 1.2; }
+    }
+    PR.x = clamp(PR.x, -12, 12); PR.z = clamp(PR.z, 57, 80);
+    PR.g.position.set(PR.x, 0, PR.z);
+    if (PR.m.limbs) { const sw = Math.sin(PR.t * 6) * .4; PR.m.limbs[0].rotation.x = sw; PR.m.limbs[1].rotation.x = -sw; PR.m.limbs[2].rotation.x = PR.mode === 'rulers' ? -2 : -sw; PR.m.limbs[3].rotation.x = PR.mode === 'grab' ? -1.5 : sw; }
+    for (let i = a.rulers.length - 1; i >= 0; i--) { const r = a.rulers[i]; r.life -= dt; r.m.position.x += r.vx * dt; r.m.position.z += r.vz * dt; r.m.rotation.y += dt * 12;
+      if (touchesYou(r.m.position.x, r.m.position.y - .6, r.m.position.z, .5)) { hurt(1, r.m.position.x, r.m.position.z); r.life = 0; }
+      if (r.life <= 0 || insideSolid(r.m.position.x, 1, r.m.position.z)) { a.group.remove(r.m); a.rulers.splice(i, 1); } }
+    for (let i = a.waves.length - 1; i >= 0; i--) { const w = a.waves[i]; w.r += dt * 8; w.m.scale.setScalar(w.r);
+      const pd = Math.hypot(P.x - w.x, P.z - w.z); if (!w.hit && Math.abs(pd - w.r) < .6 && P.y < .5) { w.hit = true; hurt(1, w.x, w.z); }
+      if (w.r > 24) { a.group.remove(w.m); a.waves.splice(i, 1); } }
+  };
+}
+
 // everything solid casts and catches shadows (glowing things and the sky don't)
 scene.traverse(o => { if (o.isMesh && !o.material.isMeshBasicMaterial && !o.userData.isInk) { o.castShadow = !o.userData.noShadow; o.receiveShadow = true; } });
 fists.forEach(f => f.traverse(o => { o.castShadow = false; }));
