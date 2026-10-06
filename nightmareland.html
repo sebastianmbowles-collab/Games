@@ -226,7 +226,7 @@ body.title #fear,body.cine #fear{display:none}
 <div id="cross"></div>
 <canvas id="charge" width="80" height="80"></canvas>
 <div id="toast"></div>
-<div id="bossbar" hidden><span>Rust Scorpion</span><div class="track"><div id="bossfill"></div></div></div>
+<div id="bossbar" hidden><span>The Boy</span><div class="track"><div id="bossfill"></div></div></div>
 <div id="cinetext"></div>
 <button class="small" id="skip" hidden>Skip</button>
 <button class="small" id="muteBtn" hidden>Music: on</button>
@@ -259,9 +259,9 @@ body.title #fear,body.cine #fear{display:none}
     <path class="d7" d="M900 330 q-30 -40 -60 -10 q-30 -40 -60 0 q-20 30 30 40 h60 q50 -10 30 -30z" />
   </svg>
   <div id="tapToWake">Tap anywhere to go back to sleep</div>
-  <div class="chapter">Chapter 2 · The Ruins</div>
+  <div class="chapter">Chapter 2 · Through Its Eyes</div>
   <div class="tlogo" id="tlogo" aria-label="Dreamland"></div>
-  <div class="tagline">What happened…?</div>
+  <div class="tagline">That was how he saw the world…</div>
   <nav class="menu" id="menu">
     <button data-act="new"><i>☾</i><span>New Dream</span></button>
     <button data-act="continue" id="mContinue"><i>✦</i><span>Continue</span></button>
@@ -876,7 +876,7 @@ hexIsland(1.3, 6.5, 2.75, 11.8, 0xfff0fb);
     solid(x - r * .8, 0, z - r * .8, x + r * .8, r * .8, z + r * .8);
   });
   // a hidden message tucked behind the big dome
-  { const n = note(['they broke', 'when you left.'], 1.8, 1.05); n.position.set(-24, 1.6, -.8); scene.add(n);
+  { const n = note(['he took', 'your key.'], 1.8, 1.05); n.position.set(-24, 1.6, -.8); scene.add(n);
     const post = mesh(boxG(.15, 1.1, .15), mat(0xffffff)); post.position.set(-24, .55, -.85); scene.add(post);
     addMessage(n, -24, 0, 0); }
   // glass pyramid
@@ -1051,7 +1051,7 @@ let shadowTarget = -30;
 
 // ============ PLAYER ============
 const P = { x: 0, y: 0, z: -1, vy: 0, yaw: Math.PI, pitch: 0, hp: 5, onGround: true, wasGround: true, hurtT: 0, kx: 0, kz: 0, airT: 0, gy: 0, slam: false, climbing: false };
-const R = 0.35, H = 1.6, STEP = 0.36, EYE = 1.5;
+const R = 0.35, H = 1.6, STEP = 0.36, EYE = 1.1; // you're a scorpion now: your eyes are low to the ground
 const store = {
   get() { try { return JSON.parse(localStorage.getItem('nightmareland-v1')) || {}; } catch (e) { return {}; } },
   set(o) { try { localStorage.setItem('nightmareland-v1', JSON.stringify(o)); } catch (e) {} },
@@ -1448,10 +1448,10 @@ function updateCine(dt) {
 
 function introCine() {
   playCine([
-    { text: 'Sebastian has waited all day to go back to Dreamland. He closes his eyes…', d: 3.5, snap: true, pos: [1.5, 2.6, 1.5], look: [-3.4, .8, -3] },
-    { text: '…but the room is cold. The ceiling is broken. The toys lie still.', d: 3.5, pos: [0, 2.3, 0], look: [-.5, 1, -1.2] },
-    { text: 'Dreamland is not the same. Something red glows outside the window.', d: 3.5, pos: [0, 2, 2.5], look: [6.5, 3.5, 11.8] },
-  ], () => { objective('Find the key outside your window'); toast('Nightmareland', 'Your flashlight is on. Stay near the warm lights when you feel scared'); });
+    { text: 'Remember the Pastel Scorpion? The boy beat it, took its key, and left.', d: 3.8, snap: true, pos: [1.5, 2.6, 1.5], look: [-3.4, .8, -3] },
+    { text: 'This time, YOU are the scorpion. You wake up in the boy\'s room.', d: 3.6, pos: [0, 2.3, 0], look: [-.5, 1, -1.2] },
+    { text: 'Everything looks dark and broken… because this is how the scorpion sees Dreamland.', d: 4, pos: [0, 2, 2.5], look: [6.5, 3.5, 11.8] },
+  ], () => { objective('Find the key outside your window'); toast('You are the Pastel Scorpion', 'Your light is on. Stay near the warm lights when you feel scared'); });
 }
 function gateCine() {
   sfx('gate');
@@ -1476,13 +1476,13 @@ function bossCine() {
   boss.g.visible = true; setTimeout(() => sfx('roar'), 900);
   playCine([
     { text: 'The ash is moving…', d: 2.5, snap: true, pos: [7, 4, 64], look: [0, 1, 78] },
-    { text: 'The RUST SCORPION. It looks like an old friend… but it is broken, and angry.', d: 3.8, pos: [4, 3, 68], look: [0, 2, 78], tick: dt => { boss.rise = Math.min(1, boss.rise + dt / 2); } },
-  ], () => { boss.rise = 1; boss.active = true; boss.lpx = P.x; boss.lpz = P.z; $('bossbar').hidden = false; objective('Beat the Rust Scorpion'); });
+    { text: 'THE BOY. The one who beat you. To a scorpion, he looks like a giant.', d: 3.8, pos: [4, 3, 68], look: [0, 2, 78], tick: dt => { boss.rise = Math.min(1, boss.rise + dt / 2); } },
+  ], () => { boss.rise = 1; boss.active = true; boss.lpx = P.x; boss.lpz = P.z; $('bossbar').hidden = false; objective('Beat the Boy'); });
 }
 function resetBoss() {
   Object.assign(boss, { hp: boss.maxHp, x: 0, z: 78, mode: 'walk', modeT: 0, cool: 2, charge: 4, phase: 1, under: false, hits: [], shotCool: 3, burrowCool: 6 });
   if (boss.active) boss.rise = 1;
-  boss.shell.color.setHex(0xc9a6ff); bossRing.visible = false; boss.tail.scale.setScalar(1); straighten(0);
+  boss.shell.color.setHex(0x1c1424); bossRing.visible = false; boss.tail.scale.setScalar(1); straighten(0);
   bossShots.forEach(s => scene.remove(s.m)); bossShots.length = 0;
   $('bossfill').style.width = '100%';
 }
@@ -1512,27 +1512,30 @@ function bossDefeated() {
   burst(boss.x, terrainH(boss.x, boss.z) + 1.5, boss.z, [0xc9a6ff, 0xff9ad5, 0xfff0fb, 0xffd36b], 40); sfx('big');
   boss.g.visible = false;
   key2.active = true; key2.m.visible = true; key2.base = terrainH(boss.x, boss.z) + 1.3; key2.m.position.set(boss.x, key2.base, boss.z);
-  toast('Scorpion defeated!', 'Key 4 appeared');
+  toast('The Boy fades away…', 'Key 4 appeared');
   objective('Grab key 4');
-  if (!state.glovesOnBoss) achieve('Fists Only', 'Beat a boss without gravity gloves');
+  if (!state.glovesOnBoss) achieve('Claws Only', 'Beat a boss without gravity gloves');
 }
 function endingCine() {
   playCine([
     { text: 'KEY 4 of 10!', d: 2.5, snap: true, pos: [P.x + 3, P.y + 2.5, P.z + 3], look: [P.x, P.y + 1, P.z] },
     { text: 'Far away, the one who looks just like Sebastian is not watching any more…', d: 4, pos: [0, 30, 60], look: [0, 0, 30], speed: .6 },
     { text: '…he is coming.', d: 2.6, pos: [0, 40, 40], look: [0, 0, 40], speed: .6 },
-    { text: 'Sebastian turns around.', d: 2.2, snap: true, pos: [P.x, P.y + 1.5, P.z], look: [P.x, P.y + 1.4, P.z + 5],
-      on: () => { const t = NM.stalker.g; t.position.set(P.x, terrainH(P.x, P.z + 2.6), P.z + 2.6); t.rotation.y = Math.PI; t.visible = true; NM.stalker.on = false; NM.endTwin = true; } },
-    { text: '"You left me here, alone."', d: 3, pos: [P.x, P.y + 1.5, P.z + .6], look: [P.x, P.y + 1.6, P.z + 2.6], speed: .4,
+    { text: 'The scorpion turns around.', d: 2.2, snap: true, pos: [P.x, P.y + 1.5, P.z], look: [P.x, P.y + 1.4, P.z + 5],
+      on: () => { const t = NM.stalker.g; t.position.set(P.x, terrainH(P.x, P.z + 2.6), P.z + 2.6); t.rotation.y = Math.PI; t.visible = true; NM.stalker.on = false; NM.endTwin = true;
+        // …and the shadow becomes just a boy in starry pajamas
+        setTimeout(() => { t.visible = false; sebastian.visible = true; sebastian.scale.setScalar(1); sebastian.position.copy(t.position); sebastian.rotation.y = Math.PI;
+          burst(t.position.x, t.position.y + 1, t.position.z, [0xffd6f6, 0xfff2a8, 0xffffff], 20); }, 1600); } },
+    { text: 'It\'s only the boy. Small. Not scary at all. "I\'m sorry I fought you."', d: 3.4, pos: [P.x, P.y + 1.5, P.z + .6], look: [P.x, P.y + 1.6, P.z + 2.6], speed: .4,
       on: () => { if (ac) { const t = ac.currentTime; tone('sine', 98, t, 2.5, .2, master, .5); hiss(t, 2.5, .08, 300, 100, 'lowpass'); } } },
-    { text: '"So I made Dreamland look like how I feel."', d: 3.4, pos: [P.x, P.y + 1.5, P.z + 1], look: [P.x, P.y + 1.6, P.z + 2.6], speed: .3 },
-    { text: '"See you next chapter, Sebastian."', d: 3, pos: [P.x, P.y + 1.5, P.z + 1.3], look: [P.x, P.y + 1.6, P.z + 2.6], speed: .3,
-      on: () => { setTimeout(() => { NM.stalker.g.visible = false; burst(P.x, P.y + 1.5, P.z + 2.6, [0x000000, 0xff1010], 30); sfx('whoosh'); }, 2400); } },
+    { text: '"I thought YOU were the monster. I guess we were both scared."', d: 3.6, pos: [P.x, P.y + 1.5, P.z + 1], look: [P.x, P.y + 1.6, P.z + 2.6], speed: .3 },
+    { text: 'That was how the scorpion saw the world.', d: 3.4, pos: [P.x, P.y + 1.5, P.z + 1.3], look: [P.x, P.y + 1.6, P.z + 2.6], speed: .3,
+      on: () => { setTimeout(() => { sebastian.visible = false; burst(P.x, P.y + 1.5, P.z + 2.6, [0xffd6f6, 0xfff2a8, 0xffffff], 30); sfx('kid'); }, 2600); } },
   ], () => {
-    NM.endTwin = false; NM.stalker.g.visible = false;
+    NM.endTwin = false; NM.stalker.g.visible = false; sebastian.visible = false;
     state.mode = 'end';
     const s = Math.floor((performance.now() - state.startTime) / 1000);
-    $('eMsg').textContent = `Key 4 of 10 is yours. You found ${messages.filter(m => m.found).length} of ${messages.length} hidden messages. Now you know who broke Dreamland.`;
+    $('eMsg').textContent = `Key 4 of 10 is yours. You found ${messages.filter(m => m.found).length} of ${messages.length} hidden messages. Now you know how the scorpion saw the world.`;
     $('eKids').textContent = state.kids; $('eGems').textContent = state.gems; $('eTime').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     $('endScreen').hidden = false; document.exitPointerLock?.();
   });
@@ -1675,8 +1678,8 @@ function hitBoss(dmg) {
   if (boss.hp <= 0) { bossDefeated(); return; }
   // at half health it gets ANGRY: faster, pinker, and it learns new tricks
   if (boss.phase === 1 && boss.hp <= boss.maxHp / 2) {
-    boss.phase = 2; boss.shell.color.setHex(0xff8fd0); sfx('roar'); state.shake = .4;
-    toast('The Scorpion is ANGRY!', 'Keep moving: it can dig under the sand now');
+    boss.phase = 2; boss.shell.color.setHex(0x4a0a18); // angry: dark red sfx('roar'); state.shake = .4;
+    toast('The Boy is ANGRY!', 'Keep moving: he can sink into the ash now');
     boss.mode = 'burrow'; boss.modeT = 0;
   }
 }
@@ -2683,8 +2686,32 @@ const NM = { fear: 0, flash: true, battery: 100, figures: [], whisperT: 4, boltT
     if (r.limbs && i % 3 === 1) r.limbs[3].visible = false; // lost its arm
     r.g.rotation.z = rand(-.08, .08); r.maxHp += 1; r.hp = r.maxHp;
   });
-  // --- the Rust Scorpion ---
-  boss.shell.color.setHex(0x7a3a30);
+  // --- YOU are the Pastel Scorpion: pincers instead of fists ---
+  const pinM = new THREE.MeshPhongMaterial({ color: 0xc98aa8, shininess: 50, specular: 0x402030 }), armM = new THREE.MeshPhongMaterial({ color: 0x9a7aa8, shininess: 30 });
+  fists.forEach((f, i) => {
+    f.children.slice().forEach(c => f.remove(c));
+    const palm = mesh(new THREE.SphereGeometry(.13, 14, 10), pinM); palm.scale.set(1, .8, 1.25); f.add(palm);
+    [-1, 1].forEach(k => { const fin = mesh(new THREE.ConeGeometry(.055, .3, 10), pinM); fin.rotation.x = -Math.PI / 2; fin.rotation.z = k * .25; fin.position.set(k * .06, 0, -.24); f.add(fin); });
+    const arm = mesh(new THREE.CylinderGeometry(.06, .075, .5, 10), armM); arm.rotation.x = Math.PI / 2; arm.position.z = .38; f.add(arm);
+    const joint = mesh(new THREE.SphereGeometry(.085, 10, 8), armM); joint.position.z = .14; f.add(joint);
+    ink(f, .012); f.traverse(o => o.castShadow = false); f.userData.size = .48;
+  });
+  // on the title screen it's you (the scorpion) standing in the boy's room
+  NM.me = model('Scorpion');
+  if (NM.me) { NM.me.scale.setScalar(.3); NM.me.position.set(0, 0, -.6); NM.me.rotation.y = Math.PI; scene.add(NM.me); keep.add(NM.me); }
+  sebastian.visible = false;
+  // --- the boss is THE BOY: a giant, dark Sebastian with a huge pillow ---
+  boss.g.children.forEach(c => { if (c !== boss.tail) c.visible = false; });
+  boss.tail.traverse(o => { if (o.isMesh) o.visible = false; });
+  boss.sting.visible = true; boss.sting.material = boss.sting.material.clone(); boss.sting.material.visible = false; // the hitbox stays, the stinger is gone
+  { const pil = mesh(pillowG, new THREE.MeshPhongMaterial({ color: 0x6a5a6a, shininess: 4 })); pil.scale.setScalar(3.4); pil.rotation.x = Math.PI / 2; boss.sting.add(pil); ink(pil, .03); }
+  const boy = model('Sebastian') || makeSebastian(), boyM = boss.shell; // shares the boss material, so he flashes when you hit him
+  boy.traverse(o => { if (o.isMesh && !o.userData.isInk) o.material = boyM; });
+  [-.09, .09].forEach(x => { const e = halo(0xff1a1a, .25, 1); e.position.set(x, 1.5, .25); boy.add(e); });
+  boy.scale.setScalar(3.2); boss.g.add(boy); NM.boy = boy;
+  BOSS_PARTS.length = 0; BOSS_PARTS.push([0, 1.2, 0, 1.0], [0, 3.1, 0, 1.3], [0, 4.7, 0, .95], [.9, 2.4, .3, .6], [-.9, 2.4, .3, .6]); // his hitbox: legs, body, head, arms
+  // --- (the boss used to be the Rust Scorpion) ---
+  boss.shell.color.setHex(0x1c1424);
   boss.g.traverse(o => { if (o.material && o.material.color && !o.userData.isInk && o.material !== boss.shell && !o.isSprite) { o.material = o.material.clone(); o.material.color.lerp(new THREE.Color(0x4a3030), .6); } });
   // --- your flashlight ---
   NM.torch = new THREE.SpotLight(0xffe2b8, 1.7, 30, .5, .55, 1.2); NM.torch.position.set(.25, -.15, 0);
@@ -2843,7 +2870,7 @@ function nightmareTick(dt, time) {
   // title screen: now and then, for a blink, it isn't Sebastian standing there
   if (document.body.classList.contains('title')) $('tlogo').style.opacity = Math.random() < .03 ? .2 : 1; // the title flickers like a dying bulb
   if (NM.twin && document.body.classList.contains('title')) {
-    NM.twinT -= dt; const on = NM.twinT < 0 && NM.twinT > -.14; NM.twin.visible = on; sebastian.visible = !on;
+    NM.twinT -= dt; const on = NM.twinT < 0 && NM.twinT > -.14; NM.twin.visible = on; if (NM.me) NM.me.visible = !on; sebastian.visible = false;
     if (NM.twinT < -.14) NM.twinT = rand(3, 7);
   } else if (NM.twin) NM.twin.visible = false;
   if (state.mode !== 'play' || cine) return;
