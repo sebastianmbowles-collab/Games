@@ -1068,6 +1068,7 @@ function makeFist(side) {
 }
 const fists = [makeFist(-1), makeFist(1)];
 fists.forEach(f => f.visible = false); // no floating hands on the title screen
+let punchCount = 0; // goes up by one every punch (areas use it to notice punches)
 let punchT = 0, punchSide = 1, charging = false, chargeT = 0, bobT = 0;
 
 // ============ ENEMIES ============
@@ -1306,6 +1307,7 @@ function sfx(kind) {
   if (!ac) return;
   const t = ac.currentTime;
   if (kind === 'punch') { tone('square', 140, t, .12, .12, master); tone('sine', 70, t, .18, .25, master); }
+  if (kind === 'pop') { tone('sine', 600, t, .08, .2, master); tone('sine', 900, t + .05, .1, .15, master); }
   if (kind === 'big') { tone('sawtooth', 90, t, .35, .2, master); tone('sine', 50, t, .4, .35, master); }
   if (kind === 'gem') { [0, 4, 7, 12].forEach((s, i) => tone('triangle', mtof(76 + s), t + i * .05, .25, .1, master)); }
   if (kind === 'key') { [0, 4, 7, 11, 14, 19].forEach((s, i) => tone('sine', mtof(72 + s), t + i * .09, .8, .12, master)); }
@@ -1598,7 +1600,7 @@ function drawHitboxes() {
 addEventListener('keydown', e => { if (e.code === 'KeyH' && state.mode === 'play') { hbView.visible = !hbView.visible; toast(hbView.visible ? 'Hitboxes ON' : 'Hitboxes OFF', 'press H to switch'); } });
 
 function doPunch(charged) {
-  punchT = .22; punchSide *= -1; sfx(charged ? 'big' : 'punch'); sfx('swing');
+  punchT = .22; punchSide *= -1; punchCount++; sfx(charged ? 'big' : 'punch'); sfx('swing');
   let dmg = charged ? 3 : 1; if (state.buffs.power > 0) dmg *= 2;
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), cp = Math.cos(P.pitch);
   const dx = fx * cp, dy = Math.sin(P.pitch), dz = fz * cp;
@@ -2658,6 +2660,7 @@ function enterArea(name, instant) {
     a.group.visible = true; a.solids.forEach(sd => sd.on = true);
     robots.forEach(r => { if (r.area === name && r.alive) { r.active = true; r.g.visible = true; } });
     const f = a.fog; scene.fog.color.setHex(f[0]); scene.fog.near = f[1]; scene.fog.far = f[2];
+    if (composer && composer.passes[1]) composer.passes[1].strength = a.bloom ?? .45; // each area decides how much things glow
     Object.assign(P, { x: a.start.x, z: a.start.z, y: a.start.y ?? a.h(a.start.x, a.start.z) + .2, vy: 0, yaw: a.start.yaw, pitch: 0, kx: 0, kz: 0, hp: Math.max(P.hp, 3), hurtT: 1.5 });
     saved.save = Object.assign(saved.save || {}, { keys: state.keys, area: name, gems: state.gems, kids: state.kids }); store.set(saved);
     if (a.enter) a.enter();
@@ -2944,7 +2947,7 @@ function updateBolts(dt) {
 {
   const a = makeArea('mirror', {
     title: 'The Mirror Maze', sub: 'Find your way through. Who is that in the mirrors…?', goal: 'Find key 5 in the maze',
-    fog: [0x6a7ad0, 10, 70], next: 'school', robotHp: 4, h: () => 0,
+    fog: [0x6a7ad0, 10, 70], next: 'school', robotHp: 4, h: () => 0, bloom: .3,
     keyText: 'In every mirror, the other Sebastian smiles. A portal to the UPSIDE-DOWN SCHOOL opens.',
   });
   a.start = { x: -24, z: 2, yaw: Math.PI };
@@ -3029,7 +3032,7 @@ function updateBolts(dt) {
 {
   const a = makeArea('school', {
     title: 'The Upside-Down School', sub: 'Sneak past the robot teachers. Don\'t get caught!', goal: 'Sneak to the gym',
-    fog: [0x3a2a5a, 14, 80], next: 'sketch', robotHp: 4, h: () => 0,
+    fog: [0x3a2a5a, 14, 80], next: 'sketch', robotHp: 4, h: () => 0, bloom: .25,
     keyText: 'The bell rings one last time. A portal to the SKETCH HOUSE opens.',
   });
   a.start = { x: 0, z: 2, yaw: Math.PI };
@@ -3151,7 +3154,8 @@ function updateBolts(dt) {
       t.cone.material.color.setHex(sees ? 0xff4040 : 0xfff27f); t.cone.material.opacity = sees ? .3 : .16;
       if (sees) caught('teacher');
       // a punch from behind stuns them for a few seconds
-      if (punchT > .2 && Math.hypot(P.x - t.x, P.z - t.z) < 2) { t.stun = 4; sfx('hit'); burst(t.x, 1.8, t.z, [0xfff27f, 0xffffff], 8); }
+      const punched = t.lastPunch !== undefined && t.lastPunch !== punchCount; t.lastPunch = punchCount;
+      if (punched && Math.hypot(P.x - t.x, P.z - t.z) < 2) { t.stun = 4; sfx('hit'); burst(t.x, 1.8, t.z, [0xfff27f, 0xffffff], 8); }
     }
     // entering the gym starts the fight
     if (!PR.active && PR.hp > 0 && P.z > 55 && state.mode === 'play' && !cine) { startABoss(PR); sfx('alert'); toast('THE ROBOT PRINCIPAL', 'Jump over the bell waves and dodge the rulers!'); }
@@ -3190,6 +3194,110 @@ function updateBolts(dt) {
     for (let i = a.waves.length - 1; i >= 0; i--) { const w = a.waves[i]; w.r += dt * 8; w.m.scale.setScalar(w.r);
       const pd = Math.hypot(P.x - w.x, P.z - w.z); if (!w.hit && Math.abs(pd - w.r) < .6 && P.y < .5) { w.hit = true; hurt(1, w.x, w.z); }
       if (w.r > 24) { a.group.remove(w.m); a.waves.splice(i, 1); } }
+  };
+}
+
+// ===================== 7. THE SKETCH HOUSE =====================
+// Everything is drawn in pencil on white paper by the kids Sebastian rescued.
+// Punch a wall to ERASE it. Scribble monsters wobble around. Key 7 is in the attic.
+{
+  const a = makeArea('sketch', {
+    title: 'The Sketch House', sub: 'The rescued kids drew this place. Punch walls to erase them!', goal: 'Find the key in the attic',
+    fog: [0xd8d4c8, 25, 110], next: 'bedroom8', h: (x, z) => 0, bloom: 0,
+    keyText: 'Far away, your bedroom goes dark… A portal home opens.',
+  });
+  a.start = { x: 0, z: 2, yaw: Math.PI };
+  zoneOf('sketch', { x0: -18, x1: 18, z0: 6, z1: 50 });
+  const paperM = new THREE.MeshBasicMaterial({ color: 0xe8e4d6 }), lineM = new THREE.LineBasicMaterial({ color: 0x2a2a2a });
+  // the floor: graph paper
+  { const t = paint(128, 128, k => { k.fillStyle = '#e4e0d0'; k.fillRect(0, 0, 128, 128); k.strokeStyle = '#90b0d8'; k.lineWidth = 1; for (let i = 0; i <= 128; i += 16) { k.beginPath(); k.moveTo(i, 0); k.lineTo(i, 128); k.moveTo(0, i); k.lineTo(128, i); k.stroke(); } k.strokeStyle = '#e88a8a'; k.beginPath(); k.moveTo(20, 0); k.lineTo(20, 128); k.stroke(); }); t.repeat.set(30, 30);
+    const f = mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshBasicMaterial({ map: t })); f.rotation.x = -Math.PI / 2; f.position.z = 30; a.group.add(f); }
+  // a pencil-drawn box: white faces plus wobbly black outlines (drawn twice, a bit off, like a real sketch)
+  const sketchBox = (w, h, d, x, y, z, solid = true, fill = paperM) => {
+    const g = new THREE.Group(), geo = boxG(w, h, d), m = mesh(geo, fill); g.add(m);
+    const e = new THREE.EdgesGeometry(geo);
+    for (let k = 0; k < 2; k++) { const l = new THREE.LineSegments(e, lineM); l.position.set(rand(-.03, .03), rand(-.03, .03), rand(-.03, .03)); l.scale.setScalar(1 + rand(-.01, .01)); g.add(l); }
+    g.position.set(x, y + h / 2, z); a.group.add(g);
+    const sd = solid ? aSolid(a, x - w / 2, y, z - d / 2, x + w / 2, y + h, z + d / 2) : null;
+    return { g, sd, x, y, z, w, h, d };
+  };
+  // crayon scribbles on the walls
+  const crayon = (x, y, z, ry, draw) => { const t = paint(256, 256, k => { k.lineCap = 'round'; k.lineWidth = 7; draw(k); }); const m = mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false })); m.position.set(x, y, z); m.rotation.y = ry; a.group.add(m); return m; };
+  const sun = k => { k.strokeStyle = '#ffb000'; k.beginPath(); k.arc(128, 128, 50, 0, 7); k.stroke(); for (let i = 0; i < 12; i++) { const an = i * Math.PI / 6; k.beginPath(); k.moveTo(128 + Math.cos(an) * 65, 128 + Math.sin(an) * 65); k.lineTo(128 + Math.cos(an) * 100, 128 + Math.sin(an) * 100); k.stroke(); } };
+  const kid = col => k => { k.strokeStyle = col; k.beginPath(); k.arc(128, 70, 30, 0, 7); k.moveTo(128, 100); k.lineTo(128, 180); k.moveTo(80, 130); k.lineTo(176, 130); k.moveTo(128, 180); k.lineTo(95, 235); k.moveTo(128, 180); k.lineTo(160, 235); k.stroke(); k.fillStyle = col; k.fillRect(115, 60, 6, 6); k.fillRect(135, 60, 6, 6); };
+  const heart = k => { k.fillStyle = '#ff5fa8'; k.beginPath(); k.moveTo(128, 200); k.bezierCurveTo(20, 120, 60, 40, 128, 90); k.bezierCurveTo(196, 40, 236, 120, 128, 200); k.fill(); };
+  const thanks = k => { k.fillStyle = '#5a3aa8'; k.font = 'bold 44px "Caveat","Comic Sans MS",cursive'; k.textAlign = 'center'; k.fillText('THANK YOU', 128, 110); k.fillText('SEBASTIAN!', 128, 170); };
+  // the house: outer walls with a door, rooms inside made of ERASABLE walls
+  const X0 = -14, X1 = 14, Z0 = 8, Z1 = 44, WH = 4.5;
+  a.erasable = [];
+  const wall = (x, z, w, d, erasable) => { const b = sketchBox(w, WH, d, x, 0, z); if (erasable) { b.erasable = true; a.erasable.push(b); b.g.children[0].material = new THREE.MeshBasicMaterial({ color: 0xece4d0, transparent: true }); } return b; };
+  wall(-8.5, Z0, 11, .3); wall(8.5, Z0, 11, .3); wall(0, Z1, 28, .3); wall(X0, (Z0 + Z1) / 2, .3, 36); wall(X1, (Z0 + Z1) / 2, .3, 36);
+  // inside: a grid of erasable walls (some rooms you can only reach by erasing)
+  [[-7, 14, 14, .25], [7, 20, 14, .25], [0, 17, .25, 6], [-7, 26, 14, .25], [7, 30, 14, .25], [-4, 34, .25, 8], [4, 22, .25, 4], [-9, 38, 10, .25], [9, 38, 10, .25], [0, 41, .25, 6]].forEach(([x, z, w, d]) => wall(x, z, w, d, true));
+  // the stairs to the attic (a pencil staircase), and the attic floor
+  for (let i = 0; i < 10; i++) sketchBox(3, .5, 1.2, 10, i * .5, 40 - i * 1.2);
+  sketchBox(10, .4, 8, 9, 5, 26);
+  sketchBox(3, 3, .2, 9, 5.4, 22.1, false); // attic window frame (just a drawing)
+  // furniture drawn by the kids
+  sketchBox(3, .9, 1.6, -10, 0, 11); sketchBox(1, 1.6, 1, -12.5, 0, 17); sketchBox(2, .8, 2, 8, 0, 12); sketchBox(.8, .8, .8, 6.6, 0, 12.2);
+  sketchBox(4, .7, 2, -8, 0, 31); sketchBox(1.4, 2.4, .6, 11, 0, 33);
+  crayon(-13.8, 2.4, 20, Math.PI / 2, sun); crayon(13.8, 2.4, 14, -Math.PI / 2, kid('#3a8ae8')); crayon(-13.8, 2.4, 36, Math.PI / 2, kid('#e8508a'));
+  crayon(0, 2.6, 43.8, Math.PI, thanks); crayon(13.8, 2.4, 26, -Math.PI / 2, heart); crayon(-5, 2.6, 8.2, 0, kid('#2aa868'));
+  // the roof: two big pencil triangles
+  { const roofG = new THREE.ConeGeometry(22, 8, 4); const r = mesh(roofG, paperM); r.rotation.y = Math.PI / 4; r.scale.z = 1.3; r.position.set(0, WH + 6, 26); a.group.add(r);
+    const re = new THREE.LineSegments(new THREE.EdgesGeometry(roofG), lineM); re.rotation.copy(r.rotation); re.scale.copy(r.scale); re.position.copy(r.position); a.group.add(re); }
+  // pencil-drawn trees, clouds and a sun outside
+  for (let i = 0; i < 16; i++) { const x = rand(-40, 40), z = rand(-10, 70); if (x > -17 && x < 17 && z > 4 && z < 48) continue;
+    sketchBox(.5, 3, .5, x, 0, z, true); const top = mesh(new THREE.IcosahedronGeometry(1.6, 0), paperM); top.position.set(x, 4, z); a.group.add(top); const te = new THREE.LineSegments(new THREE.EdgesGeometry(top.geometry), lineM); te.position.copy(top.position); a.group.add(te); }
+  aKey(a, 7, 0x5a5a5a, 9, 6.6, 25);
+  a.portal = makePortal(0x5a5a5a); a.portal.position.set(0, 0, 3); a.group.add(a.portal);
+  [['pink', -10, 12], ['blue', 8, 16], ['green', -6, 29], ['purple', 10, 34], ['rainbow', -11, 41], ['pink', 2, 24]].forEach(([t, x, z]) => aGem(a, t, x, z, .8));
+  aNote(a, ['the kids drew this', 'for when i\'m sad.'], -2, 1.8, 40.5);
+  // ---------- SCRIBBLE MONSTERS ----------
+  a.scribbles = [];
+  const scribble = (x, z) => {
+    const n = 90, pos = new Float32Array(n * 3); const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x1a1a1a })); l.frustumCulled = false; a.group.add(l);
+    const eyes = new THREE.Group(); [-.15, .15].forEach(ex => { const e = mesh(new THREE.CircleGeometry(.12, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })); e.position.x = ex; eyes.add(e); const pu = mesh(new THREE.CircleGeometry(.05, 8), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide })); pu.position.set(ex, 0, .01); eyes.add(pu); });
+    a.group.add(eyes);
+    a.scribbles.push({ l, eyes, x, z, hx: x, hz: z, hp: 3, alive: true, t: rand(0, 6), cool: 0, flash: 0 });
+  };
+  [[-8, 18], [6, 25], [-4, 30], [8, 40], [-10, 36], [3, 12]].forEach(([x, z]) => scribble(x, z));
+  a.update = (dt, time) => {
+    // erasing: a punch that hits an erasable wall rubs it out, bit by bit
+    if (a.lastPunch === undefined) a.lastPunch = punchCount;
+    if (punchCount !== a.lastPunch) {
+      a.lastPunch = punchCount;
+      const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+      for (const w of a.erasable) {
+        if (w.gone) continue;
+        const px = P.x + fx * 1.4, pz = P.z + fz * 1.4;
+        if (px > w.x - w.w / 2 - .6 && px < w.x + w.w / 2 + .6 && pz > w.z - w.d / 2 - .6 && pz < w.z + w.d / 2 + .6) {
+          w.rub = (w.rub || 0) + 1; sfx('swing'); burst(px, P.y + 1.4, pz, [0xffc0c8, 0xfafaf4], 8);
+          w.g.children[0].material.opacity = 1 - w.rub / 3; w.g.children.slice(1).forEach(l => l.visible = Math.random() < (1 - w.rub / 3));
+          if (w.rub >= 3) { w.gone = true; w.g.visible = false; w.sd.on = false; navGrid = null; sfx('pop');
+            const n = a.erasable.filter(q => q.gone).length; toast('Erased!', `${n} of ${a.erasable.length} walls`); if (n === a.erasable.length) achieve('Eraser', 'Erase every wall in the Sketch House'); }
+          break;
+        }
+      }
+    }
+    // scribble monsters: a wiggly ball of pencil lines that chases you
+    for (const sc of a.scribbles) {
+      if (!sc.alive) continue;
+      sc.t += dt; sc.cool -= dt; sc.flash = Math.max(0, sc.flash - dt);
+      const dx = P.x - sc.x, dz = P.z - sc.z, d = Math.hypot(dx, dz) || 1;
+      if (d < 12 && state.mode === 'play') { const nx = sc.x + dx / d * 2.4 * dt, nz = sc.z + dz / d * 2.4 * dt; if (!insideSolid(nx, 1, nz)) { sc.x = nx; sc.z = nz; } }
+      else { sc.x += Math.cos(sc.t * .7) * dt; sc.z += Math.sin(sc.t * .5) * dt; }
+      const pp = sc.l.geometry.attributes.position, y = 1 + Math.abs(Math.sin(sc.t * 4)) * .3;
+      for (let i = 0; i < pp.count; i++) { const a2 = i * .7 + sc.t * 6, b = i * .37 + sc.t * 3, r = .7 + Math.sin(i * 1.3 + sc.t * 9) * .15;
+        pp.setXYZ(i, sc.x + Math.cos(a2) * Math.sin(b) * r, y + Math.cos(b) * r * .8, sc.z + Math.sin(a2) * Math.sin(b) * r); }
+      pp.needsUpdate = true; sc.l.material.color.setHex(sc.flash > 0 ? 0xff5fa8 : 0x1a1a1a);
+      sc.eyes.position.set(sc.x, y + .2, sc.z); sc.eyes.lookAt(camera.position);
+      if (d < 1.3 && sc.cool <= 0) { sc.cool = 1.2; hurt(1, sc.x, sc.z); }
+      const punched = sc.lastPunch !== undefined && sc.lastPunch !== punchCount; sc.lastPunch = punchCount;
+      if (punched && d < 2.2) { sc.hp--; sc.flash = .2; sfx('hit'); sc.x -= dx / d * 1.5; sc.z -= dz / d * 1.5;
+        if (sc.hp <= 0) { sc.alive = false; sc.l.visible = false; sc.eyes.visible = false; burst(sc.x, 1.2, sc.z, [0x1a1a1a, 0xfafaf4], 16); sfx('pop'); toast('Scribble erased!'); } }
+    }
   };
 }
 
