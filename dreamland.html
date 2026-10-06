@@ -238,6 +238,14 @@ body.title .hud,body.title #objective,body.title #cross,body.title #muteBtn{disp
 <div id="speech"></div>
 <div id="flicker"></div>
 
+<div class="screen panel" id="wardScreen" hidden>
+  <div class="card">
+    <div class="sub">Wardrobe</div>
+    <p id="wardWallet" style="margin:0"></p>
+    <div class="achlist" id="wardList"></div>
+    <button class="btn" data-close>Back to bed… I mean, the dream</button>
+  </div>
+</div>
 <div class="screen panel" id="achScreen" hidden>
   <div class="card">
     <div class="sub">Achievements</div>
@@ -1445,6 +1453,10 @@ function openGate() {
   // the bedroom changes: a new drawing, a door back to the gate, and the rocket flies off to point at a secret
   keyDrawing.visible = true; dreamDoor.visible = true;
   const rocket = toys[3]; rocket.point = true; rocket.y = 8.4; rocket.m.position.set(26, 8.4, 16); rocket.m.rotation.set(0, 0, Math.PI);
+  // more toys fly off to point at secrets (find them all for Toy Tracker)
+  const ball = toys[2]; ball.y = 1.2; ball.m.position.set(-22.6, 1.2, 1.4); ball.point = true;              // next to the hidden note behind the big dome
+  const teddy = toys[4]; if (teddy) { teddy.y = PILLAR.base + 1.2; teddy.m.position.set(PILLAR.x + 2.4, PILLAR.base + 1.2, PILLAR.z); teddy.point = true; teddy.m.rotation.set(0, -Math.PI / 2, 0); } // waving at the gloves pillar
+  toast('', 'Your toys flew away! Where did they go…?');
 }
 function bossCine() {
   state.bossSeen = true;
@@ -2566,6 +2578,7 @@ function loop(now) {
   { const g = groundAt(P.x, P.z, P.y + .05), air = P.y - g; footShadow.visible = state.mode === 'play' && !cine && air < 12;
     footShadow.position.set(P.x, g + .03, P.z); footShadow.scale.setScalar(Math.max(.5, 1 - air * .06)); footShadow.material.opacity = Math.max(.12, .45 - air * .03); }
   updatePortals(dt, time);
+  wardrobeTick(time); toyTick();
   if (aBoss && aBoss.g && aBoss.active) { aBoss.flash = Math.max(0, (aBoss.flash || 0) - dt); }
   if (curArea !== 'home' && AREAS[curArea].update) AREAS[curArea].update(dt, time);
   updateFireworks(dt);
@@ -3747,6 +3760,62 @@ function enterAreaHome() { // go back to the original world
   curArea = 'home'; groundFn = null; navGrid = null;
   homeList().forEach(q => q.visible = q.userData.homeVis !== false); solids.forEach(sd => { if (!sd.area) sd.on = sd.homeOn !== false; });
   robots.forEach(r => r.g.visible = false);
+}
+
+// ===================== THE WARDROBE: spend gems on new pajamas =====================
+const SKINS = [
+  { id: 'classic', name: 'Classic Stars', cost: 0, pj: 0x8fc8ff, pj2: 0x6fa8ef },
+  { id: 'dino', name: 'Dino Green', cost: 10, pj: 0x7fe08a, pj2: 0x4fb860 },
+  { id: 'berry', name: 'Strawberry', cost: 15, pj: 0xff8fb0, pj2: 0xe8607f },
+  { id: 'galaxy', name: 'Galaxy Purple', cost: 25, pj: 0x8a5ad8, pj2: 0x5a3aa8 },
+  { id: 'sunny', name: 'Sunny Yellow', cost: 35, pj: 0xffe27f, pj2: 0xe8b84a },
+  { id: 'night', name: 'Midnight', cost: 50, pj: 0x3a3a6a, pj2: 0x24244a },
+  { id: 'gold', name: 'Golden Dreamer', cost: 80, pj: 0xffc83a, pj2: 0xd89a1a },
+];
+saved.skins = saved.skins || ['classic']; saved.spent = saved.spent || 0; saved.skin = saved.skin || 'classic';
+const wallet = () => Math.max(0, saved.totalGems - saved.spent);
+function wearSkin(id) {
+  const sk = SKINS.find(q => q.id === id) || SKINS[0]; saved.skin = sk.id; store.set(saved);
+  sleeve.color.setHex(sk.pj); if (looks.pj) looks.pj.color.setHex(sk.pj); if (looks.pj2) looks.pj2.color.setHex(sk.pj2);
+}
+function openWardrobe() {
+  $('wardWallet').textContent = `You have ${wallet()} gems to spend.`;
+  $('wardList').innerHTML = SKINS.map(sk => { const own = saved.skins.includes(sk.id), on = saved.skin === sk.id;
+    return `<div class="ach" data-skin="${sk.id}" style="cursor:pointer;grid-template-columns:28px 1fr auto"><span style="width:22px;height:22px;border-radius:6px;background:#${sk.pj.toString(16).padStart(6, '0')}"></span><b>${sk.name}</b><span>${on ? 'WEARING' : own ? 'Wear' : sk.cost + ' gems'}</span></div>`; }).join('');
+  $('wardList').querySelectorAll('[data-skin]').forEach(el => el.addEventListener('click', () => {
+    const sk = SKINS.find(q => q.id === el.dataset.skin);
+    if (!saved.skins.includes(sk.id)) { if (wallet() < sk.cost) { sfx('tick'); el.lastChild.textContent = 'Need ' + (sk.cost - wallet()) + ' more'; return; } saved.spent += sk.cost; saved.skins.push(sk.id); sfx('fanfare'); }
+    wearSkin(sk.id); sfx('select'); openWardrobe();
+  }));
+  $('wardScreen').hidden = false; state.mode = 'pause'; document.exitPointerLock?.();
+}
+$('wardScreen').querySelector('[data-close]').addEventListener('click', () => { state.mode = 'play'; });
+// the wardrobe itself, against the bedroom wall
+const wardrobe = new THREE.Group();
+{ const body = mesh(boxG(1.3, 2.4, .7), mat(0xc8a0e0)); body.position.y = 1.2; wardrobe.add(body);
+  [-.32, .32].forEach(x => { const d = mesh(boxG(.6, 2.2, .05), mat(0xd8b8f0)); d.position.set(x, 1.2, .37); wardrobe.add(d); const k = mesh(new THREE.SphereGeometry(.05, 8, 6), mat(0xffd36b)); k.position.set(x * .2, 1.2, .41); wardrobe.add(k); });
+  const st = mesh(new THREE.OctahedronGeometry(.18, 0), glow(0xffe27f)); st.position.y = 2.6; wardrobe.add(st); st.add(halo(0xffe27f, 1, .6)); wardrobe.userData.star = st;
+  wardrobe.position.set(-4.55, 0, 3.2); wardrobe.rotation.y = Math.PI / 2; scene.add(wardrobe); solid(-5, 0, 2.55, -4.2, 2.4, 3.85); }
+let wardNear = false;
+function wardrobeTick(time) {
+  wardrobe.userData.star.rotation.y = time * 2;
+  const near = curArea === 'home' && Math.hypot(P.x + 3.9, P.z - 3.2) < 1.1;
+  if (near && !wardNear && state.mode === 'play' && !cine) openWardrobe(); // opens once each time you walk up to it
+  wardNear = near;
+}
+wearSkin(saved.skin);
+// TOY TRACKER: find where the floating toys flew to
+const toySpots = [];
+function toyTick() {
+  if (!state.gateOpen || curArea !== 'home' || state.mode !== 'play') return;
+  [toys[3], toys[2], toys[4]].forEach((t, i) => {
+    if (!t || toySpots[i]) return;
+    if (Math.hypot(t.m.position.x - P.x, t.m.position.z - P.z) < 3 && Math.abs(t.m.position.y - P.y) < 6) {
+      toySpots[i] = true; sfx('kid'); burst(t.m.position.x, t.m.position.y, t.m.position.z, [0xffe27f, 0xffffff], 14);
+      const n = toySpots.filter(Boolean).length; toast('Found a toy!', `${n} of 3 · it was pointing at a secret`);
+      if (n === 3) achieve('Toy Tracker', 'Find where every floating toy goes');
+    }
+  });
 }
 
 // everything solid casts and catches shadows (glowing things and the sky don't)
