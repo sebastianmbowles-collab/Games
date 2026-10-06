@@ -407,3 +407,39 @@ export function drawForeground(ctx, theme, camX, time) {
 }
 
 export { text } from './pixel'
+
+// ---------- profile pictures ----------
+
+export const AVATARS = [
+  { id: 'rex', name: 'T. REX' },
+  { id: 'trike', name: 'TRICERATOPS' },
+  { id: 'stego', name: 'STEGOSAURUS' },
+  { id: 'raptor', name: 'RAPTOR' },
+  { id: 'bronto', name: 'BRONTOSAURUS' },
+  { id: 'goldrex', name: 'GOLD T. REX' },
+  { id: 'alien', name: 'GREEN ALIEN' },
+  { id: 'alien2', name: 'PURPLE ALIEN' },
+]
+
+// Draws a profile picture in a round frame centred on (x, y). big = the large version.
+export function drawAvatar(ctx, pic, x, y, big = false) {
+  const r = big ? 64 : 24
+  ctx.save()
+  circle(ctx, x, y, r)
+  ctx.fillStyle = '#262b44'
+  ctx.fill()
+  ctx.lineWidth = big ? 6 : 3
+  ctx.strokeStyle = '#fee761'
+  ctx.stroke()
+  if (pic === 'alien' || pic === 'alien2') {
+    ctx.translate(x, y - (big ? 6 : 2))
+    if (big) ctx.scale(2, 2)
+    drawAlien(ctx, 0, 0, { enemy: pic === 'alien2', mood: 'happy' })
+  } else {
+    // small pictures use the baby dino sprites, big ones the grown-ups
+    ctx.translate(x, y + (big ? 44 : 16))
+    ctx.scale(big ? -1.1 : -0.55, big ? 1.1 : 0.55)
+    drawDino(ctx, pic === 'goldrex' ? 'rex' : pic || 'rex', { gold: pic === 'goldrex' })
+  }
+  ctx.restore()
+}

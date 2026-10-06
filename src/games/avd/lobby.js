@@ -1,10 +1,10 @@
 // Screens for typing your name, picking your school year, and setting up a 2-player game.
 
-import { W, H, INK, rrect, text } from './art'
+import { W, H, INK, rrect, text, AVATARS, drawAvatar } from './art'
 import { sfx } from './sound'
 import { inside, drawButton, drawTitleWorld, updateTitleWorld } from './menus'
 import { checkName, safeName, yearLabel, YEAR_LEVELS, MAX_NAME } from './names'
-import { findAccount, accountCount, hashPassword, MAX_ACCOUNTS } from './save'
+import { findAccount, accountCount, hashPassword, MAX_ACCOUNTS, deleteAccount } from './save'
 import { startSession, cleanCode } from './net'
 
 const LETTER_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
@@ -266,7 +266,7 @@ function typeCode(game, ch) {
 // What this player tells the other while setting up.
 function lobbyState(game) {
   const mp = game.mp
-  return { role: mp.session.role, name: game.profile.name, year: game.profile.year, side: mp.side || '', ph: 'lobby' }
+  return { role: mp.session.role, name: game.profile.name, year: game.profile.year, pic: game.profile.pic || 'rex', side: mp.side || '', ph: 'lobby' }
 }
 
 // ---------- shared hooks the game calls ----------
@@ -297,6 +297,7 @@ export function lobbyKey(game, e) {
 export function updateLobby(game, dt) {
   updateTitleWorld(game, dt)
   const k = game.pressed
+  if (game.scene === 'account') return updateAccount(game)
   if (game.scene === 'profile') {
     const pf = game.prof
     if (k.has('pause')) {
@@ -370,6 +371,11 @@ export function updateLobby(game, dt) {
 }
 
 export function clickLobby(game, p) {
+  if (game.scene === 'account') {
+    const b = accountButtons(game).find((x) => inside(p, x))
+    if (b) accountPress(game, b.id)
+    return
+  }
   if (game.scene === 'profile') {
     const pf = game.prof
     if (pf.step === 'name') {
@@ -400,6 +406,7 @@ export function drawLobby(game, ctx) {
   drawTitleWorld(game, ctx)
   ctx.fillStyle = 'rgba(15,10,40,0.72)'
   ctx.fillRect(0, 0, W, H)
+  if (game.scene === 'account') return drawAccount(game, ctx)
   if (game.scene === 'profile') {
     const pf = game.prof
     if (pf.step === 'name') {
@@ -479,6 +486,10 @@ export function drawLobby(game, ctx) {
     const line = (side, who) => `${side === 'aliens' ? 'ALIENS' : 'DINOS'} ${safeName(who.name)} ${yearLabel(Number(who.year) || 0)}`.toUpperCase()
     const aliens = mp.side === 'aliens' ? me : them
     const dinos = mp.side === 'dinos' ? me : them
+    const pics = AVATARS.map((x) => x.id)
+    const picOf = (who) => (pics.includes(who.pic) ? who.pic : 'rex')
+    drawAvatar(ctx, picOf(mp.side === 'aliens' ? game.profile : them), 110, 178)
+    drawAvatar(ctx, picOf(mp.side === 'dinos' ? game.profile : them), 110, 280)
     text(ctx, line('aliens', aliens), W / 2, 190, 32, '#7dffb0')
     text(ctx, 'VS', W / 2, 240, 28, '#fee761')
     text(ctx, line('dinos', dinos), W / 2, 292, 32, '#ffa94d')
@@ -487,4 +498,125 @@ export function drawLobby(game, ctx) {
   }
   for (const [i, b] of mpButtons(game).entries()) drawButton(ctx, b, mp.sel === i, t)
   if (mp.err) text(ctx, mp.err, W / 2, mp.step === 'code' ? 244 : 516, 16, '#ff8fa0')
+}
+
+// ---------- My Profile: picture, school year, delete account ----------
+
+const PIC_GRID = AVATARS.map((a, i) => ({ id: `pic:${a.id}`, pic: a.id, x: W / 2 - 330 + (i % 4) * 170, y: 150 + Math.floor(i / 4) * 150, w: 150, h: 136 }))
+
+export function openAccount(game) {
+  game.acct = { step: 'main', sel: 0 }
+  game.goScene('account')
+}
+
+function accountButtons(game) {
+  const step = game.acct.step
+  if (step === 'main')
+    return [
+      { id: 'pic', label: 'CHANGE PICTURE', color: '#63c74d', x: W / 2 + 10, y: 150, w: 320, h: 52, size: 20 },
+      { id: 'year', label: 'CHANGE SCHOOL YEAR', color: '#6bb8ff', x: W / 2 + 10, y: 216, w: 320, h: 52, size: 20 },
+      { id: 'del', label: 'DELETE ACCOUNT', color: '#e43b44', x: W / 2 + 10, y: 282, w: 320, h: 52, size: 20 },
+      { id: 'back', label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: 440, w: 220, h: 48, size: 20 },
+    ]
+  if (step === 'pic') return [...PIC_GRID, { id: 'main', label: '◀  DONE', color: '#ffe14a', x: W / 2 - 110, y: 470, w: 220, h: 46, size: 20 }]
+  if (step === 'del1')
+    return [
+      { id: 'main', label: 'NO, KEEP IT', color: '#63c74d', x: W / 2 - 300, y: 330, w: 280, h: 60, size: 22 },
+      { id: 'del2', label: 'YES, DELETE', color: '#e43b44', x: W / 2 + 20, y: 330, w: 280, h: 60, size: 22 },
+    ]
+  return [
+    { id: 'main', label: 'NO! KEEP IT', color: '#63c74d', x: W / 2 - 300, y: 330, w: 280, h: 60, size: 22 },
+    { id: 'gone', label: 'DELETE FOREVER', color: '#e43b44', x: W / 2 + 20, y: 330, w: 280, h: 60, size: 20 },
+  ]
+}
+
+function accountPress(game, id) {
+  const a = game.acct
+  if (id.startsWith('pic:')) {
+    game.profile.pic = id.slice(4)
+    game.persist()
+    sfx.capture()
+    return
+  }
+  sfx.click()
+  if (id === 'back') game.goScene('settings')
+  else if (id === 'year') openProfile(game, () => openAccount(game), 'year')
+  else if (id === 'pic' || id === 'main' || id === 'del2') {
+    a.step = id === 'del' ? 'del1' : id
+    a.sel = 0
+    if (id === 'del2') sfx.warn()
+  } else if (id === 'del') {
+    a.step = 'del1'
+    a.sel = 0
+    sfx.warn()
+  } else if (id === 'gone') {
+    const name = game.profile.name
+    deleteAccount(name)
+    game.useAccount(null)
+    game.goTitle()
+    game.toast = { text: `${name}'S ACCOUNT WAS DELETED`, t: 3 }
+    sfx.boom()
+  }
+}
+
+function updateAccount(game) {
+  const a = game.acct
+  const k = game.pressed
+  if (!game.profile) return game.goTitle()
+  if (k.has('pause')) {
+    if (a.step === 'main') game.goScene('settings')
+    else a.step = 'main'
+    return
+  }
+  const btns = accountButtons(game)
+  if (k.has('up') || k.has('left')) a.sel = (a.sel + btns.length - 1) % btns.length
+  if (k.has('down') || k.has('right')) a.sel = (a.sel + 1) % btns.length
+  if (game.mouseMoved) {
+    const h = btns.findIndex((b) => inside(game.mouse, b))
+    if (h >= 0) a.sel = h
+  }
+  a.sel = Math.min(a.sel, btns.length - 1)
+  if (k.has('enter') || k.has('action')) accountPress(game, btns[a.sel].id)
+}
+
+function drawAccount(game, ctx) {
+  const t = game.time
+  const a = game.acct
+  const p = game.profile
+  if (!p) return
+  const btns = accountButtons(game)
+  if (a.step === 'main') {
+    text(ctx, 'MY PROFILE', W / 2, 80, 40, '#fee761')
+    drawAvatar(ctx, p.pic, W / 2 - 200, 220, true)
+    text(ctx, p.name, W / 2 - 200, 330, 28, '#ffffff')
+    text(ctx, yearLabel(p.year), W / 2 - 200, 362, 18, '#c0cbdc')
+    text(ctx, `$ ${game.shop.coins} COINS  ·  BEST: ALIENS ${game.best.aliens || 0}  ·  DINOS ${game.best.dinos || 0}`, W / 2, 408, 14, '#fee761')
+  } else if (a.step === 'pic') {
+    text(ctx, 'PICK YOUR PICTURE', W / 2, 80, 34, '#fee761')
+    text(ctx, 'Tap a dino or an alien', W / 2, 110, 14, '#c0cbdc')
+  } else if (a.step === 'del1') {
+    text(ctx, '⚠ WARNING ⚠', W / 2, 120, 40, '#e43b44')
+    text(ctx, `DELETE ${p.name}'S ACCOUNT?`, W / 2, 180, 28, '#ffffff')
+    text(ctx, 'All your coins, shop upgrades and best scores will be gone.', W / 2, 230, 16, '#c0cbdc')
+    text(ctx, 'Your name and password will be forgotten too.', W / 2, 258, 16, '#c0cbdc')
+  } else {
+    const flash = Math.floor(t * 4) % 2 ? '#e43b44' : '#fee761'
+    text(ctx, '⚠ LAST WARNING! ⚠', W / 2, 120, 40, flash)
+    text(ctx, 'ARE YOU REALLY, REALLY SURE?', W / 2, 180, 28, '#ffffff')
+    text(ctx, 'This can NOT be undone. Your game will be gone forever!', W / 2, 230, 16, '#ff8fa0')
+  }
+  for (const [i, b] of btns.entries()) {
+    if (b.pic) {
+      const on = p.pic === b.pic || (!p.pic && b.pic === 'rex')
+      const hover = a.sel === i || inside(game.mouse, b)
+      rrect(ctx, b.x, b.y, b.w, b.h, 16)
+      ctx.fillStyle = on ? '#3a4466' : hover ? '#262b44' : '#181425'
+      ctx.fill()
+      ctx.lineWidth = on ? 5 : 2
+      ctx.strokeStyle = on ? '#fee761' : 'rgba(255,255,255,0.3)'
+      ctx.stroke()
+      drawAvatar(ctx, b.pic, b.x + b.w / 2, b.y + 56)
+      text(ctx, AVATARS.find((x) => x.id === b.pic).name, b.x + b.w / 2, b.y + 118, 12, '#ffffff')
+    } else drawButton(ctx, b, a.sel === i, t)
+  }
 }

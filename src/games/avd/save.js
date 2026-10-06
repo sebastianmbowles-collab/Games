@@ -70,6 +70,12 @@ export function storeAccount(acc) {
   writeLocal()
 }
 
+export function deleteAccount(name) {
+  delete data.accounts[name]
+  if (data.current === name) data.current = null
+  writeLocal()
+}
+
 export function logOut() {
   data.current = null
   writeLocal()

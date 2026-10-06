@@ -39,7 +39,7 @@ import { makeMath, makeSpell, quizKey, quizClick, drawQuiz } from './quiz'
 import { itemLevel } from './shop'
 import { loadSave, currentAccount, storeAccount, logOut } from './save'
 import { tagLine } from './names'
-import { openProfile, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
+import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
 
@@ -694,7 +694,7 @@ export class AliensVsDinos {
   }
 
   editProfile() {
-    openProfile(this, () => this.goScene('settings'), 'year')
+    openAccount(this)
   }
 
   tag() {
@@ -859,7 +859,7 @@ export class AliensVsDinos {
       }
     } else if (this.scene === 'paused') {
       this.scene = 'play'
-    } else if (this.scene === 'profile' || this.scene === 'mp') {
+    } else if (this.scene === 'profile' || this.scene === 'mp' || this.scene === 'account') {
       clickLobby(this, { x, y })
     } else if ((this.scene === 'play' || this.scene === 'vs') && this.quiz && !this.quiz.doneT) {
       const r = quizClick(this.quiz, x, y)
@@ -894,7 +894,7 @@ export class AliensVsDinos {
     }
     if (this.isMenuScreen()) updateScreen(this, realDt)
     else if (this.scene === 'menu') this.updateMenu(realDt)
-    else if (this.scene === 'profile' || this.scene === 'mp') updateLobby(this, realDt)
+    else if (this.scene === 'profile' || this.scene === 'mp' || this.scene === 'account') updateLobby(this, realDt)
     else if (this.scene === 'vs') this.updateVersus(dt)
     else if (this.scene === 'cutscene') this.updateCutscene(realDt)
     else if (this.scene === 'play') {
@@ -1754,7 +1754,7 @@ export class AliensVsDinos {
       ctx.translate(Math.round(rand(-1, 1) * this.shake * 0.2) * PX, Math.round(rand(-1, 1) * this.shake * 0.2) * PX)
     }
     if (this.isMenuScreen()) drawScreen(this, ctx)
-    else if (this.scene === 'profile' || this.scene === 'mp') drawLobby(this, ctx)
+    else if (this.scene === 'profile' || this.scene === 'mp' || this.scene === 'account') drawLobby(this, ctx)
     else if (this.scene === 'vs') {
       drawVersus(this, ctx)
       if (this.quiz) {
@@ -1788,7 +1788,7 @@ export class AliensVsDinos {
       if (this.toast.t <= 0) this.toast = null
       else {
         // on the typing screens the keyboard fills the bottom, so the message goes at the top
-        const y = this.scene === 'profile' || this.scene === 'mp' ? 8 : 492
+        const y = this.scene === 'profile' || this.scene === 'mp' || this.scene === 'account' ? 8 : 492
         rrect(ctx, W / 2 - 260, y, 520, 40, 12)
         ctx.fillStyle = 'rgba(24,20,37,0.92)'
         ctx.fill()

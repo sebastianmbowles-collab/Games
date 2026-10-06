@@ -1,6 +1,6 @@
 // The title screen (PLAY / SETTINGS / JUKEBOX), the settings page and the jukebox.
 
-import { W, H, TAU, INK, circle, rrect, text, drawDino, drawUFO, drawAlien, drawBeam, drawSky, drawBackdrop, mixTheme, getTheme } from './art'
+import { W, H, TAU, INK, drawAvatar, circle, rrect, text, drawDino, drawUFO, drawAlien, drawBeam, drawSky, drawBackdrop, mixTheme, getTheme } from './art'
 import { sfx, audioRunning } from './sound'
 import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels } from './music'
 import { SHOP_ITEMS, itemLevel, buy } from './shop'
@@ -290,6 +290,7 @@ function drawTitle(game, ctx) {
   }
   const best = game.best
   text(ctx, game.profile ? `PLAYER: ${game.profile.name} · ${yearLabel(game.profile.year)}` : 'NOT LOGGED IN', W / 2, 140, 14, '#fee761')
+  if (game.profile) drawAvatar(ctx, game.profile.pic, W - 230, 31)
   drawButton(ctx, { ...LOGIN_BTN, label: game.profile ? 'LOG OUT' : 'LOG IN', color: game.profile ? '#f6757a' : '#63c74d' }, inside(game.mouse, LOGIN_BTN), t)
   text(ctx, `Best: Aliens ${best.aliens || 0}  ·  Dinos ${best.dinos || 0}`, W / 2, 512, 15, '#fff')
   text(ctx, '↑ ↓ to choose · Enter or tap to pick', W / 2, 532, 12, 'rgba(255,255,255,0.8)')
@@ -303,7 +304,7 @@ const ROWS = [
   { key: 'difficulty', label: 'Difficulty', type: 'choice', options: ['easy', 'normal', 'hard'], names: ['Easy', 'Normal', 'Hard'] },
   { key: 'shake', label: 'Screen shake', type: 'toggle' },
   { key: 'cutscenes', label: 'Cutscenes', type: 'toggle' },
-  { key: 'player', label: 'School year', type: 'player' },
+  { key: 'player', label: 'My profile', type: 'player' },
   { key: 'logout', label: 'Log out', type: 'logout' },
   { key: 'back', label: 'Back', type: 'back' },
 ]
@@ -398,7 +399,7 @@ function drawSettings(game, ctx) {
     const cy = r.y + r.h / 2
     if (row.type === 'player' || row.type === 'logout') {
       const p = game.profile
-      const label = !p ? 'TAP TO LOG IN' : row.type === 'player' ? `${yearLabel(p.year)} · TAP TO CHANGE` : `${p.name} · TAP TO LOG OUT`
+      const label = !p ? 'TAP TO LOG IN' : row.type === 'player' ? `${p.name} · ${yearLabel(p.year)} · OPEN` : `${p.name} · TAP TO LOG OUT`
       text(ctx, label, 640, cy + 7, 16, '#fee761')
       continue
     }
