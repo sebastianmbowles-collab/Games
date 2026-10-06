@@ -85,7 +85,7 @@ export default function AliensVsDinos({ game, onExit }) {
         <b>Aliens:</b> arrow keys fly the UFO, hold <b>Space</b> to beam up dinos, <b>Z</b> zaps rival UFOs. Your UFO
         burns fuel and laser charge: solve the math problem (press <b>1</b>-<b>4</b> or tap the answer) to fill them up. <b>Dinos:</b> arrows to
         run, <b>↑</b> to jump, <b>Space</b> to ROAR. Each roar uses one up: spell the dino word (type the letters or tap
-        them) to get more. Spelling also gives a power-up. The game waits while you answer, and <b>Enter</b> opens a quiz any time. Press <b>2 Players</b> to play against a friend, and spend your coins in the <b>Shop</b>! Your name, school year, coins and upgrades are saved: log out in Settings, and type the same name next time to carry on.
+        them) to get more. Spelling also gives a power-up. The game waits while you answer, and <b>Enter</b> opens a quiz any time. Press <b>2 Players</b> to play against a friend, and spend your coins in the <b>Shop</b>! Log in to the game with your name: your school year, coins and upgrades are saved on this device, so log out in Settings and type the same name next time to carry on.
       </p>
     </div>
   )

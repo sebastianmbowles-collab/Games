@@ -37,7 +37,7 @@ import { PX, retroColors, flushText } from './pixel'
 const snap = (v) => Math.round(v / PX) * PX
 import { makeMath, makeSpell, quizKey, quizClick, drawQuiz } from './quiz'
 import { itemLevel } from './shop'
-import { loadSave, currentAccount, storeAccount, logOut, connectCloud } from './save'
+import { loadSave, currentAccount, storeAccount, logOut } from './save'
 import { tagLine } from './names'
 import { openProfile, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
@@ -47,10 +47,13 @@ export { W, H }
 
 
 const WAVES = 5
+// After this long without playing, the game asks if you're still there.
+const AFK_SECONDS = 120
 const POWER_NAMES = { mega: 'MEGA ROAR', shield: 'SHIELD', speed: 'SPEED BOOST' }
 // How fast the action runs: 1 is normal speed, bigger is faster.
 const GAME_SPEED = 1.3
 const WAVE_SECONDS = 40
+const AFK_OK = { x: W / 2 - 90, y: 360, w: 180, h: 52 }
 const UNLOCK_EVENTS = ['pointerup', 'touchend', 'click', 'keydown']
 const DIFF = {
   easy: { mul: 0.75, hp: 7, lives: 5 },
@@ -355,7 +358,15 @@ export class AliensVsDinos {
     this.menuT = 0
     this.cam = { x: W / 2, y: H / 2, zoom: 1 }
 
+    this.lastInput = 0
+    this.afkT = 0
     this.onKeyDown = (e) => {
+      this.lastInput = this.time
+      if (this.afk && (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape')) {
+        e.preventDefault()
+        this.closeAfk()
+        return
+      }
       if (lobbyKey(this, e)) {
         e.preventDefault()
         wakeAudio()
@@ -383,8 +394,14 @@ export class AliensVsDinos {
     }
     this.onPointerDown = (e) => {
       wakeAudio()
+      this.lastInput = this.time
       const p = this.toCanvas(e)
       this.mouse = p
+      if (this.afk) {
+        const b = AFK_OK
+        if (p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h) this.closeAfk()
+        return
+      }
       this.click(p.x, p.y)
     }
     this.onPointerMove = (e) => {
@@ -410,10 +427,7 @@ export class AliensVsDinos {
     wakeAudio()
     this.applySettings()
     playSong('title')
-    // on claude.ai, saves are also kept in your account; bring back anything newer from there
-    connectCloud(() => {
-      if (!this.vs) this.useAccount(currentAccount())
-    })
+
   }
 
   destroy() {
@@ -435,6 +449,7 @@ export class AliensVsDinos {
   // Used by the on-screen touch buttons.
   setKey(k, down) {
     wakeAudio()
+    this.lastInput = this.time
     if (down && !this.keys[k]) this.pressed.add(k)
     this.keys[k] = down
   }
@@ -609,6 +624,55 @@ export class AliensVsDinos {
   goTitle() {
     this.goScene('title')
     if (!this.userSong) playSong('title')
+  }
+
+  // ---------- "are you still there?" ----------
+
+  checkAfk(dt) {
+    if (this.afk) return
+    const inGame = this.scene === 'play' || this.scene === 'vs' || this.scene === 'cutscene'
+    if (this.scene === 'cutscene') this.lastInput = this.time
+    // in a game, being away means not touching the controls; anywhere else, it's not playing at all
+    this.afkT = inGame ? this.time - this.lastInput : this.afkT + dt
+    if (inGame && this.time - this.lastInput < 1) this.afkT = 0
+    if (this.afkT > AFK_SECONDS) {
+      this.afk = { t: 0 }
+      beamOn(false)
+      sfx.warn()
+    }
+  }
+
+  closeAfk() {
+    sfx.click()
+    this.afk = null
+    this.afkT = 0
+    this.lastInput = this.time
+  }
+
+  drawAfk(ctx) {
+    ctx.fillStyle = 'rgba(15,10,40,0.75)'
+    ctx.fillRect(0, 0, W, H)
+    rrect(ctx, 150, 90, 660, 360, 18)
+    ctx.fillStyle = '#181425'
+    ctx.fill()
+    ctx.lineWidth = 6
+    ctx.strokeStyle = '#feae34'
+    ctx.stroke()
+    const name = this.profile?.name || 'HEY'
+    text(ctx, `${name}, why are you not playing?`, W / 2, 150, 24, '#feae34')
+    text(ctx, 'Are you chatting to a friend?', W / 2, 205, 19, '#ffffff')
+    text(ctx, 'Looking at the shop?', W / 2, 240, 19, '#ffffff')
+    text(ctx, 'Jamming out at the jukebox?', W / 2, 275, 19, '#ffffff')
+    text(ctx, 'Please play, or you are wasting time!', W / 2, 325, 21, '#fee761')
+    const b = AFK_OK
+    const hover = this.mouse.x > b.x && this.mouse.x < b.x + b.w && this.mouse.y > b.y && this.mouse.y < b.y + b.h
+    rrect(ctx, b.x, b.y + (hover ? -2 : 0), b.w, b.h, 24)
+    ctx.fillStyle = '#63c74d'
+    ctx.fill()
+    ctx.lineWidth = 4
+    ctx.strokeStyle = INK
+    ctx.stroke()
+    text(ctx, 'OK', b.x + b.w / 2, b.y + 34 + (hover ? -2 : 0), 26, INK, 'center', false)
   }
 
   // PLAY: first make sure we know your name and school year.
@@ -806,6 +870,14 @@ export class AliensVsDinos {
     this.flash = Math.max(0, this.flash - realDt * 2.5)
 
     this.sceneT += realDt
+    this.checkAfk(realDt)
+    if (this.afk && this.scene !== 'vs') {
+      // everything waits until you press OK
+      beamOn(false)
+      this.pressed.clear()
+      this.mouseMoved = false
+      return
+    }
     // crickets chirping (and now and then an owl) all through the night
     this.ambT = (this.ambT ?? 1) - realDt
     if (this.ambT <= 0 && this.scene !== 'paused' && this.scene !== 'jukebox') {
@@ -1699,6 +1771,10 @@ export class AliensVsDinos {
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(255,${this.side === 'aliens' ? 80 : 255},${this.side === 'aliens' ? 90 : 255},${this.flash * 0.5})`
       ctx.fillRect(0, 0, W, H)
+    }
+    if (this.afk) {
+      this.flushLayer()
+      this.drawAfk(ctx)
     }
     if (this.toast) {
       this.toast.t -= 1 / 60
