@@ -3423,6 +3423,131 @@ function updateBolts(dt) {
   a.onKey = () => { a.bed2.visible = true; burst(a.bed2.position.x, 2, a.bed2.position.z, [0x3a2a6b, 0xb07fff], 20); };
 }
 
+// ===================== 9. THE GLOWING OCEAN =====================
+// The hardest area. Wade through glowing shallow water and hop across coral islands
+// while neon jellyfish drift around and ZAP you. Deep water pulls you down.
+// The GLITCH OCTOPUS waits in the middle with key 9.
+{
+  const a = makeArea('ocean', {
+    title: 'The Glowing Ocean', sub: 'The hardest place in Dreamland. Don\'t touch the jellyfish!', goal: 'Cross the ocean',
+    fog: [0x0a2a4a, 15, 110], next: 'home10', bloom: .2,
+    keyText: 'The ocean goes calm. Now there is only one place left to look… home.',
+    h: (x, z) => {
+      // sandbars and islands; between them deep water (h < -1.2)
+      let h = -2.2 + Math.sin(x * .12 + z * .05) * .6;
+      const isl = [[0, 4, 6], [-6, 16, 4], [5, 26, 4.5], [-4, 36, 3.5], [8, 44, 4], [0, 54, 3.5], [-8, 60, 4], [0, 78, 15]];
+      for (const [ix, iz, ir] of isl) { const d = Math.hypot(x - ix, z - iz); if (d < ir) h = Math.max(h, (1 - d / ir) * 1.6 - .2 + (ir > 10 ? .4 : 0)); }
+      // a shallow sandbar path that wiggles between them
+      const px = Math.sin(z * .14) * 6, pd = Math.abs(x - px); if (pd < 1.6 && z > 8 && z < 64) h = Math.max(h, -.5 - pd * .2);
+      return h;
+    },
+  });
+  a.start = { x: 0, z: 3, yaw: Math.PI };
+  a.zaps = 0; a.beds = 0;
+  zoneOf('ocean', { x0: -22, x1: 22, z0: 64, z1: 92 });
+  aGround(a, [80, 120, 0, 50], (x, z, c) => { const h = a.h(x, z); c.setHex(h > -.3 ? 0xc8a07a : h > -1 ? 0x3a9aa0 : 0x123a6a); c.multiplyScalar(.75 + Math.sin(x * 2 + z) * .05); });
+  // the water surface: glowing, see-through and moving
+  { const g = new THREE.PlaneGeometry(200, 200, 60, 60); g.rotateX(-Math.PI / 2);
+    a.water = mesh(g, new THREE.MeshPhongMaterial({ color: 0x2ab0d0, emissive: 0x0a4a7a, transparent: true, opacity: .55, shininess: 80, specular: 0x6a9ab0, depthWrite: false }));
+    a.water.position.set(0, -.25, 50); a.water.userData.noShadow = true; a.group.add(a.water); }
+  // coral and glowing plants on the islands
+  for (let i = 0; i < 70; i++) { const x = rand(-25, 25), z = rand(0, 95), h = a.h(x, z); if (h < -1.5) continue;
+    const c = mesh(new THREE.ConeGeometry(rand(.15, .3), rand(.6, 1.6), 5), glow(pick([0xff6fc8, 0x5ff6ff, 0xb07fff, 0xffe27f]))); c.position.set(x, h + .4, z); c.rotation.set(rand(-.3, .3), 0, rand(-.3, .3)); a.group.add(c); }
+  // bubbles rising
+  { const n = 200, pos = new Float32Array(n * 3); for (let i = 0; i < n; i++) pos.set([rand(-30, 30), rand(-2, 6), rand(0, 100)], i * 3);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    a.bubbles = new THREE.Points(g, new THREE.PointsMaterial({ map: glowTex, color: 0xb8f8ff, size: .3, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); a.group.add(a.bubbles); }
+  // NEON JELLYFISH: they drift on patrol paths and zap you if you touch them
+  a.jellies = [];
+  [[-3, 12, 4, 0], [3, 20, 3, 1], [-6, 28, 5, 2], [6, 33, 4, 3], [-2, 40, 3, 4], [4, 48, 5, 5], [-5, 52, 4, 6], [2, 58, 3, 7], [-8, 70, 5, 1], [8, 72, 5, 3], [-12, 82, 4, 5], [12, 84, 4, 2]].forEach(([x, z, r, ph]) => {
+    const c = pick([0xff6fc8, 0x5ff6ff, 0xb07fff, 0x9ff0c0]), g = new THREE.Group();
+    const dome = mesh(new THREE.SphereGeometry(.55, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: .7 })); g.add(dome);
+    for (let k = 0; k < 6; k++) { const t = mesh(new THREE.CylinderGeometry(.025, .01, 1.3, 4), glow(c)); const an = k / 6 * Math.PI * 2; t.position.set(Math.cos(an) * .3, -.65, Math.sin(an) * .3); g.add(t); }
+    g.add(at(halo(c, 3, .7), 0, 0, 0)); a.group.add(g);
+    a.jellies.push({ g, dome, x, z, r, ph, cool: 0 });
+  });
+  // the octopus island in the middle, with a ring of rocks
+  for (let k = 0; k < 14; k++) { const an = k / 14 * Math.PI * 2, rk = mesh(new THREE.DodecahedronGeometry(rand(.8, 1.4), 0), mat(0x3a5a7a)); rk.position.set(Math.cos(an) * 14.5, a.h(Math.cos(an) * 14.5, 78 + Math.sin(an) * 14.5) + .3, 78 + Math.sin(an) * 14.5); a.group.add(rk); }
+  [['pink', 0, 6], ['pink', -6, 16], ['blue', 5, 26], ['green', -4, 36], ['pink', 8, 44], ['purple', 0, 54], ['rainbow', -8, 60]].forEach(([t, x, z]) => aGem(a, t, x, z));
+  aNote(a, ['the ocean is where', 'i cry. nobody sees.'], 3, 1.8, 6);
+  aKey(a, 9, 0x3fe0ff, 0, a.h(0, 78) + 1.5, 78); a.key.active = false; a.key.m.visible = false;
+  a.portal = makePortal(0x3fe0ff); a.portal.position.set(0, a.h(0, 88), 88); a.group.add(a.portal);
+
+  // ---------- THE GLITCH OCTOPUS ----------
+  const OC = { name: 'Glitch Octopus', maxHp: 30, hp: 30, active: false, x: 0, z: 84, t: 0, mode: 'rise', flash: 0, slams: [] };
+  { const g = new THREE.Group(), skin = new THREE.MeshPhongMaterial({ color: 0x9a4ad0, shininess: 60, emissive: 0x2a0a4a }); OC.skin = skin;
+    const head = mesh(new THREE.SphereGeometry(2.6, 24, 18), skin); head.scale.set(1, 1.25, 1); head.position.y = 3.5; g.add(head);
+    [-1, 1].forEach(k => { const e = mesh(new THREE.SphereGeometry(.55, 14, 10), new THREE.MeshBasicMaterial({ color: 0xffffff })); e.position.set(k * 1, 3.7, 2.2); g.add(e);
+      const pu = mesh(new THREE.SphereGeometry(.3, 10, 8), new THREE.MeshBasicMaterial({ color: 0x1a0a2a })); pu.position.set(k * 1, 3.7, 2.6); g.add(pu); });
+    for (let i = 0; i < 12; i++) { const sp = mesh(new THREE.SphereGeometry(.25, 8, 6), glow(pick([0x5ff6ff, 0xff6fc8]))); const an = rand(0, 6); sp.position.set(Math.cos(an) * 2.2, rand(3, 5.5), Math.sin(an) * 2.2 - .5); g.add(sp); }
+    // tentacles: chains of balls that wave (and slam!)
+    OC.arms = [];
+    for (let k = 0; k < 8; k++) { const arm = new THREE.Group(), an = k / 8 * Math.PI * 2; arm.position.set(Math.cos(an) * 1.8, 1.2, Math.sin(an) * 1.8); arm.rotation.y = -an + Math.PI / 2; g.add(arm);
+      let prev = arm; const segs = [];
+      for (let i = 0; i < 7; i++) { const sg = new THREE.Group(); sg.position.z = i ? .7 : 0; const b = mesh(new THREE.SphereGeometry(.45 - i * .05, 10, 8), skin); sg.add(b); prev.add(sg); prev = sg; segs.push(sg); }
+      OC.arms.push({ arm, segs, an }); }
+    ink(g, .04); g.position.set(OC.x, -8, OC.z); a.group.add(g); OC.g = g; }
+  OC.balls = () => [{ x: OC.g.position.x, y: OC.g.position.y + 3.5, z: OC.g.position.z, r: 2.8 }];
+  OC.die = () => {
+    for (let i = 0; i < 8; i++) setTimeout(() => { burst(OC.g.position.x + rand(-2, 2), OC.g.position.y + rand(2, 5), OC.g.position.z + rand(-2, 2), [0x9a4ad0, 0x5ff6ff, 0xff6fc8], 18); sfx('slam'); }, i * 200);
+    setTimeout(() => { OC.g.visible = false; a.key.active = true; a.key.m.visible = true; toast('Octopus defeated!', 'Key 9 appeared'); objective('Grab key 9');
+      if (a.beds === 0) achieve('Unbreakable', 'Beat the ocean without going back to bed'); if (a.zaps === 0) achieve('Jellyfish Friend', 'Get through the ocean without getting zapped'); }, 1700);
+  };
+  a.onRespawn = () => { a.beds++; OC.slams.forEach(sl => a.group.remove(sl.ring)); OC.slams = []; };
+  a.leave = () => { aBoss = null; $('bossbar').hidden = true; P.inkT = 0; $('game').style.filter = ''; };
+  a.update = (dt, time) => {
+    // water ripples
+    { const q = a.water.geometry.attributes.position; for (let i = 0; i < q.count; i++) q.setY(i, Math.sin(q.getX(i) * .3 + time * 1.5) * .12 + Math.cos(q.getZ(i) * .25 + time) * .12); q.needsUpdate = true;
+      a.water.material.emissive.setHSL(.55 + Math.sin(time * .3) * .03, .8, .12 + Math.sin(time * 1.2) * .03); }
+    { const q = a.bubbles.geometry.attributes.position; for (let i = 0; i < q.count; i++) { let y = q.getY(i) + dt * .8; if (y > 6) y = -2; q.setY(i, y); } q.needsUpdate = true; }
+    // deep water slows you right down, and very deep water pulls you under
+    const gh = a.h(P.x, P.z);
+    if (gh < -1.2 && P.y < .2) { P.kx *= .5; P.kz *= .5; if (Math.random() < dt * 2) burst(P.x, P.y + .3, P.z, [0xb8f8ff], 2); }
+    if (gh < -2 && P.onGround && state.mode === 'play' && !cine && P.hurtT <= 0) { hurt(1, P.x + .1, P.z); toast('', 'Too deep! Stay on the sand'); }
+    // jellyfish
+    for (const j of a.jellies) {
+      const t = time * .4 + j.ph, x = j.x + Math.sin(t) * j.r, z = j.z + Math.cos(t * .8) * j.r * .6;
+      const pulse = Math.sin(time * 3 + j.ph); j.g.position.set(x, Math.max(a.h(x, z), -.3) + 1.6 + pulse * .2, z); j.dome.scale.set(1 + pulse * .1, 1 - pulse * .15, 1 + pulse * .1);
+      j.cool -= dt;
+      if (j.cool <= 0 && touchesYou(x, j.g.position.y - .3, z, .7)) { j.cool = 1.5; a.zaps++; hurt(1, x, z); burst(x, j.g.position.y, z, [0xfff2a8, 0x5ff6ff], 12); if (ac) hiss(ac.currentTime, .3, .25, 6000, 2000, 'highpass'); toast('', 'ZAP!'); }
+    }
+    // the octopus: it rises when you reach its island
+    if (!OC.active && OC.hp > 0 && P.z > 66 && state.mode === 'play' && !cine) { startABoss(OC); OC.mode = 'rise'; OC.t = 0; sfx('roar'); toast('THE GLITCH OCTOPUS', 'Dodge the tentacle slams, then hit its head while a tentacle is stuck!'); }
+    if (!OC.g.visible) return;
+    OC.flash = Math.max(0, OC.flash - dt); OC.skin.emissive.setHex(OC.flash > 0 ? 0xff6fc8 : 0x2a0a4a);
+    OC.arms.forEach((ar, k) => ar.segs.forEach((sg, i) => { if (ar.slam) return; sg.rotation.x = Math.sin(time * 2 + k + i * .6) * .25 + .15; sg.rotation.y = Math.sin(time * 1.3 + k * 2 + i) * .2; }));
+    if (!OC.active) return;
+    const angry = OC.hp < OC.maxHp / 2;
+    OC.t += dt;
+    OC.immune = OC.mode !== 'stuck';
+    const gp = OC.g.position;
+    if (OC.mode === 'rise') { gp.y = Math.min(a.h(OC.x, OC.z) - 1, gp.y + dt * 4); if (OC.t > 2.5) { OC.mode = 'slam'; OC.t = 0; } }
+    else if (OC.mode === 'slam') { // raises tentacles, rings show where they'll hit
+      if (OC.t < .1 && !OC.marked) { OC.marked = true; const n = angry ? 4 : 2;
+        for (let k = 0; k < n; k++) { const tx = P.x + (k ? rand(-4, 4) : 0), tz = P.z + (k ? rand(-4, 4) : 0); const ring = mesh(new THREE.RingGeometry(1.4, 1.9, 28), new THREE.MeshBasicMaterial({ color: 0xff3fd0, transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false }));
+          ring.rotation.x = -Math.PI / 2; ring.position.set(tx, a.h(tx, tz) + .1, tz); a.group.add(ring); OC.slams.push({ ring, x: tx, z: tz, t: 1.1 - k * .1 }); } sfx('warn'); }
+      for (let i = OC.slams.length - 1; i >= 0; i--) { const sl = OC.slams[i]; sl.t -= dt; sl.ring.material.opacity = .4 + Math.abs(Math.sin(sl.t * 16)) * .5;
+        if (sl.t <= 0) { const tent = mesh(new THREE.CylinderGeometry(.6, .3, 9, 10), OC.skin); tent.position.set(sl.x, a.h(sl.x, sl.z) + 2, sl.z); tent.rotation.x = .4; a.group.add(tent); setTimeout(() => a.group.remove(tent), 2600);
+          state.shake = .4; sfx('slam'); burst(sl.x, a.h(sl.x, sl.z) + .4, sl.z, [0x5ff6ff, 0xffffff], 14); dustRing(sl.x, a.h(sl.x, sl.z), sl.z, 2.5, 0x5ff6ff);
+          if (Math.hypot(P.x - sl.x, P.z - sl.z) < 1.9) hurt(1, sl.x, sl.z);
+          a.group.remove(sl.ring); OC.slams.splice(i, 1); } }
+      if (OC.t > 1.4 && !OC.slams.length) { OC.marked = false; OC.mode = 'stuck'; OC.t = 0; toast('', 'Its tentacle is stuck! Hit its head!'); gp.y = a.h(OC.x, OC.z) - 2.4; } // it leans down: you can reach it
+    } else if (OC.mode === 'stuck') {
+      OC.g.rotation.z = Math.sin(OC.t * 14) * .05;
+      if (OC.t > (angry ? 3 : 4.5)) { OC.mode = Math.random() < .5 ? 'ink' : 'glitch'; OC.t = 0; gp.y = a.h(OC.x, OC.z) - 1; }
+    } else if (OC.mode === 'ink') { // squirts ink: the screen goes dark for a moment
+      if (OC.t < .1 && !OC.inked) { OC.inked = true; P.inkT = 3.2; sfx('whoosh'); burst(gp.x, gp.y + 3, gp.z, [0x1a0a2a, 0x2a1a4a], 30); }
+      if (OC.t > 1.5) { OC.inked = false; OC.mode = 'slam'; OC.t = 0; }
+    } else if (OC.mode === 'glitch') { // glitches to another spot around the island
+      OC.g.visible = Math.random() < .5;
+      if (OC.t > .8) { OC.g.visible = true; const an = rand(0, Math.PI * 2); OC.x = Math.cos(an) * 6; OC.z = 78 + Math.sin(an) * 6; gp.x = OC.x; gp.z = OC.z; OC.mode = 'slam'; OC.t = 0; burst(gp.x, gp.y + 3, gp.z, [0xff3fd0, 0x5ff6ff], 20); }
+    }
+    OC.g.lookAt(P.x, gp.y, P.z);
+    // ink on your screen
+    if (P.inkT > 0) { P.inkT -= dt; $('game').style.filter = `brightness(${Math.max(.15, 1 - Math.min(1, P.inkT) * .85)})`; if (P.inkT <= 0) $('game').style.filter = ''; }
+  };
+}
+
 // everything solid casts and catches shadows (glowing things and the sky don't)
 scene.traverse(o => { if (o.isMesh && !o.material.isMeshBasicMaterial && !o.userData.isInk) { o.castShadow = !o.userData.noShadow; o.receiveShadow = true; } });
 fists.forEach(f => f.traverse(o => { o.castShadow = false; }));
