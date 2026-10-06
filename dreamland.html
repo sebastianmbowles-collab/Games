@@ -619,6 +619,10 @@ function hexIsland(r, x, top, z, color) {
   const g = new THREE.Group();
   const cap = mesh(new THREE.CylinderGeometry(r, r * 0.92, 0.35, 6), mat(color)); cap.position.y = -0.175; g.add(cap);
   const rock = mesh(new THREE.ConeGeometry(r * 0.9, r * 1.6, 6), mat(0x9a5fd6)); rock.rotation.x = Math.PI; rock.position.y = -0.35 - r * 0.8; g.add(rock);
+  // a glowing rim so you can see the edge you're jumping to
+  const rim = mesh(new THREE.TorusGeometry(r * .97, .045, 6, 6), glow(0x7ff0d8)); rim.rotation.x = Math.PI / 2; rim.rotation.z = Math.PI / 6; rim.position.y = .01; g.add(rim);
+  // a little crystal flower on top
+  const fl = mesh(new THREE.OctahedronGeometry(.12, 0), glow(0xff9ad5)); fl.position.set(r * .5, .15, -r * .3); g.add(fl);
   g.position.set(x, top, z); scene.add(g);
   const k = r * 0.8; solid(x - k, top - 0.5, z - k, x + k, top, z + k);
   return g;
@@ -802,9 +806,10 @@ const fairy = [];
 }
 block(3, 0.4, 2, 0xe6c4ff, 0, 0.6, 6.3);       // ledge under the window
 block(1.2, 0.5, 1.2, 0xc9a6ff, -1.9, 0, 6.6);  // small step to climb back up
-hexIsland(0.9, 2.2, 1.55, 8.3, 0xffd2f0);
-hexIsland(0.9, 4.3, 2.15, 9.9, 0xffd2f0);
-hexIsland(1.3, 6.5, 2.75, 11.8, 0xfff0fb);
+// floating islands up to key 1 (big enough to land on without being a pro)
+hexIsland(1.25, 2.2, 1.55, 8.4, 0xffd2f0);
+hexIsland(1.25, 4.5, 2.15, 10.1, 0xffd2f0);
+hexIsland(1.5, 6.5, 2.75, 12.2, 0xfff0fb);
 
 // ============ MEADOW DECORATION ============
 {
@@ -1194,7 +1199,7 @@ function makeKey(color = 0xffd36b) {
   scene.add(g); return g;
 }
 const key1 = { kind: 'key', n: 1, m: makeKey(), base: 3.8, taken: false, active: true };
-key1.m.position.set(6.5, 3.8, 11.8); pickups.push(key1);
+key1.m.position.set(6.5, 3.8, 12.2); pickups.push(key1);
 const key2 = { kind: 'key', n: 2, m: makeKey(0xff9ad5), base: 0, taken: false, active: false };
 key2.m.visible = false; pickups.push(key2);
 // meadow gems
@@ -2458,6 +2463,9 @@ function updateBossShots(dt) {
 }
 
 let last = performance.now();
+// a soft round shadow right under you, so you can always see where you'll land
+const footShadow = mesh(new THREE.CircleGeometry(.42, 24), new THREE.MeshBasicMaterial({ color: 0x1a0830, transparent: true, opacity: .45, depthWrite: false }));
+footShadow.rotation.x = -Math.PI / 2; footShadow.renderOrder = 2; footShadow.userData.global = true; scene.add(footShadow);
 let hitStop = 0; // a tiny freeze when a punch lands, so hits feel strong
 function loop(now) {
   requestAnimationFrame(loop); frameNo++;
@@ -2555,6 +2563,8 @@ function loop(now) {
     $('dist').textContent = Math.round(Math.hypot(dx, dz)) + ' m';
   }
   updateRings(dt);
+  { const g = groundAt(P.x, P.z, P.y + .05), air = P.y - g; footShadow.visible = state.mode === 'play' && !cine && air < 12;
+    footShadow.position.set(P.x, g + .03, P.z); footShadow.scale.setScalar(Math.max(.5, 1 - air * .06)); footShadow.material.opacity = Math.max(.12, .45 - air * .03); }
   updatePortals(dt, time);
   if (aBoss && aBoss.g && aBoss.active) { aBoss.flash = Math.max(0, (aBoss.flash || 0) - dt); }
   if (curArea !== 'home' && AREAS[curArea].update) AREAS[curArea].update(dt, time);
