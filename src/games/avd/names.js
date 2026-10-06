@@ -1,25 +1,10 @@
 // Player names and school year, plus a filter that keeps rude or mean names out.
 
-const KEY = 'avd-profile-v1'
 export const MAX_NAME = 12
 
-export function loadProfile() {
-  try {
-    const p = JSON.parse(localStorage.getItem(KEY))
-    if (p && typeof p.name === 'string' && p.year >= 1 && p.year <= 6) return p
-  } catch {
-    // no profile yet
-  }
-  return null
-}
-
-export function saveProfile(p) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(p))
-  } catch {
-    // The name just won't be remembered next time.
-  }
-}
+// School years: 0 is "below Year 1" (Prep), 7 is "above Year 6".
+export const YEAR_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7]
+export const yearLabel = (y) => (y === 0 ? 'PREP' : y >= 7 ? 'YEAR 7+' : `YEAR ${y}`)
 
 // Swear words and rude words are blocked anywhere inside a name, even with tricks like
 // "5H1T" or spaces between the letters.
@@ -69,5 +54,5 @@ export function safeName(raw) {
 
 // e.g. "DINOS SAM YEAR 4"
 export function tagLine(side, profile) {
-  return `${side === 'aliens' ? 'ALIENS' : 'DINOS'} ${profile.name} YEAR ${profile.year}`.toUpperCase()
+  return `${side === 'aliens' ? 'ALIENS' : 'DINOS'} ${profile.name} ${yearLabel(profile.year)}`.toUpperCase()
 }

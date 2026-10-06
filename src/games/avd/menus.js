@@ -4,6 +4,7 @@ import { W, H, TAU, INK, circle, rrect, text, drawDino, drawUFO, drawAlien, draw
 import { sfx, audioRunning } from './sound'
 import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels } from './music'
 import { SHOP_ITEMS, itemLevel, buy } from './shop'
+import { yearLabel } from './names'
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const rand = (a, b) => a + Math.random() * (b - a)
@@ -286,7 +287,7 @@ function drawTitle(game, ctx) {
     text(ctx, '♪ TAP OR PRESS A KEY FOR MUSIC ♪', W / 2, 470, 18, '#fee761')
   }
   const best = game.best
-  if (game.profile) text(ctx, `PLAYER: ${game.profile.name} · YEAR ${game.profile.year}`, W / 2, 140, 14, '#fee761')
+  text(ctx, game.profile ? `PLAYER: ${game.profile.name} · ${yearLabel(game.profile.year)}` : 'PRESS PLAY TO LOG IN', W / 2, 140, 14, '#fee761')
   text(ctx, `Best: Aliens ${best.aliens || 0}  ·  Dinos ${best.dinos || 0}`, W / 2, 512, 15, '#fff')
   text(ctx, '↑ ↓ to choose · Enter or tap to pick', W / 2, 532, 12, 'rgba(255,255,255,0.8)')
 }
@@ -299,12 +300,13 @@ const ROWS = [
   { key: 'difficulty', label: 'Difficulty', type: 'choice', options: ['easy', 'normal', 'hard'], names: ['Easy', 'Normal', 'Hard'] },
   { key: 'shake', label: 'Screen shake', type: 'toggle' },
   { key: 'cutscenes', label: 'Cutscenes', type: 'toggle' },
-  { key: 'player', label: 'Player', type: 'player' },
+  { key: 'player', label: 'School year', type: 'player' },
+  { key: 'logout', label: 'Log out', type: 'logout' },
   { key: 'back', label: 'Back', type: 'back' },
 ]
 
 function rowRect(i) {
-  return { x: 170, y: 108 + i * 55, w: 620, h: 48 }
+  return { x: 170, y: 100 + i * 51, w: 620, h: 45 }
 }
 
 function changeSetting(game, row, dir) {
@@ -319,7 +321,13 @@ function changeSetting(game, row, dir) {
     return
   } else if (row.type === 'player') {
     sfx.click()
-    game.editProfile()
+    if (game.profile) game.editProfile()
+    else game.playPressed()
+    return
+  } else if (row.type === 'logout') {
+    sfx.click()
+    if (game.profile) game.logOutPlayer()
+    else game.playPressed()
     return
   }
   game.saveSettings()
@@ -338,8 +346,8 @@ function updateSettings(game, dt) {
   const hover = ROWS.findIndex((_, i) => inside(game.mouse, rowRect(i)))
   if (game.mouseMoved && hover >= 0) s.setSel = hover
   const row = ROWS[s.setSel]
-  if (k.has('left') && row.type !== 'back' && row.type !== 'player') changeSetting(game, row, -1)
-  if (k.has('right') && row.type !== 'back' && row.type !== 'player') changeSetting(game, row, 1)
+  if (k.has('left') && (row.type === 'volume' || row.type === 'choice' || row.type === 'toggle')) changeSetting(game, row, -1)
+  if (k.has('right') && (row.type === 'volume' || row.type === 'choice' || row.type === 'toggle')) changeSetting(game, row, 1)
   if (k.has('enter') || k.has('action')) changeSetting(game, row, 1)
   if (k.has('pause')) game.goTitle()
 }
@@ -374,7 +382,7 @@ function drawSettings(game, ctx) {
     const r = rowRect(i)
     const on = sel === i
     if (row.type === 'back') {
-      drawButton(ctx, { label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: r.y + 2, w: 220, h: 44, size: 22 }, on, t)
+      drawButton(ctx, { label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: r.y + 2, w: 220, h: 42, size: 20 }, on, t)
       continue
     }
     rrect(ctx, r.x, r.y, r.w, r.h, 16)
@@ -385,10 +393,10 @@ function drawSettings(game, ctx) {
     ctx.stroke()
     text(ctx, row.label, r.x + 24, r.y + 34, 22, '#fff', 'left')
     const cy = r.y + r.h / 2
-    if (row.type === 'player') {
+    if (row.type === 'player' || row.type === 'logout') {
       const p = game.profile
-      text(ctx, p ? `${p.name} · YEAR ${p.year}` : 'NOT SET', 640, cy + 7, 18, '#fee761')
-      text(ctx, 'TAP TO CHANGE', 640, cy + 20, 10, '#c0cbdc')
+      const label = !p ? 'TAP TO LOG IN' : row.type === 'player' ? `${yearLabel(p.year)} · TAP TO CHANGE` : `${p.name} · TAP TO LOG OUT`
+      text(ctx, label, 640, cy + 7, 16, '#fee761')
       continue
     }
     if (row.type !== 'toggle') {
@@ -624,6 +632,7 @@ function shopBuy(game, i) {
     s.shopMsg = { text: 'ALREADY MAXED OUT!', t: 1.5 }
     sfx.click()
   } else if (buy(game.shop, side, item)) {
+    game.persist()
     s.shopMsg = { text: `YOU BOUGHT ${item.name.toUpperCase()}!`, t: 1.8 }
     sfx.capture()
     const r = buyRect(i)

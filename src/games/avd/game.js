@@ -36,8 +36,9 @@ import { PX, retroColors, flushText } from './pixel'
 // Snap a position to the chunky pixel grid.
 const snap = (v) => Math.round(v / PX) * PX
 import { makeMath, makeSpell, quizKey, quizClick, drawQuiz } from './quiz'
-import { loadShop, saveShop, itemLevel } from './shop'
-import { loadProfile, tagLine } from './names'
+import { itemLevel } from './shop'
+import { loadSave, currentAccount, storeAccount, logOut, connectCloud } from './save'
+import { tagLine } from './names'
 import { openProfile, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
@@ -58,13 +59,6 @@ const DIFF = {
 }
 const DEFAULT_SETTINGS = { music: 6, sound: 8, difficulty: 'normal', shake: true, cutscenes: true }
 
-function loadSettings() {
-  try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem('avd-settings-v1')) }
-  } catch {
-    return { ...DEFAULT_SETTINGS }
-  }
-}
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const lerp = (a, b, t) => a + (b - a) * t
 const rand = (a, b) => a + Math.random() * (b - a)
@@ -331,14 +325,6 @@ export function inBeam(bx, by, x, y, wide = 70) {
   return Math.abs(x - bx) < 16 + (wide - 16) * f + 12
 }
 
-function loadBest() {
-  try {
-    return JSON.parse(localStorage.getItem('avd-best-v1')) || { aliens: 0, dinos: 0 }
-  } catch {
-    return { aliens: 0, dinos: 0 }
-  }
-}
-
 // ---------- the game ----------
 
 export class AliensVsDinos {
@@ -358,12 +344,11 @@ export class AliensVsDinos {
     this.shake = 0
     this.slowmo = 0
     this.flash = 0
-    this.best = loadBest()
     this.scene = 'title'
     this.sceneT = 0
-    this.settings = loadSettings()
-    this.shop = loadShop()
-    this.profile = loadProfile()
+    // everything about the player who's logged in (see save.js)
+    loadSave()
+    this.useAccount(currentAccount())
     initTitle(this)
     this.side = null
     this.menuPick = 0
@@ -425,6 +410,10 @@ export class AliensVsDinos {
     wakeAudio()
     this.applySettings()
     playSong('title')
+    // on claude.ai, saves are also kept in your account; bring back anything newer from there
+    connectCloud(() => {
+      if (!this.vs) this.useAccount(currentAccount())
+    })
   }
 
   destroy() {
@@ -462,11 +451,44 @@ export class AliensVsDinos {
 
   saveSettings() {
     this.applySettings()
-    try {
-      localStorage.setItem('avd-settings-v1', JSON.stringify(this.settings))
-    } catch {
-      // Settings just won't be remembered next time.
-    }
+    this.persist()
+  }
+
+  // ---------- players: log in, log out, remember everything ----------
+
+  useAccount(acc) {
+    this.profile = acc?.profile || null
+    this.shop = acc?.shop || { coins: 0, owned: {} }
+    this.best = acc?.best || { aliens: 0, dinos: 0 }
+    this.settings = { ...DEFAULT_SETTINGS, ...(acc?.settings || this.settings || {}) }
+    this.applySettings()
+  }
+
+  // Saves this player's name, year, coins, shop items, best scores and settings.
+  persist() {
+    if (this.profile) storeAccount({ profile: this.profile, shop: this.shop, best: this.best, settings: this.settings })
+  }
+
+  logIn(acc) {
+    this.useAccount(acc)
+    this.persist()
+    this.toast = { text: `WELCOME BACK, ${acc.profile.name}!`, t: 3 }
+    sfx.win()
+  }
+
+  newPlayer(profile) {
+    this.useAccount({ profile, settings: this.settings })
+    this.persist()
+    this.toast = { text: `HI ${profile.name}! LET'S PLAY!`, t: 3 }
+  }
+
+  logOutPlayer() {
+    const name = this.profile?.name
+    this.persist()
+    logOut()
+    this.useAccount(null)
+    this.goTitle()
+    if (name) this.toast = { text: `BYE ${name}! YOUR GAME IS SAVED.`, t: 3 }
   }
 
   goScene(name) {
@@ -502,7 +524,7 @@ export class AliensVsDinos {
   earn(n, x, y) {
     this.shop.coins += n
     this.coinsRun += n
-    saveShop(this.shop)
+    this.persist()
     if (x !== undefined) this.fx.text(x, y, `+${n} $`, '#fee761', 18)
   }
 
@@ -601,7 +623,7 @@ export class AliensVsDinos {
   }
 
   editProfile() {
-    openProfile(this, () => this.goScene('settings'))
+    openProfile(this, () => this.goScene('settings'), 'year')
   }
 
   tag() {
@@ -739,11 +761,7 @@ export class AliensVsDinos {
     this.newBest = this.score > best
     if (this.newBest) {
       this.best[this.side] = this.score
-      try {
-        localStorage.setItem('avd-best-v1', JSON.stringify(this.best))
-      } catch {
-        // Saving the best score is only a nicety.
-      }
+      this.persist()
     }
   }
 
@@ -1681,6 +1699,16 @@ export class AliensVsDinos {
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(255,${this.side === 'aliens' ? 80 : 255},${this.side === 'aliens' ? 90 : 255},${this.flash * 0.5})`
       ctx.fillRect(0, 0, W, H)
+    }
+    if (this.toast) {
+      this.toast.t -= 1 / 60
+      if (this.toast.t <= 0) this.toast = null
+      else {
+        rrect(ctx, W / 2 - 260, 492, 520, 40, 12)
+        ctx.fillStyle = 'rgba(24,20,37,0.92)'
+        ctx.fill()
+        text(ctx, this.toast.text, W / 2, 519, 18, '#fee761')
+      }
     }
     this.flushLayer()
   }

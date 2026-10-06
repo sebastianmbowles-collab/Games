@@ -1,4 +1,4 @@
-// The shop: coins you earn in the game buy upgrades and gold skins. Saved in the browser.
+// The shop: coins you earn in the game buy upgrades and gold skins. Saved with your player (save.js).
 
 export const SHOP_ITEMS = {
   aliens: [
@@ -17,26 +17,6 @@ export const SHOP_ITEMS = {
   ],
 }
 
-const KEY = 'avd-shop-v1'
-
-export function loadShop() {
-  try {
-    const s = JSON.parse(localStorage.getItem(KEY))
-    if (s && typeof s.coins === 'number' && s.owned) return s
-  } catch {
-    // no saved shop yet
-  }
-  return { coins: 0, owned: {} }
-}
-
-export function saveShop(shop) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(shop))
-  } catch {
-    // Coins just won't be remembered next time.
-  }
-}
-
 export const itemLevel = (shop, side, key) => shop.owned[`${side}.${key}`] || 0
 
 // Buys the next level of an item. Returns true if it worked.
@@ -46,6 +26,5 @@ export function buy(shop, side, item) {
   if (price === undefined || shop.coins < price) return false
   shop.coins -= price
   shop.owned[`${side}.${item.key}`] = lvl + 1
-  saveShop(shop)
   return true
 }

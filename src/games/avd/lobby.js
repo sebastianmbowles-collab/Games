@@ -3,7 +3,8 @@
 import { W, H, INK, rrect, text } from './art'
 import { sfx } from './sound'
 import { inside, drawButton, drawTitleWorld, updateTitleWorld } from './menus'
-import { checkName, saveProfile, safeName, MAX_NAME } from './names'
+import { checkName, safeName, yearLabel, YEAR_LEVELS, MAX_NAME } from './names'
+import { findAccount } from './save'
 import { startSession, cleanCode } from './net'
 
 const LETTER_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
@@ -59,10 +60,13 @@ function drawKeys(ctx, keys, t, game) {
 
 // ---------- profile: name, then year ----------
 
-const YEARS = [1, 2, 3, 4, 5, 6].map((y, i) => ({ year: y, x: W / 2 - 330 + (i % 3) * 230, y: 220 + Math.floor(i / 3) * 96, w: 200, h: 76 }))
+const YEARS = YEAR_LEVELS.map((y, i) => ({ year: y, x: W / 2 - 380 + (i % 4) * 192, y: 206 + Math.floor(i / 4) * 90, w: 176, h: 70 }))
 
-export function openProfile(game, next) {
-  game.prof = { step: 'name', name: game.profile?.name || '', year: game.profile?.year || 3, err: null, next }
+// mode 'login': type your name (an old player picks up where they left off; a new one picks a year).
+// mode 'year': just change your school year.
+export function openProfile(game, next, mode = 'login') {
+  const step = mode === 'year' ? 'year' : 'name'
+  game.prof = { step, mode, name: mode === 'year' ? game.profile.name : '', year: game.profile?.year ?? 3, err: null, next }
   game.goScene('profile')
 }
 
@@ -78,6 +82,13 @@ function typeName(game, ch) {
       return
     }
     pf.name = pf.name.trim().toUpperCase()
+    const old = findAccount(pf.name)
+    if (old) {
+      // welcome back! everything about you is remembered
+      game.logIn(old)
+      pf.next()
+      return
+    }
     pf.step = 'year'
     sfx.select()
     return
@@ -88,8 +99,10 @@ function typeName(game, ch) {
 function pickYear(game, year) {
   const pf = game.prof
   pf.year = year
-  game.profile = { name: pf.name, year }
-  saveProfile(game.profile)
+  if (pf.mode === 'year') {
+    game.profile.year = year
+    game.persist()
+  } else game.newPlayer({ name: pf.name, year })
   sfx.capture()
   pf.next()
 }
@@ -191,7 +204,7 @@ export function lobbyKey(game, e) {
   if (!typing) return false
   const c = e.code
   if (typing === 'year') {
-    const m = c.match(/^(?:Digit|Numpad)([1-6])$/)
+    const m = c.match(/^(?:Digit|Numpad)([0-7])$/)
     if (m) {
       pickYear(game, Number(m[1]))
       return true
@@ -214,14 +227,15 @@ export function updateLobby(game, dt) {
   if (game.scene === 'profile') {
     const pf = game.prof
     if (k.has('pause')) {
-      if (pf.step === 'year') pf.step = 'name'
+      if (pf.step === 'year' && pf.mode === 'login') pf.step = 'name'
+      else if (pf.mode === 'year') pf.next()
       else game.goTitle()
     }
     if (pf.step === 'year') {
-      if (k.has('left')) pf.year = Math.max(1, pf.year - 1)
-      if (k.has('right')) pf.year = Math.min(6, pf.year + 1)
-      if (k.has('up')) pf.year = Math.max(1, pf.year - 3)
-      if (k.has('down')) pf.year = Math.min(6, pf.year + 3)
+      if (k.has('left')) pf.year = Math.max(0, pf.year - 1)
+      if (k.has('right')) pf.year = Math.min(7, pf.year + 1)
+      if (k.has('up')) pf.year = Math.max(0, pf.year - 4)
+      if (k.has('down')) pf.year = Math.min(7, pf.year + 4)
       if (k.has('enter') || k.has('action')) pickYear(game, pf.year)
     }
     return
@@ -311,6 +325,7 @@ export function drawLobby(game, ctx) {
     const pf = game.prof
     if (pf.step === 'name') {
       text(ctx, "WHAT'S YOUR NAME?", W / 2, 90, 34, '#fee761')
+      text(ctx, 'Played before? Type the same name and your game comes back!', W / 2, 118, 13, '#c0cbdc')
       rrect(ctx, W / 2 - 220, 130, 440, 64, 12)
       ctx.fillStyle = '#181425'
       ctx.fill()
@@ -322,14 +337,15 @@ export function drawLobby(game, ctx) {
       text(ctx, pf.err || 'Type your name, then press OK', W / 2, 232, 15, pf.err ? '#ff8fa0' : '#c0cbdc')
       drawKeys(ctx, nameKeys(), t, game)
     } else {
-      text(ctx, `HI ${pf.name}!`, W / 2, 96, 34, '#fee761')
+      text(ctx, pf.mode === 'year' ? pf.name : `HI ${pf.name}!`, W / 2, 96, 34, '#fee761')
       text(ctx, 'WHAT YEAR ARE YOU IN AT SCHOOL?', W / 2, 150, 22, '#ffffff')
       text(ctx, 'Your math and spelling will match your year', W / 2, 182, 14, '#c0cbdc')
       for (const b of YEARS) {
         const sel = pf.year === b.year
-        drawButton(ctx, { ...b, label: `YEAR ${b.year}`, color: sel ? '#fee761' : '#8b9bb4', size: 26 }, sel || inside(game.mouse, b), t)
+        drawButton(ctx, { ...b, label: yearLabel(b.year), color: sel ? '#fee761' : '#8b9bb4', size: 22 }, sel || inside(game.mouse, b), t)
       }
-      text(ctx, 'Tap your year, or press 1-6', W / 2, 440, 15, '#c0cbdc')
+      text(ctx, 'PREP = below Year 1    ·    YEAR 7+ = above Year 6', W / 2, 410, 14, '#c0cbdc')
+      text(ctx, 'Tap your year, or press 0-7', W / 2, 440, 15, '#c0cbdc')
     }
     return
   }
@@ -367,7 +383,7 @@ export function drawLobby(game, ctx) {
     const them = mp.them || {}
     const me = { name: game.profile.name, year: game.profile.year }
     const other = mp.side === 'aliens' ? 'dinos' : 'aliens'
-    const line = (side, who) => `${side === 'aliens' ? 'ALIENS' : 'DINOS'} ${safeName(who.name)} YEAR ${who.year || '?'}`.toUpperCase()
+    const line = (side, who) => `${side === 'aliens' ? 'ALIENS' : 'DINOS'} ${safeName(who.name)} ${yearLabel(Number(who.year) || 0)}`.toUpperCase()
     const aliens = mp.side === 'aliens' ? me : them
     const dinos = mp.side === 'dinos' ? me : them
     text(ctx, line('aliens', aliens), W / 2, 190, 32, '#7dffb0')

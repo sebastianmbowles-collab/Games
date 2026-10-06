@@ -8,7 +8,7 @@
 import { W, H, GROUND, WORLD, KIND_LIST, rrect, text, drawDino, drawUFO, drawBeam, getTheme } from './art'
 import { sfx, beamOn } from './sound'
 import { Dino, inBeam } from './game'
-import { safeName } from './names'
+import { safeName, yearLabel } from './names'
 
 const ROUND_TIME = 120
 const POWERS = ['mega', 'shield', 'speed']
@@ -522,7 +522,7 @@ export function drawVersus(game, ctx) {
   }
 }
 
-const tag = (vs, side) => `${side === 'aliens' ? 'ALIENS' : 'DINOS'} ${safeName(vs.names[side].name)} YEAR ${vs.names[side].year}`.toUpperCase()
+const tag = (vs, side) => `${side === 'aliens' ? 'ALIENS' : 'DINOS'} ${safeName(vs.names[side].name)} ${yearLabel(Number(vs.names[side].year) || 0)}`.toUpperCase()
 
 function hud(ctx, x, y, w, h) {
   rrect(ctx, x, y, w, h, 14)

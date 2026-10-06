@@ -78,7 +78,7 @@ const GLYPHS = {
   '🌙': '..###.. .##.... ##..... ##..... ##..... .##.... ..###..',
   '🏆': '####### ####### .#####. ..###.. ...#... ..###.. .#####.',
 }
-const ALIASES = { '—': '-', '…': '.', '–': '-' }
+const ALIASES = { '—': '-', '…': '.', '–': '-', '−': '-' }
 const FONT = {}
 for (const [ch, rows] of Object.entries(GLYPHS)) FONT[ch] = rows.split(' ')
 

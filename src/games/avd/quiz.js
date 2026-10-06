@@ -16,42 +16,47 @@ const shuffle = (arr) => {
 
 // ---------- math ----------
 
-// Problems follow the Australian school years, Year 1 to Year 6.
+// Problems follow the Australian school years:
+// Prep: tiny adding and taking away. Year 1: adding and subtracting. Year 2: adding, subtracting and a
+// little bit of times. Year 3: adding, subtracting, times and some dividing. Year 4: all four.
+// Year 5: times and dividing. Year 6: all of them, with bigger numbers. Year 7+: all of them, even bigger.
+const YEAR_MATH = {
+  0: { ops: ['+', '-'], max: 5 },
+  1: { ops: ['+', '-'], max: 10 },
+  2: { ops: ['+', '+', '-', '-', '×'], max: 25, tables: [2, 5, 10], upTo: 5 },
+  3: { ops: ['+', '-', '×', '×', '÷'], max: 50, tables: [2, 3, 4, 5, 10], upTo: 10 },
+  4: { ops: ['+', '-', '×', '×', '÷', '÷'], max: 100, tables: [2, 3, 4, 5, 6, 7, 8, 9, 10], upTo: 10 },
+  5: { ops: ['×', '÷'], tables: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], upTo: 12 },
+  6: { ops: ['+', '-', '×', '÷', 'big×'], max: 500, tables: [3, 4, 6, 7, 8, 9, 11, 12], upTo: 12 },
+  7: { ops: ['+', '-', '×', '÷', 'big×', 'big×'], max: 2000, tables: [6, 7, 8, 9, 11, 12], upTo: 12, big: 99 },
+}
+
 function mathProblem(year) {
-  const ops = {
-    1: ['+', '-'],
-    2: ['+', '-', '×'],
-    3: ['+', '-', '×', '×'],
-    4: ['+', '-', '×', '×', '÷'],
-    5: ['+', '-', '×', '×', '÷'],
-    6: ['+', '-', '×', '×', '÷', 'big×'],
-  }[year]
-  const op = pick(ops)
-  const max = { 1: 10, 2: 25, 3: 50, 4: 100, 5: 500, 6: 1000 }[year]
-  const tables = { 1: [2], 2: [2, 5, 10], 3: [2, 3, 4, 5, 10], 4: [2, 3, 4, 5, 6, 7, 8, 9, 10], 5: [3, 4, 6, 7, 8, 9, 11, 12], 6: [6, 7, 8, 9, 11, 12] }[year]
+  const m = YEAR_MATH[year] ?? YEAR_MATH[3]
+  const op = pick(m.ops)
   let a
   let b
   let answer
   if (op === '+') {
-    a = randInt(1, max)
-    b = randInt(1, max)
+    a = randInt(1, m.max)
+    b = randInt(1, m.max)
     answer = a + b
   } else if (op === '-') {
-    a = randInt(2, max * 2)
+    a = randInt(2, m.max * 2)
     b = randInt(1, a)
     answer = a - b
   } else if (op === '×') {
-    a = pick(tables)
-    b = randInt(1, year <= 3 ? 10 : 12)
+    a = pick(m.tables)
+    b = randInt(1, m.upTo)
     answer = a * b
   } else if (op === 'big×') {
-    a = randInt(12, 49)
+    a = randInt(12, m.big || 49)
     b = randInt(3, 9)
     answer = a * b
     return { q: `${a} × ${b} = ?`, answer }
   } else {
-    b = pick(year === 4 ? [2, 5, 10] : tables)
-    answer = randInt(1, 12)
+    b = pick(m.tables)
+    answer = randInt(1, m.upTo)
     a = b * answer
   }
   return { q: `${a} ${op} ${b} = ?`, answer }
@@ -107,10 +112,31 @@ const WORDS = [
   ['CARNIVORE', 'An animal that eats meat'],
   ['TRICERATOPS', 'The dino with three horns'],
   ['STEGOSAURUS', 'The dino with plates on its back'],
+  ['ZOO', 'The aliens want dinos for their space...'],
+  ['DIG', 'What you do to find fossils'],
+  ['CLAWS', 'Sharp nails on a dino foot'],
+  ['HATCH', 'When a baby breaks out of its egg'],
+  ['TRIASSIC', 'The first time of the dinosaurs'],
+  ['ASTEROID', 'A big rock flying through space'],
+  ['FOOTPRINT', 'A mark a dino foot leaves in mud'],
+  ['SPACESHIP', 'A ship that flies to other planets'],
+  ['MOTHERSHIP', 'The giant alien ship up in space'],
+  ['EXTINCTION', 'When a whole kind of animal dies out'],
+  ['CRETACEOUS', 'The last time of the dinosaurs'],
+  ['PREHISTORIC', 'From a time before writing was invented'],
+  ['PTERODACTYL', 'A flying reptile with big wings'],
+  ['SPINOSAURUS', 'A huge dino with a sail on its back'],
+  ['VELOCIRAPTOR', 'A small, fast, clever hunting dino'],
+  ['ANKYLOSAURUS', 'An armoured dino with a club tail'],
+  ['TYRANNOSAURUS', 'The full name of the T. rex'],
+  ['BRACHIOSAURUS', 'A very tall dino with a long neck'],
+  ['ARCHAEOPTERYX', 'An early bird with feathers and teeth'],
+  ['PALAEONTOLOGIST', 'A scientist who studies fossils'],
 ]
 
 export function makeSpell(year, lastWord) {
-  const lengths = { 1: [3, 4], 2: [3, 5], 3: [4, 6], 4: [4, 7], 5: [6, 9], 6: [7, 11] }[year]
+  // word lengths from the Australian year level guide
+  const lengths = { 0: [1, 4], 1: [2, 5], 2: [3, 6], 3: [4, 7], 4: [5, 8], 5: [6, 10], 6: [7, 12], 7: [8, 15] }[year] || [4, 7]
   const list = WORDS.filter(([w]) => w.length >= lengths[0] && w.length <= lengths[1] && w !== lastWord)
   const [word, clue] = pick(list)
   let order = shuffle(word.split(''))
@@ -176,7 +202,7 @@ function mathButtons() {
 
 function tileRects(quiz) {
   const n = quiz.tiles.length
-  const size = n > 9 ? 40 : 46
+  const size = n > 12 ? 32 : n > 9 ? 40 : 46
   const gap = 6
   const total = n * size + (n - 1) * gap
   return quiz.tiles.map((_, i) => ({ x: W / 2 - total / 2 + i * (size + gap), y: 200, w: size, h: 42 }))
