@@ -1532,7 +1532,7 @@ function backToBed() { // (the name stayed, but you don't go back to bed any mor
   P.slam = false; saved.beds++; store.set(saved); sfx('bed');
   if (saved.beds >= 100) achieve('Sleepwalker', 'Get back up 100 times');
   setTimeout(() => {
-    Object.assign(P, { x: cp.x, y: terrainH(cp.x, cp.z) + .2, z: cp.z, vy: 0, yaw: cp.yaw, pitch: 0, hp: 5, kx: 0, kz: 0, hurtT: 2.5 });
+    Object.assign(P, { x: cp.x, y: cp.y ?? terrainH(cp.x, cp.z) + .2, z: cp.z, vy: 0, yaw: cp.yaw, pitch: 0, hp: 5, kx: 0, kz: 0, hurtT: 2.5 });
     // robots step back a bit so you have room to breathe (they keep their damage!)
     robots.forEach(r => { if (r.alive) { r.lift = r.lv = 0; r.flung = false; r.path = []; r.alerted = false;
       if (Math.hypot(r.x - P.x, r.z - P.z) < 8) { r.x = r.home.x; r.z = r.home.z; } } });
@@ -1618,6 +1618,11 @@ function doPunch(charged) {
     const t = firstTouch((x, y, z) => Math.min(...balls.map(b => Math.hypot(b.x - x, b.y - y, b.z - z) - b.r)));
     if (t >= 0) found.push([t, boss]);
   }
+  if (aBoss && aBoss.active && !aBoss.immune) { // the boss of this area
+    const balls = aBoss.balls();
+    const t = firstTouch((x, y, z) => Math.min(...balls.map(b => Math.hypot(b.x - x, b.y - y, b.z - z) - b.r)));
+    if (t >= 0) found.push([t, aBoss]);
+  }
   // a little help aiming: if the line just missed, a robot almost straight ahead still counts
   if (!found.length) for (const r of robots) {
     if (!r.alive || !r.active) continue;
@@ -1627,7 +1632,7 @@ function doPunch(charged) {
   found.sort((a, b) => a[0] - b[0]);
   // a normal punch hits the first thing; a charged punch goes through everything in reach
   const hits = charged ? found : found.slice(0, 1);
-  for (const [, who] of hits) { if (who === boss) hitBoss(dmg); else hitRobot(who, dmg, charged ? 10 : 6); }
+  for (const [, who] of hits) { if (who === boss) hitBoss(dmg); else if (who === aBoss) hitABoss(dmg); else hitRobot(who, dmg, charged ? 10 : 6); }
   if (hits.length) {
     sfx('hit'); const t = hits[0][0]; hitStop = charged ? .12 : .06; state.shake = Math.max(state.shake, charged ? .2 : .08);
     burst(ex + dx * t, ey + dy * t, ez + dz * t, [0xffffff, 0xffe27f], charged ? 10 : 4);
@@ -1662,6 +1667,7 @@ function landSlam() {
     if (Math.hypot(r.x - P.x, r.z - P.z) < 4 && Math.abs(terrainH(r.x, r.z) - P.y) < 2.5) { r.lv = 4; hitRobot(r, dmg, 9); }
   }
   if (boss.active && !boss.under && bossBalls().some(b => !b.tail && Math.hypot(b.x - P.x, b.z - P.z) < b.r + 2.5)) hitBoss(dmg);
+  if (aBoss && aBoss.active && aBoss.balls().some(b => Math.hypot(b.x - P.x, b.z - P.z) < b.r + 2.5 && Math.abs(b.y - P.y) < b.r + 2.5)) hitABoss(dmg);
 }
 // gravity gloves: grab the robot you're looking at and fling it
 // ============ THE PILLOW GUN ============
@@ -1720,10 +1726,12 @@ function updatePillows(dt) {
     let hit = null;
     for (const r of robots) if (r.alive && r.active && robotDist(r, q.x, q.y, q.z) < HB.robot + .3) { hit = r; break; }
     if (!hit && boss.active && !boss.under && bossBalls().some(b => Math.hypot(b.x - q.x, b.y - q.y, b.z - q.z) < b.r + .3)) hit = boss;
+    if (!hit && aBoss && aBoss.active && aBoss.balls().some(b => Math.hypot(b.x - q.x, b.y - q.y, b.z - q.z) < b.r + .3)) hit = aBoss;
     const ground = q.y < terrainH(q.x, q.z) + .1, wall = insideSolid(q.x, q.y, q.z);
     if (hit || ground || wall || q.life <= 0) {
       burst(q.x, q.y, q.z, [0xffffff, 0xffeefa], hit ? 10 : 5); // feathers!
       if (hit === boss) { hitBoss(1); sfx('hit'); }
+      else if (hit === aBoss) hitABoss(1);
       else if (hit) {
         let dmg = 1; if (state.buffs.power > 0) dmg *= 2;
         const sp = Math.hypot(q.vx, q.vz) || 1;
@@ -1747,6 +1755,9 @@ function useGloves() {
   }
   let bossHit = false;
   if (!best && boss.active) { const dx = boss.x - P.x, dz = boss.z - P.z, d = Math.hypot(dx, dz); bossHit = d < 13 && (dx * fx + dz * fz) / (d || 1) > .4; }
+  let aHit = false;
+  if (!best && !bossHit && aBoss && aBoss.active) { const ab = aBoss.balls()[0], dx = ab.x - P.x, dz = ab.z - P.z, d = Math.hypot(dx, dz); aHit = d < 16 && (dx * fx + dz * fz) / (d || 1) > .4; }
+  if (aHit) { state.gloveCool = 1; sfx('glove'); state.glovesOnBoss = true; const ab = aBoss.balls()[0]; gloveBeam.geometry.setFromPoints([new THREE.Vector3(P.x, P.y + 1.1, P.z), new THREE.Vector3(ab.x, ab.y, ab.z)]); gloveBeam.visible = true; beamT = .25; hitABoss(state.buffs.power > 0 ? 4 : 2); return; }
   if (!best && !bossHit) { toast('', 'Nothing to grab. Look at a robot!'); return; }
   state.gloveCool = 1; sfx('glove');
   const tx = best ? best.x : boss.x, tz = best ? best.z : boss.z;
@@ -2543,6 +2554,7 @@ function loop(now) {
   }
   updateRings(dt);
   updatePortals(dt, time);
+  if (aBoss && aBoss.g && aBoss.active) { aBoss.flash = Math.max(0, (aBoss.flash || 0) - dt); }
   if (curArea !== 'home' && AREAS[curArea].update) AREAS[curArea].update(dt, time);
   updateFireworks(dt);
   updateFar(time);
@@ -2567,8 +2579,18 @@ function loop(now) {
 // the old world (the bedroom, meadow and desert) and shows the new area, with
 // its own ground, enemies, key and boss.
 let curArea = 'home';
+// AREA BOSSES: each one gives the game an object with balls() (its hitbox), hit and die
+let aBoss = null;
+function hitABoss(dmg) {
+  if (!aBoss || !aBoss.active || aBoss.immune) return;
+  aBoss.hp -= dmg; aBoss.flash = .15; sfx('hit'); $('bossfill').style.width = Math.max(0, aBoss.hp / aBoss.maxHp * 100) + '%';
+  if (aBoss.onHit) aBoss.onHit(dmg);
+  if (aBoss.hp <= 0) { aBoss.active = false; $('bossbar').hidden = true; aBoss.die(); if (!state.glovesOnBoss) achieve('Fists Only', 'Beat a boss without gravity gloves'); }
+}
+function startABoss(b) { aBoss = b; b.active = true; b.hp = b.maxHp; state.glovesOnBoss = false; $('bossbar').hidden = false; $('bossbar').querySelector('span').textContent = b.name; $('bossfill').style.width = '100%'; objective('Beat the ' + b.name); }
 const AREAS = {};
-const isGlobal = o => o === camera || o.isLight || o === sun.target || (() => { let f = false; o.traverse(q => { if (q.material && q.material.fog === false) f = true; }); return f; })();
+// things that belong to every world: the camera, lights, and the sky stuff (everything in it ignores fog)
+const isGlobal = o => o === camera || o.isLight || o === sun.target || (() => { let any = false, all = true; o.traverse(q => { if (q.material) { any = true; if (q.material.fog !== false) all = false; } }); return any && all; })();
 const HOME = scene.children.filter(o => !isGlobal(o));
 const homeSolidCount = solids.length;
 const homeFog = { c: scene.fog.color.getHex(), n: scene.fog.near, f: scene.fog.far };
@@ -2586,10 +2608,10 @@ function aBox(a, w, h, d, color, x, y, z, isSolid = true, m) {
 }
 function aGem(a, type, x, z, y) { const g = addGem(type, x, z, y ?? a.h(x, z) + .7); g.area = a.name; scene.remove(g.m); a.group.add(g.m); return g; }
 function aRobot(a, x, z, heart) { const r = addRobot(x, z, heart, a.name, true); r.maxHp = r.hp = a.robotHp || 4; scene.remove(r.g); a.group.add(r.g); r.area = a.name; return r; }
-function aNote(a, lines, x, y, z, ry = 0) {
+function aNote(a, lines, x, y, z, ry = 0, gy = a.h(x, z)) {
   const n = note(lines, 1.8, 1.05); n.position.set(x, y, z); n.rotation.y = ry; a.group.add(n);
-  const post = mesh(boxG(.15, y - .3, .15), mat(0xe2d6f2)); post.position.set(x, (y - .3) / 2 + a.h(x, z) - .1, z); a.group.add(post);
-  messages.push({ m: n, x, y: a.h(x, z), z, found: false, area: a.name });
+  const ph = Math.max(.3, y - .3 - gy), post = mesh(boxG(.15, ph, .15), mat(0xe2d6f2)); post.position.set(x, gy + ph / 2, z); a.group.add(post);
+  messages.push({ m: n, x, y: gy, z, found: false, area: a.name });
 }
 function aKey(a, n, color, x, y, z) { const k = { kind: 'key', n, m: makeKey(color), base: y, taken: false, active: true, area: a.name }; scene.remove(k.m); a.group.add(k.m); k.m.position.set(x, y, z); pickups.push(k); a.key = k; return k; }
 function aGround(a, size, colorAt) {
@@ -2636,7 +2658,7 @@ function enterArea(name, instant) {
     a.group.visible = true; a.solids.forEach(sd => sd.on = true);
     robots.forEach(r => { if (r.area === name && r.alive) { r.active = true; r.g.visible = true; } });
     const f = a.fog; scene.fog.color.setHex(f[0]); scene.fog.near = f[1]; scene.fog.far = f[2];
-    Object.assign(P, { x: a.start.x, z: a.start.z, y: a.h(a.start.x, a.start.z) + .2, vy: 0, yaw: a.start.yaw, pitch: 0, kx: 0, kz: 0, hp: Math.max(P.hp, 3), hurtT: 1.5 });
+    Object.assign(P, { x: a.start.x, z: a.start.z, y: a.start.y ?? a.h(a.start.x, a.start.z) + .2, vy: 0, yaw: a.start.yaw, pitch: 0, kx: 0, kz: 0, hp: Math.max(P.hp, 3), hurtT: 1.5 });
     saved.save = Object.assign(saved.save || {}, { keys: state.keys, area: name, gems: state.gems, kids: state.kids }); store.set(saved);
     if (a.enter) a.enter();
     state.mode = 'play'; $('fade').style.opacity = 0; hud();
@@ -2750,6 +2772,169 @@ const zoneOf = (name, b) => { ZONES[name] = b; };
       an.g.position.set(an.x + (an.glitch > .9 ? rand(-.2, .2) : 0), y, an.z); an.g.rotation.y = Math.atan2(Math.cos(an.hop * .3), Math.sin(an.hop * .25));
     });
     a.leaves.material.emissive = a.leaves.material.emissive || new THREE.Color(); if (Math.random() < .02) { a.leaves.material.emissive.setHex(0x3a1050); setTimeout(() => a.leaves.material.emissive.setHex(0), 90); }
+  };
+}
+
+// a lightning bolt from the sky: a warning ring first, then ZAP
+const bolts = [];
+function lightning(x, z, y, group, delay = 1, r = 1.6) {
+  const ring = mesh(new THREE.RingGeometry(r - .25, r, 32), new THREE.MeshBasicMaterial({ color: 0xffe27f, transparent: true, opacity: .8, side: THREE.DoubleSide, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(x, y + .06, z); group.add(ring);
+  bolts.push({ ring, x, y, z, r, t: delay, group, hit: false });
+}
+function updateBolts(dt) {
+  for (let i = bolts.length - 1; i >= 0; i--) {
+    const b = bolts[i]; b.t -= dt;
+    if (b.t > 0) { b.ring.material.opacity = .4 + Math.abs(Math.sin(b.t * 18)) * .5; continue; }
+    if (!b.bolt) {
+      b.bolt = mesh(new THREE.CylinderGeometry(.18, .35, 40, 6), new THREE.MeshBasicMaterial({ color: 0xfffbe0 })); b.bolt.position.set(b.x, b.y + 20, b.z); b.group.add(b.bolt);
+      b.glow = halo(0xfff2a8, 9, 1); b.glow.position.set(b.x, b.y + 1, b.z); b.group.add(b.glow);
+      if (ac) { const t = ac.currentTime; hiss(t, .6, .35, 5000, 300, 'highpass'); hiss(t + .05, 1.2, .3, 200, 60, 'lowpass'); }
+      state.shake = Math.max(state.shake, .25); burst(b.x, b.y + .3, b.z, [0xfff2a8, 0xffffff], 10);
+      if (Math.hypot(P.x - b.x, P.z - b.z) < b.r + .2 && P.y - b.y < 3) hurt(1, b.x, b.z);
+    }
+    b.bolt.material.opacity = 1; b.bolt.visible = Math.random() < .8;
+    if (b.t < -.25) { b.group.remove(b.ring); b.group.remove(b.bolt); b.group.remove(b.glow); bolts.splice(i, 1); }
+  }
+}
+
+// ===================== 4. CLOUD CITY =====================
+// No ground at all: jump between floating cloud platforms. Some slide, some bounce,
+// some are storm clouds that fall when you stand on them. Watch out for the wind!
+// At the end, the STORM MACHINE guards key 4.
+{
+  const a = makeArea('cloud', {
+    title: 'Cloud City', sub: 'Jump from cloud to cloud. Don\'t look down!', goal: 'Reach the Storm Machine',
+    fog: [0xb8a0ff, 30, 170], next: 'mirror', h: () => -60,
+    keyText: 'The storm clears… and a portal to the MIRROR MAZE opens.',
+  });
+  a.start = { x: 0, y: .1, z: 2, yaw: Math.PI };
+  a.falls = 0; a.plats = [];
+  const puffM = [0xffffff, 0xfff0fb, 0xf0e6ff].map(c => mat(c, { flatShading: false, shininess: 20 }));
+  const stormM = mat(0x8a809a, { flatShading: false });
+  // a cloud platform: a flat solid top with puffy balls around it
+  const cloud = (x, y, z, r, kind = 'cloud', extra = {}) => {
+    const g = new THREE.Group(), m = kind === 'storm' ? stormM : pick(puffM);
+    const top = mesh(new THREE.CylinderGeometry(r, r * .8, .6, 14), kind === 'bounce' ? mat(0xff9ad5, { flatShading: false }) : m); top.position.y = -.3; g.add(top);
+    for (let i = 0; i < Math.round(r * 4); i++) { const a2 = rand(0, Math.PI * 2), b = mesh(new THREE.IcosahedronGeometry(rand(.4, .8) * Math.min(1.4, r * .6), 1), m); b.position.set(Math.cos(a2) * r * .85, rand(-.7, -.1), Math.sin(a2) * r * .85); g.add(b); }
+    if (kind === 'bounce') { g.add(at(halo(0xff9ad5, r * 2.5, .5), 0, .2, 0)); }
+    if (extra.cp) { const flag = mesh(new THREE.ConeGeometry(.25, .6, 4), glow(0x7ff0d8)); flag.position.set(0, 1.2, 0); flag.rotation.z = Math.PI / 2; g.add(flag); const pole = mesh(boxG(.06, 1.5, .06), mat(0xffffff)); pole.position.set(-.3, .75, 0); g.add(pole); }
+    g.position.set(x, y, z); a.group.add(g);
+    const k = r * .78, sd = aSolid(a, x - k, y - .6, z - k, x + k, y, z + k);
+    const pl = Object.assign({ g, sd, x, y, z, r, k, kind, t: 0, home: { x, y, z } }, extra); a.plats.push(pl); return pl;
+  };
+  // the route: start cloud, then a winding path up and over to the storm arena
+  cloud(0, 0, 2, 4, 'cloud', { cp: true });
+  const route = [[0, .3, 8, 1.6], [2.5, .9, 11, 1.4], [0, 1.5, 14, 1.4], [-3, 1.5, 17, 1.6, 'slide', { ax: 4, sp: .7 }], [-3, 2.1, 21, 1.3],
+    [0, 2.1, 24.5, 2.8, 'cloud', { cp: true }], [3.5, 2.5, 28, 1.3, 'storm'], [6, 3, 31, 1.3, 'storm'], [8, 3.4, 34.5, 1.6],
+    [8, 2.4, 38.5, 1.4, 'bounce'], [8, 7.5, 43, 2.2, 'cloud', { cp: true }], [4.5, 7.5, 46, 1.3, 'slide', { az: 2.5, sp: .9 }], [1, 7.9, 49.5, 1.3],
+    [-2.5, 8.3, 52.5, 1.3, 'storm'], [-5.5, 8.6, 55.5, 1.4], [-5.5, 7.6, 59.5, 2.4, 'cloud', { cp: true }]];
+  route.forEach(([x, y, z, r, kind, extra]) => cloud(x, y, z, r, kind, extra));
+  cloud(-5.5, 2.5, 25.5, 1.2); cloud(-9, 2.9, 27, 1.1); cloud(-12, 3.4, 28.6, 1.1); cloud(-14.5, 3.9, 30.5, 1.6); // a secret side path
+  // gems floating along the way (some on side paths)
+  [['pink', 2.5, 12], ['blue', -3, 22], ['green', 8, 35.5], ['purple', 8, 43], ['pink', -5.5, 57], ['rainbow', -14.5, 30.5]].forEach(([t, x, z]) => {
+    const pl = a.plats.reduce((b, q) => Math.hypot(q.x - x, q.z - z) < Math.hypot(b.x - x, b.z - z) ? q : b); aGem(a, t, x, z, pl.y + .8); });
+  aNote(a, ['i made the clouds', 'so i could fly away.'], -15, 5.4, 31, Math.PI / 2, 3.9);
+  // the storm arena: a huge round cloud
+  const ar = { x: 0, y: 6, z: 75 };
+  cloud(ar.x, ar.y, ar.z, 13, 'cloud'); a.plats[a.plats.length - 1].arena = true;
+  cloud(-3, 7, 64, 1.6); cloud(0, 6.5, 66.5, 1.5);
+  // decoration: far-away cloud towers and floating sky lanterns
+  for (let i = 0; i < 18; i++) { const x = rand(-60, 60), z = rand(-10, 110); if (Math.abs(x) < 20 && z > -5 && z < 90) continue; const t = new THREE.Group();
+    for (let k = 0; k < 6; k++) { const b = mesh(new THREE.IcosahedronGeometry(rand(3, 6), 1), pick(puffM)); b.position.set(rand(-3, 3), k * 3 - 20, rand(-3, 3)); t.add(b); }
+    t.position.set(x, rand(-5, 10), z); a.group.add(t); }
+  a.lanterns = [];
+  for (let i = 0; i < 26; i++) { const l = mesh(boxG(.35, .5, .35), glow(pick([0xffd080, 0xff9ad5, 0x9fe8ff]))); l.position.set(rand(-25, 25), rand(-6, 18), rand(0, 95)); l.add(halo(0xffd080, 1.6, .5)); a.group.add(l); a.lanterns.push(l); }
+  a.portal = makePortal(0x9fe8ff); a.portal.position.set(0, ar.y, ar.z + 8); a.group.add(a.portal);
+  // wind gusts
+  a.windT = 6; a.wind = 0; a.windDir = 1;
+  a.streaks = [];
+  for (let i = 0; i < 30; i++) { const sk = mesh(boxG(2.5, .04, .04), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 })); a.group.add(sk); a.streaks.push(sk); }
+
+  // ---------- THE STORM MACHINE ----------
+  const SM = { name: 'Storm Machine', maxHp: 20, hp: 20, active: false, x: ar.x, y: ar.y + 7, z: ar.z, mode: 'hover', t: 0, zaps: 0, flash: 0 };
+  { const g = new THREE.Group(), metal = new THREE.MeshPhongMaterial({ color: 0x6a6a8a, shininess: 90, specular: 0xaaaaff });
+    const body = mesh(new THREE.SphereGeometry(1.8, 24, 16), metal); g.add(body); SM.body = metal;
+    const core = mesh(new THREE.SphereGeometry(.8, 16, 12), glow(0x5ff6ff)); core.position.y = -1.3; g.add(core); SM.core = core;
+    g.add(at(halo(0x5ff6ff, 4, .6), 0, -1.3, 0));
+    const eye = mesh(boxG(1.8, .35, .2), glow(0xffe27f)); eye.position.set(0, .3, 1.75); g.add(eye); SM.eye = eye;
+    SM.rings = [0, 1].map(k => { const r = mesh(new THREE.TorusGeometry(2.6 + k * .7, .1, 8, 40), glow(k ? 0xb07fff : 0x9fe8ff)); r.rotation.x = Math.PI / 2 + k * .4; g.add(r); return r; });
+    for (let k = 0; k < 4; k++) { const rod = mesh(new THREE.CylinderGeometry(.06, .1, 1.6, 6), metal); const an = k * Math.PI / 2; rod.position.set(Math.cos(an) * 1.3, 1.6, Math.sin(an) * 1.3); g.add(rod);
+      const tip = mesh(new THREE.SphereGeometry(.14, 8, 6), glow(0xfff2a8)); tip.position.copy(rod.position).y += .85; g.add(tip); }
+    for (let k = 0; k < 10; k++) { const c = mesh(new THREE.IcosahedronGeometry(rand(.7, 1.2), 1), stormM); const an = k / 10 * Math.PI * 2; c.position.set(Math.cos(an) * 1.8, -1.6, Math.sin(an) * 1.8); g.add(c); }
+    ink(g, .03); g.position.set(SM.x, SM.y, SM.z); a.group.add(g); SM.g = g; }
+  SM.balls = () => [{ x: SM.g.position.x, y: SM.g.position.y, z: SM.g.position.z, r: 2 }, { x: SM.g.position.x, y: SM.g.position.y - 1.4, z: SM.g.position.z, r: 1.1 }];
+  SM.onHit = () => { if (SM.mode !== 'drain') SM.hpShield = true; };
+  SM.die = () => {
+    for (let i = 0; i < 6; i++) setTimeout(() => { burst(SM.g.position.x + rand(-2, 2), SM.g.position.y + rand(-1, 1), SM.g.position.z + rand(-2, 2), [0x9fe8ff, 0xfff2a8, 0xffffff], 18); sfx('slam'); }, i * 220);
+    setTimeout(() => { SM.g.visible = false; a.key.active = true; a.key.m.visible = true; toast('Storm Machine defeated!', 'Key 4 appeared'); objective('Grab key 4'); }, 1500);
+    achieve('Storm Chaser', 'Beat the Storm Machine');
+  };
+  aKey(a, 4, 0x9fe8ff, ar.x, ar.y + 1.3, ar.z); a.key.active = false; a.key.m.visible = false;
+  a.onRespawn = () => { bolts.forEach(b => { b.group.remove(b.ring); if (b.bolt) { b.group.remove(b.bolt); b.group.remove(b.glow); } }); bolts.length = 0; if (SM.active) { SM.mode = 'hover'; SM.t = 0; } };
+  a.leave = () => { aBoss = null; $('bossbar').hidden = true; };
+
+  a.update = (dt, time) => {
+    updateBolts(dt);
+    a.lanterns.forEach((l, i) => { l.position.y += Math.sin(time * .5 + i) * dt * .3; l.rotation.y += dt * .3; });
+    // platforms: slide, sink (storm clouds) and bounce
+    let standing = null;
+    for (const pl of a.plats) {
+      const on = P.onGround && P.x > pl.sd.x0 - .1 && P.x < pl.sd.x1 + .1 && P.z > pl.sd.z0 - .1 && P.z < pl.sd.z1 + .1 && Math.abs(P.y - pl.sd.y1) < .15;
+      if (on) standing = pl;
+      let nx = pl.home.x, ny = pl.home.y, nz = pl.home.z;
+      if (pl.kind === 'slide') { pl.t += dt * pl.sp; nx += Math.sin(pl.t) * (pl.ax || 0); nz += Math.sin(pl.t) * (pl.az || 0); }
+      if (pl.kind === 'storm') {
+        if (on) pl.t += dt; else if (pl.t > 0 && pl.t < 1.2) pl.t = Math.max(0, pl.t - dt * .5);
+        if (pl.t > .9) { pl.fall = (pl.fall || 0) + dt * 6; ny -= pl.fall * pl.fall; } // it gives way!
+        if (pl.t > .9 && pl.fall > 3.5) { pl.t = 0; pl.fall = 0; } // …and comes back
+        pl.g.position.x = nx + (pl.t > .4 && pl.t < .9 ? rand(-.06, .06) : 0);
+      }
+      const dx = nx - pl.x, dy = ny - pl.y, dz = nz - pl.z;
+      pl.x = nx; pl.y = ny; pl.z = nz; if (pl.kind !== 'storm') pl.g.position.x = nx; pl.g.position.y = ny; pl.g.position.z = nz;
+      pl.sd.x0 = nx - pl.k; pl.sd.x1 = nx + pl.k; pl.sd.z0 = nz - pl.k; pl.sd.z1 = nz + pl.k; pl.sd.y0 = ny - .6; pl.sd.y1 = ny;
+      if (on && pl.kind === 'slide') { P.x += dx; P.z += dz; }
+      if (on && pl.kind === 'bounce') { P.vy = 14.5; P.onGround = false; sfx('jump'); burst(P.x, P.y, P.z, [0xff9ad5, 0xffffff], 6); }
+    }
+    if (standing && standing.cp) a.start = { x: standing.home.x, y: standing.home.y + .1, z: standing.home.z, yaw: P.yaw };
+    if (standing && standing.arena && !a.reached) { a.reached = true; if (a.falls === 0) achieve('Sky Walker', 'Never fall in cloud city'); }
+    if (standing && standing.arena && !SM.active && SM.hp > 0) { startABoss(SM); toast('THE STORM MACHINE', 'Dodge the lightning. Hit its glowing core when it comes down!'); sfx('roar'); }
+    // falling off: lose a heart and get back on your last checkpoint cloud
+    if (P.y < -10 && state.mode === 'play') {
+      a.falls++; P.hurtT = 0; P.hp -= 1; sfx('hurt'); hud();
+      if (P.hp <= 0) backToBed(); else { const c = a.start; Object.assign(P, { x: c.x, z: c.z, y: c.y, vy: 0, kx: 0, kz: 0, hurtT: 1.5 }); toast('Whoa!', 'Back to the last flag'); }
+    }
+    // wind gusts across the middle of the path (not in the arena)
+    a.windT -= dt;
+    if (a.windT <= 0 && a.wind <= 0 && P.z > 10 && P.z < 60) { a.wind = 2.2; a.windDir = Math.random() < .5 ? -1 : 1; toast('', a.windDir > 0 ? 'WIND! ←' : 'WIND! →'); if (ac) hiss(ac.currentTime, 2.2, .12, 400, 900, 'bandpass'); }
+    if (a.wind > 0) { a.wind -= dt; if (a.wind <= 0) a.windT = rand(5, 9); if (!P.onGround || true) P.x -= a.windDir * 2.2 * dt * (P.onGround ? .6 : 1); }
+    a.streaks.forEach((sk, i) => { if (a.wind > 0) { sk.material.opacity = .5; sk.position.set(P.x + ((time * 30 * -a.windDir + i * 7) % 30) - 15, P.y + rand(-1, 3), P.z + (i % 10) - 5); } else sk.material.opacity = 0; });
+    // ---- the Storm Machine's brain ----
+    if (!SM.g.visible) return;
+    SM.rings[0].rotation.z += dt * 2; SM.rings[1].rotation.z -= dt * 1.4;
+    SM.flash = Math.max(0, SM.flash - dt); SM.body.emissive.setHex(SM.flash > 0 ? 0xff6fc8 : 0);
+    if (!SM.active) { SM.g.position.y = SM.y + Math.sin(time) * .4; return; }
+    const angry = SM.hp <= SM.maxHp / 2;
+    SM.t += dt;
+    if (SM.mode === 'hover') { // float around the arena and shoot lightning at you
+      const ang = time * .35; SM.g.position.set(ar.x + Math.sin(ang) * 6, SM.y + Math.sin(time * 1.3) * .5, ar.z + Math.cos(ang) * 6);
+      SM.g.lookAt(P.x, SM.g.position.y, P.z); SM.core.material.color.setHex(0x5ff6ff); SM.eye.material.color.setHex(0xffe27f);
+      if (SM.t > (angry ? .9 : 1.3)) { SM.t = 0; SM.zaps++;
+        const lead = 1; lightning(P.x, P.z, ar.y, a.group, lead); if (angry) { const an = rand(0, 6); lightning(P.x + Math.cos(an) * 3, P.z + Math.sin(an) * 3, ar.y, a.group, lead + .2); }
+        if (SM.zaps % 4 === 0) { SM.mode = 'gust'; SM.t = 0; toast('', 'It\'s blowing you away!'); }
+      }
+    } else if (SM.mode === 'gust') { // blows you towards the edge of the cloud
+      const dx = P.x - ar.x, dz = P.z - ar.z, d = Math.hypot(dx, dz) || 1;
+      if (SM.t < 2.2) { P.x += dx / d * 3.2 * dt; P.z += dz / d * 3.2 * dt; SM.eye.material.color.setHex(0xff6fc8); }
+      a.streaks.forEach((sk, i) => { sk.material.opacity = SM.t < 2.2 ? .6 : 0; sk.lookAt(ar.x, sk.position.y, ar.z); sk.position.set(ar.x + Math.sin(i) * ((time * 8 + i * 3) % 13), ar.y + 1 + (i % 4) * .6, ar.z + Math.cos(i) * ((time * 8 + i * 3) % 13)); });
+      if (SM.t > 2.6) { SM.mode = 'down'; SM.t = 0; }
+    } else if (SM.mode === 'down') { // tired: it sinks down and its core glows pink. HIT IT NOW!
+      const gp = SM.g.position; gp.y += (ar.y + 2.2 - gp.y) * Math.min(1, dt * 3);
+      SM.core.material.color.setHex(Math.floor(time * 6) % 2 ? 0xff6fc8 : 0xffffff); SM.eye.material.color.setHex(0x5a5a7a);
+      if (SM.t < .1) toast('', 'NOW! Punch its core!');
+      if (SM.t > (angry ? 3.5 : 5)) { SM.mode = 'hover'; SM.t = 0; burst(gp.x, gp.y, gp.z, [0x9fe8ff, 0xffffff], 14); if (Math.hypot(P.x - gp.x, P.z - gp.z) < 3) hurt(1, gp.x, gp.z); }
+    }
+    SM.immune = SM.mode !== 'down'; // only hurtable when it's down (pillows still bonk it a little)
   };
 }
 
