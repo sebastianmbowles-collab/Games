@@ -564,7 +564,9 @@ const dust = (() => {
 
 // ---------- terrain ----------
 function noise(x, z) { return Math.sin(x * .31 + z * .17) * .5 + Math.sin(x * .13 - z * .27) * .5 + Math.sin(x * .7 + z * .53) * .25; }
+let groundFn = null; // each area has its own ground shape
 function terrainH(x, z) {
+  if (groundFn) return groundFn(x, z);
   const room = Math.max(0, 1 - Math.hypot(x, z) / 9);
   let h = noise(x, z) * 0.3;
   if (z > 20) {
@@ -1486,14 +1488,17 @@ function endingCine() {
   playCine([
     { text: 'KEY 2 of 10!', d: 2.5, snap: true, pos: [P.x + 3, P.y + 2.5, P.z + 3], look: [P.x, P.y + 1, P.z] },
     { text: 'Far away, someone who looks just like Sebastian is watching…', d: 4, pos: [0, 30, 60], look: [0, 0, 30], speed: .6 },
-    { text: 'Tonight, the whole world will shift again.', d: 3.5, pos: [0, 40, 40], look: [0, 0, 40], speed: .6 },
-  ], () => {
+    { text: 'A glowing portal opens in the sand. Dreamland goes on…', d: 3.5, pos: [0, 40, 40], look: [0, 0, 40], speed: .6 },
+  ], () => { openPortal(homePortal, 'forest'); objective('Step into the portal'); });
+}
+function chapterEnd() { // shown when you reach the end of the areas that exist so far
+  {
     state.mode = 'end';
     const s = Math.floor((performance.now() - state.startTime) / 1000);
-    $('eMsg').textContent = `Key 2 of 10 is yours. You found ${messages.filter(m => m.found).length} of ${messages.length} hidden messages. Tonight the world will shift again…`;
+    $('eMsg').textContent = `Key ${state.keys} of 10 is yours. You found ${messages.filter(m => m.found).length} of ${messages.length} hidden messages. More of Dreamland is coming…`;
     $('eKids').textContent = state.kids; $('eGems').textContent = state.gems; $('eTime').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     $('endScreen').hidden = false; document.exitPointerLock?.();
-  });
+  }
 }
 
 // ============ GAME FLOW ============
@@ -1509,6 +1514,7 @@ function hurt(n, fromX, fromZ) {
 // CHECKPOINTS: when you run out of hearts you don't go all the way back to bed.
 // You get back up at the nearest checkpoint you've already reached.
 function checkpoint() {
+  if (curArea !== 'home') return AREAS[curArea].start;
   const spots = [{ x: 0, z: -1, yaw: Math.PI }];                                    // your bedroom (only if you never left)
   if (P.z > 5 || state.keys > 0) spots.push({ x: 0, z: 8.6, yaw: Math.PI });        // just outside the window
   if (P.z > 14 || state.gateOpen) spots.push({ x: 0, z: 16.5, yaw: Math.PI });      // in front of the gate
@@ -1531,6 +1537,7 @@ function backToBed() { // (the name stayed, but you don't go back to bed any mor
     robots.forEach(r => { if (r.alive) { r.lift = r.lv = 0; r.flung = false; r.path = []; r.alerted = false;
       if (Math.hypot(r.x - P.x, r.z - P.z) < 8) { r.x = r.home.x; r.z = r.home.z; } } });
     // the scorpion goes back to the middle of its arena but stays hurt
+    if (curArea !== 'home' && AREAS[curArea].onRespawn) AREAS[curArea].onRespawn();
     if (!state.bossDead && boss.active) { Object.assign(boss, { x: 0, z: 78, mode: 'walk', modeT: 0, cool: 2, under: false, rise: 1 }); bossRing.visible = false; boss.tail.scale.setScalar(1); straighten(0); }
     toast('Back on your feet!', 'You have all your hearts again');
     hud(); state.mode = 'play';
@@ -1762,7 +1769,7 @@ function collect(p) {
   if (p.kind === 'key') {
     state.keys = p.n; sfx('key'); hud();
     saved.save = { keys: p.n, gems: state.gems, kids: state.kids }; store.set(saved);
-    if (p.n === 1) gateCine(); else endingCine();
+    if (p.n === 1) gateCine(); else if (p.n === 2) endingCine(); else areaKeyCine(p);
     return;
   }
   state.gems++; sfx('gem'); saved.totalGems++; store.set(saved);
@@ -2005,6 +2012,7 @@ function newDream(cont) {
     openGate(); gateBars.position.y = -6.6;
     Object.assign(P, { x: 0, y: 0, z: 16, yaw: Math.PI, pitch: 0 });
     objective('Cross the pastel desert'); toast('Night ' + saved.nights, 'The world shifted. The robots moved to new places!'); hud();
+    if (saved.save.area && AREAS[saved.save.area]) { state.keys = saved.save.keys; state.bossDead = true; hud(); enterArea(saved.save.area, true); }
   } else { hud(); introCine(); }
 }
 const easeIO = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -2483,7 +2491,7 @@ function loop(now) {
     updatePlayer(dt);
     // pickups
     for (const p of pickups) {
-      if (p.taken || !p.active) continue;
+      if (p.taken || !p.active || (p.area || 'home') !== curArea) continue;
       const pp = p.m.position, gd = Math.hypot(pp.x - P.x, pp.z - P.z);
       // gems zoom over to you when you get close (keys stay put, you have to reach them!)
       if (p.kind === 'gem' && gd < 3.2 && Math.abs(pp.y - (P.y + 1)) < 3) {
@@ -2493,7 +2501,7 @@ function loop(now) {
     }
     // hidden messages: walk up close to read one
     for (const m of messages) {
-      if (m.found || Math.hypot(m.x - P.x, m.z - P.z) > 3.2 || Math.abs(m.y - P.y) > 3) continue;
+      if (m.found || (m.area || 'home') !== curArea || Math.hypot(m.x - P.x, m.z - P.z) > 3.2 || Math.abs(m.y - P.y) > 3) continue;
       m.found = true; const n = messages.filter(q => q.found).length;
       toast(`Hidden message ${n} of ${messages.length}`, 'Who keeps writing these?'); sfx('message');
       if (n === messages.length) achieve('Message Finder', 'Find every hidden message');
@@ -2507,12 +2515,12 @@ function loop(now) {
     }
     state.gloveCool = Math.max(0, state.gloveCool - dt);
     // the dream door in the bedroom goes back to the gate
-    if (dreamDoor.visible && Math.hypot(P.x - 4.6, P.z + 1.6) < 1 && P.y < 1) {
+    if (curArea === 'home' && dreamDoor.visible && Math.hypot(P.x - 4.6, P.z + 1.6) < 1 && P.y < 1) {
       state.mode = 'dead'; sfx('door'); $('fadeText').textContent = '✦'; $('fade').style.opacity = 1;
       setTimeout(() => { Object.assign(P, { x: 0, y: 0, z: 16, vy: 0, yaw: Math.PI, pitch: 0, kx: 0, kz: 0 }); state.mode = 'play'; $('fade').style.opacity = 0; }, 700);
     }
     // boss trigger
-    if (state.gateOpen && !state.bossSeen && P.z > 62) bossCine();
+    if (curArea === 'home' && state.gateOpen && !state.bossSeen && P.z > 62) bossCine();
     if (state.gateOpen && !state.bossSeen && P.z > 30 && P.z < 31 && $('objText').textContent === 'Cross the pastel desert') objective('Explore the desert. Free the kids!');
     // buffs
     const b = state.buffs; let changed = false;
@@ -2534,6 +2542,8 @@ function loop(now) {
     $('dist').textContent = Math.round(Math.hypot(dx, dz)) + ' m';
   }
   updateRings(dt);
+  updatePortals(dt, time);
+  if (curArea !== 'home' && AREAS[curArea].update) AREAS[curArea].update(dt, time);
   updateFireworks(dt);
   updateFar(time);
   wind.value = time;
@@ -2550,6 +2560,199 @@ function loop(now) {
   watchFps(dt);
   if (composer && fancy) composer.render(); else renderer.render(scene, camera);
 }
+// =====================================================================
+// ============ AREAS: the rest of Dreamland ============
+// =====================================================================
+// Each area is its own world. When you step through a portal, the game hides
+// the old world (the bedroom, meadow and desert) and shows the new area, with
+// its own ground, enemies, key and boss.
+let curArea = 'home';
+const AREAS = {};
+const isGlobal = o => o === camera || o.isLight || o === sun.target || (() => { let f = false; o.traverse(q => { if (q.material && q.material.fog === false) f = true; }); return f; })();
+const HOME = scene.children.filter(o => !isGlobal(o));
+const homeSolidCount = solids.length;
+const homeFog = { c: scene.fog.color.getHex(), n: scene.fog.near, f: scene.fog.far };
+function makeArea(name, cfg) {
+  const a = Object.assign({ name, group: new THREE.Group(), solids: [], start: { x: 0, z: 2, yaw: Math.PI }, fog: [0xc493f2, 40, 230] }, cfg);
+  a.group.visible = false; scene.add(a.group); AREAS[name] = a; return a;
+}
+const at = (o, x, y, z) => (o.position.set(x, y, z), o); // put something at a spot
+// helpers for building inside an area
+function aSolid(a, x0, y0, z0, x1, y1, z1) { const sd = solid(x0, y0, z0, x1, y1, z1); sd.on = false; sd.area = a.name; a.solids.push(sd); return sd; }
+function aBox(a, w, h, d, color, x, y, z, isSolid = true, m) {
+  const o = mesh(boxG(w, h, d), m || (typeof color === 'number' ? mat(color) : color)); o.position.set(x, y + h / 2, z); a.group.add(o);
+  if (isSolid) aSolid(a, x - w / 2, y, z - d / 2, x + w / 2, y + h, z + d / 2);
+  return o;
+}
+function aGem(a, type, x, z, y) { const g = addGem(type, x, z, y ?? a.h(x, z) + .7); g.area = a.name; scene.remove(g.m); a.group.add(g.m); return g; }
+function aRobot(a, x, z, heart) { const r = addRobot(x, z, heart, a.name, true); r.maxHp = r.hp = a.robotHp || 4; scene.remove(r.g); a.group.add(r.g); r.area = a.name; return r; }
+function aNote(a, lines, x, y, z, ry = 0) {
+  const n = note(lines, 1.8, 1.05); n.position.set(x, y, z); n.rotation.y = ry; a.group.add(n);
+  const post = mesh(boxG(.15, y - .3, .15), mat(0xe2d6f2)); post.position.set(x, (y - .3) / 2 + a.h(x, z) - .1, z); a.group.add(post);
+  messages.push({ m: n, x, y: a.h(x, z), z, found: false, area: a.name });
+}
+function aKey(a, n, color, x, y, z) { const k = { kind: 'key', n, m: makeKey(color), base: y, taken: false, active: true, area: a.name }; scene.remove(k.m); a.group.add(k.m); k.m.position.set(x, y, z); pickups.push(k); a.key = k; return k; }
+function aGround(a, size, colorAt) {
+  const g = new THREE.PlaneGeometry(size[0], size[1], size[0], size[1]); g.rotateX(-Math.PI / 2); g.translate(size[2], 0, size[3]);
+  const pp = g.attributes.position, cols = new Float32Array(pp.count * 3), c = new THREE.Color();
+  for (let i = 0; i < pp.count; i++) { const x = pp.getX(i), z = pp.getZ(i); pp.setY(i, a.h(x, z)); colorAt(x, z, c); cols.set([c.r, c.g, c.b], i * 3); }
+  g.setAttribute('color', new THREE.BufferAttribute(cols, 3)); g.computeVertexNormals();
+  const m = mesh(g, new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 6 })); m.receiveShadow = true; a.group.add(m); return m;
+}
+// portals: a swirling ring that takes you to the next area
+function makePortal(color = 0xb07fff) {
+  const g = new THREE.Group();
+  const ring = mesh(new THREE.TorusGeometry(1.6, .16, 10, 40), glow(color)); ring.position.y = 2; g.add(ring);
+  const fill = mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .45, side: THREE.DoubleSide })); fill.position.y = 2; g.add(fill);
+  g.add(at(halo(color, 7, .6), 0, 2, 0));
+  g.visible = false; g.userData = { ring, fill, to: null }; return g;
+}
+const portals = [];
+function openPortal(pt, to) { pt.visible = true; pt.userData.to = to; if (!portals.includes(pt)) portals.push(pt); sfx('door'); burst(pt.position.x, pt.position.y + 2, pt.position.z, [0xb07fff, 0xffffff], 20); }
+const homePortal = makePortal(); homePortal.position.set(0, 0, 84); scene.add(homePortal); HOME.push(homePortal);
+function updatePortals(dt, time) {
+  for (const pt of portals) {
+    if (!pt.visible) continue;
+    pt.userData.ring.rotation.z += dt * 1.5; pt.userData.fill.material.opacity = .35 + Math.sin(time * 3) * .12; pt.lookAt(camera.position.x, pt.position.y, camera.position.z);
+    const wp = pt.getWorldPosition(new THREE.Vector3());
+    if (state.mode === 'play' && !cine && Math.hypot(wp.x - P.x, wp.z - P.z) < 1.4 && Math.abs(P.y + 1 - (wp.y + 2)) < 2.5) {
+      pt.visible = false; const to = pt.userData.to;
+      if (AREAS[to]) enterArea(to); else chapterEnd();
+    }
+  }
+}
+function enterArea(name, instant) {
+  const a = AREAS[name];
+  state.mode = 'dead'; $('fadeText').textContent = a.title; $('fade').style.opacity = 1; sfx('door');
+  setTimeout(() => {
+    // hide wherever we were
+    if (curArea === 'home') {
+      HOME.forEach(o => { o.userData.homeVis = o.visible; o.visible = false; });
+      for (let i = 0; i < homeSolidCount; i++) { solids[i].homeOn = solids[i].on; solids[i].on = false; }
+      robots.forEach(r => { if (!r.area) { r.homeActive = r.active; r.active = false; } });
+      boss.active = false; $('bossbar').hidden = true;
+    } else { const o = AREAS[curArea]; o.group.visible = false; o.solids.forEach(sd => sd.on = false); robots.forEach(r => { if (r.area === curArea) { r.active = false; r.g.visible = false; } }); if (o.leave) o.leave(); }
+    curArea = name; groundFn = a.h; navGrid = null;
+    a.group.visible = true; a.solids.forEach(sd => sd.on = true);
+    robots.forEach(r => { if (r.area === name && r.alive) { r.active = true; r.g.visible = true; } });
+    const f = a.fog; scene.fog.color.setHex(f[0]); scene.fog.near = f[1]; scene.fog.far = f[2];
+    Object.assign(P, { x: a.start.x, z: a.start.z, y: a.h(a.start.x, a.start.z) + .2, vy: 0, yaw: a.start.yaw, pitch: 0, kx: 0, kz: 0, hp: Math.max(P.hp, 3), hurtT: 1.5 });
+    saved.save = Object.assign(saved.save || {}, { keys: state.keys, area: name, gems: state.gems, kids: state.kids }); store.set(saved);
+    if (a.enter) a.enter();
+    state.mode = 'play'; $('fade').style.opacity = 0; hud();
+    toast(a.title, a.sub); objective(a.goal);
+  }, instant ? 50 : 900);
+}
+function areaKeyCine(k) {
+  const a = AREAS[curArea];
+  playCine([
+    { text: `KEY ${k.n} of 10!`, d: 2.5, snap: true, pos: [P.x + 3, P.y + 2.5, P.z + 3], look: [P.x, P.y + 1, P.z] },
+    { text: a.keyText || 'A portal opens. On to the next part of Dreamland…', d: 3.5, pos: [a.portal.position.x + 4, a.portal.position.y + 4, a.portal.position.z - 6], look: [a.portal.position.x, a.portal.position.y + 2, a.portal.position.z], on: () => openPortal(a.portal, a.next) },
+  ], () => objective('Step into the portal'));
+}
+// ZONES for the robots: each area is its own zone
+const zoneOf = (name, b) => { ZONES[name] = b; };
+
+// ===================== 3. THE GLITCH FOREST =====================
+// Giant blocky trees, glitched pixel animals, and the Great Pixel Tree with key 3 at the very top.
+{
+  const a = makeArea('forest', {
+    title: 'The Glitch Forest', sub: 'Climb the Great Pixel Tree to find key 3', goal: 'Climb the Great Pixel Tree',
+    fog: [0x1a3a40, 18, 120], next: 'cloud', robotHp: 4,
+    keyText: 'The Great Pixel Tree glitches… and a portal to the CLOUD CITY opens.',
+    h: (x, z) => Math.sin(x * .15) * .6 + Math.cos(z * .11 + x * .05) * .7 + Math.sin(x * .5 + z * .4) * .12,
+  });
+  a.start = { x: 0, z: 2, yaw: Math.PI };
+  zoneOf('forest', { x0: -30, x1: 30, z0: 4, z1: 70 });
+  aGround(a, [64, 104, 0, 44], (x, z, c) => { const n = (Math.sin(x * 1.3) * Math.cos(z * 1.1) + 1) / 2; c.setHex(0x1f6a58).lerp(new THREE.Color(0x3aa070), n * .6); if ((Math.floor(x) + Math.floor(z)) % 7 === 0) c.lerp(new THREE.Color(0x5fe0b0), .4); });
+  // pixel trees (instanced: one trunk shape and one leaf-cube shape, drawn many times)
+  const trunkI = new THREE.InstancedMesh(boxG(1, 1, 1), mat(0x6a4a8a), 120), leafI = new THREE.InstancedMesh(boxG(1, 1, 1), mat(0xffffff), 600);
+  const leafCols = [0x3fd0a0, 0x5fe0b0, 0x7ff0d8, 0x2fb090, 0x9ff0c0, 0x5fc8ff].map(c => new THREE.Color(c));
+  const dm = new THREE.Object3D(); let ti = 0, li = 0; a.trees = [];
+  const tree = (x, z, sz) => {
+    const g = a.h(x, z), th = 3 + sz * 2.5, tw = .7 + sz * .5;
+    dm.position.set(x, g + th / 2 - .2, z); dm.rotation.set(0, 0, 0); dm.scale.set(tw, th, tw); dm.updateMatrix(); trunkI.setMatrixAt(ti++, dm.matrix);
+    aSolid(a, x - tw / 2, g - 1, z - tw / 2, x + tw / 2, g + th, z + tw / 2);
+    const layers = 2 + Math.round(sz * 2);
+    for (let k = 0; k < layers; k++) { const w = (layers - k) * 1.1 + sz * 1.2;
+      dm.position.set(x, g + th + k * 1.2, z); dm.scale.set(w, 1.3, w); dm.rotation.y = k * .25; dm.updateMatrix(); leafI.setMatrixAt(li, dm.matrix); leafI.setColorAt(li++, pick(leafCols)); }
+    a.trees.push({ x, z, top: g + th + layers * 1.2 });
+  };
+  for (let i = 0; i < 70; i++) { const x = rand(-30, 30), z = rand(6, 96); if (Math.abs(x) < 3 && z < 70) continue; if (Math.hypot(x, z - 82) < 9) continue; tree(x, z, rand(.3, 1.2)); }
+  trunkI.count = ti; leafI.count = li; a.group.add(trunkI, leafI); a.leaves = leafI;
+  // a path of glowing stepping stones
+  for (let z = 4; z < 74; z += 2.2) { const st = mesh(new THREE.CylinderGeometry(.6, .7, .2, 6), glow(z % 4 < 2 ? 0x7ff0d8 : 0xb07fff)); st.position.set(Math.sin(z * .15) * 2, a.h(Math.sin(z * .15) * 2, z) + .05, z); a.group.add(st); }
+  // glowing pixel mushrooms
+  for (let i = 0; i < 40; i++) { const x = rand(-28, 28), z = rand(6, 90), mg = new THREE.Group(), c = pick([0xff6fc8, 0x5ff6ff, 0xffe27f]);
+    const st = mesh(boxG(.15, .4, .15), mat(0xf1ecff)); st.position.y = .2; mg.add(st); const cap = mesh(boxG(.5, .2, .5), glow(c)); cap.position.y = .45; mg.add(cap);
+    mg.position.set(x, a.h(x, z), z); a.group.add(mg); }
+  // floating glitch cubes that flicker in and out
+  a.glitchCubes = [];
+  for (let i = 0; i < 30; i++) { const c = mesh(boxG(.4, .4, .4), glow(pick([0xff3fd0, 0x5ff6ff, 0x7ff0d8, 0xffffff]))); c.position.set(rand(-28, 28), rand(2, 9), rand(6, 95)); a.group.add(c); a.glitchCubes.push(c); }
+  // fireflies
+  { const n = 160, pos = new Float32Array(n * 3); for (let i = 0; i < n; i++) pos.set([rand(-30, 30), rand(.5, 6), rand(4, 96)], i * 3);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    a.flies = new THREE.Points(g, new THREE.PointsMaterial({ map: glowTex, color: 0xd8ff80, size: .45, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); a.group.add(a.flies); }
+  // GLITCHED PIXEL ANIMALS: find them all for the Pet Lover achievement
+  a.animals = [];
+  const animal = (kind, x, z) => {
+    const g = new THREE.Group(), c1 = { bunny: 0xffffff, deer: 0xd7a46b, fox: 0xff8a3a, bird: 0x5fc8ff, frog: 0x6ff09a, cat: 0xb07fff }[kind], m1 = mat(c1), m2 = glow(0x2a1450);
+    const body = mesh(boxG(kind === 'deer' ? .6 : .45, .35, kind === 'deer' ? .9 : .6), m1); body.position.y = kind === 'deer' ? .8 : .3; g.add(body);
+    const head = mesh(boxG(.32, .3, .3), m1); head.position.set(0, body.position.y + .25, kind === 'deer' ? .5 : .35); g.add(head);
+    [-.08, .08].forEach(ex => { const e = mesh(boxG(.05, .07, .02), m2); e.position.set(ex, head.position.y + .04, head.position.z + .16); g.add(e); });
+    if (kind === 'bunny') [-.08, .08].forEach(ex => { const ear = mesh(boxG(.08, .3, .06), m1); ear.position.set(ex, head.position.y + .3, head.position.z - .05); g.add(ear); });
+    if (kind === 'deer') { [-.2, .2].forEach(ex => [-.3, .3].forEach(ez => { const l = mesh(boxG(.1, .6, .1), m1); l.position.set(ex, .3, ez); g.add(l); }));
+      [-.1, .1].forEach(ex => { const an = mesh(boxG(.05, .35, .05), mat(0xfff0d0)); an.position.set(ex, head.position.y + .3, head.position.z - .05); an.rotation.z = ex * 3; g.add(an); }); }
+    if (kind === 'fox' || kind === 'cat') { const tail = mesh(boxG(.12, .12, .5), m1); tail.position.set(0, .45, -.5); tail.rotation.x = .6; g.add(tail);
+      [-.1, .1].forEach(ex => { const ear = mesh(boxG(.1, .14, .05), m1); ear.position.set(ex, head.position.y + .2, head.position.z); g.add(ear); }); }
+    if (kind === 'bird') { [-1, 1].forEach(k => { const w = mesh(boxG(.4, .04, .25), m1); w.position.set(k * .3, .35, 0); g.add(w); g.userData['w' + k] = w; }); const bk = mesh(boxG(.1, .08, .15), glow(0xffe27f)); bk.position.set(0, head.position.y, head.position.z + .2); g.add(bk); }
+    g.add(at(halo(c1, 1.4, .3), 0, .5, 0));
+    g.position.set(x, a.h(x, z), z); a.group.add(g);
+    a.animals.push({ g, kind, x, z, hx: x, hz: z, found: false, hop: rand(0, 6), glitch: 0, fly: kind === 'bird' });
+  };
+  [['bunny', -8, 14], ['deer', 14, 26], ['fox', -18, 38], ['bird', 6, 48], ['frog', -6, 58], ['cat', 20, 64]].forEach(v => animal(...v));
+  // the GREAT PIXEL TREE: a giant tree with platforms spiralling up its trunk. Key 3 waits at the top
+  const T = { x: 0, z: 82 }, tg = a.h(T.x, T.z);
+  aBox(a, 4, 20, 4, 0x5a3a7a, T.x, tg - .5, T.z); a.solids[a.solids.length - 1].climb = false; // too smooth to climb: use the platforms!
+  for (let k = 0; k < 4; k++) { const w = 16 - k * 3.2, lf = mesh(boxG(w, 2.4, w), mat(pick([0x3fd0a0, 0x5fe0b0, 0x2fb090]))); lf.position.set(T.x, tg + 23.6 + k * 2.2, T.z); a.group.add(lf); }
+  // the spiral of platforms (some glitch in and out!)
+  a.flicker = [];
+  for (let i = 0; i < 22; i++) {
+    const ang = i * .55 + Math.PI, rr = 3.5, y = tg + .3 + i * .9, x = T.x + Math.sin(ang) * rr, z = T.z + Math.cos(ang) * rr;
+    const plat = aBox(a, 1.6, .35, 1.6, i % 3 === 2 ? 0xff6fc8 : 0x9ff0c0, x, y, z); plat.rotation.y = ang;
+    if (i % 3 === 2 && i > 3) a.flicker.push({ m: plat, sd: a.solids[a.solids.length - 1], t: i * .7 }); // pink ones blink
+  }
+  aKey(a, 3, 0x7ff0d8, T.x, tg + 20.6, T.z); // on top of the trunk
+  a.portal = makePortal(0x7ff0d8); a.portal.position.set(0, a.h(0, 74), 74); a.group.add(a.portal);
+  // robots
+  [[-10, 20, 1], [12, 18, 0], [-16, 32, 0], [8, 36, 1], [18, 44, 1], [-12, 50, 0], [4, 56, 1], [-20, 62, 1], [14, 62, 0]].forEach(([x, z, h]) => aRobot(a, x, z, !!h));
+  // gems and a hidden message
+  [['pink', 2, 10], ['blue', -6, 22], ['green', 10, 30], ['purple', -14, 44], ['pink', 6, 52], ['blue', -4, 66], ['rainbow', 24, 88]].forEach(([t, x, z]) => aGem(a, t, x, z));
+  aNote(a, ['the animals glitch', 'because i do.'], 22, 1.6, 86, -Math.PI / 3);
+  a.update = (dt, time) => {
+    a.glitchCubes.forEach((c, i) => { c.visible = Math.sin(time * 3 + i * 1.7) > -.3; c.rotation.x += dt; c.rotation.y += dt * .7; if (Math.random() < .005) c.position.x += rand(-1, 1); });
+    { const q = a.flies.geometry.attributes.position; for (let i = 0; i < q.count; i++) q.setY(i, q.getY(i) + Math.sin(time * 2 + i) * dt * .3); q.needsUpdate = true; a.flies.material.opacity = .6 + Math.sin(time * 4) * .3; }
+    // pink platforms blink: solid for a while, then gone
+    a.flicker.forEach(f => { const on = Math.sin(time * 1.4 + f.t) > -.35; f.m.visible = on || Math.random() < .1; f.sd.on = on; f.m.material.opacity = on ? 1 : .3; });
+    // animals hop around; if you get close they glitch away… unless you're very sneaky (or really close)
+    a.animals.forEach(an => {
+      an.hop += dt * (an.found ? 6 : 3);
+      if (an.fly) { an.g.userData['w-1'].rotation.z = Math.sin(time * 20) * .6; an.g.userData.w1.rotation.z = -Math.sin(time * 20) * .6; }
+      const d = Math.hypot(an.g.position.x - P.x, an.g.position.z - P.z);
+      if (!an.found && d < 1.6) { an.found = true; sfx('kid'); burst(an.g.position.x, an.g.position.y + .6, an.g.position.z, [0x7ff0d8, 0xffffff], 12);
+        const n = a.animals.filter(q => q.found).length; toast(`Pixel ${an.kind} found!`, `${n} of ${a.animals.length} pixel animals`); if (n === a.animals.length) achieve('Pet Lover', 'Find every pixel animal in the forest'); }
+      if (!an.found && d < 5 && an.glitch <= 0 && Math.random() < .02) { // glitch-teleport a few metres away
+        an.glitch = 1.2; burst(an.g.position.x, an.g.position.y + .4, an.g.position.z, [0xff3fd0, 0x5ff6ff], 6); an.x = an.hx + rand(-4, 4); an.z = an.hz + rand(-4, 4); }
+      an.glitch -= dt;
+      if (an.found) { an.x += (P.x + 1.2 - an.x) * dt * .8; an.z += (P.z + 1.2 - an.z) * dt * .8; } // found animals follow you!
+      else { an.x += Math.cos(an.hop * .3) * dt * .4; an.z += Math.sin(an.hop * .25) * dt * .4; }
+      const y = a.h(an.x, an.z) + (an.fly ? 2.4 + Math.sin(an.hop) * .4 : Math.abs(Math.sin(an.hop * 2)) * .3);
+      an.g.position.set(an.x + (an.glitch > .9 ? rand(-.2, .2) : 0), y, an.z); an.g.rotation.y = Math.atan2(Math.cos(an.hop * .3), Math.sin(an.hop * .25));
+    });
+    a.leaves.material.emissive = a.leaves.material.emissive || new THREE.Color(); if (Math.random() < .02) { a.leaves.material.emissive.setHex(0x3a1050); setTimeout(() => a.leaves.material.emissive.setHex(0), 90); }
+  };
+}
+
 // everything solid casts and catches shadows (glowing things and the sky don't)
 scene.traverse(o => { if (o.isMesh && !o.material.isMeshBasicMaterial && !o.userData.isInk) { o.castShadow = !o.userData.noShadow; o.receiveShadow = true; } });
 fists.forEach(f => f.traverse(o => { o.castShadow = false; }));
