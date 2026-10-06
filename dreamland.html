@@ -2592,9 +2592,10 @@ function hitABoss(dmg) {
 function startABoss(b) { aBoss = b; b.active = true; b.hp = b.maxHp; state.glovesOnBoss = false; $('bossbar').hidden = false; $('bossbar').querySelector('span').textContent = b.name; $('bossfill').style.width = '100%'; objective(b.goal || 'Beat the ' + b.name); }
 const AREAS = {};
 // things that belong to every world: the camera, lights, and the sky stuff (everything in it ignores fog)
-const isGlobal = o => o === camera || o.isLight || o === sun.target || (() => { let any = false, all = true; o.traverse(q => { if (q.material) { any = true; if (q.material.fog !== false) all = false; } }); return any && all; })();
-const HOME = scene.children.filter(o => !isGlobal(o));
-const homeSolidCount = solids.length;
+const isGlobal = o => o.userData.global || o === camera || o.isLight || o === sun.target || (() => { let any = false, all = true; o.traverse(q => { if (q.material) { any = true; if (q.material.fog !== false) all = false; } }); return any && all; })();
+// the home world is everything that isn't global and isn't an area (worked out the first time you leave home)
+let HOME = null;
+const homeList = () => HOME || (HOME = scene.children.filter(o => !isGlobal(o) && !Object.values(AREAS).some(a => a.group === o)));
 const homeFog = { c: scene.fog.color.getHex(), n: scene.fog.near, f: scene.fog.far };
 function makeArea(name, cfg) {
   const a = Object.assign({ name, group: new THREE.Group(), solids: [], start: { x: 0, z: 2, yaw: Math.PI }, fog: [0xc493f2, 40, 230] }, cfg);
@@ -2633,7 +2634,7 @@ function makePortal(color = 0xb07fff) {
 }
 const portals = [];
 function openPortal(pt, to) { pt.visible = true; pt.userData.to = to; if (!portals.includes(pt)) portals.push(pt); sfx('door'); burst(pt.position.x, pt.position.y + 2, pt.position.z, [0xb07fff, 0xffffff], 20); }
-const homePortal = makePortal(); homePortal.position.set(0, 0, 84); scene.add(homePortal); HOME.push(homePortal);
+const homePortal = makePortal(); homePortal.position.set(0, 0, 84); scene.add(homePortal);
 function updatePortals(dt, time) {
   for (const pt of portals) {
     if (!pt.visible) continue;
@@ -2651,8 +2652,8 @@ function enterArea(name, instant) {
   setTimeout(() => {
     // hide wherever we were
     if (curArea === 'home') {
-      HOME.forEach(o => { o.userData.homeVis = o.visible; o.visible = false; });
-      for (let i = 0; i < homeSolidCount; i++) { solids[i].homeOn = solids[i].on; solids[i].on = false; }
+      homeList().forEach(o => { o.userData.homeVis = o.visible; o.visible = false; });
+      solids.forEach(sd => { if (!sd.area) { sd.homeOn = sd.on; sd.on = false; } });
       robots.forEach(r => { if (!r.area) { r.homeActive = r.active; r.active = false; } });
       boss.active = false; $('bossbar').hidden = true;
     } else { const o = AREAS[curArea]; o.group.visible = false; o.solids.forEach(sd => sd.on = false); robots.forEach(r => { if (r.area === curArea) { r.active = false; r.g.visible = false; } }); if (o.leave) o.leave(); }
@@ -3734,7 +3735,7 @@ function NM_TOY() { const t = model('Teddy') || mesh(boxG(.4, .5, .4), mat(0xd7a
 function enterAreaHome() { // go back to the original world
   const o = AREAS[curArea]; o.group.visible = false; o.solids.forEach(sd => sd.on = false); if (o.leave) o.leave();
   curArea = 'home'; groundFn = null; navGrid = null;
-  HOME.forEach(q => q.visible = q.userData.homeVis !== false); for (let i = 0; i < homeSolidCount; i++) solids[i].on = solids[i].homeOn !== false;
+  homeList().forEach(q => q.visible = q.userData.homeVis !== false); solids.forEach(sd => { if (!sd.area) sd.on = sd.homeOn !== false; });
   robots.forEach(r => r.g.visible = false);
 }
 

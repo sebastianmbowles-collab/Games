@@ -1,0 +1,34 @@
+/* ===================== NIGHTMARELAND look ===================== */
+:root{--sky:#1a0a22;--ink:#12060e;--pink:#ff4a5a;--mint:#ff9a6a;--cream:#e8dcd4;--panel:rgba(14,4,12,.72);--panel-line:rgba(255,90,90,.3)}
+body{background:#05020a}
+/* red at the edges when you're scared */
+body::before{content:"";position:fixed;inset:0;z-index:4;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,transparent 40%,rgba(150,0,20,var(--fearRed,0)) 100%)}
+#fear{position:fixed;right:16px;top:calc(env(safe-area-inset-top,0px) + 74px);z-index:5;display:flex;align-items:center;gap:8px;font:800 12px var(--f-body);letter-spacing:.14em;color:#e8dcd4;pointer-events:none}
+#fear .track{width:110px;height:10px;border-radius:999px;background:rgba(0,0,0,.5);border:1px solid rgba(255,90,90,.4);overflow:hidden}
+#fearFill{height:100%;width:0;background:linear-gradient(90deg,#7a5aa0,#ff3040);transition:width .2s}
+#batFill{height:100%;width:100%;background:linear-gradient(90deg,#ffb050,#ffe2b8);transition:width .2s}
+#fear{display:grid;grid-template-columns:auto 110px;gap:4px 8px}
+#fear.high span{color:#ff4a5a;animation:blink .5s infinite}
+body.title #fear,body.cine #fear{display:none}
+#nmword{position:fixed;z-index:7;pointer-events:none;font:400 clamp(26px,5vw,52px) "Caveat Brush","Comic Sans MS",system-ui,sans-serif;color:#ff2a3a;text-shadow:0 0 12px #000;opacity:0;transition:opacity .25s;transform:rotate(-4deg)}
+/* the title screen: same hand-drawn style, but torn, burnt and red */
+.tlogo{font-size:clamp(40px,8.6vw,96px);filter:url(#wobbleBig) drop-shadow(3px 4px 0 #000) drop-shadow(0 0 18px rgba(255,30,40,.55))}
+.tlogo span{background:linear-gradient(180deg,#e8dcd4 20%,#b8a8b0 60%,#ff4a5a 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-stroke:2px #12060e}
+.tlogo span.glitch{-webkit-text-fill-color:#ff3040;text-shadow:-3px 0 #000,3px 0 #6a0010}
+.chapter{color:#ff7a6a;text-shadow:0 0 10px rgba(255,40,40,.6)}
+.tagline{color:#e8dcd4;font-size:24px}
+.doodles .d1{stroke:#ff3040;fill:rgba(255,40,40,.12)}.doodles .d2,.doodles .d6{stroke:#8a7a90}.doodles .d3{stroke:#ff6a5a}
+.doodles .d4{stroke:#5a4a60}.doodles .d5{stroke:#ff3040}.doodles .d7{stroke:#3a3040;opacity:.8}
+#title{background:linear-gradient(rgba(5,2,10,.55),transparent 40%,transparent 60%,rgba(5,2,10,.75))}
+.menu{background-color:#cbbfae;background-image:repeating-linear-gradient(0deg,transparent 0 27px,rgba(80,40,40,.22) 27px 28px),radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(60,30,10,.55));box-shadow:4px 6px 0 rgba(0,0,0,.7)}
+.menu::before{background:rgba(120,110,100,.75)}
+.menu button{color:#3a1a20}
+.menu button.sel{background:#ff5a5a;color:#12060e;border-color:#12060e;box-shadow:3px 3px 0 #12060e}
+.menu button.off{color:rgba(58,26,32,.4)}
+.screen{background:radial-gradient(ellipse at 50% 30%,rgba(120,10,30,.35),transparent 60%),linear-gradient(#1a0a22,#05020a)}
+.screen .card{background-color:#cbbfae;background-image:repeating-linear-gradient(0deg,transparent 0 29px,rgba(80,40,40,.2) 29px 30px),radial-gradient(ellipse at 50% 50%,transparent 60%,rgba(60,30,10,.5))}
+.screen .sub,.screen .logo{color:#8a1a2a;-webkit-text-fill-color:#8a1a2a}
+.btn{background:#ff5a5a;color:#12060e;border-color:#12060e;box-shadow:3px 4px 0 #12060e}
+#loading{background:radial-gradient(ellipse at 50% 40%,#3a0a1a,#05020a 70%)}
+.lmoon{color:#ff3a2a;text-shadow:0 0 30px rgba(255,40,30,.7)}
+.lz{color:#8a7a90}
