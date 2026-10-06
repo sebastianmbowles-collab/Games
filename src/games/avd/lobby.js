@@ -4,7 +4,7 @@ import { W, H, INK, rrect, text } from './art'
 import { sfx } from './sound'
 import { inside, drawButton, drawTitleWorld, updateTitleWorld } from './menus'
 import { checkName, safeName, yearLabel, YEAR_LEVELS, MAX_NAME } from './names'
-import { findAccount } from './save'
+import { findAccount, accountCount, hashPassword, MAX_ACCOUNTS } from './save'
 import { startSession, cleanCode } from './net'
 
 const LETTER_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
@@ -83,18 +83,91 @@ function typeName(game, ch) {
     }
     pf.name = pf.name.trim().toUpperCase()
     const old = findAccount(pf.name)
+    pf.acc = old
+    pf.pw = ''
     if (old) {
-      // welcome back! everything about you is remembered
-      game.logIn(old)
-      pf.next()
+      // played before: type your password (players from before passwords make one now)
+      pf.step = old.pass ? 'pass' : 'newpass'
+    } else if (accountCount() >= MAX_ACCOUNTS) {
+      pf.err = `This device already has ${MAX_ACCOUNTS} players`
+      sfx.hurt()
       return
-    }
-    pf.step = 'year'
+    } else pf.step = 'newpass'
     sfx.select()
     return
   } else if (pf.name.length < MAX_NAME && !(ch === ' ' && (!pf.name || pf.name.endsWith(' ')))) pf.name += ch
   sfx.click()
 }
+
+// Typing a password: letters and numbers, shown as stars.
+async function typePass(game, ch) {
+  const pf = game.prof
+  if (pf.busy) return
+  pf.err = null
+  if (ch === 'DEL') {
+    pf.pw = pf.pw.slice(0, -1)
+    sfx.click()
+    return
+  }
+  if (ch !== 'OK') {
+    if (pf.pw.length < 12 && ch !== ' ') pf.pw += ch
+    sfx.click()
+    return
+  }
+  if (pf.step === 'pass') {
+    pf.busy = true
+    const hash = await hashPassword(pf.name, pf.pw)
+    pf.busy = false
+    if (hash === pf.acc.pass) {
+      // welcome back! everything about you is remembered
+      game.logIn(pf.acc)
+      pf.next()
+    } else {
+      pf.err = 'Wrong password! Try again.'
+      pf.pw = ''
+      sfx.hurt()
+    }
+  } else if (pf.step === 'newpass') {
+    if (pf.pw.length < 3) {
+      pf.err = 'Make it at least 3 letters or numbers'
+      sfx.hurt()
+      return
+    }
+    pf.first = pf.pw
+    pf.pw = ''
+    pf.step = 'confirm'
+    sfx.select()
+  } else if (pf.step === 'confirm') {
+    if (pf.pw !== pf.first) {
+      pf.err = "Those didn't match. Make your password again."
+      pf.pw = ''
+      pf.step = 'newpass'
+      sfx.hurt()
+      return
+    }
+    pf.busy = true
+    pf.passHash = await hashPassword(pf.name, pf.pw)
+    pf.busy = false
+    pf.pw = ''
+    if (pf.acc) {
+      pf.acc.pass = pf.passHash
+      game.logIn(pf.acc)
+      pf.next()
+    } else {
+      pf.step = 'year'
+      sfx.select()
+    }
+  }
+}
+
+function passKeys() {
+  return keyboard(CODE_ROWS, [
+    { ch: 'DEL', label: '◀ DEL', w: 120 },
+    { ch: 'OK', label: 'OK ▶', w: 120 },
+  ])
+}
+
+const isPassStep = (s) => s === 'pass' || s === 'newpass' || s === 'confirm'
 
 function pickYear(game, year) {
   const pf = game.prof
@@ -102,7 +175,7 @@ function pickYear(game, year) {
   if (pf.mode === 'year') {
     game.profile.year = year
     game.persist()
-  } else game.newPlayer({ name: pf.name, year })
+  } else game.newPlayer({ name: pf.name, year }, pf.passHash)
   sfx.capture()
   pf.next()
 }
@@ -211,12 +284,12 @@ export function lobbyKey(game, e) {
     }
     return false
   }
-  const fn = typing === 'name' ? typeName : typeCode
+  const fn = typing === 'name' ? typeName : isPassStep(typing) ? typePass : typeCode
   if (c === 'Backspace') fn(game, 'DEL')
   else if (c === 'Enter' || c === 'NumpadEnter') fn(game, 'OK')
   else if (c === 'Space' && typing === 'name') fn(game, ' ')
   else if (/^Key[A-Z]$/.test(c)) fn(game, c.slice(3))
-  else if (/^Digit[0-9]$/.test(c) && typing === 'code') fn(game, c.slice(5))
+  else if (/^(?:Digit|Numpad)[0-9]$/.test(c) && typing !== 'name') fn(game, c.slice(-1))
   else return false
   return true
 }
@@ -227,7 +300,10 @@ export function updateLobby(game, dt) {
   if (game.scene === 'profile') {
     const pf = game.prof
     if (k.has('pause')) {
-      if (pf.step === 'year' && pf.mode === 'login') pf.step = 'name'
+      if ((pf.step === 'year' || isPassStep(pf.step)) && pf.mode === 'login') {
+        pf.step = 'name'
+        pf.pw = ''
+      }
       else if (pf.mode === 'year') pf.next()
       else game.goTitle()
     }
@@ -299,6 +375,9 @@ export function clickLobby(game, p) {
     if (pf.step === 'name') {
       const key = nameKeys().find((k) => inside(p, k))
       if (key) typeName(game, key.ch)
+    } else if (isPassStep(pf.step)) {
+      const key = passKeys().find((k) => inside(p, k))
+      if (key) typePass(game, key.ch)
     } else {
       const y = YEARS.find((b) => inside(p, b))
       if (y) pickYear(game, y.year)
@@ -325,7 +404,7 @@ export function drawLobby(game, ctx) {
     const pf = game.prof
     if (pf.step === 'name') {
       text(ctx, "WHAT'S YOUR NAME?", W / 2, 90, 34, '#fee761')
-      text(ctx, 'Played before? Type the same name and your game comes back!', W / 2, 118, 13, '#c0cbdc')
+      text(ctx, 'Played before? Type the same name, then your password', W / 2, 118, 13, '#c0cbdc')
       rrect(ctx, W / 2 - 220, 130, 440, 64, 12)
       ctx.fillStyle = '#181425'
       ctx.fill()
@@ -336,6 +415,20 @@ export function drawLobby(game, ctx) {
       text(ctx, pf.name + cursor, W / 2, 176, 34, '#ffffff')
       text(ctx, pf.err || 'Type your name, then press OK', W / 2, 232, 15, pf.err ? '#ff8fa0' : '#c0cbdc')
       drawKeys(ctx, nameKeys(), t, game)
+    } else if (isPassStep(pf.step)) {
+      const title = { pass: `HI ${pf.name}! TYPE YOUR PASSWORD`, newpass: `MAKE A PASSWORD, ${pf.name}`, confirm: 'TYPE YOUR PASSWORD AGAIN' }[pf.step]
+      text(ctx, title, W / 2, 90, 28, '#fee761')
+      text(ctx, pf.step === 'pass' ? 'Press Esc to go back' : "3 to 12 letters or numbers. Don't tell anyone!", W / 2, 118, 13, '#c0cbdc')
+      rrect(ctx, W / 2 - 220, 130, 440, 64, 12)
+      ctx.fillStyle = '#181425'
+      ctx.fill()
+      ctx.lineWidth = 4
+      ctx.strokeStyle = '#fee761'
+      ctx.stroke()
+      const cursor = Math.floor(t * 2) % 2 ? '_' : ' '
+      text(ctx, '★'.repeat(pf.pw.length) + cursor, W / 2, 176, 30, '#ffffff')
+      text(ctx, pf.err || (pf.step === 'pass' ? 'Forgot it? Make a new player with a different name.' : 'Type it, then press OK'), W / 2, 232, 15, pf.err ? '#ff8fa0' : '#c0cbdc')
+      drawKeys(ctx, passKeys(), t, game)
     } else {
       text(ctx, pf.mode === 'year' ? pf.name : `HI ${pf.name}!`, W / 2, 96, 34, '#fee761')
       text(ctx, 'WHAT YEAR ARE YOU IN AT SCHOOL?', W / 2, 150, 22, '#ffffff')

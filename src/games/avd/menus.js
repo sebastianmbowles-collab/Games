@@ -232,6 +232,8 @@ export function drawButton(ctx, b, selected, t) {
   ctx.restore()
 }
 
+const LOGIN_BTN = { x: W - 196, y: 12, w: 182, h: 38, size: 16 }
+
 function updateTitle(game, dt) {
   const s = game.title
   updateTitleWorld(game, dt)
@@ -287,7 +289,8 @@ function drawTitle(game, ctx) {
     text(ctx, '♪ TAP OR PRESS A KEY FOR MUSIC ♪', W / 2, 470, 18, '#fee761')
   }
   const best = game.best
-  text(ctx, game.profile ? `PLAYER: ${game.profile.name} · ${yearLabel(game.profile.year)}` : 'PRESS PLAY TO LOG IN', W / 2, 140, 14, '#fee761')
+  text(ctx, game.profile ? `PLAYER: ${game.profile.name} · ${yearLabel(game.profile.year)}` : 'NOT LOGGED IN', W / 2, 140, 14, '#fee761')
+  drawButton(ctx, { ...LOGIN_BTN, label: game.profile ? 'LOG OUT' : 'LOG IN', color: game.profile ? '#f6757a' : '#63c74d' }, inside(game.mouse, LOGIN_BTN), t)
   text(ctx, `Best: Aliens ${best.aliens || 0}  ·  Dinos ${best.dinos || 0}`, W / 2, 512, 15, '#fff')
   text(ctx, '↑ ↓ to choose · Enter or tap to pick', W / 2, 532, 12, 'rgba(255,255,255,0.8)')
 }
@@ -765,6 +768,10 @@ export function clickScreen(game, p) {
   if (game.scene === 'title') {
     const i = titleButtons().findIndex((b) => inside(p, b))
     if (i >= 0 && game.sceneT > 0.3) pressTitle(game, i)
+    if (inside(p, LOGIN_BTN) && game.sceneT > 0.3) {
+      sfx.click()
+      game.loginPressed()
+    }
   } else if (game.scene === 'settings') clickSettings(game, p)
   else if (game.scene === 'jukebox') clickJukebox(game, p)
   else if (game.scene === 'shop') clickShop(game, p)

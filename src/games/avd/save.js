@@ -43,6 +43,23 @@ export function loadSave() {
   return data
 }
 
+// One device can remember this many players (plenty for a class).
+export const MAX_ACCOUNTS = 50
+export const accountCount = () => Object.keys(data.accounts).length
+
+// Passwords are never saved as they are typed: they're scrambled ("hashed") first.
+export async function hashPassword(name, pw) {
+  const s = `avd:${name}:${pw}`
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    let h = 5381
+    for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0
+    return `x${h.toString(16)}`
+  }
+}
+
 export const currentAccount = () => (data.current ? data.accounts[data.current] || null : null)
 export const findAccount = (name) => data.accounts[String(name).toUpperCase()] || null
 

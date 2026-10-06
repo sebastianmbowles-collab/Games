@@ -473,6 +473,7 @@ export class AliensVsDinos {
 
   useAccount(acc) {
     this.profile = acc?.profile || null
+    this.pass = acc?.pass || null
     this.shop = acc?.shop || { coins: 0, owned: {} }
     this.best = acc?.best || { aliens: 0, dinos: 0 }
     this.settings = { ...DEFAULT_SETTINGS, ...(acc?.settings || this.settings || {}) }
@@ -481,7 +482,7 @@ export class AliensVsDinos {
 
   // Saves this player's name, year, coins, shop items, best scores and settings.
   persist() {
-    if (this.profile) storeAccount({ profile: this.profile, shop: this.shop, best: this.best, settings: this.settings })
+    if (this.profile) storeAccount({ profile: this.profile, pass: this.pass, shop: this.shop, best: this.best, settings: this.settings })
   }
 
   logIn(acc) {
@@ -491,8 +492,8 @@ export class AliensVsDinos {
     sfx.win()
   }
 
-  newPlayer(profile) {
-    this.useAccount({ profile, settings: this.settings })
+  newPlayer(profile, pass) {
+    this.useAccount({ profile, pass, settings: this.settings })
     this.persist()
     this.toast = { text: `HI ${profile.name}! LET'S PLAY!`, t: 3 }
   }
@@ -676,6 +677,12 @@ export class AliensVsDinos {
   }
 
   // PLAY: first make sure we know your name and school year.
+  // the LOG IN / LOG OUT button on the title screen
+  loginPressed() {
+    if (this.profile) this.logOutPlayer()
+    else openProfile(this, () => this.goTitle())
+  }
+
   playPressed() {
     if (this.profile) this.goMenu()
     else openProfile(this, () => this.goMenu())
@@ -1780,10 +1787,12 @@ export class AliensVsDinos {
       this.toast.t -= 1 / 60
       if (this.toast.t <= 0) this.toast = null
       else {
-        rrect(ctx, W / 2 - 260, 492, 520, 40, 12)
+        // on the typing screens the keyboard fills the bottom, so the message goes at the top
+        const y = this.scene === 'profile' || this.scene === 'mp' ? 8 : 492
+        rrect(ctx, W / 2 - 260, y, 520, 40, 12)
         ctx.fillStyle = 'rgba(24,20,37,0.92)'
         ctx.fill()
-        text(ctx, this.toast.text, W / 2, 519, 18, '#fee761')
+        text(ctx, this.toast.text, W / 2, y + 27, 18, '#fee761')
       }
     }
     this.flushLayer()
