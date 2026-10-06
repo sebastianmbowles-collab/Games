@@ -2589,7 +2589,7 @@ function hitABoss(dmg) {
   if (aBoss.onHit) aBoss.onHit(dmg);
   if (aBoss.hp <= 0) { aBoss.active = false; $('bossbar').hidden = true; aBoss.die(); if (!state.glovesOnBoss) achieve('Fists Only', 'Beat a boss without gravity gloves'); }
 }
-function startABoss(b) { aBoss = b; b.active = true; b.hp = b.maxHp; state.glovesOnBoss = false; $('bossbar').hidden = false; $('bossbar').querySelector('span').textContent = b.name; $('bossfill').style.width = '100%'; objective('Beat the ' + b.name); }
+function startABoss(b) { aBoss = b; b.active = true; b.hp = b.maxHp; state.glovesOnBoss = false; $('bossbar').hidden = false; $('bossbar').querySelector('span').textContent = b.name; $('bossfill').style.width = '100%'; objective(b.goal || 'Beat the ' + b.name); }
 const AREAS = {};
 // things that belong to every world: the camera, lights, and the sky stuff (everything in it ignores fog)
 const isGlobal = o => o === camera || o.isLight || o === sun.target || (() => { let any = false, all = true; o.traverse(q => { if (q.material) { any = true; if (q.material.fog !== false) all = false; } }); return any && all; })();
@@ -2670,6 +2670,7 @@ function enterArea(name, instant) {
 }
 function areaKeyCine(k) {
   const a = AREAS[curArea];
+  if (a.onKey) a.onKey();
   playCine([
     { text: `KEY ${k.n} of 10!`, d: 2.5, snap: true, pos: [P.x + 3, P.y + 2.5, P.z + 3], look: [P.x, P.y + 1, P.z] },
     { text: a.keyText || 'A portal opens. On to the next part of Dreamland…', d: 3.5, pos: [a.portal.position.x + 4, a.portal.position.y + 4, a.portal.position.z - 6], look: [a.portal.position.x, a.portal.position.y + 2, a.portal.position.z], on: () => openPortal(a.portal, a.next) },
@@ -3299,6 +3300,127 @@ function updateBolts(dt) {
         if (sc.hp <= 0) { sc.alive = false; sc.l.visible = false; sc.eyes.visible = false; burst(sc.x, 1.2, sc.z, [0x1a1a1a, 0xfafaf4], 16); sfx('pop'); toast('Scribble erased!'); } }
     }
   };
+}
+
+// ===================== 8. THE BEDROOM (again) — LONELINESS =====================
+// Sebastian's room, but now huge and futuristic. The lights go out and Loneliness,
+// the first of the 5 Emotions, appears. It splits into shadow copies; only the real
+// one has a glowing tear. Every miss makes the room darker. After it, a second bed appears…
+{
+  const a = makeArea('bedroom8', {
+    title: 'Home…?', sub: 'Your room has grown. And it\'s so quiet…', goal: 'Something is in your room',
+    fog: [0x1a1030, 12, 60], next: 'ocean', h: () => 0, bloom: .4,
+    keyText: 'A second bed appears beside yours… and a portal to the GLOWING OCEAN opens.',
+  });
+  a.start = { x: 0, z: -6, yaw: Math.PI };
+  const S = 2.6; // the room is 2.6 times bigger than before
+  const W = 10.6 * S / 2;
+  // walls with the same starry wallpaper, a big glowing window wall, a futuristic floor
+  { const pt = paperTex.clone(); pt.needsUpdate = true; pt.repeat.set(10, 4); const wm = new THREE.MeshPhongMaterial({ map: pt, shininess: 4, color: 0x8a7ab0 });
+    [[0, -W, 2 * W, .5], [-W, 0, .5, 2 * W], [W, 0, .5, 2 * W], [0, W, 2 * W, .5]].forEach(([x, z, w, d]) => { aBox(a, w, 10, d, null, x, 0, z, true, wm); a.solids[a.solids.length - 1].climb = false; });
+    const ft = paint(128, 128, k => { k.fillStyle = '#2a1a4a'; k.fillRect(0, 0, 128, 128); k.strokeStyle = '#7ff0d8'; k.lineWidth = 2; k.strokeRect(2, 2, 124, 124); k.fillStyle = '#3a2a6a'; k.fillRect(8, 8, 112, 112); }); ft.repeat.set(14, 14);
+    const fl = mesh(new THREE.PlaneGeometry(2 * W, 2 * W), new THREE.MeshPhongMaterial({ map: ft, shininess: 80, specular: 0x5a4a9a })); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; a.group.add(fl);
+    const ce = mesh(new THREE.PlaneGeometry(2 * W, 2 * W), new THREE.MeshBasicMaterial({ map: ceilTex, color: 0x6a5a9a, side: THREE.DoubleSide })); ce.rotation.x = Math.PI / 2; ce.position.y = 10; a.group.add(ce);
+    const win = mesh(new THREE.PlaneGeometry(10, 5), new THREE.MeshBasicMaterial({ color: 0x5a3ab0 })); win.position.set(0, 4.5, W - .3); win.rotation.y = Math.PI; a.group.add(win);
+    a.moonWin = halo(0xd8c8ff, 10, .6); a.moonWin.position.set(0, 4.5, W - .5); a.group.add(a.moonWin); }
+  // giant versions of his furniture: bed, desk, toy chest, and the toys (big now!)
+  aBox(a, 2.2 * S, .5 * S, 3.4 * S, 0xe2d6f2, -3.4 * S, 0, -3.1 * S); aBox(a, 2.1 * S, .3 * S, 2.6 * S, 0x7fd8ff, -3.4 * S, .5 * S, -2.7 * S, false);
+  aBox(a, 2.2 * S, 1.4 * S, .2 * S, 0xe2d6f2, -3.4 * S, 0, -4.85 * S);
+  aBox(a, 1.8 * S, .9 * S, S, 0xffc6e0, 3.6 * S, 0, -4.2 * S); aBox(a, 1.4 * S, .8 * S, .9 * S, 0xff8fd0, 0, 0, 4.4 * S);
+  // the futuristic bits: glowing strips and floating screens
+  for (let k = 0; k < 4; k++) { const st = mesh(boxG(2 * W, .08, .08), glow([0x7ff0d8, 0xff6fc8, 0xb07fff, 0x5ff6ff][k])); st.position.set(0, 1 + k * 2.6, -W + .3); a.group.add(st); a.strips = (a.strips || []).concat(st); }
+  a.screens = [];
+  for (let k = 0; k < 5; k++) { const sc = mesh(new THREE.PlaneGeometry(2.4, 1.4), new THREE.MeshBasicMaterial({ color: 0x5ff6ff, transparent: true, opacity: .35, side: THREE.DoubleSide })); sc.position.set(-10 + k * 5, 6, -8 + (k % 2) * 4); a.group.add(sc); a.screens.push(sc); }
+  // big toys lying around (the teddy is huge)
+  const td = model('Teddy'); if (td) { td.scale.setScalar(4); td.position.set(9, 1.2, 6); td.rotation.y = -2.2; a.group.add(td); }
+  const rk = model('Rocket'); if (rk) { rk.scale.setScalar(4); rk.position.set(-10, 3, 8); rk.rotation.z = 1.2; a.group.add(rk); }
+  // the lamps you can turn back on (they light up when you hit the real Loneliness)
+  a.lamps = [[-10, -10], [10, -10], [-10, 10], [10, 10]].map(([x, z]) => {
+    const g = new THREE.Group(); const post = mesh(new THREE.CylinderGeometry(.12, .2, 3, 8), mat(0x5a4a7a)); post.position.y = 1.5; g.add(post);
+    const bulb = mesh(new THREE.SphereGeometry(.45, 14, 10), new THREE.MeshBasicMaterial({ color: 0x3a3050 })); bulb.position.y = 3.2; g.add(bulb);
+    const l = new THREE.PointLight(0xffd8a0, 0, 16, 1.5); l.position.y = 3.2; g.add(l); const h = halo(0xffd8a0, 4, 0); h.position.y = 3.2; g.add(h);
+    g.position.set(x, 0, z); a.group.add(g); aSolid(a, x - .3, 0, z - .3, x + .3, 3, z + .3); return { bulb, l, h, on: false };
+  });
+  // the SECOND BED: it appears after Loneliness is beaten
+  a.bed2 = new THREE.Group();
+  { const f = mesh(boxG(2.2 * S, .5 * S, 3.4 * S), mat(0x3a2a6b)); f.position.y = .25 * S; a.bed2.add(f);
+    const b = mesh(boxG(2.1 * S, .3 * S, 2.6 * S), mat(0x241448)); b.position.set(0, .65 * S, .4 * S); a.bed2.add(b);
+    const h = mesh(boxG(2.2 * S, 1.4 * S, .2 * S), mat(0x3a2a6b)); h.position.set(0, .7 * S, -1.75 * S); a.bed2.add(h); }
+  a.bed2.position.set(3.4 * S, 0, -3.1 * S); a.bed2.visible = false; a.group.add(a.bed2);
+  aNote(a, ['you have a room', 'full of toys.', 'i only had you.'].slice(0, 2), 0, 1.8, -12);
+  [['pink', -6, 0], ['pink', 6, 0], ['blue', 0, 8], ['green', -12, 4]].forEach(([t, x, z]) => aGem(a, t, x, z, .8));
+  aKey(a, 8, 0x8a9aff, 0, 1.5, 0); a.key.active = false; a.key.m.visible = false;
+  a.portal = makePortal(0x5ff6ff); a.portal.position.set(0, 0, W - 3); a.group.add(a.portal);
+
+  // ---------- LONELINESS ----------
+  // a tall, thin, sad shadow with a single glowing blue tear
+  const LO = { name: 'Loneliness', goal: 'Find the real Loneliness (it has a glowing tear)', maxHp: 6, hp: 6, active: false, t: 0, phase: 'wait', dark: 0, copies: [], flash: 0 };
+  const makeShade = (real) => {
+    const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: 0x0c0818, transparent: true, opacity: .92 });
+    const body = mesh(new THREE.ConeGeometry(1.1, 5.5, 16, 1, true), m); body.position.y = 2.75; g.add(body);
+    const head = mesh(new THREE.SphereGeometry(.75, 16, 12), m); head.position.y = 5.6; g.add(head);
+    [-.25, .25].forEach(x => { const e = mesh(new THREE.SphereGeometry(.09, 8, 6), new THREE.MeshBasicMaterial({ color: 0x9ab0ff })); e.position.set(x, 5.65, .65); g.add(e); });
+    for (let k = 0; k < 2; k++) { const arm = mesh(new THREE.CylinderGeometry(.08, .04, 3.4, 6), m); arm.position.set(k ? .8 : -.8, 3.4, 0); arm.rotation.z = k ? .25 : -.25; g.add(arm); }
+    if (real) { const tear = mesh(new THREE.SphereGeometry(.13, 10, 8), glow(0x5ff6ff)); tear.scale.y = 1.6; tear.position.set(.25, 5.2, .7); g.add(tear); g.add(at(halo(0x5ff6ff, 1.6, .9), .25, 5.2, .75)); g.userData.tear = tear; }
+    g.userData.m = m; g.visible = false; a.group.add(g); return g;
+  };
+  LO.real = makeShade(true);
+  for (let k = 0; k < 4; k++) LO.copies.push(makeShade(false));
+  LO.balls = () => [{ x: LO.real.position.x, y: 3, z: LO.real.position.z, r: 1.3 }, { x: LO.real.position.x, y: 5.5, z: LO.real.position.z, r: .9 }];
+  LO.onHit = () => { // you found the real one: a lamp comes back on, and it runs off to hide again
+    const lamp = a.lamps.find(q => !q.on); if (lamp) { lamp.on = true; lamp.bulb.material.color.setHex(0xffe2b8); lamp.l.intensity = 1.6; lamp.h.material.opacity = .8; }
+    LO.dark = Math.max(0, LO.dark - .35); sfx('message'); burst(LO.real.position.x, 4, LO.real.position.z, [0x5ff6ff, 0xffffff], 14);
+    LO.phase = 'scatter'; LO.t = 0; LO.immune = true;
+    if (LO.hp > 0) toast('', pick(['"Don\'t leave…"', '"Why does everyone go?"', '"Stay with me…"']));
+  };
+  LO.die = () => {
+    LO.real.visible = false; LO.copies.forEach(c => c.visible = false);
+    a.lamps.forEach(l => { l.on = true; l.bulb.material.color.setHex(0xffe2b8); l.l.intensity = 1.6; l.h.material.opacity = .8; });
+    LO.dark = 0; toast('Loneliness fades…', '"…thank you for coming back."'); achieve('Not Alone', 'Beat Loneliness');
+    setTimeout(() => { a.key.active = true; a.key.m.visible = true; objective('Grab key 8'); }, 1500);
+  };
+  const place = (g, x, z) => { g.position.set(x, 0, z); g.visible = true; g.userData.m.opacity = .92; };
+  const spots = () => Array.from({ length: 5 }, () => { for (;;) { const x = rand(-W + 3, W - 3), z = rand(-W + 3, W - 3); if (Math.hypot(x - P.x, z - P.z) > 7) return [x, z]; } });
+  a.enter = () => { if (!LO.started) { LO.started = true; LO.phase = 'wait'; LO.t = 0; } };
+  a.leave = () => { aBoss = null; $('bossbar').hidden = true; scene.fog.near = 12; };
+  a.onRespawn = () => { if (LO.active) { LO.phase = 'scatter'; LO.t = 0; LO.dark = Math.max(0, LO.dark - .3); } };
+  a.update = (dt, time) => {
+    a.screens.forEach((sc, i) => { sc.material.opacity = .25 + Math.sin(time * 2 + i) * .1 * (1 - LO.dark); sc.position.y = 6 + Math.sin(time + i) * .3; });
+    a.strips.forEach((st, i) => st.visible = Math.random() > LO.dark * .6);
+    // the dark: fog closes in as Loneliness gets stronger
+    scene.fog.near = 12 - LO.dark * 10; scene.fog.far = 60 - LO.dark * 40; scene.fog.color.setRGB(.1 * (1 - LO.dark), .06 * (1 - LO.dark), .19 * (1 - LO.dark));
+    if (LO.phase === 'wait') { if ((LO.t += dt) > 3 && state.mode === 'play' && !cine) {
+      playCine([{ text: 'The lights go out.', d: 2.4, snap: true, pos: [P.x, 3, P.z], look: [0, 3, 0], on: () => { LO.dark = .6; sfx('roar'); } },
+        { text: 'LONELINESS, the first of the 5 Emotions.', d: 3.2, pos: [0, 5, -8], look: [0, 4, 4], on: () => { place(LO.real, 0, 4); } },
+        { text: 'It hides among its shadows. Find the one with the glowing tear!', d: 3.2, pos: [0, 5, -8], look: [0, 4, 4] }],
+        () => { startABoss(LO); a.goal = 'Find the real Loneliness'; LO.phase = 'scatter'; LO.t = 0; });
+      LO.phase = 'intro'; } return; }
+    if (!LO.active) return;
+    LO.t += dt;
+    if (LO.phase === 'scatter') { // everyone fades out, then appears in new places
+      [LO.real, ...LO.copies].forEach(g => g.userData.m.opacity = Math.max(0, .92 - LO.t * 2));
+      LO.immune = true;
+      if (LO.t > .6) { const sp = spots(); place(LO.real, ...sp[0]); LO.copies.forEach((c, i) => place(c, ...sp[i + 1])); LO.phase = 'hide'; LO.t = 0; LO.immune = false; }
+    } else if (LO.phase === 'hide') {
+      // they all drift slowly towards you. The real one's tear glints now and then
+      [LO.real, ...LO.copies].forEach(g => { if (!g.visible) return; const dx = P.x - g.position.x, dz = P.z - g.position.z, d = Math.hypot(dx, dz) || 1;
+        g.position.x += dx / d * (1 + LO.dark) * dt; g.position.z += dz / d * (1 + LO.dark) * dt; g.rotation.y = Math.atan2(dx, dz);
+        g.position.y = Math.sin(time * 2 + g.id) * .2;
+        if (d < 1.6) { hurt(1, g.position.x, g.position.z); LO.dark = Math.min(.95, LO.dark + .1); } });
+      LO.real.userData.tear.visible = Math.sin(time * 3) > -.6; // a little blink so it's tricky
+      // punching a copy: it bursts into shadow and the room gets darker
+      for (const c of LO.copies) {
+        if (!c.visible) continue;
+        const dx = c.position.x - P.x, dz = c.position.z - P.z;
+        if (c.lastPunch === undefined) c.lastPunch = punchCount;
+        const punched = c.lastPunch !== punchCount; c.lastPunch = punchCount;
+        if (punched && Math.hypot(dx, dz) < 2.6) { c.visible = false; burst(c.position.x, 3, c.position.z, [0x0c0818, 0x3a3060], 14); LO.dark = Math.min(.95, LO.dark + .12); sfx('whoosh'); toast('', 'Just a shadow… it\'s getting darker'); }
+      }
+      if (LO.t > 9) { LO.phase = 'scatter'; LO.t = 0; LO.dark = Math.min(.95, LO.dark + .08); } // took too long: everything gets darker
+    }
+  };
+  a.LO = LO;
+  a.onKey = () => { a.bed2.visible = true; burst(a.bed2.position.x, 2, a.bed2.position.z, [0x3a2a6b, 0xb07fff], 20); };
 }
 
 // everything solid casts and catches shadows (glowing things and the sky don't)
