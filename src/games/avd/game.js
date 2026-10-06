@@ -37,12 +37,16 @@ import { PX, retroColors, flushText } from './pixel'
 const snap = (v) => Math.round(v / PX) * PX
 import { makeMath, makeSpell, quizKey, quizClick, drawQuiz } from './quiz'
 import { loadShop, saveShop, itemLevel } from './shop'
+import { loadProfile, tagLine } from './names'
+import { openProfile, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
+import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
 
 export { W, H }
 
 
 const WAVES = 5
+const POWER_NAMES = { mega: 'MEGA ROAR', shield: 'SHIELD', speed: 'SPEED BOOST' }
 // How fast the action runs: 1 is normal speed, bigger is faster.
 const GAME_SPEED = 1.3
 const WAVE_SECONDS = 40
@@ -232,7 +236,7 @@ class FX {
 
 // ---------- characters ----------
 
-class Dino {
+export class Dino {
   constructor(x, kind, scale = 1) {
     this.x = x
     this.y = GROUND
@@ -321,7 +325,7 @@ class Saucer {
 }
 
 // Is the point (x, y) inside a tractor beam shining down from (bx, by)?
-function inBeam(bx, by, x, y, wide = 70) {
+export function inBeam(bx, by, x, y, wide = 70) {
   if (y < by + 10) return false
   const f = clamp((y - by) / (GROUND - by), 0, 1)
   return Math.abs(x - bx) < 16 + (wide - 16) * f + 12
@@ -359,6 +363,7 @@ export class AliensVsDinos {
     this.sceneT = 0
     this.settings = loadSettings()
     this.shop = loadShop()
+    this.profile = loadProfile()
     initTitle(this)
     this.side = null
     this.menuPick = 0
@@ -366,7 +371,12 @@ export class AliensVsDinos {
     this.cam = { x: W / 2, y: H / 2, zoom: 1 }
 
     this.onKeyDown = (e) => {
-      if (this.scene === 'play' && this.quiz && !this.quiz.doneT) {
+      if (lobbyKey(this, e)) {
+        e.preventDefault()
+        wakeAudio()
+        return
+      }
+      if ((this.scene === 'play' || this.scene === 'vs') && this.quiz && !this.quiz.doneT) {
         const r = quizKey(this.quiz, e.code)
         if (r !== undefined) {
           e.preventDefault()
@@ -498,9 +508,9 @@ export class AliensVsDinos {
 
   // ---------- math and spelling quizzes ----------
 
+  // Math and spelling follow your school year (Year 1 to 6).
   quizLevel() {
-    const base = { easy: 0, normal: 1, hard: 2 }[this.settings.difficulty] ?? 1
-    return Math.min(2, base + (this.wave >= 4 ? 1 : 0))
+    return this.profile?.year || 3
   }
 
   openQuiz(hint) {
@@ -523,10 +533,26 @@ export class AliensVsDinos {
     // correct!
     q.doneT = 0.7
     sfx.capture()
+    if (this.scene === 'vs') {
+      // in a 2-player game the host's game hands out the reward
+      const vs = this.vs
+      const host = vs.role === 'host'
+      if (this.side === 'aliens') {
+        if (host) rewardMath(this)
+        else vs.mc++
+      } else if (host) rewardSpell(this)
+      else vs.sc++
+      if (q.word) this.lastWord = q.word
+      this.earn(2)
+      return
+    }
     if (this.side === 'aliens') {
       const p = this.ufo
       p.fuel = Math.min(1, p.fuel + 0.7)
-      this.fx.text(p.x, p.y - 60, 'REFUELED!', '#2ce8f5', 24)
+      p.ammo = Math.min(15, p.ammo + 5)
+      p.energy = 1
+      p.overheat = false
+      this.fx.text(p.x, p.y - 60, 'REFUELED! +5 LASERS', '#2ce8f5', 22)
       this.fx.burst(p.x, p.y, 16, { speed: 200, life: 0.6, size: 6, color: ['#2ce8f5', '#ffffff'], type: 'star' })
       this.score += 50
       this.earn(3)
@@ -536,6 +562,11 @@ export class AliensVsDinos {
       r2.roars += add
       this.lastWord = q.word
       this.fx.text(r2.x, r2.y - 130, `+${add} ROARS!`, '#feae34', 24)
+      // good spelling also earns a power-up
+      const kind = pick(['mega', 'shield', 'speed'])
+      this.power = { kind, t: 12 }
+      this.fx.text(r2.x, r2.y - 165, `${POWER_NAMES[kind]}!`, '#63c74d', 26)
+      if (kind === 'shield') this.releaseRex()
       this.fx.burst(r2.x, r2.y - 80, 16, { speed: 200, life: 0.6, size: 6, color: ['#feae34', '#ffffff'], type: 'star' })
       this.score += 20 * q.word.length
       this.earn(2 + Math.ceil(q.word.length / 2))
@@ -556,6 +587,96 @@ export class AliensVsDinos {
   goTitle() {
     this.goScene('title')
     if (!this.userSong) playSong('title')
+  }
+
+  // PLAY: first make sure we know your name and school year.
+  playPressed() {
+    if (this.profile) this.goMenu()
+    else openProfile(this, () => this.goMenu())
+  }
+
+  twoPlayerPressed() {
+    if (this.profile) openMultiplayer(this)
+    else openProfile(this, () => openMultiplayer(this))
+  }
+
+  editProfile() {
+    openProfile(this, () => this.goScene('settings'))
+  }
+
+  tag() {
+    return tagLine(this.side, this.profile || { name: 'PLAYER', year: 3 })
+  }
+
+  startVersus(role, mySide, session, them) {
+    const me = { name: this.profile.name, year: this.profile.year }
+    const other = them || session.theirs() || {}
+    const otherSide = mySide === 'aliens' ? 'dinos' : 'aliens'
+    this.vs = { role, mySide, session, round: role === 'host' ? 1 : 0, names: { [mySide]: me, [otherSide]: { name: other.name, year: other.year } }, cnt: { f: 0, j: 0, ac: 0 }, mc: 0, sc: 0, lostT: 0, evId: 0 }
+    this.side = mySide
+    this.ending = null
+    this.coinsRun = 0
+    newRound(this)
+    this.scene = 'vs'
+    this.fx.list = []
+    this.userSong = false
+    playSong(mySide === 'aliens' ? 'ufo' : 'stomp')
+    sfx.wave()
+  }
+
+  leaveVersus() {
+    beamOn(false)
+    this.vs?.session.close()
+    this.vs = null
+    this.quiz = null
+    this.goTitle()
+  }
+
+  updateVersus(dt) {
+    const vs = this.vs
+    const them = vs.session.theirs()
+    vs.lostT = them ? 0 : vs.lostT + dt
+    if (this.pressed.has('pause')) return this.leaveVersus()
+    if (vs.session.error && vs.lostT > 3) return this.leaveVersus()
+    this.updateQuiz(dt)
+    // your own quizzes: math for the UFO, spelling for the T. rex
+    const p = this.pressed
+    if (!vs.winner) {
+      if (this.side === 'aliens') {
+        if (vs.ufo.fuel < 0.25) this.openQuiz('LOW FUEL! SOLVE IT TO REFUEL!')
+        if (p.has('fire') && vs.ufo.ammo <= 0) this.openQuiz('NO LASER! SOLVE IT TO CHARGE UP!')
+      } else if (vs.rex.roars <= 0 && vs.rex.power?.kind !== 'mega') this.openQuiz('OUT OF ROARS! SPELL IT TO ROAR!')
+      if (p.has('enter') && !this.quiz) this.openQuiz()
+    }
+    if (vs.role === 'host') {
+      hostUpdate(this, dt, them)
+      for (const ev of vs.events) playEvent(this, ev)
+      vs.session.mine({ role: 'host', name: this.profile.name, year: this.profile.year, side: vs.mySide, ph: 'play', s: snapshot(this) })
+      if (vs.winner && vs.overT > 1.5 && p.has('enter')) {
+        vs.round++
+        newRound(this)
+      }
+    } else {
+      if (them?.ph === 'play') applySnapshot(this, them.s)
+      if (p.has('fire')) vs.cnt.f++
+      if (p.has('up') || p.has('fire')) vs.cnt.j++
+      if (p.has('action')) vs.cnt.ac++
+      const k = this.keys
+      const frozen = this.quiz && !this.quiz.doneT
+      vs.session.mine({
+        role: 'guest',
+        name: this.profile.name,
+        year: this.profile.year,
+        ph: 'play',
+        i: { l: !!k.left, r: !!k.right, u: !!k.up, d: !!k.down, a: !!k.action && !frozen, f: vs.cnt.f, j: vs.cnt.j, ac: vs.cnt.ac },
+        q: frozen ? 1 : 0,
+        mc: vs.mc,
+        sc: vs.sc,
+      })
+    }
+    beamOn(vs.ufo.beaming && !vs.winner)
+    const target = this.side === 'aliens' ? vs.ufo : vs.rex
+    this.cam.x = approach(this.cam.x, clamp(target.x + (target.vx || 0) * 0.3, W / 2, WORLD - W / 2), 4, dt)
   }
 
   goMenu() {
@@ -580,7 +701,8 @@ export class AliensVsDinos {
     this.fx.list = []
     this.score = 0
     this.wave = 1
-    this.banner = { text: 'WAVE 1', sub: this.side === 'aliens' ? 'Beam up 6 dinos!' : `Survive ${WAVE_SECONDS} seconds!`, t: 0 }
+    this.banner = { text: this.tag(), sub: this.side === 'aliens' ? 'WAVE 1: Beam up 6 dinos!' : `WAVE 1: Survive ${WAVE_SECONDS} seconds!`, t: 0 }
+    this.power = null
     this.pickups = []
     this.eggs = []
     this.bolts = []
@@ -648,7 +770,9 @@ export class AliensVsDinos {
       }
     } else if (this.scene === 'paused') {
       this.scene = 'play'
-    } else if (this.scene === 'play' && this.quiz && !this.quiz.doneT) {
+    } else if (this.scene === 'profile' || this.scene === 'mp') {
+      clickLobby(this, { x, y })
+    } else if ((this.scene === 'play' || this.scene === 'vs') && this.quiz && !this.quiz.doneT) {
       const r = quizClick(this.quiz, x, y)
       if (r) this.quizResult(r)
     }
@@ -673,25 +797,30 @@ export class AliensVsDinos {
     }
     if (this.isMenuScreen()) updateScreen(this, realDt)
     else if (this.scene === 'menu') this.updateMenu(realDt)
+    else if (this.scene === 'profile' || this.scene === 'mp') updateLobby(this, realDt)
+    else if (this.scene === 'vs') this.updateVersus(dt)
     else if (this.scene === 'cutscene') this.updateCutscene(realDt)
     else if (this.scene === 'play') {
       if (this.pressed.has('pause')) {
         this.scene = 'paused'
         beamOn(false)
       } else {
-        // the action slows right down while you answer a quiz
-        const qdt = this.quiz && !this.quiz.doneT ? dt * 0.3 : dt
+        // the game waits while you answer a quiz
+        const frozen = this.quiz && !this.quiz.doneT
         this.updateQuiz(dt)
         if (this.pressed.has('enter') && !this.quiz) this.openQuiz()
-        if (this.side === 'aliens') this.updateAliens(qdt)
-        else this.updateDinos(qdt)
-        this.updateCamera(dt)
-        if (Math.random() < dt * 5) {
-          this.fx.add({ x: this.cam.x + rand(-W / 2, W / 2), y: GROUND - rand(10, 160), vx: rand(-20, 20), vy: rand(-15, 15), life: rand(2, 4), size: 7, color: '#d8ff6a', type: 'glow', drag: 0 })
-        }
-        if (this.banner) {
-          this.banner.t += dt
-          if (this.banner.t > 2.6) this.banner = null
+        if (frozen) beamOn(false)
+        else {
+          if (this.side === 'aliens') this.updateAliens(dt)
+          else this.updateDinos(dt)
+          this.updateCamera(dt)
+          if (Math.random() < dt * 5) {
+            this.fx.add({ x: this.cam.x + rand(-W / 2, W / 2), y: GROUND - rand(10, 160), vx: rand(-20, 20), vy: rand(-15, 15), life: rand(2, 4), size: 7, color: '#d8ff6a', type: 'glow', drag: 0 })
+          }
+          if (this.banner) {
+            this.banner.t += dt
+            if (this.banner.t > 3.2) this.banner = null
+          }
         }
         if (this.ending) {
           this.ending.t += realDt
@@ -767,7 +896,7 @@ export class AliensVsDinos {
   // ---------- ALIENS mode: you fly the UFO ----------
 
   setupAliens() {
-    this.ufo = { x: 600, y: 170, vx: 0, vy: 0, hp: this.diff.hp + this.lvl('shield'), maxHp: this.diff.hp + this.lvl('shield'), fuel: 1, energy: 1, overheat: false, beaming: false, tilt: 0, inv: 0, laserCd: 0, face: 1, hurt: 0 }
+    this.ufo = { x: 600, y: 170, vx: 0, vy: 0, hp: this.diff.hp + this.lvl('shield'), maxHp: this.diff.hp + this.lvl('shield'), fuel: 1, ammo: 6, energy: 1, overheat: false, beaming: false, tilt: 0, inv: 0, laserCd: 0, face: 1, hurt: 0 }
     this.dinos = []
     for (let i = 0; i < 7; i++) this.dinos.push(new Dino(rand(200, WORLD - 200), pick(KIND_LIST)))
     this.enemies = [new Saucer(WORLD - 200, -80)]
@@ -847,7 +976,12 @@ export class AliensVsDinos {
     }
     beamOn(p.beaming)
 
-    if (alive && this.pressed.has('fire') && p.laserCd <= 0) {
+    if (alive && this.pressed.has('fire') && p.laserCd <= 0 && p.ammo <= 0) {
+      p.laserCd = 0.4
+      fx.text(p.x, p.y - 50, 'NO LASER CHARGE!', '#ff8fa0', 18)
+      this.openQuiz('NO LASER! SOLVE IT TO CHARGE UP!')
+    } else if (alive && engine && this.pressed.has('fire') && p.laserCd <= 0) {
+      p.ammo--
       p.laserCd = 0.28
       const ys = this.lvl('laser') ? [-6, 14] : [4]
       for (const dy of ys) this.bolts.push({ x: p.x + p.face * 50, y: p.y + dy, vx: p.face * 950 + p.vx * 0.3, life: 0.9 })
@@ -1138,6 +1272,11 @@ export class AliensVsDinos {
     const alive = !this.ending
 
     r.inv = Math.max(0, r.inv - dt)
+    if (this.power) {
+      this.power.t -= dt
+      if (this.power.t <= 0) this.power = null
+      else if (this.hasPower('speed') && r.onGround && Math.abs(r.vx) > 100 && Math.random() < dt * 20) fx.dust(r.x - r.face * 20, GROUND, 1)
+    }
     r.roarCd = Math.max(0, r.roarCd - dt)
     r.roarT = Math.max(0, r.roarT - dt)
     r.squash = Math.max(0, r.squash - dt * 4)
@@ -1153,10 +1292,10 @@ export class AliensVsDinos {
       else if (!this.ending && r.y - 80 < u.y + 10) this.rexCaught(u)
     } else {
       const ix = alive ? (k.right ? 1 : 0) - (k.left ? 1 : 0) : 0
-      r.vx = approach(r.vx, ix * (this.lvl('jump') ? 370 : 300), r.onGround ? 8 : 3, dt)
+      r.vx = approach(r.vx, ix * (this.lvl('jump') ? 370 : 300) * (this.hasPower('speed') ? 1.5 : 1), r.onGround ? 8 : 3, dt)
       if (ix) r.face = ix
       if (alive && (this.pressed.has('up') || this.pressed.has('fire')) && r.onGround) {
-        r.vy = this.lvl('jump') ? -780 : -640
+        r.vy = this.lvl('jump') || this.hasPower('speed') ? -800 : -640
         r.onGround = false
         r.squash = 0.6
         fx.dust(r.x, GROUND, 6)
@@ -1184,29 +1323,17 @@ export class AliensVsDinos {
     }
 
     if (alive && this.pressed.has('action') && r.roarCd <= 0) {
-      if (r.roars > 0) this.roar()
+      if (r.roars > 0 || this.hasPower('mega')) this.roar()
       else {
         fx.text(r.x, r.y - 130, 'NO ROARS LEFT!', '#ff8fa0', 20)
         this.openQuiz('OUT OF ROARS! SPELL IT TO ROAR!')
       }
     }
 
-    // babies follow you around
+    // babies wander around the valley on their own, and run away from UFO beams
     for (const b of this.babies) {
       if (b.state === 'gone') continue
-      if (b.state === 'walk') {
-        b.think -= dt
-        if (b.think <= 0) {
-          b.think = rand(1, 3)
-          b.offset = clamp(b.offset + rand(-60, 60), -220, 220)
-        }
-        b.target = clamp(r.x + b.offset, 60, WORLD - 60)
-        const want = Math.abs(b.target - b.x) > 14 ? Math.sign(b.target - b.x) * Math.min(260, Math.abs(b.target - b.x) * 2) : 0
-        b.vx = approach(b.vx, want, 5, dt)
-        b.x += b.vx * dt
-        if (Math.abs(b.vx) > 5) b.face = Math.sign(b.vx)
-        b.walk += Math.abs(b.vx) * dt * 0.12
-      }
+      if (b.state === 'walk') this.babyWander(b, dt)
       b.physics(dt, fx)
     }
 
@@ -1258,6 +1385,28 @@ export class AliensVsDinos {
         }
       }
     }
+  }
+
+  babyWander(b, dt) {
+    b.think -= dt
+    const danger = this.ufos.find((u) => (u.beaming || u.state === 'charge') && Math.abs(u.x - b.x) < 170)
+    if (danger) {
+      b.target = clamp(b.x + Math.sign(b.x - danger.x || 1) * 260, 80, WORLD - 80)
+      b.scared = 0.5
+    } else if (b.think <= 0) {
+      b.think = rand(1.5, 4)
+      b.target = Math.random() < 0.3 ? b.x : clamp(b.x + rand(-320, 320), 200, WORLD - 200)
+    }
+    const speed = danger ? 210 : 70
+    const want = Math.abs(b.target - b.x) > 10 ? Math.sign(b.target - b.x) * speed : 0
+    b.vx = approach(b.vx, want, 5, dt)
+    b.x += b.vx * dt
+    if (Math.abs(b.vx) > 5) b.face = Math.sign(b.vx)
+    b.walk += Math.abs(b.vx) * dt * 0.12
+  }
+
+  hasPower(kind) {
+    return this.power?.kind === kind
   }
 
   ufoDinoAI(u, dt) {
@@ -1337,7 +1486,7 @@ export class AliensVsDinos {
     } else if (u.state === 'beam') {
       u.beaming = true
       // grab anyone standing in the beam
-      if (!r.liftedBy && r.inv <= 0 && !this.ending && inBeam(u.x, u.y, r.x, r.y - 40)) {
+      if (!r.liftedBy && r.inv <= 0 && !this.hasPower('shield') && !this.ending && inBeam(u.x, u.y, r.x, r.y - 40)) {
         r.liftedBy = u
         r.onGround = false
         fx.text(r.x, r.y - 110, 'ROAR to escape!', '#ffe14a', 22)
@@ -1420,9 +1569,9 @@ export class AliensVsDinos {
     const fx = this.fx
     r.roarCd = 0.85
     r.roarT = 0.6
-    r.roars--
-    if (r.roars <= 0) this.openQuiz('OUT OF ROARS! SPELL IT TO ROAR!')
-    const reach = 340 * (1 + 0.25 * this.lvl('roar'))
+    if (!this.hasPower('mega')) r.roars--
+    if (r.roars <= 0 && !this.hasPower('mega')) this.openQuiz('OUT OF ROARS! SPELL IT TO ROAR!')
+    const reach = 340 * (1 + 0.25 * this.lvl('roar')) * (this.hasPower('mega') ? 1.6 : 1)
     const hx = r.x + r.face * 36
     const hy = r.y - 70
     for (let i = 0; i < 3; i++) fx.add({ x: hx, y: hy, size: reach, color: i ? 'rgba(255,240,180,0.8)' : '#fff', type: 'ring', life: 0.5 + i * 0.12, width: 10 - i * 3 })
@@ -1508,7 +1657,14 @@ export class AliensVsDinos {
       ctx.translate(Math.round(rand(-1, 1) * this.shake * 0.2) * PX, Math.round(rand(-1, 1) * this.shake * 0.2) * PX)
     }
     if (this.isMenuScreen()) drawScreen(this, ctx)
-    else if (this.scene === 'menu') this.drawMenu(ctx)
+    else if (this.scene === 'profile' || this.scene === 'mp') drawLobby(this, ctx)
+    else if (this.scene === 'vs') {
+      drawVersus(this, ctx)
+      if (this.quiz) {
+        drawQuiz(ctx, this.quiz, this.time, this.quiz.hint)
+        if (this.quiz.doneT) text(ctx, 'CORRECT!', W / 2, 286, 40, '#63c74d')
+      }
+    } else if (this.scene === 'menu') this.drawMenu(ctx)
     else if (this.scene === 'cutscene') this.drawCutscene(ctx)
     else {
       this.drawPlay(ctx)
@@ -1631,6 +1787,16 @@ export class AliensVsDinos {
       shadow(ctx, b.x, GROUND, 22)
       b.draw(ctx, t, { lookUp: this.ufos.some((u) => Math.abs(u.x - b.x) < 150) })
     }
+    if (this.hasPower('shield')) {
+      ctx.save()
+      ctx.globalAlpha = 0.5 + 0.2 * Math.sin(t * 8)
+      ctx.strokeStyle = '#63c74d'
+      ctx.lineWidth = 6
+      ctx.beginPath()
+      ctx.arc(r.x, r.y - 45, 72, 0, TAU)
+      ctx.stroke()
+      ctx.restore()
+    }
     shadow(ctx, r.x, GROUND, 40 * clamp(1 - (GROUND - r.y) / 300, 0.3, 1))
     if (!(r.inv > 0 && Math.floor(t * 12) % 2 === 0)) {
       ctx.save()
@@ -1657,7 +1823,8 @@ export class AliensVsDinos {
   drawEdgeArrows(ctx) {
     // little arrows at the screen edge pointing at things you can't see
     const list = this.side === 'aliens' ? this.enemies : this.ufos.filter((u) => u.state !== 'leave')
-    for (const e of list) {
+    const babies = this.side === 'dinos' ? this.babies.filter((b) => b.state !== 'gone').map((b) => ({ x: b.x, y: 420, baby: true })) : []
+    for (const e of [...list, ...babies]) {
       const sx = e.x - this.cam.x + W / 2
       if (sx > -20 && sx < W + 20) continue
       const left = sx < 0
@@ -1671,7 +1838,7 @@ export class AliensVsDinos {
       ctx.lineTo(-8, -12)
       ctx.lineTo(-8, 12)
       ctx.closePath()
-      ctx.fillStyle = '#ff5a7a'
+      ctx.fillStyle = e.baby ? '#63c74d' : '#ff5a7a'
       ctx.fill()
       ctx.strokeStyle = INK
       ctx.lineWidth = 2.5
@@ -1682,7 +1849,13 @@ export class AliensVsDinos {
 
   drawAliensHUD(ctx) {
     const p = this.ufo
-    hudPanel(ctx, 14, 12, 250, 100)
+    hudPanel(ctx, 14, 12, 250, 126)
+    text(ctx, 'LASER', 28, 118, 13, '#2ce8f5', 'left')
+    for (let i = 0; i < 15; i++) {
+      rrect(ctx, 92 + i * 10.3, 106, 7, 14, 2)
+      ctx.fillStyle = i < p.ammo ? '#2ce8f5' : 'rgba(255,255,255,0.15)'
+      ctx.fill()
+    }
     text(ctx, 'FUEL', 28, 92, 13, '#feae34', 'left')
     const low = p.fuel < 0.25 && Math.floor(this.time * 4) % 2 === 0
     bar(ctx, 92, 82, 154, 16, p.fuel, low ? '#e43b44' : '#feae34')
@@ -1715,6 +1888,7 @@ export class AliensVsDinos {
     }
     if (r.roars > 10) text(ctx, `+${r.roars - 10}`, 248, 68, 12, '#ffe14a', 'right')
     if (r.roars <= 0) text(ctx, 'ENTER = SPELL', 96, 68, 12, '#ff8fa0', 'left')
+    if (this.power) text(ctx, `★ ${POWER_NAMES[this.power.kind]} ${Math.ceil(this.power.t)}S`, 28, 104, 14, '#63c74d', 'left')
     hudPanel(ctx, W / 2 - 120, 12, 240, 74)
     text(ctx, `${Math.max(0, Math.ceil(this.waveTime))}s left`, W / 2, 44, 24, this.waveTime < 6 ? '#ffe14a' : '#fff')
     const babies = this.babies.filter((b) => b.state !== 'gone').length
@@ -1725,13 +1899,13 @@ export class AliensVsDinos {
   }
 
   drawBanner(ctx, b) {
-    const a = b.t < 0.3 ? b.t / 0.3 : b.t > 2.2 ? (2.6 - b.t) / 0.4 : 1
+    const a = b.t < 0.3 ? b.t / 0.3 : b.t > 2.8 ? (3.2 - b.t) / 0.4 : 1
     const s = b.t < 0.3 ? 0.5 + easeOut(b.t / 0.3) * 0.5 : 1
     ctx.save()
     ctx.globalAlpha = clamp(a, 0, 1)
     ctx.translate(W / 2, 200)
     ctx.scale(s, s)
-    text(ctx, b.text, 0, 0, 64, '#ffe14a')
+    text(ctx, b.text, 0, 0, b.text.length > 12 ? 40 : 64, '#ffe14a')
     text(ctx, b.sub, 0, 44, 22, '#fff')
     ctx.restore()
   }
@@ -1756,7 +1930,7 @@ export class AliensVsDinos {
     ctx.scale(bounce, bounce)
     text(ctx, won ? 'YOU WIN!' : 'GAME OVER', 0, 0, 72, won ? '#ffe14a' : '#ff8fa0')
     ctx.restore()
-    text(ctx, this.side === 'aliens' ? 'You played as the Aliens' : 'You played as the Dinos', W / 2, 200, 20, '#c9c2ff')
+    text(ctx, this.tag(), W / 2, 200, 20, '#c9c2ff')
     text(ctx, `Score: ${this.score}`, W / 2, 270, 44, '#fff')
     text(ctx, this.newBest ? '★ New best score! ★' : `Best: ${this.best[this.side] || 0}`, W / 2, 316, 22, this.newBest ? '#ffe14a' : '#c9c2ff')
     text(ctx, `Coins earned: $${this.coinsRun}   ·   You have $${this.shop.coins}`, W / 2, 358, 18, '#fee761')
@@ -1811,7 +1985,7 @@ export class AliensVsDinos {
       ctx.restore()
     }
     ctx.restore()
-    text(ctx, 'Choose your side!', W / 2, 148, 22, '#fff')
+    text(ctx, this.profile ? `${this.profile.name}, choose your side!` : 'Choose your side!', W / 2, 148, 22, '#fff')
 
     for (const [i, c] of this.menuCards().entries()) {
       const sel = this.menuPick === i

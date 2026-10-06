@@ -1,0 +1,381 @@
+// Screens for typing your name, picking your school year, and setting up a 2-player game.
+
+import { W, H, INK, rrect, text } from './art'
+import { sfx } from './sound'
+import { inside, drawButton, drawTitleWorld, updateTitleWorld } from './menus'
+import { checkName, saveProfile, safeName, MAX_NAME } from './names'
+import { startSession, cleanCode } from './net'
+
+const LETTER_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
+const CODE_ROWS = ['1234567890', ...LETTER_ROWS]
+
+// ---------- on-screen keyboard (for tablets) ----------
+
+function keyboard(rows, specials) {
+  const keys = []
+  const kw = 52
+  const gap = 6
+  rows.forEach((row, r) => {
+    const total = row.length * (kw + gap) - gap
+    ;[...row].forEach((ch, i) => keys.push({ ch, label: ch, x: W / 2 - total / 2 + i * (kw + gap), y: 268 + r * 50, w: kw, h: 44 }))
+  })
+  const y = 268 + rows.length * 50
+  const total = specials.reduce((s, k) => s + k.w + gap, -gap)
+  let x = W / 2 - total / 2
+  for (const k of specials) {
+    keys.push({ ...k, x, y, h: 44 })
+    x += k.w + gap
+  }
+  return keys
+}
+
+function nameKeys() {
+  return keyboard(LETTER_ROWS, [
+    { ch: ' ', label: 'SPACE', w: 160 },
+    { ch: 'DEL', label: '◀ DEL', w: 120 },
+    { ch: 'OK', label: 'OK ▶', w: 120 },
+  ])
+}
+
+function codeKeys() {
+  return keyboard(CODE_ROWS, [
+    { ch: 'DEL', label: '◀ DEL', w: 120 },
+    { ch: 'OK', label: 'JOIN ▶', w: 140 },
+  ])
+}
+
+function drawKeys(ctx, keys, t, game) {
+  for (const k of keys) {
+    const hover = inside(game.mouse, k)
+    rrect(ctx, k.x, k.y + (hover ? -2 : 0), k.w, k.h, 8)
+    ctx.fillStyle = k.ch === 'OK' ? '#63c74d' : hover ? '#c0cbdc' : '#8b9bb4'
+    ctx.fill()
+    ctx.lineWidth = 3
+    ctx.strokeStyle = INK
+    ctx.stroke()
+    text(ctx, k.label, k.x + k.w / 2, k.y + 30 + (hover ? -2 : 0), k.label.length > 1 ? 15 : 20, INK, 'center', false)
+  }
+}
+
+// ---------- profile: name, then year ----------
+
+const YEARS = [1, 2, 3, 4, 5, 6].map((y, i) => ({ year: y, x: W / 2 - 330 + (i % 3) * 230, y: 220 + Math.floor(i / 3) * 96, w: 200, h: 76 }))
+
+export function openProfile(game, next) {
+  game.prof = { step: 'name', name: game.profile?.name || '', year: game.profile?.year || 3, err: null, next }
+  game.goScene('profile')
+}
+
+function typeName(game, ch) {
+  const pf = game.prof
+  pf.err = null
+  if (ch === 'DEL') pf.name = pf.name.slice(0, -1)
+  else if (ch === 'OK') {
+    const err = checkName(pf.name)
+    if (err) {
+      pf.err = err
+      sfx.hurt()
+      return
+    }
+    pf.name = pf.name.trim().toUpperCase()
+    pf.step = 'year'
+    sfx.select()
+    return
+  } else if (pf.name.length < MAX_NAME && !(ch === ' ' && (!pf.name || pf.name.endsWith(' ')))) pf.name += ch
+  sfx.click()
+}
+
+function pickYear(game, year) {
+  const pf = game.prof
+  pf.year = year
+  game.profile = { name: pf.name, year }
+  saveProfile(game.profile)
+  sfx.capture()
+  pf.next()
+}
+
+// ---------- 2 players ----------
+
+const MP_BUTTONS = {
+  choose: [
+    { id: 'host', label: 'HOST A GAME', color: '#63c74d', x: W / 2 - 160, y: 176, w: 320, h: 56 },
+    { id: 'join', label: 'JOIN A GAME', color: '#6bb8ff', x: W / 2 - 160, y: 246, w: 320, h: 56 },
+    { id: 'back', label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: 330, w: 220, h: 48, size: 20 },
+  ],
+  side: [
+    { id: 'aliens', label: 'ALIENS', color: '#7dffb0', x: W / 2 - 270, y: 200, w: 250, h: 90, size: 30 },
+    { id: 'dinos', label: 'DINOS', color: '#ffa94d', x: W / 2 + 20, y: 200, w: 250, h: 90, size: 30 },
+    { id: 'back', label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: 330, w: 220, h: 48, size: 20 },
+  ],
+  wait: [{ id: 'back', label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: 440, w: 220, h: 48, size: 20 }],
+  lobby: [
+    { id: 'start', label: '▶  START!', color: '#63c74d', x: W / 2 - 140, y: 380, w: 280, h: 56 },
+    { id: 'back', label: '◀  LEAVE', color: '#ffe14a', x: W / 2 - 100, y: 452, w: 200, h: 44, size: 18 },
+  ],
+  code: [],
+}
+
+export function openMultiplayer(game) {
+  game.mp = { step: 'choose', sel: 0, code: '', session: null, err: null, t: 0 }
+  game.goScene('mp')
+}
+
+function mpButtons(game) {
+  const list = MP_BUTTONS[game.mp.step]
+  return game.mp.step === 'lobby' && game.mp.session?.role !== 'host' ? list.filter((b) => b.id !== 'start') : list
+}
+
+function mpBack(game) {
+  const mp = game.mp
+  if (mp.session) {
+    mp.session.close()
+    mp.session = null
+  }
+  mp.err = null
+  if (mp.step === 'choose') game.goTitle()
+  else {
+    mp.step = 'choose'
+    mp.sel = 0
+  }
+}
+
+function mpPress(game, id) {
+  const mp = game.mp
+  sfx.click()
+  if (id === 'back') return mpBack(game)
+  if (id === 'host') {
+    mp.step = 'side'
+    mp.sel = 0
+  } else if (id === 'join') {
+    mp.step = 'code'
+    mp.code = ''
+    mp.err = null
+  } else if (id === 'aliens' || id === 'dinos') {
+    mp.side = id
+    mp.session = startSession('host')
+    mp.step = 'wait'
+    mp.t = 0
+  } else if (id === 'start') {
+    game.startVersus('host', mp.side, mp.session)
+  }
+}
+
+function typeCode(game, ch) {
+  const mp = game.mp
+  mp.err = null
+  if (ch === 'DEL') mp.code = mp.code.slice(0, -1)
+  else if (ch === 'OK') {
+    if (mp.code.length < 4) {
+      mp.err = 'Room codes have 4 letters or numbers'
+      sfx.hurt()
+      return
+    }
+    mp.session = startSession('guest', mp.code)
+    mp.step = 'wait'
+    mp.t = 0
+  } else if (ch !== ' ') mp.code = cleanCode(mp.code + ch)
+  sfx.click()
+}
+
+// What this player tells the other while setting up.
+function lobbyState(game) {
+  const mp = game.mp
+  return { role: mp.session.role, name: game.profile.name, year: game.profile.year, side: mp.side || '', ph: 'lobby' }
+}
+
+// ---------- shared hooks the game calls ----------
+
+// Typing on a real keyboard. Returns true when the key was used here.
+export function lobbyKey(game, e) {
+  const typing = game.scene === 'profile' ? game.prof.step : game.scene === 'mp' && game.mp.step === 'code' ? 'code' : null
+  if (!typing) return false
+  const c = e.code
+  if (typing === 'year') {
+    const m = c.match(/^(?:Digit|Numpad)([1-6])$/)
+    if (m) {
+      pickYear(game, Number(m[1]))
+      return true
+    }
+    return false
+  }
+  const fn = typing === 'name' ? typeName : typeCode
+  if (c === 'Backspace') fn(game, 'DEL')
+  else if (c === 'Enter' || c === 'NumpadEnter') fn(game, 'OK')
+  else if (c === 'Space' && typing === 'name') fn(game, ' ')
+  else if (/^Key[A-Z]$/.test(c)) fn(game, c.slice(3))
+  else if (/^Digit[0-9]$/.test(c) && typing === 'code') fn(game, c.slice(5))
+  else return false
+  return true
+}
+
+export function updateLobby(game, dt) {
+  updateTitleWorld(game, dt)
+  const k = game.pressed
+  if (game.scene === 'profile') {
+    const pf = game.prof
+    if (k.has('pause')) {
+      if (pf.step === 'year') pf.step = 'name'
+      else game.goTitle()
+    }
+    if (pf.step === 'year') {
+      if (k.has('left')) pf.year = Math.max(1, pf.year - 1)
+      if (k.has('right')) pf.year = Math.min(6, pf.year + 1)
+      if (k.has('up')) pf.year = Math.max(1, pf.year - 3)
+      if (k.has('down')) pf.year = Math.min(6, pf.year + 3)
+      if (k.has('enter') || k.has('action')) pickYear(game, pf.year)
+    }
+    return
+  }
+  const mp = game.mp
+  mp.t += dt
+  if (k.has('pause')) return mpBack(game)
+  const btns = mpButtons(game)
+  if (btns.length) {
+    if (k.has('up') || k.has('left')) mp.sel = (mp.sel + btns.length - 1) % btns.length
+    if (k.has('down') || k.has('right')) mp.sel = (mp.sel + 1) % btns.length
+    if (game.mouseMoved) {
+      const h = btns.findIndex((b) => inside(game.mouse, b))
+      if (h >= 0) mp.sel = h
+    }
+    mp.sel = Math.min(mp.sel, btns.length - 1)
+    if (k.has('enter') || k.has('action')) mpPress(game, btns[mp.sel].id)
+  }
+  const s = mp.session
+  if (!s || game.mp.step === 'choose') return
+  if (s.error) {
+    mp.err = s.error
+    s.close()
+    mp.session = null
+    mp.step = 'choose'
+    return
+  }
+  if (s.ready) s.mine(lobbyState(game))
+  const them = s.theirs()
+  if (mp.step === 'wait' && them) {
+    if (s.role === 'guest' && !them.side) return
+    if (s.role === 'guest') mp.side = them.side === 'aliens' ? 'dinos' : 'aliens'
+    mp.step = 'lobby'
+    mp.sel = 0
+    sfx.select()
+  }
+  if (mp.step === 'wait' && s.role === 'guest' && mp.t > 20) {
+    mp.err = "Couldn't find that room. Check the code and try again."
+    s.close()
+    mp.session = null
+    mp.step = 'code'
+  }
+  if (mp.step === 'lobby') {
+    mp.them = them || mp.them
+    if (!them) {
+      mp.lost = (mp.lost || 0) + dt
+      if (mp.lost > 5) {
+        mp.err = 'Your friend left.'
+        s.close()
+        mp.session = null
+        mp.step = 'choose'
+      }
+    } else mp.lost = 0
+    if (s.role === 'guest' && them?.ph === 'play') game.startVersus('guest', mp.side, s, them)
+  }
+}
+
+export function clickLobby(game, p) {
+  if (game.scene === 'profile') {
+    const pf = game.prof
+    if (pf.step === 'name') {
+      const key = nameKeys().find((k) => inside(p, k))
+      if (key) typeName(game, key.ch)
+    } else {
+      const y = YEARS.find((b) => inside(p, b))
+      if (y) pickYear(game, y.year)
+    }
+    return
+  }
+  const mp = game.mp
+  if (mp.step === 'code') {
+    const key = codeKeys().find((k) => inside(p, k))
+    if (key) typeCode(game, key.ch)
+    if (inside(p, { x: 20, y: 20, w: 120, h: 44 })) mpBack(game)
+    return
+  }
+  const b = mpButtons(game).find((x) => inside(p, x))
+  if (b) mpPress(game, b.id)
+}
+
+export function drawLobby(game, ctx) {
+  const t = game.time
+  drawTitleWorld(game, ctx)
+  ctx.fillStyle = 'rgba(15,10,40,0.72)'
+  ctx.fillRect(0, 0, W, H)
+  if (game.scene === 'profile') {
+    const pf = game.prof
+    if (pf.step === 'name') {
+      text(ctx, "WHAT'S YOUR NAME?", W / 2, 90, 34, '#fee761')
+      rrect(ctx, W / 2 - 220, 130, 440, 64, 12)
+      ctx.fillStyle = '#181425'
+      ctx.fill()
+      ctx.lineWidth = 4
+      ctx.strokeStyle = '#fee761'
+      ctx.stroke()
+      const cursor = Math.floor(t * 2) % 2 ? '_' : ' '
+      text(ctx, pf.name + cursor, W / 2, 176, 34, '#ffffff')
+      text(ctx, pf.err || 'Type your name, then press OK', W / 2, 232, 15, pf.err ? '#ff8fa0' : '#c0cbdc')
+      drawKeys(ctx, nameKeys(), t, game)
+    } else {
+      text(ctx, `HI ${pf.name}!`, W / 2, 96, 34, '#fee761')
+      text(ctx, 'WHAT YEAR ARE YOU IN AT SCHOOL?', W / 2, 150, 22, '#ffffff')
+      text(ctx, 'Your math and spelling will match your year', W / 2, 182, 14, '#c0cbdc')
+      for (const b of YEARS) {
+        const sel = pf.year === b.year
+        drawButton(ctx, { ...b, label: `YEAR ${b.year}`, color: sel ? '#fee761' : '#8b9bb4', size: 26 }, sel || inside(game.mouse, b), t)
+      }
+      text(ctx, 'Tap your year, or press 1-6', W / 2, 440, 15, '#c0cbdc')
+    }
+    return
+  }
+  const mp = game.mp
+  text(ctx, '2 PLAYERS', W / 2, 80, 40, '#63c74d')
+  if (mp.step === 'choose') {
+    text(ctx, 'Play against a friend! One of you is the UFO, one is the T. rex.', W / 2, 128, 15, '#c0cbdc')
+    text(ctx, 'Both players need this game open on their own screen.', W / 2, 420, 14, '#c0cbdc')
+  } else if (mp.step === 'side') {
+    text(ctx, 'WHICH SIDE DO YOU WANT TO BE?', W / 2, 150, 22, '#ffffff')
+    text(ctx, 'Your friend gets the other side', W / 2, 180, 14, '#c0cbdc')
+  } else if (mp.step === 'code') {
+    text(ctx, "TYPE YOUR FRIEND'S ROOM CODE", W / 2, 128, 22, '#ffffff')
+    for (let i = 0; i < 4; i++) {
+      rrect(ctx, W / 2 - 130 + i * 66, 150, 56, 64, 10)
+      ctx.fillStyle = '#181425'
+      ctx.fill()
+      ctx.lineWidth = 4
+      ctx.strokeStyle = i === mp.code.length ? '#fee761' : '#5a6988'
+      ctx.stroke()
+      text(ctx, mp.code[i] || '', W / 2 - 102 + i * 66, 196, 34, '#ffffff')
+    }
+    drawKeys(ctx, codeKeys(), t, game)
+    drawButton(ctx, { label: '◀ BACK', color: '#ffe14a', x: 20, y: 20, w: 120, h: 44, size: 16 }, inside(game.mouse, { x: 20, y: 20, w: 120, h: 44 }), t)
+  } else if (mp.step === 'wait') {
+    if (mp.session?.role === 'host') {
+      text(ctx, 'YOUR ROOM CODE IS', W / 2, 150, 22, '#ffffff')
+      text(ctx, mp.session.ready ? mp.session.code : '....', W / 2, 250, 90, '#fee761')
+      text(ctx, 'Tell your friend to press 2 PLAYERS, then JOIN A GAME, and type this code.', W / 2, 310, 15, '#c0cbdc')
+      text(ctx, `Waiting for a friend${'.'.repeat(1 + (Math.floor(t * 2) % 3))}`, W / 2, 370, 20, '#ffffff')
+    } else {
+      text(ctx, `Joining room ${mp.code}${'.'.repeat(1 + (Math.floor(t * 2) % 3))}`, W / 2, 250, 26, '#ffffff')
+    }
+  } else if (mp.step === 'lobby') {
+    const them = mp.them || {}
+    const me = { name: game.profile.name, year: game.profile.year }
+    const other = mp.side === 'aliens' ? 'dinos' : 'aliens'
+    const line = (side, who) => `${side === 'aliens' ? 'ALIENS' : 'DINOS'} ${safeName(who.name)} YEAR ${who.year || '?'}`.toUpperCase()
+    const aliens = mp.side === 'aliens' ? me : them
+    const dinos = mp.side === 'dinos' ? me : them
+    text(ctx, line('aliens', aliens), W / 2, 190, 32, '#7dffb0')
+    text(ctx, 'VS', W / 2, 240, 28, '#fee761')
+    text(ctx, line('dinos', dinos), W / 2, 292, 32, '#ffa94d')
+    text(ctx, `You are the ${mp.side === 'aliens' ? 'UFO' : 'T. REX'}!  Your friend is the ${other === 'aliens' ? 'UFO' : 'T. REX'}.`, W / 2, 336, 15, '#c0cbdc')
+    if (mp.session?.role !== 'host') text(ctx, `Waiting for ${safeName(them.name)} to start${'.'.repeat(1 + (Math.floor(t * 2) % 3))}`, W / 2, 404, 18, '#ffffff')
+  }
+  for (const [i, b] of mpButtons(game).entries()) drawButton(ctx, b, mp.sel === i, t)
+  if (mp.err) text(ctx, mp.err, W / 2, mp.step === 'code' ? 244 : 516, 16, '#ff8fa0')
+}

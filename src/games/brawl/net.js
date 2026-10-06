@@ -64,13 +64,13 @@ function makeLink(peer, conn) {
 }
 
 // Host: make a room and wait for a friend. Calls onCode(code) once the room exists.
-export function hostRoom({ onCode, onError }) {
+export function hostRoom({ onCode, onError, prefix = PREFIX }) {
   let peer
   let cancelled = false
   const promise = new Promise((resolve, reject) => {
     const tryCode = (attempt) => {
       const code = randomCode()
-      peer = new Peer(PREFIX + code, peerOptions())
+      peer = new Peer(prefix + code, peerOptions())
       peer.on('open', () => onCode(code))
       let taken = false
       peer.on('connection', (conn) => {
@@ -105,7 +105,7 @@ export function hostRoom({ onCode, onError }) {
 }
 
 // Guest: join a friend's room by code.
-export function joinRoom(code, { onError }) {
+export function joinRoom(code, { onError, prefix = PREFIX }) {
   let cancelled = false
   const peer = new Peer(peerOptions())
   const promise = new Promise((resolve, reject) => {
@@ -117,7 +117,7 @@ export function joinRoom(code, { onError }) {
     }
     const timer = setTimeout(() => fail({ type: 'timeout' }), 15000)
     peer.on('open', () => {
-      const conn = peer.connect(PREFIX + code.toUpperCase().trim(), { reliable: true })
+      const conn = peer.connect(prefix + code.toUpperCase().trim(), { reliable: true })
       conn.on('open', () => {
         clearTimeout(timer)
         resolve(makeLink(peer, conn))

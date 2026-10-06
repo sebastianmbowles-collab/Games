@@ -16,12 +16,19 @@ const shuffle = (arr) => {
 
 // ---------- math ----------
 
-// level 0 = easy sums, 1 = medium, 2 = hard. Waves make it a little harder as you go.
-function mathProblem(level) {
-  const kinds = level === 0 ? ['+', '-'] : level === 1 ? ['+', '-', '×'] : ['+', '-', '×', '×', '÷']
-  const op = pick(kinds)
-  const max = [10, 25, 50][level]
-  const tables = [5, 6, 12][level]
+// Problems follow the Australian school years, Year 1 to Year 6.
+function mathProblem(year) {
+  const ops = {
+    1: ['+', '-'],
+    2: ['+', '-', '×'],
+    3: ['+', '-', '×', '×'],
+    4: ['+', '-', '×', '×', '÷'],
+    5: ['+', '-', '×', '×', '÷'],
+    6: ['+', '-', '×', '×', '÷', 'big×'],
+  }[year]
+  const op = pick(ops)
+  const max = { 1: 10, 2: 25, 3: 50, 4: 100, 5: 500, 6: 1000 }[year]
+  const tables = { 1: [2], 2: [2, 5, 10], 3: [2, 3, 4, 5, 10], 4: [2, 3, 4, 5, 6, 7, 8, 9, 10], 5: [3, 4, 6, 7, 8, 9, 11, 12], 6: [6, 7, 8, 9, 11, 12] }[year]
   let a
   let b
   let answer
@@ -34,19 +41,24 @@ function mathProblem(level) {
     b = randInt(1, a)
     answer = a - b
   } else if (op === '×') {
-    a = randInt(2, tables)
-    b = randInt(1, tables)
+    a = pick(tables)
+    b = randInt(1, year <= 3 ? 10 : 12)
     answer = a * b
+  } else if (op === 'big×') {
+    a = randInt(12, 49)
+    b = randInt(3, 9)
+    answer = a * b
+    return { q: `${a} × ${b} = ?`, answer }
   } else {
-    b = randInt(2, tables)
-    answer = randInt(1, tables)
+    b = pick(year === 4 ? [2, 5, 10] : tables)
+    answer = randInt(1, 12)
     a = b * answer
   }
   return { q: `${a} ${op} ${b} = ?`, answer }
 }
 
-export function makeMath(level) {
-  const { q, answer } = mathProblem(level)
+export function makeMath(year) {
+  const { q, answer } = mathProblem(year)
   const wrong = new Set()
   while (wrong.size < 3) {
     const w = answer + pick([-10, -2, -1, 1, 2, 10, randInt(-5, 5)])
@@ -97,12 +109,8 @@ const WORDS = [
   ['STEGOSAURUS', 'The dino with plates on its back'],
 ]
 
-export function makeSpell(level, lastWord) {
-  const lengths = [
-    [3, 4],
-    [4, 7],
-    [6, 11],
-  ][level]
+export function makeSpell(year, lastWord) {
+  const lengths = { 1: [3, 4], 2: [3, 5], 3: [4, 6], 4: [4, 7], 5: [6, 9], 6: [7, 11] }[year]
   const list = WORDS.filter(([w]) => w.length >= lengths[0] && w.length <= lengths[1] && w !== lastWord)
   const [word, clue] = pick(list)
   let order = shuffle(word.split(''))

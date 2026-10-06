@@ -8,7 +8,7 @@ import { SHOP_ITEMS, itemLevel, buy } from './shop'
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const rand = (a, b) => a + Math.random() * (b - a)
 const easeOut = (t) => 1 - (1 - t) ** 3
-const inside = (p, r) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h
+export const inside = (p, r) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h
 
 const DUSK = mixTheme('aliens', 'dinos', 0.5)
 
@@ -39,14 +39,15 @@ export function initTitle(game) {
 
 function titleButtons() {
   return [
-    { label: '▶  PLAY', color: '#ffe14a', x: W / 2 - 150, y: 168, w: 300, h: 50 },
-    { label: '$  SHOP', color: '#63c74d', x: W / 2 - 150, y: 228, w: 300, h: 50 },
-    { label: '⚙  SETTINGS', color: '#6bb8ff', x: W / 2 - 150, y: 288, w: 300, h: 50 },
-    { label: '♫  JUKEBOX', color: '#ff8fb0', x: W / 2 - 150, y: 348, w: 300, h: 50 },
+    { label: '▶  PLAY', color: '#ffe14a', x: W / 2 - 150, y: 156, w: 300, h: 44 },
+    { label: '2 PLAYERS', color: '#f77622', x: W / 2 - 150, y: 208, w: 300, h: 44 },
+    { label: '$  SHOP', color: '#63c74d', x: W / 2 - 150, y: 260, w: 300, h: 44 },
+    { label: '⚙  SETTINGS', color: '#6bb8ff', x: W / 2 - 150, y: 312, w: 300, h: 44 },
+    { label: '♫  JUKEBOX', color: '#ff8fb0', x: W / 2 - 150, y: 364, w: 300, h: 44 },
   ]
 }
 
-function updateTitleWorld(game, dt) {
+export function updateTitleWorld(game, dt) {
   const s = game.title
   s.t += dt
   for (const w of s.walkers) {
@@ -115,7 +116,7 @@ function updateTitleWorld(game, dt) {
 
 const REX_X = 700
 
-function drawTitleWorld(game, ctx) {
+export function drawTitleWorld(game, ctx) {
   const s = game.title
   const t = game.time
   drawSky(ctx, DUSK, t)
@@ -203,7 +204,7 @@ function drawLogo(ctx, t, y, intro = 1, size = 1) {
   ctx.restore()
 }
 
-function drawButton(ctx, b, selected, t) {
+export function drawButton(ctx, b, selected, t) {
   ctx.save()
   ctx.translate(b.x + b.w / 2, b.y + b.h / 2)
   const s = selected ? 1.07 + Math.sin(t * 6) * 0.015 : 1
@@ -236,11 +237,11 @@ function updateTitle(game, dt) {
   const btns = titleButtons()
   const k = game.pressed
   if (k.has('up')) {
-    s.sel = (s.sel + 3) % 4
+    s.sel = (s.sel + 4) % 5
     sfx.click()
   }
   if (k.has('down')) {
-    s.sel = (s.sel + 1) % 4
+    s.sel = (s.sel + 1) % 5
     sfx.click()
   }
   const hover = btns.findIndex((b) => inside(game.mouse, b))
@@ -253,9 +254,10 @@ function updateTitle(game, dt) {
 
 function pressTitle(game, i) {
   sfx.select()
-  if (i === 0) game.goMenu()
-  else if (i === 1) game.goShop()
-  else if (i === 2) game.goScene('settings')
+  if (i === 0) game.playPressed()
+  else if (i === 1) game.twoPlayerPressed()
+  else if (i === 2) game.goShop()
+  else if (i === 3) game.goScene('settings')
   else game.goScene('jukebox')
 }
 
@@ -284,6 +286,7 @@ function drawTitle(game, ctx) {
     text(ctx, '♪ TAP OR PRESS A KEY FOR MUSIC ♪', W / 2, 470, 18, '#fee761')
   }
   const best = game.best
+  if (game.profile) text(ctx, `PLAYER: ${game.profile.name} · YEAR ${game.profile.year}`, W / 2, 140, 14, '#fee761')
   text(ctx, `Best: Aliens ${best.aliens || 0}  ·  Dinos ${best.dinos || 0}`, W / 2, 512, 15, '#fff')
   text(ctx, '↑ ↓ to choose · Enter or tap to pick', W / 2, 532, 12, 'rgba(255,255,255,0.8)')
 }
@@ -296,11 +299,12 @@ const ROWS = [
   { key: 'difficulty', label: 'Difficulty', type: 'choice', options: ['easy', 'normal', 'hard'], names: ['Easy', 'Normal', 'Hard'] },
   { key: 'shake', label: 'Screen shake', type: 'toggle' },
   { key: 'cutscenes', label: 'Cutscenes', type: 'toggle' },
+  { key: 'player', label: 'Player', type: 'player' },
   { key: 'back', label: 'Back', type: 'back' },
 ]
 
 function rowRect(i) {
-  return { x: 170, y: 118 + i * 60, w: 620, h: 52 }
+  return { x: 170, y: 108 + i * 55, w: 620, h: 48 }
 }
 
 function changeSetting(game, row, dir) {
@@ -312,6 +316,10 @@ function changeSetting(game, row, dir) {
     st[row.key] = row.options[(i + dir + row.options.length) % row.options.length]
   } else if (row.type === 'back') {
     game.goTitle()
+    return
+  } else if (row.type === 'player') {
+    sfx.click()
+    game.editProfile()
     return
   }
   game.saveSettings()
@@ -330,8 +338,8 @@ function updateSettings(game, dt) {
   const hover = ROWS.findIndex((_, i) => inside(game.mouse, rowRect(i)))
   if (game.mouseMoved && hover >= 0) s.setSel = hover
   const row = ROWS[s.setSel]
-  if (k.has('left') && row.type !== 'back') changeSetting(game, row, -1)
-  if (k.has('right') && row.type !== 'back') changeSetting(game, row, 1)
+  if (k.has('left') && row.type !== 'back' && row.type !== 'player') changeSetting(game, row, -1)
+  if (k.has('right') && row.type !== 'back' && row.type !== 'player') changeSetting(game, row, 1)
   if (k.has('enter') || k.has('action')) changeSetting(game, row, 1)
   if (k.has('pause')) game.goTitle()
 }
@@ -366,7 +374,7 @@ function drawSettings(game, ctx) {
     const r = rowRect(i)
     const on = sel === i
     if (row.type === 'back') {
-      drawButton(ctx, { label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: r.y + 4, w: 220, h: 48, size: 22 }, on, t)
+      drawButton(ctx, { label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: r.y + 2, w: 220, h: 44, size: 22 }, on, t)
       continue
     }
     rrect(ctx, r.x, r.y, r.w, r.h, 16)
@@ -377,6 +385,12 @@ function drawSettings(game, ctx) {
     ctx.stroke()
     text(ctx, row.label, r.x + 24, r.y + 34, 22, '#fff', 'left')
     const cy = r.y + r.h / 2
+    if (row.type === 'player') {
+      const p = game.profile
+      text(ctx, p ? `${p.name} · YEAR ${p.year}` : 'NOT SET', 640, cy + 7, 18, '#fee761')
+      text(ctx, 'TAP TO CHANGE', 640, cy + 20, 10, '#c0cbdc')
+      continue
+    }
     if (row.type !== 'toggle') {
       for (const [x, s] of [
         [500, '−'],
