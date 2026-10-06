@@ -82,9 +82,10 @@ export default function AliensVsDinos({ game, onExit }) {
         </div>
       </div>
       <p className="avd-help">
-        <b>Aliens:</b> arrow keys (or WASD) fly the UFO, hold <b>Space</b> to beam up dinos, press <b>Z</b> to zap rival
-        UFOs. <b>Dinos:</b> arrows to run, <b>↑</b> to jump, <b>Space</b> to ROAR and knock UFOs away. If a beam grabs
-        you, ROAR to break free! <b>P</b> pauses.
+        <b>Aliens:</b> arrow keys fly the UFO, hold <b>Space</b> to beam up dinos, <b>Z</b> zaps rival UFOs. Your UFO
+        burns fuel: solve the math problem (press <b>1</b>-<b>4</b> or tap the answer) to refuel. <b>Dinos:</b> arrows to
+        run, <b>↑</b> to jump, <b>Space</b> to ROAR. Each roar uses one up: spell the dino word (type the letters or tap
+        them) to get more. Press <b>Enter</b> for a quiz any time. Spend your coins in the <b>Shop</b>!
       </p>
     </div>
   )

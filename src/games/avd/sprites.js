@@ -178,7 +178,7 @@ function legs(g, list, frame, colBack, colFront) {
 }
 
 function buildDino(kind, o) {
-  const C = DINO_COLORS[kind]
+  const C = o.gold ? { body: PAL.yellow, shade: PAL.amber, belly: PAL.cream, extra: PAL.amber } : DINO_COLORS[kind]
   const { frame } = o
   let g
   let anchor
@@ -458,9 +458,9 @@ function buildBaby(kind, o) {
 
 function buildUFO(o) {
   const enemy = o.enemy
-  const metal = enemy ? PAL.red : PAL.steel
-  const hi = enemy ? PAL.pink : PAL.silver
-  const lo = enemy ? PAL.dkred : PAL.slate
+  const metal = enemy ? PAL.red : o.gold ? PAL.amber : PAL.steel
+  const hi = enemy ? PAL.pink : o.gold ? PAL.yellow : PAL.silver
+  const lo = enemy ? PAL.dkred : o.gold ? PAL.orange : PAL.slate
   const glass = enemy ? PAL.purple : PAL.navy
   const skin = enemy ? PAL.magenta : PAL.green
   const g = new Grid(41, 19)

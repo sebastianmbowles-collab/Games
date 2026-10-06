@@ -3,6 +3,7 @@
 import { W, H, TAU, INK, circle, rrect, text, drawDino, drawUFO, drawAlien, drawBeam, drawSky, drawBackdrop, mixTheme, getTheme } from './art'
 import { sfx, audioRunning } from './sound'
 import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels } from './music'
+import { SHOP_ITEMS, itemLevel, buy } from './shop'
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const rand = (a, b) => a + Math.random() * (b - a)
@@ -38,9 +39,10 @@ export function initTitle(game) {
 
 function titleButtons() {
   return [
-    { label: '▶  PLAY', color: '#ffe14a', x: W / 2 - 150, y: 180, w: 300, h: 58 },
-    { label: '⚙  SETTINGS', color: '#6bb8ff', x: W / 2 - 150, y: 252, w: 300, h: 58 },
-    { label: '♫  JUKEBOX', color: '#ff8fb0', x: W / 2 - 150, y: 324, w: 300, h: 58 },
+    { label: '▶  PLAY', color: '#ffe14a', x: W / 2 - 150, y: 168, w: 300, h: 50 },
+    { label: '$  SHOP', color: '#63c74d', x: W / 2 - 150, y: 228, w: 300, h: 50 },
+    { label: '⚙  SETTINGS', color: '#6bb8ff', x: W / 2 - 150, y: 288, w: 300, h: 50 },
+    { label: '♫  JUKEBOX', color: '#ff8fb0', x: W / 2 - 150, y: 348, w: 300, h: 50 },
   ]
 }
 
@@ -234,11 +236,11 @@ function updateTitle(game, dt) {
   const btns = titleButtons()
   const k = game.pressed
   if (k.has('up')) {
-    s.sel = (s.sel + 2) % 3
+    s.sel = (s.sel + 3) % 4
     sfx.click()
   }
   if (k.has('down')) {
-    s.sel = (s.sel + 1) % 3
+    s.sel = (s.sel + 1) % 4
     sfx.click()
   }
   const hover = btns.findIndex((b) => inside(game.mouse, b))
@@ -252,7 +254,8 @@ function updateTitle(game, dt) {
 function pressTitle(game, i) {
   sfx.select()
   if (i === 0) game.goMenu()
-  else if (i === 1) game.goScene('settings')
+  else if (i === 1) game.goShop()
+  else if (i === 2) game.goScene('settings')
   else game.goScene('jukebox')
 }
 
@@ -582,18 +585,157 @@ function drawJukebox(game, ctx) {
   text(ctx, 'Enter = play · Z = stop · Esc = back', 470, 545 - 12, 12, 'rgba(255,255,255,0.7)')
 }
 
+// ---------- shop ----------
+
+const SHOP_TABS = [
+  { side: 'aliens', label: 'ALIENS', color: '#7dffb0', x: 250, y: 96, w: 220, h: 40 },
+  { side: 'dinos', label: 'DINOS', color: '#ffa94d', x: 490, y: 96, w: 220, h: 40 },
+]
+const SHOP_BACK = { label: '◀  BACK', color: '#ffe14a', x: 40, y: 476, w: 180, h: 46, size: 20 }
+
+function shopRow(i) {
+  return { x: 110, y: 150 + i * 62, w: 740, h: 54 }
+}
+function buyRect(i) {
+  const r = shopRow(i)
+  return { x: r.x + r.w - 160, y: r.y + 8, w: 146, h: r.h - 16 }
+}
+
+function shopBuy(game, i) {
+  const s = game.title
+  const side = s.shopTab || 'aliens'
+  const item = SHOP_ITEMS[side][i]
+  const lvl = itemLevel(game.shop, side, item.key)
+  if (lvl >= item.prices.length) {
+    s.shopMsg = { text: 'ALREADY MAXED OUT!', t: 1.5 }
+    sfx.click()
+  } else if (buy(game.shop, side, item)) {
+    s.shopMsg = { text: `YOU BOUGHT ${item.name.toUpperCase()}!`, t: 1.8 }
+    sfx.capture()
+    const r = buyRect(i)
+    game.fx.burst(r.x + r.w / 2, r.y + r.h / 2, 20, { speed: 220, life: 0.7, size: 7, color: ['#fee761', '#7dffb0', '#ffffff'], type: 'star' })
+  } else {
+    s.shopMsg = { text: `YOU NEED ${item.prices[lvl] - game.shop.coins} MORE COINS`, t: 1.8 }
+    sfx.warn()
+  }
+}
+
+function updateShop(game, dt) {
+  updateTitleWorld(game, dt)
+  const s = game.title
+  const k = game.pressed
+  s.shopSel = s.shopSel ?? 0
+  if (s.shopMsg) {
+    s.shopMsg.t -= dt
+    if (s.shopMsg.t <= 0) s.shopMsg = null
+  }
+  if (k.has('left') || k.has('right')) {
+    s.shopTab = (s.shopTab || 'aliens') === 'aliens' ? 'dinos' : 'aliens'
+    sfx.click()
+  }
+  if (k.has('up')) s.shopSel = (s.shopSel + 5) % 6
+  if (k.has('down')) s.shopSel = (s.shopSel + 1) % 6
+  if (k.has('up') || k.has('down')) sfx.click()
+  if (game.mouseMoved) {
+    const hover = [0, 1, 2, 3, 4].findIndex((i) => inside(game.mouse, shopRow(i)))
+    if (hover >= 0) s.shopSel = hover
+    if (inside(game.mouse, SHOP_BACK)) s.shopSel = 5
+  }
+  if (k.has('enter') || k.has('action')) {
+    if (s.shopSel === 5) game.goBack()
+    else shopBuy(game, s.shopSel)
+  }
+  if (k.has('pause')) game.goBack()
+}
+
+function clickShop(game, p) {
+  const s = game.title
+  for (const tab of SHOP_TABS) {
+    if (inside(p, tab)) {
+      s.shopTab = tab.side
+      sfx.click()
+    }
+  }
+  const i = [0, 1, 2, 3, 4].findIndex((k) => inside(p, shopRow(k)))
+  if (i >= 0) {
+    s.shopSel = i
+    shopBuy(game, i)
+  }
+  if (inside(p, SHOP_BACK)) {
+    sfx.click()
+    game.goBack()
+  }
+}
+
+function drawShop(game, ctx) {
+  const t = game.time
+  const s = game.title
+  const side = s.shopTab || 'aliens'
+  drawTitleWorld(game, ctx)
+  ctx.fillStyle = 'rgba(15,10,40,0.7)'
+  ctx.fillRect(0, 0, W, H)
+  text(ctx, '$ SHOP', W / 2, 70, 40, '#7dffb0')
+  text(ctx, `$ ${game.shop.coins} COINS`, W - 30, 52, 20, '#fee761', 'right')
+  for (const tab of SHOP_TABS) {
+    const on = tab.side === side
+    rrect(ctx, tab.x, tab.y, tab.w, tab.h, 12)
+    ctx.fillStyle = on ? tab.color : 'rgba(255,255,255,0.12)'
+    ctx.fill()
+    ctx.lineWidth = 3
+    ctx.strokeStyle = INK
+    ctx.stroke()
+    text(ctx, tab.label, tab.x + tab.w / 2, tab.y + 28, 20, on ? INK : '#c0cbdc', 'center', !on)
+  }
+  for (const [i, item] of SHOP_ITEMS[side].entries()) {
+    const r = shopRow(i)
+    const sel = s.shopSel === i
+    const lvl = itemLevel(game.shop, side, item.key)
+    const maxed = lvl >= item.prices.length
+    const price = item.prices[lvl]
+    rrect(ctx, r.x, r.y, r.w, r.h, 14)
+    ctx.fillStyle = sel ? 'rgba(125,255,176,0.22)' : 'rgba(15,10,40,0.85)'
+    ctx.fill()
+    ctx.lineWidth = sel ? 4 : 2
+    ctx.strokeStyle = sel ? '#7dffb0' : 'rgba(255,255,255,0.25)'
+    ctx.stroke()
+    text(ctx, item.name, r.x + 20, r.y + 26, 20, '#ffffff', 'left')
+    text(ctx, item.desc, r.x + 20, r.y + 45, 13, '#c0cbdc', 'left')
+    // one pip per level you can buy
+    for (let k = 0; k < item.prices.length; k++) {
+      rrect(ctx, r.x + 400 + k * 24, r.y + 19, 16, 16, 4)
+      ctx.fillStyle = k < lvl ? '#fee761' : 'rgba(255,255,255,0.18)'
+      ctx.fill()
+    }
+    const b = buyRect(i)
+    const afford = !maxed && game.shop.coins >= price
+    rrect(ctx, b.x, b.y, b.w, b.h, 10)
+    ctx.fillStyle = maxed ? '#3a4466' : afford ? '#fee761' : '#5a6988'
+    ctx.fill()
+    ctx.lineWidth = 3
+    ctx.strokeStyle = INK
+    ctx.stroke()
+    text(ctx, maxed ? 'MAXED' : `BUY $${price}`, b.x + b.w / 2, b.y + 27, 18, maxed ? '#c0cbdc' : INK, 'center', false)
+  }
+  drawButton(ctx, SHOP_BACK, s.shopSel === 5, t)
+  if (s.shopMsg) text(ctx, s.shopMsg.text, W / 2 + 90, 505, 18, '#fee761')
+  else text(ctx, 'Earn coins by playing, solving math and spelling words!', W / 2 + 90, 505, 14, '#c0cbdc')
+  game.fx.draw(ctx)
+}
+
 // ---------- what the game calls ----------
 
 export function updateScreen(game, dt) {
   if (game.scene === 'title') updateTitle(game, dt)
   else if (game.scene === 'settings') updateSettings(game, dt)
   else if (game.scene === 'jukebox') updateJukebox(game, dt)
+  else if (game.scene === 'shop') updateShop(game, dt)
 }
 
 export function drawScreen(game, ctx) {
   if (game.scene === 'title') drawTitle(game, ctx)
   else if (game.scene === 'settings') drawSettings(game, ctx)
   else if (game.scene === 'jukebox') drawJukebox(game, ctx)
+  else if (game.scene === 'shop') drawShop(game, ctx)
 }
 
 export function clickScreen(game, p) {
@@ -602,6 +744,7 @@ export function clickScreen(game, p) {
     if (i >= 0 && game.sceneT > 0.3) pressTitle(game, i)
   } else if (game.scene === 'settings') clickSettings(game, p)
   else if (game.scene === 'jukebox') clickJukebox(game, p)
+  else if (game.scene === 'shop') clickShop(game, p)
 }
 
 export const MENU_BACK = { x: 16, y: 14, w: 110, h: 40 }
