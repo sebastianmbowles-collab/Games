@@ -888,8 +888,30 @@ hexIsland(1.5, 6.5, 2.75, 12.2, 0xfff0fb);
   // pink domes
   [[-24, -6, 5], [22, 4, 4], [-26, 14, 3.5], [26, 16, 6]].forEach(([x, z, r]) => {
     const d = mesh(new THREE.SphereGeometry(r, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xff7ad9, { flatShading: false, shininess: 30 })); d.position.set(x, -0.2, z); scene.add(d);
+    // candy stripes around each dome
+    for (let k = 1; k < 4; k++) { const h = r * k / 4, rr = Math.sqrt(r * r - h * h), st = mesh(new THREE.TorusGeometry(rr, .07, 6, 40), mat(0xffe0f4)); st.rotation.x = Math.PI / 2; st.position.set(x, h - .2, z); scene.add(st); }
     solid(x - r * .8, 0, z - r * .8, x + r * .8, r * .8, z + r * .8);
   });
+  // a little pond with glowing lily pads (and a frog that's not really there)
+  { const pond = mesh(new THREE.CircleGeometry(3, 32), new THREE.MeshPhongMaterial({ color: 0x5a8aff, emissive: 0x1a2a6a, shininess: 120, specular: 0xffffff, transparent: true, opacity: .85 }));
+    pond.rotation.x = -Math.PI / 2; pond.position.set(-12, terrainH(-12, 6) + .05, 6); scene.add(pond); window.__pond = pond;
+    const edge = mesh(new THREE.TorusGeometry(3, .25, 6, 32), mat(0xd8c8f0)); edge.rotation.x = Math.PI / 2; edge.position.copy(pond.position); scene.add(edge);
+    for (let k = 0; k < 6; k++) { const an = k * 1.1, pad = mesh(new THREE.CircleGeometry(.4, 12), mat(0x7fe096)); pad.rotation.x = -Math.PI / 2; pad.position.set(-12 + Math.cos(an) * rand(.8, 2.2), pond.position.y + .03, 6 + Math.sin(an) * rand(.8, 2.2)); scene.add(pad);
+      if (k % 2 === 0) { const fl = mesh(new THREE.OctahedronGeometry(.12, 0), glow(0xff9ad5)); fl.position.set(pad.position.x, pad.position.y + .15, pad.position.z); scene.add(fl); fl.add(halo(0xff9ad5, .8, .5)); } } }
+  // a swing set that sways by itself in the dream breeze
+  { const sw = new THREE.Group(), wood = mat(0xf0e0ff);
+    [-1.6, 1.6].forEach(x => [-.8, .8].forEach(z => { const leg = mesh(new THREE.CylinderGeometry(.07, .07, 3.2, 6), wood); leg.position.set(x, 1.5, z * .5); leg.rotation.x = z * .3; sw.add(leg); }));
+    const bar = mesh(new THREE.CylinderGeometry(.07, .07, 3.4, 6), wood); bar.rotation.z = Math.PI / 2; bar.position.y = 3; sw.add(bar);
+    window.__swings = [-.7, .7].map(x => { const piv = new THREE.Group(); piv.position.set(x, 3, 0); sw.add(piv);
+      [-.25, .25].forEach(z => { const rope = mesh(new THREE.CylinderGeometry(.02, .02, 2.2, 4), mat(0xffffff)); rope.position.set(z, -1.1, 0); piv.add(rope); });
+      const seat = mesh(boxG(.7, .08, .35), mat(0xff8fd0)); seat.position.y = -2.2; piv.add(seat); return piv; });
+    sw.position.set(13, terrainH(13, 5), 5); sw.rotation.y = .4; scene.add(sw); solid(11.3, 0, 4.4, 14.7, 3.1, 5.6).climb = false; }
+  // signposts pointing the way
+  { const sign = (x, z, ry, lines) => { const g = new THREE.Group(), post = mesh(boxG(.12, 1.8, .12), mat(0xf0e0ff)); post.position.y = .9; g.add(post);
+      lines.forEach(([t, dir], i) => { const b = mesh(new THREE.PlaneGeometry(1.5, .38), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, map: paint(256, 64, k => { k.fillStyle = '#ffe0f4'; k.beginPath(); if (dir > 0) { k.moveTo(0, 0); k.lineTo(220, 0); k.lineTo(256, 32); k.lineTo(220, 64); k.lineTo(0, 64); } else { k.moveTo(256, 0); k.lineTo(36, 0); k.lineTo(0, 32); k.lineTo(36, 64); k.lineTo(256, 64); } k.fill(); k.fillStyle = '#5a24a8'; k.font = 'bold 34px "Baloo 2",sans-serif'; k.textAlign = 'center'; k.fillText(t, 128, 45); }) }));
+        b.position.set(0, 1.55 - i * .45, .08); g.add(b); const back = b.clone(); back.material = b.material.clone(); back.material.side = THREE.FrontSide; back.rotation.y = Math.PI; back.position.z = -.08; g.add(back); b.material.side = THREE.FrontSide; });
+      g.position.set(x, terrainH(x, z), z); g.rotation.y = ry; scene.add(g); };
+    sign(2.5, 7.4, Math.PI, [['KEY ↑', 1], ['GATE', -1]]); sign(-2, 17.5, Math.PI, [['DESERT', 1], ['POND', -1]]); }
   // a hidden message tucked behind the big dome
   { const n = note(['the robots', 'were kids once.'], 1.8, 1.05); n.position.set(-24, 1.6, -.8); scene.add(n);
     const post = mesh(boxG(.15, 1.1, .15), mat(0xffffff)); post.position.set(-24, .55, -.85); scene.add(post);
@@ -1825,6 +1847,12 @@ function killRobot(r) {
   if (r.heart) {
     state.kids++; freeKid(r.x, y, r.z); sfx('kid');
     toast('You freed a kid!', 'They are waking up in the real world');
+    if (state.kids === 1) { const kx = r.x, kz = r.z, ky = y; // the very first rescue gets its own little movie
+      setTimeout(() => playCine([
+        { text: 'The robot\'s glowing heart flickers…', d: 2, snap: true, pos: [kx + 2.5, ky + 1.6, kz + 2.5], look: [kx, ky + 1, kz] },
+        { text: '…and a kid steps out! They wave at you…', d: 2.8, pos: [kx + 1.8, ky + 1.4, kz + 1.8], look: [kx, ky + 1.4, kz] },
+        { text: '…and fade away as they wake up in the real world. 49 more to go.', d: 3, pos: [kx + 2.5, ky + 2.4, kz + 2.5], look: [kx, ky + 2.4, kz] },
+      ]), 200); }
   }
   hud();
 }
@@ -2613,6 +2641,8 @@ function loop(now) {
     footShadow.position.set(P.x, g + .03, P.z); footShadow.scale.setScalar(Math.max(.5, 1 - air * .06)); footShadow.material.opacity = Math.max(.12, .45 - air * .03); }
   updatePortals(dt, time);
   wardrobeTick(time); toyTick();
+  if (window.__swings) window.__swings.forEach((sw, i) => sw.rotation.z = Math.sin(time * 1.4 + i * 1.3) * .35);
+  if (window.__pond) window.__pond.material.emissive.setHSL(.62, .6, .12 + Math.sin(time * 1.5) * .04);
   if (aBoss && aBoss.g && aBoss.active) { aBoss.flash = Math.max(0, (aBoss.flash || 0) - dt); }
   if (curArea !== 'home' && AREAS[curArea].update) AREAS[curArea].update(dt, time);
   updateFireworks(dt);
