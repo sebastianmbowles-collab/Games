@@ -3930,7 +3930,7 @@ function revealCine() {
       } else if (DS.emo === 'Pride') { // walks slowly towards you, swatting hard
         p.x += dx / d * 1.4 * dt; p.z += dz / d * 1.4 * dt; if (d < 1.2 * DS.self.scale.x && DS.t % 1.6 < .05) { hurt(1, p.x, p.z); state.shake = .3; }
       }
-      p.x = clamp(p.x, -22, 22); p.z = clamp(p.z, -22, 22);
+      { const r = Math.hypot(p.x, p.z); if (r > 18) { p.x *= 18 / r; p.z *= 18 / r; } } // stay inside the round arena (so it can't hide behind the wall)
     }
   };
   a.DS = DS;
