@@ -44,13 +44,16 @@ import { buildLevel, updateLevel, rexInLevel, ufoInLevel, landMeteors, poolAt, d
 import { choice, UFO_PAINTS, REX_PAINTS } from './custom'
 import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
-import { drawWallet } from './menus'
+import { drawWallet, drawButton, inside } from './menus'
+import { secretKey, secretClick, updateSecrets, drawTitleSecrets, drawSecretPopup, startSecrets, updateCow, drawCow, roarAtGrandpa, updateGrandpa, drawGrandpa } from './secrets'
+import { isAdmin, openTest, updateTest, clickTest, drawTest, testKey } from './testmode'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
 
 export { W, H }
 
 
 const WAVES = 5
+const TEST_BTN = { x: 14, y: 56, w: 182, h: 38, size: 16 } // only for the ADMIN player
 // After this long without playing, the game asks if you're still there.
 const AFK_SECONDS = 120
 const POWER_NAMES = { mega: 'MEGA ROAR', shield: 'SHIELD', speed: 'SPEED BOOST' }
@@ -372,6 +375,11 @@ export class AliensVsDinos {
         this.closeAfk()
         return
       }
+      secretKey(this, e.code)
+      if (testKey(this, e.code)) {
+        e.preventDefault()
+        return
+      }
       if (lobbyKey(this, e)) {
         e.preventDefault()
         wakeAudio()
@@ -586,6 +594,8 @@ export class AliensVsDinos {
     this.quiz.hint = hint
     this.quiz.bonus = bonus
     sfx.warn()
+    // test mode: answer it straight away
+    if (isAdmin(this.profile) && this.test?.auto) this.quizResult('right')
   }
 
   quizResult(r) {
@@ -854,6 +864,7 @@ export class AliensVsDinos {
     this.run = {}
     if (this.side === 'aliens') this.setupAliens()
     else this.setupDinos()
+    startSecrets(this)
     this.level = buildLevel(this.side, 1, this.playerX())
     this.cam.x = clamp(this.playerX(), W / 2, WORLD - W / 2)
     this.cam.y = H / 2
@@ -918,7 +929,12 @@ export class AliensVsDinos {
   }
 
   click(x, y) {
-    if (this.isMenuScreen()) {
+    if (this.scene === 'title' && this.sceneT > 0.3) {
+      if (isAdmin(this.profile) && inside({ x, y }, TEST_BTN)) return openTest(this)
+      if (secretClick(this, { x, y })) return
+    }
+    if (this.scene === 'test') clickTest(this, { x, y })
+    else if (this.isMenuScreen()) {
       clickScreen(this, { x, y })
     } else if (this.scene === 'menu') {
       if (x > MENU_BACK.x && x < MENU_BACK.x + MENU_BACK.w && y > MENU_BACK.y && y < MENU_BACK.y + MENU_BACK.h) {
@@ -980,7 +996,9 @@ export class AliensVsDinos {
       if (Math.random() < 0.06) sfx.owl()
       else sfx.cricket()
     }
+    updateSecrets(this, realDt)
     if (this.isMenuScreen()) updateScreen(this, realDt)
+    else if (this.scene === 'test') updateTest(this, realDt)
     else if (this.scene === 'menu') this.updateMenu(realDt)
     else if (this.scene === 'profile' || this.scene === 'mp' || this.scene === 'account') updateLobby(this, realDt)
     else if (this.scene === 'vs') this.updateVersus(dt)
@@ -1103,6 +1121,7 @@ export class AliensVsDinos {
     const fx = this.fx
     const k = this.keys
     const alive = !this.ending
+    updateCow(this, dt)
 
     // smooth flying: push with the arrows, then glide to a stop
     // fuel burns as you fly; when it runs low you solve a math problem to refuel
@@ -1455,6 +1474,7 @@ export class AliensVsDinos {
     const fx = this.fx
     const k = this.keys
     const alive = !this.ending
+    updateGrandpa(this, dt)
 
     r.inv = Math.max(0, r.inv - dt)
     if (this.power) {
@@ -1611,9 +1631,14 @@ export class AliensVsDinos {
   }
 
   // Lava, kill bricks and meteors cost a life (a shield power-up protects you).
+  // god mode (ADMIN test mode only) means nothing can hurt you
+  get godMode() {
+    return isAdmin(this.profile) && !!this.test?.god
+  }
+
   hurtRex() {
     const r = this.rex
-    if (r.inv > 0 || this.ending) return
+    if (r.inv > 0 || this.ending || this.godMode) return
     if (this.hasPower('shield')) {
       r.inv = 1
       this.fx.text(r.x, r.y - 120, 'SHIELD SAVED YOU!', '#63c74d', 18)
@@ -1634,7 +1659,7 @@ export class AliensVsDinos {
 
   hurtUfo(vx = 0, vy = 0, words = 'Ouch!') {
     const p = this.ufo
-    if (this.ending || p.inv > 0) return
+    if (this.ending || p.inv > 0 || this.godMode) return
     p.hp--
     p.inv = 1.4
     p.hurt = 0.2
@@ -1790,7 +1815,7 @@ export class AliensVsDinos {
   rexCaught(u) {
     const r = this.rex
     const fx = this.fx
-    r.lives--
+    if (!this.godMode) r.lives--
     r.liftedBy = null
     this.flash = 0.8
     this.shake = 14
@@ -1850,6 +1875,7 @@ export class AliensVsDinos {
       }
     }
     if (this.boss) bossRoar(this, hx, hy, reach, this.hasPower('mega'))
+    roarAtGrandpa(this, r.x)
     if (hits) {
       sfx.stun()
       this.slowmo = Math.max(this.slowmo, 0.12)
@@ -1902,7 +1928,13 @@ export class AliensVsDinos {
       // shake in whole chunky pixels so the picture stays sharp
       ctx.translate(Math.round(rand(-1, 1) * this.shake * 0.2) * PX, Math.round(rand(-1, 1) * this.shake * 0.2) * PX)
     }
-    if (this.isMenuScreen()) drawScreen(this, ctx)
+    if (this.isMenuScreen()) {
+      drawScreen(this, ctx)
+      if (this.scene === 'title') {
+        drawTitleSecrets(this, ctx)
+        if (isAdmin(this.profile)) drawButton(ctx, { ...TEST_BTN, label: '★ TEST MODE', color: '#f77622' }, inside(this.mouse, TEST_BTN), this.time)
+      }
+    } else if (this.scene === 'test') drawTest(this, ctx)
     else if (this.scene === 'profile' || this.scene === 'mp' || this.scene === 'account') drawLobby(this, ctx)
     else if (this.scene === 'vs') {
       drawVersus(this, ctx)
@@ -1927,6 +1959,10 @@ export class AliensVsDinos {
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(255,${this.side === 'aliens' ? 80 : 255},${this.side === 'aliens' ? 90 : 255},${this.flash * 0.5})`
       ctx.fillRect(0, 0, W, H)
+    }
+    if (this.secretPopup) {
+      this.flushLayer()
+      drawSecretPopup(this, ctx)
     }
     if (this.afk) {
       this.flushLayer()
@@ -1990,6 +2026,7 @@ export class AliensVsDinos {
     this.drawEdgeArrows(ctx)
     if (this.banner && !this.quiz) this.drawBanner(ctx, this.banner)
     drawWallet(ctx, this.shop, W - 20, 106, 11, 'right')
+    if (isAdmin(this.profile)) text(ctx, `TEST MODE · N NEXT WAVE · B BOSS · K BOSS 1HP · G GOD ${this.godMode ? 'ON' : 'OFF'}`, W / 2, 530, 11, '#f77622')
     if (this.quiz) {
       drawQuiz(ctx, this.quiz, this.time, this.quiz.hint)
       if (this.quiz.doneT) text(ctx, 'CORRECT!', W / 2, 286, 40, '#63c74d')
@@ -2000,6 +2037,7 @@ export class AliensVsDinos {
     const p = this.ufo
     drawLevel(ctx, this.level)
     drawBoss(ctx, this)
+    drawCow(ctx, this)
     for (const egg of this.eggs) drawEgg(ctx, egg.x, GROUND, egg.t / 2, t)
     for (const e of this.enemies) if (e.beaming) drawBeam(ctx, e.x, e.y + 10, GROUND, t, { enemy: true })
     if (p.beaming) drawBeam(ctx, p.x, p.y + 12, GROUND, t, { power: 0.6 + p.energy * 0.4, width: this.beamWidth() })
@@ -2039,6 +2077,7 @@ export class AliensVsDinos {
     const r = this.rex
     drawLevel(ctx, this.level)
     drawBoss(ctx, this)
+    drawGrandpa(ctx, this)
     for (const lf of this.pickups) drawLeaf(ctx, lf.x, lf.y, t)
     for (const u of this.ufos) {
       if (u.state === 'charge') {

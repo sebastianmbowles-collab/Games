@@ -38,7 +38,7 @@ export const SHOP_ITEMS = {
 
 // Old saves had just "coins": those become Xenobits.
 export function normalizeShop(s) {
-  return { xeno: s?.xeno ?? s?.coins ?? 0, cells: s?.cells || 0, shards: s?.shards || 0, dna: s?.dna || 0, owned: s?.owned || {} }
+  return { xeno: s?.xeno ?? s?.coins ?? 0, cells: s?.cells || 0, shards: s?.shards || 0, dna: s?.dna || 0, owned: s?.owned || {}, secrets: s?.secrets || [] }
 }
 
 export const itemLevel = (shop, side, key) => shop.owned[`${side}.${key}`] || 0

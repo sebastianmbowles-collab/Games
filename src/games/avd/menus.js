@@ -6,6 +6,7 @@ import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevel
 import { SHOP_ITEMS, SHOP_TABS, CURRENCIES, CURRENCY_ORDER, itemLevel, buy, costText, shortOf } from './shop'
 import { yearLabel } from './names'
 import { colourOf, titleOf } from './custom'
+import { SECRETS } from './secrets'
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const rand = (a, b) => a + Math.random() * (b - a)
@@ -17,7 +18,7 @@ const DUSK = mixTheme('aliens', 'dinos', 0.5)
 // ---------- the title screen: a big hill with dinos walking about and UFOs trying to grab them ----------
 
 const HILL = { cx: 480, cy: 610, rx: 760, ry: 220 }
-const hillY = (x) => HILL.cy - HILL.ry * Math.sqrt(Math.max(0, 1 - ((x - HILL.cx) / HILL.rx) ** 2))
+export const hillY = (x) => HILL.cy - HILL.ry * Math.sqrt(Math.max(0, 1 - ((x - HILL.cx) / HILL.rx) ** 2))
 const hillSlope = (x) => Math.atan2(hillY(x + 2) - hillY(x - 2), 4)
 
 export function initTitle(game) {
@@ -116,7 +117,7 @@ export function updateTitleWorld(game, dt) {
   }
 }
 
-const REX_X = 700
+export const REX_X = 700
 
 export function drawTitleWorld(game, ctx) {
   const s = game.title
@@ -861,6 +862,7 @@ function drawCurrency(game, ctx) {
       return cost ? `${it.side === 'aliens' ? 'UFO' : 'T. REX'} → ${it.stages[lvl]}: ${costText(cost)}` : `${it.stages[lvl - 1]} DONE!`
     })
   text(ctx, `NEXT EVOLUTIONS:  ${next.join('   ·   ')}`, W / 2, 462, 13, '#f6757a')
+  text(ctx, `🥚 EASTER EGGS FOUND: ${(shop.secrets || []).length} OF ${SECRETS.length}   (each one gives +25 ◆ +1 🧬)`, W / 2, 505, 13, '#fee761')
   drawButton(ctx, CUR_BACK, inside(game.mouse, CUR_BACK), t)
   drawButton(ctx, CUR_SHOP, inside(game.mouse, CUR_SHOP), t)
 }
