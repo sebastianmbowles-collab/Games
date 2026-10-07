@@ -339,11 +339,13 @@ function nightmareTick(dt, time) {
   fists.forEach(f => f.traverse(o => { if (o.isMesh && !o.userData.isInk) o.material = o.material.color && o.material.color.getHex() === skin.color.getHex() ? paleSkin : darkSleeve; }));
   // on the title screen, the one standing in the room is the dream self (pale, a little see-through)
   { const pm = new THREE.MeshPhongMaterial({ color: 0x6a78b8, emissive: 0x0c0c28, shininess: 10, transparent: true, opacity: .82 }); sebastian.traverse(o => { if (o.isMesh && !o.userData.isInk) o.material = pm; }); }
+  // the top of whatever you'd stand on here (for sky places where the ground is made of boxes)
+  const topAt = (a, x, z) => { let t = 0; a.solids.forEach(sd => { if (x > sd.x0 && x < sd.x1 && z > sd.z0 && z < sd.z1 && sd.y1 < 30) t = Math.max(t, sd.y1); }); return t; };
   const L = (area, pts) => pts.forEach(([x, z]) => { const a = AREAS[area], g = new THREE.Group(), y = a.h(x, z);
     const post = mesh(new THREE.CylinderGeometry(.05, .07, 1.6, 6), mat(0x2a2030)); post.position.y = .8; g.add(post);
     const lamp = mesh(new THREE.SphereGeometry(.16, 10, 8), glow(0xffc070)); lamp.position.y = 1.7; g.add(lamp);
     const h = halo(0xffb060, 3.2, .75); h.position.y = 1.7; g.add(h); const l = new THREE.PointLight(0xffa050, 1.1, 7, 1.6); l.position.y = 1.8; g.add(l);
-    g.position.set(x, y < -20 ? 0 : y, z); a.group.add(g); NM.lanterns.push({ x, z, g, l, h, area }); });
+    g.position.set(x, y < -20 ? topAt(a, x, z) : y, z); a.group.add(g); NM.lanterns.push({ x, z, g, l, h, area }); });
   // the five levels, in order
   const LEVELS = [
     ['ocean', 'Sadness', 'The Ocean of Tears', 'Cross the ocean and find the memory', [
@@ -523,6 +525,40 @@ function nightmareTick(dt, time) {
     };
     const oldLeave = a.leave; a.leave = () => { if (oldLeave) oldLeave(); calm(); a.storm = null; };
     const oldResp = a.onRespawn; a.onRespawn = () => { if (oldResp) oldResp(); calm(); a.storm = null; a.stormT = 12; };
+  }
+  // ---------- PRIDE: golden statues in the City in the Sky ----------
+  // Golden statues of you, bragging. Punch one 3 times and it breaks… and the true feeling inside falls out.
+  {
+    const a = AREAS.cloud;
+    const brag = ['"I\'m the BEST dream ever!"', '"I don\'t NEED anyone!"', '"Look how BIG my city is!"', '"I\'m never sad. NEVER."', '"Who needs friends? Not me!"', '"I\'m better ALONE!"'];
+    const truth = ['"…I miss him."', '"I\'m scared he\'ll forget me."', '"I wish someone would stay."', '"I\'m not fine. I\'m lonely."', '"I just want a friend."', '"Please come back."'];
+    const gold = new THREE.MeshPhongMaterial({ color: 0xffc83a, emissive: 0x5a3a00, shininess: 120, specular: 0xffffff });
+    a.statues = [[1.5, 3], [1.5, 24.5], [8, 34.5], [9.5, 43], [1, 49.5], [-4, 59.5]].map(([x, z], i) => {
+      const y = topAt(a, x, z), g = new THREE.Group(), me = model('Sebastian') || makeSebastian();
+      me.traverse(o => { if (o.isMesh && !o.userData.isInk) o.material = gold; }); me.scale.setScalar(1.15); me.position.y = .5; g.add(me);
+      g.add(at(mesh(new THREE.CylinderGeometry(.6, .7, .5, 10), mat(0xd8a020, { shininess: 80 })), 0, .25, 0)); // the stand
+      const crown = new THREE.Group(); for (let k = 0; k < 5; k++) { const sp = mesh(new THREE.ConeGeometry(.06, .2, 4), glow(0xffe27f)); const an = k / 5 * Math.PI * 2; sp.position.set(Math.cos(an) * .16, 0, Math.sin(an) * .16); crown.add(sp); }
+      crown.position.y = 2.35; g.add(crown); g.add(at(halo(0xffc83a, 3, .4), 0, 1.5, 0));
+      g.position.set(x, y, z); a.group.add(g);
+      return { g, x, y, z, hp: 3, broken: false, told: false, brag: brag[i], truth: truth[i] };
+    });
+    a.humbleN = 0; let lastPunch = punchCount;
+    a.nmTick = (dt, time) => {
+      const punched = punchCount !== lastPunch; lastPunch = punchCount;
+      const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+      a.statues.forEach(st => { if (st.broken) return;
+        const dx = st.x - P.x, dz = st.z - P.z, d = Math.hypot(dx, dz) || 1, near = d < 6 && Math.abs(P.y - st.y) < 3;
+        st.g.rotation.y = Math.atan2(-dx, -dz); // it always turns to show off to you
+        if (near && !st.told) { st.told = true; toast('A golden statue of you', st.brag); }
+        if (punched && d < 2.4 && (dx * fx + dz * fz) / d > .5 && Math.abs(P.y - st.y) < 2) {
+          st.hp--; state.shake = .15; sfx('hit'); burst(st.x, st.y + 1.5, st.z, [0xffc83a, 0xffffff], 8); st.g.position.x = st.x + rand(-.1, .1);
+          if (st.hp <= 0) { st.broken = true; a.group.remove(st.g); a.humbleN++; sfx('break');
+            burst(st.x, st.y + 1, st.z, [0xffc83a, 0xffe27f, 0x9aa8e8], 30);
+            P.hp = Math.min(5, P.hp + 1); hud(); NM.fear = Math.max(0, NM.fear - 25);
+            toast(`The statue breaks… (${a.humbleN} of 6)`, 'Inside, a tiny voice: ' + st.truth);
+            if (a.humbleN === 6) setTimeout(() => { achieve('Humble Heart', 'Break every statue of pride in the sky'); toast('', '"It\'s okay to not be okay."'); }, 3500); }
+        } });
+    };
   }
   // renamed bosses
   // the prologue: the portal waits just outside the bedroom window
