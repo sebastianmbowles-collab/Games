@@ -203,6 +203,15 @@ export const sfx = {
   stolen: () => tone('sawtooth', 500, 150, 0.4, 0.08),
   laser: () => tone('square', 1500, 300, 0.12, 0.07),
   plasma: () => tone('sawtooth', 300, 700, 0.2, 0.05),
+  // a sniper alien charging up, then firing its big laser
+  charge: () => tone('sine', 250, 1400, 1.3, 0.045),
+  lock: () => {
+    for (let i = 0; i < 3; i++) tone('square', 1800, 1800, 0.05, 0.05, i * 0.1)
+  },
+  snipe: () => {
+    tone('sawtooth', 2200, 90, 0.35, 0.1)
+    noise(0.3, 0.2, 'highpass', 2000)
+  },
   hit: () => {
     noise(0.15, 0.18, 'bandpass', 1500)
     tone('square', 300, 120, 0.12, 0.08)

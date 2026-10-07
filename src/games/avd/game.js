@@ -46,6 +46,7 @@ import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawL
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
 import { drawWallet, drawButton, inside } from './menus'
 import { secretKey, secretClick, updateSecrets, drawTitleSecrets, drawSecretPopup } from './secrets'
+import { startSnipers, updateSnipers, drawSnipers, roarSnipers } from './snipers'
 import { isAdmin, openTest, updateTest, clickTest, drawTest, testKey } from './testmode'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
 
@@ -864,6 +865,7 @@ export class AliensVsDinos {
     this.run = {}
     if (this.side === 'aliens') this.setupAliens()
     else this.setupDinos()
+    startSnipers(this)
     this.level = buildLevel(this.side, 1, this.playerX())
     this.cam.x = clamp(this.playerX(), W / 2, WORLD - W / 2)
     this.cam.y = H / 2
@@ -1245,6 +1247,7 @@ export class AliensVsDinos {
 
     // enemy UFOs
     for (const e of this.enemies) this.enemyAliensAI(e, dt)
+    updateSnipers(this, dt)
     this.updateShots(dt)
     this.enemies = this.enemies.filter((e) => !e.dead)
     for (const r of this.enemyRespawn) r.t -= dt
@@ -1579,6 +1582,7 @@ export class AliensVsDinos {
     }
     for (const u of this.ufos) this.ufoDinoAI(u, dt)
     this.ufos = this.ufos.filter((u) => !u.dead)
+    updateSnipers(this, dt)
 
     if (alive && !this.boss) {
       this.waveTime -= dt / GAME_SPEED
@@ -1633,7 +1637,7 @@ export class AliensVsDinos {
     return isAdmin(this.profile) && !!this.test?.god
   }
 
-  hurtRex() {
+  hurtRex(words = 'OUCH! HOT HOT HOT!') {
     const r = this.rex
     if (r.inv > 0 || this.ending || this.godMode) return
     if (this.hasPower('shield')) {
@@ -1649,7 +1653,7 @@ export class AliensVsDinos {
     this.flash = 0.6
     this.shake = 12
     sfx.hurt()
-    this.fx.text(r.x, r.y - 120, r.lives > 0 ? 'OUCH! HOT HOT HOT!' : 'OH NO!', '#ff8fa0', 22)
+    this.fx.text(r.x, r.y - 120, r.lives > 0 ? words : 'OH NO!', '#ff8fa0', 22)
     this.fx.burst(r.x, r.y - 40, 16, { speed: 260, life: 0.5, size: 6, color: ['#feae34', '#e43b44', '#fff'], type: 'spark' })
     if (r.lives <= 0) this.finish(false)
   }
@@ -1872,6 +1876,7 @@ export class AliensVsDinos {
       }
     }
     if (this.boss) bossRoar(this, hx, hy, reach, this.hasPower('mega'))
+    roarSnipers(this, hx, hy, reach)
     if (hits) {
       sfx.stun()
       this.slowmo = Math.max(this.slowmo, 0.12)
@@ -2033,6 +2038,7 @@ export class AliensVsDinos {
     const p = this.ufo
     drawLevel(ctx, this.level)
     drawBoss(ctx, this)
+    drawSnipers(ctx, this)
     for (const egg of this.eggs) drawEgg(ctx, egg.x, GROUND, egg.t / 2, t)
     for (const e of this.enemies) if (e.beaming) drawBeam(ctx, e.x, e.y + 10, GROUND, t, { enemy: true })
     if (p.beaming) drawBeam(ctx, p.x, p.y + 12, GROUND, t, { power: 0.6 + p.energy * 0.4, width: this.beamWidth() })
@@ -2072,6 +2078,7 @@ export class AliensVsDinos {
     const r = this.rex
     drawLevel(ctx, this.level)
     drawBoss(ctx, this)
+    drawSnipers(ctx, this)
     for (const lf of this.pickups) drawLeaf(ctx, lf.x, lf.y, t)
     for (const u of this.ufos) {
       if (u.state === 'charge') {
