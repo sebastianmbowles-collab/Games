@@ -1855,7 +1855,7 @@ function killRobot(r) {
   const y = terrainH(r.x, r.z) + r.lift;
   burst(r.x, y + 1.2, r.z, [0xf1ecff, 0xb9a6ff, 0x5ff6ff]);
   if (r.heart) {
-    state.kids++; freeKid(r.x, y, r.z); sfx('kid');
+    state.kids++; freeKid(r.x, y, r.z); sfx('kid'); if (state.kids >= 50) achieve('Full Rescue', 'Free all 50 kids');
     toast('You freed a kid!', 'They are waking up in the real world');
     if (state.kids === 1) { const kx = r.x, kz = r.z, ky = y; // the very first rescue gets its own little movie
       setTimeout(() => playCine([
@@ -2943,9 +2943,9 @@ function updateBolts(dt) {
   };
   // the route: start cloud, then a winding path up and over to the storm arena
   cloud(0, 0, 2, 4, 'cloud', { cp: true });
-  const route = [[0, .3, 8, 1.6], [2.5, .9, 11, 1.4], [0, 1.5, 14, 1.4], [-3, 1.5, 17, 1.6, 'slide', { ax: 4, sp: .7 }], [-3, 2.1, 21, 1.3],
-    [0, 2.1, 24.5, 2.8, 'cloud', { cp: true }], [3.5, 2.5, 28, 1.3, 'storm'], [6, 3, 31, 1.3, 'storm'], [8, 3.4, 34.5, 1.6],
-    [8, 2.4, 38.5, 1.4, 'bounce'], [8, 7.5, 43, 2.2, 'cloud', { cp: true }], [4.5, 7.5, 46, 1.3, 'slide', { az: 2.5, sp: .9 }], [1, 7.9, 49.5, 1.3],
+  const route = [[0, .3, 8, 1.6], [2.5, .9, 11, 1.4], [0, 1.5, 14, 1.4], [-2, 1.5, 17, 1.7, 'slide', { ax: 3, sp: .55 }], [-3, 2.1, 21, 1.3],
+    [0, 2.1, 24.5, 2.8, 'cloud', { cp: true }], [3.5, 2.5, 28, 1.3, 'storm'], [6, 3, 31, 1.3, 'storm'], [8, 3.4, 34.5, 1.8, 'cloud', { cp: true }],
+    [8, 2.4, 38.5, 1.4, 'bounce'], [8, 7.5, 43, 2.2, 'cloud', { cp: true }], [4.5, 7.5, 46.3, 1.5, 'slide', { ax: 2.2, sp: .6 }], [1, 7.9, 49.5, 1.6, 'cloud', { cp: true }],
     [-2.5, 8.3, 52.5, 1.3, 'storm'], [-5.5, 8.6, 55.5, 1.4], [-5.5, 7.6, 59.5, 2.4, 'cloud', { cp: true }]];
   route.forEach(([x, y, z, r, kind, extra]) => cloud(x, y, z, r, kind, extra));
   cloud(-5.5, 2.5, 25.5, 1.2); cloud(-9, 2.9, 27, 1.1); cloud(-12, 3.4, 28.6, 1.1); cloud(-14.5, 3.9, 30.5, 1.6); // a secret side path
@@ -2991,9 +2991,26 @@ function updateBolts(dt) {
   aKey(a, 4, 0x9fe8ff, ar.x, ar.y + 1.3, ar.z); a.key.active = false; a.key.m.visible = false;
   a.onRespawn = () => { bolts.forEach(b => { b.group.remove(b.ring); if (b.bolt) { b.group.remove(b.bolt); b.group.remove(b.glow); } }); bolts.length = 0; if (SM.active) { SM.mode = 'hover'; SM.t = 0; } };
   a.leave = () => { aBoss = null; $('bossbar').hidden = true; };
-
+  // KIDS IN BUBBLES: robot kids floating in soap bubbles next to the path. Punch a bubble to pop it!
+  // each one floats just off the side of a cloud, at punching height
+  a.bubbles = [3, 5, 9, 13, 15].map(i => { const pl = a.plats[i]; return [pl.home.x + 1.5, pl.home.y + 1.3, pl.home.z]; }).map(([x, y, z]) => {
+    const g = new THREE.Group(), r = makeRobot(true); scene.remove(r.g); r.g.scale.setScalar(.45); r.g.position.y = -.55; g.add(r.g);
+    const b = mesh(new THREE.SphereGeometry(.9, 20, 14), new THREE.MeshPhongMaterial({ color: 0xc8f0ff, transparent: true, opacity: .3, shininess: 120, specular: 0xffffff, depthWrite: false })); g.add(b);
+    g.position.set(x, y, z); a.group.add(g); return { g, x, y, z, popped: false };
+  });
   a.update = (dt, time) => {
     updateBolts(dt);
+    for (const bb of a.bubbles) {
+      if (bb.popped) continue;
+      bb.g.position.y = bb.y + Math.sin(time * 1.5 + bb.x) * .25; bb.g.rotation.y += dt * .5;
+      if (bb.lastPunch === undefined) bb.lastPunch = punchCount;
+      const punched = bb.lastPunch !== punchCount; bb.lastPunch = punchCount;
+      if (punched && Math.hypot(P.x - bb.x, P.z - bb.z) < 2.3 && Math.abs(P.y + 1.2 - bb.g.position.y) < 1.8) {
+        bb.popped = true; bb.g.visible = false; sfx('pop'); burst(bb.x, bb.g.position.y, bb.z, [0xc8f0ff, 0xffffff], 16);
+        state.kids++; freeKid(bb.x, bb.g.position.y - .8, bb.z); sfx('kid'); toast('You freed a kid!', 'Popped right out of the bubble'); hud();
+        if (state.kids >= 50) achieve('Full Rescue', 'Free all 50 kids');
+      }
+    }
     a.lanterns.forEach((l, i) => { l.position.y += Math.sin(time * .5 + i) * dt * .3; l.rotation.y += dt * .3; });
     // platforms: slide, sink (storm clouds) and bounce
     let standing = null;
@@ -3003,10 +3020,10 @@ function updateBolts(dt) {
       let nx = pl.home.x, ny = pl.home.y, nz = pl.home.z;
       if (pl.kind === 'slide') { pl.t += dt * pl.sp; nx += Math.sin(pl.t) * (pl.ax || 0); nz += Math.sin(pl.t) * (pl.az || 0); }
       if (pl.kind === 'storm') {
-        if (on) pl.t += dt; else if (pl.t > 0 && pl.t < 1.2) pl.t = Math.max(0, pl.t - dt * .5);
-        if (pl.t > .9) { pl.fall = (pl.fall || 0) + dt * 6; ny -= pl.fall * pl.fall; } // it gives way!
-        if (pl.t > .9 && pl.fall > 3.5) { pl.t = 0; pl.fall = 0; } // …and comes back
-        pl.g.position.x = nx + (pl.t > .4 && pl.t < .9 ? rand(-.06, .06) : 0);
+        if (on) pl.t += dt; else if (pl.t > 0 && pl.t < 1.3) pl.t = Math.max(0, pl.t - dt * .5);
+        if (pl.t > 1.3) { pl.fall = (pl.fall || 0) + dt * 6; ny -= pl.fall * pl.fall; } // it gives way!
+        if (pl.t > 1.3 && pl.fall > 3.5) { pl.t = 0; pl.fall = 0; } // …and comes back
+        pl.g.position.x = nx + (pl.t > .4 && pl.t < 1.3 ? rand(-.08, .08) : 0); // shakes to warn you
       }
       const dx = nx - pl.x, dy = ny - pl.y, dz = nz - pl.z;
       pl.x = nx; pl.y = ny; pl.z = nz; if (pl.kind !== 'storm') pl.g.position.x = nx; pl.g.position.y = ny; pl.g.position.z = nz;
@@ -3016,6 +3033,7 @@ function updateBolts(dt) {
     }
     if (standing && standing.cp) a.start = { x: standing.home.x, y: standing.home.y + .1, z: standing.home.z, yaw: P.yaw };
     if (standing && standing.arena && !a.reached) { a.reached = true; if (a.falls === 0) achieve('Sky Walker', 'Never fall in cloud city'); }
+    if (standing && standing.arena) a.start = { x: ar.x, y: ar.y + .1, z: ar.z - 9, yaw: Math.PI }; // the arena is a checkpoint too
     if (standing && standing.arena && !SM.active && SM.hp > 0) { startABoss(SM); toast('THE STORM MACHINE', 'Dodge the lightning. Hit its glowing core when it comes down!'); sfx('roar'); }
     // falling off: lose a heart and get back on your last checkpoint cloud
     if (P.y < -10 && state.mode === 'play') {
@@ -3025,7 +3043,7 @@ function updateBolts(dt) {
     // wind gusts across the middle of the path (not in the arena)
     a.windT -= dt;
     if (a.windT <= 0 && a.wind <= 0 && P.z > 10 && P.z < 60) { a.wind = 2.2; a.windDir = Math.random() < .5 ? -1 : 1; toast('', a.windDir > 0 ? 'WIND! ←' : 'WIND! →'); if (ac) hiss(ac.currentTime, 2.2, .12, 400, 900, 'bandpass'); }
-    if (a.wind > 0) { a.wind -= dt; if (a.wind <= 0) a.windT = rand(5, 9); if (!P.onGround || true) P.x -= a.windDir * 2.2 * dt * (P.onGround ? .6 : 1); }
+    if (a.wind > 0) { a.wind -= dt; if (a.wind <= 0) a.windT = rand(5, 9); if (!P.onGround || true) P.x -= a.windDir * 2.2 * dt * (P.onGround ? .3 : 1); }
     a.streaks.forEach((sk, i) => { if (a.wind > 0) { sk.material.opacity = .5; sk.position.set(P.x + ((time * 30 * -a.windDir + i * 7) % 30) - 15, P.y + rand(-1, 3), P.z + (i % 10) - 5); } else sk.material.opacity = 0; });
     // ---- the Storm Machine's brain ----
     if (!SM.g.visible) return;
@@ -3033,6 +3051,8 @@ function updateBolts(dt) {
     SM.flash = Math.max(0, SM.flash - dt); SM.body.emissive.setHex(SM.flash > 0 ? 0xff6fc8 : 0);
     if (!SM.active) { SM.g.position.y = SM.y + Math.sin(time) * .4; return; }
     const angry = SM.hp <= SM.maxHp / 2;
+    const onArena = Math.hypot(P.x - ar.x, P.z - ar.z) < 13 && P.y > ar.y - 1;
+    if (!onArena) { SM.g.position.y += (SM.y - SM.g.position.y) * Math.min(1, dt * 2); return; } // it waits for you to come back
     SM.t += dt;
     if (SM.mode === 'hover') { // float around the arena and shoot lightning at you
       const ang = time * .35; SM.g.position.set(ar.x + Math.sin(ang) * 6, SM.y + Math.sin(time * 1.3) * .5, ar.z + Math.cos(ang) * 6);
@@ -3043,7 +3063,7 @@ function updateBolts(dt) {
       }
     } else if (SM.mode === 'gust') { // blows you towards the edge of the cloud
       const dx = P.x - ar.x, dz = P.z - ar.z, d = Math.hypot(dx, dz) || 1;
-      if (SM.t < 2.2) { P.x += dx / d * 3.2 * dt; P.z += dz / d * 3.2 * dt; SM.eye.material.color.setHex(0xff6fc8); }
+      if (SM.t < 2.2 && d < 8.5) { P.x += dx / d * 2.2 * dt; P.z += dz / d * 2.2 * dt; } if (SM.t < 2.2) SM.eye.material.color.setHex(0xff6fc8); // blows you back, but not off the edge
       a.streaks.forEach((sk, i) => { sk.material.opacity = SM.t < 2.2 ? .6 : 0; sk.lookAt(ar.x, sk.position.y, ar.z); sk.position.set(ar.x + Math.sin(i) * ((time * 8 + i * 3) % 13), ar.y + 1 + (i % 4) * .6, ar.z + Math.cos(i) * ((time * 8 + i * 3) % 13)); });
       if (SM.t > 2.6) { SM.mode = 'down'; SM.t = 0; }
     } else if (SM.mode === 'down') { // tired: it sinks down and its core glows pink. HIT IT NOW!
