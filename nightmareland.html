@@ -3385,9 +3385,9 @@ function updateBolts(dt) {
   const wall = (x, z, w, d, erasable) => { const b = sketchBox(w, WH, d, x, 0, z); if (erasable) { b.erasable = true; a.erasable.push(b); b.g.children[0].material = new THREE.MeshBasicMaterial({ color: 0xece4d0, transparent: true }); } return b; };
   wall(-8.5, Z0, 11, .3); wall(8.5, Z0, 11, .3); wall(0, Z1, 28, .3); wall(X0, (Z0 + Z1) / 2, .3, 36); wall(X1, (Z0 + Z1) / 2, .3, 36);
   // inside: a grid of erasable walls (some rooms you can only reach by erasing)
-  [[-7, 14, 14, .25], [7, 20, 14, .25], [0, 17, .25, 6], [-7, 26, 14, .25], [7, 30, 14, .25], [-4, 34, .25, 8], [4, 22, .25, 4], [-9, 38, 10, .25], [9, 38, 10, .25], [0, 41, .25, 6]].forEach(([x, z, w, d]) => wall(x, z, w, d, true));
+  [[-7, 14, 14, .25], [7, 20, 14, .25], [0, 17, .25, 6], [-7, 26, 14, .25], [5, 30, 10, .25], [-4, 34, .25, 8], [4, 22, .25, 4], [-9, 38, 10, .25], [6.5, 38, 5, .25], [0, 41, .25, 6]].forEach(([x, z, w, d]) => wall(x, z, w, d, true));
   // the stairs to the attic (a pencil staircase), and the attic floor
-  for (let i = 0; i < 10; i++) sketchBox(3, .5, 1.2, 10, i * .5, 40 - i * 1.2);
+  for (let i = 0; i < 16; i++) sketchBox(2.5, .34, .85, 12.5, i * .34, 43 - i * .8); // small steps along the side wall: you can walk up
   sketchBox(10, .4, 8, 9, 5, 26);
   sketchBox(3, 3, .2, 9, 5.4, 22.1, false); // attic window frame (just a drawing)
   // furniture drawn by the kids
@@ -3424,8 +3424,9 @@ function updateBolts(dt) {
       const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
       for (const w of a.erasable) {
         if (w.gone) continue;
-        const px = P.x + fx * 1.4, pz = P.z + fz * 1.4;
-        if (px > w.x - w.w / 2 - .6 && px < w.x + w.w / 2 + .6 && pz > w.z - w.d / 2 - .6 && pz < w.z + w.d / 2 + .6) {
+        let px = 0, pz = 0, hitW = false; // any point along the punch counts
+        for (let t = .3; t <= 1.7 && !hitW; t += .2) { px = P.x + fx * t; pz = P.z + fz * t; hitW = px > w.x - w.w / 2 - .25 && px < w.x + w.w / 2 + .25 && pz > w.z - w.d / 2 - .25 && pz < w.z + w.d / 2 + .25; }
+        if (hitW) {
           w.rub = (w.rub || 0) + 1; sfx('swing'); burst(px, P.y + 1.4, pz, [0xffc0c8, 0xfafaf4], 8);
           w.g.children[0].material.opacity = 1 - w.rub / 3; w.g.children.slice(1).forEach(l => l.visible = Math.random() < (1 - w.rub / 3));
           if (w.rub >= 3) { w.gone = true; w.g.visible = false; w.sd.on = false; navGrid = null; sfx('pop');
