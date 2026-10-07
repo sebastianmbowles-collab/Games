@@ -39,7 +39,7 @@ import { makeMath, makeSpell, quizKey, quizClick, drawQuiz } from './quiz'
 import { itemLevel, normalizeShop, CURRENCIES, evoName } from './shop'
 import { loadSave, currentAccount, storeAccount, logOut } from './save'
 import { tagLine } from './names'
-import { startBoss, updateBoss, bossRoar, bossBolt, drawBoss, drawBossHUD } from './boss'
+import { startBoss, updateBoss, bossRoar, bossBolt, drawBoss, drawBossHUD, MAX_HP } from './boss'
 import { buildLevel, updateLevel, rexInLevel, ufoInLevel, landMeteors, poolAt, drawLevel, drawLevelFront, EVENT_NAMES } from './level'
 import { choice, UFO_PAINTS, REX_PAINTS } from './custom'
 import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
@@ -57,6 +57,7 @@ const POWER_NAMES = { mega: 'MEGA ROAR', shield: 'SHIELD', speed: 'SPEED BOOST' 
 // How fast the action runs: 1 is normal speed, bigger is faster.
 const GAME_SPEED = 1.3
 const WAVE_SECONDS = 40
+const LEVEL_QUIZZES = 3 // Level Quizzes in every wave and boss fight
 const AFK_OK = { x: W / 2 - 90, y: 360, w: 180, h: 52 }
 const UNLOCK_EVENTS = ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'touchend', 'click', 'keydown']
 const DIFF = {
@@ -786,6 +787,7 @@ export class AliensVsDinos {
         if (p.has('fire') && vs.ufo.ammo <= 0) this.openQuiz('NO LASER! SOLVE IT TO CHARGE UP!')
       } else if (vs.rex.roars <= 0 && vs.rex.power?.kind !== 'mega') this.openQuiz('OUT OF ROARS! SPELL IT TO ROAR!')
       if (p.has('enter') && !this.quiz) this.openQuiz()
+      this.checkLevelQuizzes()
     }
     if (vs.role === 'host') {
       hostUpdate(this, dt, them)
@@ -862,8 +864,34 @@ export class AliensVsDinos {
     this.levelQuiz()
   }
 
+  // Every level has 3 Level Quizzes: one at the start, one a third of the way through
+  // and one two thirds of the way through. Call this when a level starts.
   levelQuiz() {
-    this.openQuiz(this.side === 'aliens' ? 'LEVEL QUIZ! SOLVE IT FOR BONUS ⚡ AND ◆' : 'LEVEL QUIZ! SPELL IT FOR BONUS 🦴 AND ◆', true)
+    this.levelQuizzes = 0
+    this.nextLevelQuiz()
+  }
+
+  nextLevelQuiz() {
+    if (this.quiz) this.quiz = null
+    this.levelQuizzes = (this.levelQuizzes || 0) + 1
+    const n = `${this.levelQuizzes} OF ${LEVEL_QUIZZES}`
+    this.openQuiz(this.side === 'aliens' ? `LEVEL QUIZ ${n}! SOLVE IT FOR BONUS ⚡ AND ◆` : `LEVEL QUIZ ${n}! SPELL IT FOR BONUS 🦴 AND ◆`, true)
+  }
+
+  // How far through this level you are, from 0 to 1.
+  levelProgress() {
+    if (this.scene === 'vs') return this.vs.boss ? 1 - this.vs.boss.hp / MAX_HP : 0
+    if (this.boss) return 1 - this.boss.hp / MAX_HP
+    if (this.side === 'aliens') return this.goal ? this.captured / this.goal : 0
+    return 1 - this.waveTime / WAVE_SECONDS
+  }
+
+  // opens the 2nd and 3rd Level Quiz when it's time (waits if another quiz is open)
+  checkLevelQuizzes() {
+    if (this.quiz || this.ending || this.levelQuizzes == null || this.levelQuizzes >= LEVEL_QUIZZES) return
+    if (this.scene === 'vs' && (!this.vs.boss || this.vs.winner || this.vs.boss.dead)) return
+    if (this.boss?.dead) return
+    if (this.levelProgress() >= this.levelQuizzes / LEVEL_QUIZZES) this.nextLevelQuiz()
   }
 
   playerX() {
@@ -966,6 +994,7 @@ export class AliensVsDinos {
         const frozen = this.quiz && !this.quiz.doneT
         this.updateQuiz(dt)
         if (this.pressed.has('enter') && !this.quiz) this.openQuiz()
+        this.checkLevelQuizzes()
         if (frozen) beamOn(false)
         else {
           if (this.level) updateLevel(this.level, dt, this.cam.x)
