@@ -4,13 +4,21 @@
 //
 // Aliens win by beaming up all 4 babies, or the T. rex 3 times.
 // Dinos win by roaring the UFO out of the sky (5 hits), or by lasting 2 minutes.
+//
+// TEAM UP mode: both players fight the volcano boss together. The UFO zaps it, the T. rex
+// roars at its face, and hitting it at nearly the same time is a TEAM COMBO. If one of you
+// gets knocked out you come back after a few seconds, but if you're BOTH out, the volcano wins.
 
 import { W, H, GROUND, WORLD, KIND_LIST, rrect, text, drawDino, drawUFO, drawBeam, getTheme } from './art'
 import { sfx, beamOn } from './sound'
 import { Dino, inBeam } from './game'
 import { safeName, yearLabel } from './names'
+import { VX, TOP, MAX_HP, FACE, halfWidth, phase, drawVolcano, drawBossBar } from './boss'
 
 const ROUND_TIME = 120
+const TEAM_TIME = 180
+const ARENA = 880
+const KO_TIME = 6
 const POWERS = ['mega', 'shield', 'speed']
 const POWER_NAMES = { mega: 'MEGA ROAR', shield: 'SHIELD', speed: 'SPEED' }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -20,7 +28,8 @@ const STATES = ['walk', 'lifted', 'fall', 'gone']
 
 export function newRound(game) {
   const vs = game.vs
-  vs.t = ROUND_TIME
+  const team = vs.mode === 'team'
+  vs.t = team ? TEAM_TIME : ROUND_TIME
   vs.winner = ''
   vs.overT = 0
   vs.bannerT = 0
@@ -29,21 +38,36 @@ export function newRound(game) {
   vs.rex = { x: 1700, y: GROUND, vx: 0, vy: 0, face: -1, walk: 0, onGround: true, lives: 3, roars: 3, roarCd: 0, roarT: 0, lifted: false, stun: 0, inv: 0, power: null }
   vs.babies = ['trike', 'stego', 'raptor', 'bronto'].map((k, i) => new Dino(1300 + i * 150, k, 0.55))
   vs.bolts = []
+  vs.boss = null
+  if (team) {
+    // everyone on the same side of the volcano's valley, no babies to fight over
+    vs.ufo.x = VX - 520
+    vs.ufo.hp = vs.ufo.maxHp = 6
+    vs.rex.x = VX + 520
+    vs.rex.lives = 4
+    vs.rex.roars = 5
+    vs.babies = []
+    vs.boss = { hp: MAX_HP, t: 0, hurt: 0, mouth: 0, attackT: 3, waveT: 6, balls: [], waves: [], puddles: [], last: { aliens: -9, dinos: -9 }, dead: 0 }
+  }
+  vs.ufo.down = 0
+  vs.rex.down = 0
   vs.seen = new Set()
   vs.remote = { f: 0, j: 0, a: 0, mc: 0, sc: 0 }
   game.quiz = null
   game.cam.x = clamp(vs.mySide === 'aliens' ? vs.ufo.x : vs.rex.x, W / 2, WORLD - W / 2)
   game.cam.y = H / 2
   game.cam.zoom = 1
+  // every boss fight starts with a Level Quiz: math for the UFO, dino words for the T. rex
+  if (team) game.levelQuiz()
 }
 
 // ---------- host: run the whole match ----------
 
-function event(game, type, x, y) {
+function event(game, type, x, y, v = 0) {
   const vs = game.vs
   vs.evId = (vs.evId || 0) + 1
-  vs.events.push([vs.evId, type, Math.round(x), Math.round(y)])
-  if (vs.events.length > 12) vs.events.shift()
+  vs.events.push([vs.evId, type, Math.round(x), Math.round(y), v])
+  if (vs.events.length > 16) vs.events.shift()
 }
 
 // What a player is pressing: { l, r, u, d, a (action held), tapF, tapJ, tapA, frozen }
@@ -100,6 +124,7 @@ export function hostUpdate(game, dt, them) {
     return
   }
   vs.t -= dt
+  if (vs.mode === 'team') return teamUpdate(game, inA, inD, dt)
   updateUfo(game, inA, dt)
   updateRex(game, inD, dt)
   for (const b of vs.babies) {
@@ -134,6 +159,185 @@ export function hostUpdate(game, dt, them) {
   if (vs.rex.lives <= 0 || babiesLeft === 0) vs.winner = 'aliens'
   else if (vs.ufo.hp <= 0 || vs.t <= 0) vs.winner = 'dinos'
   if (vs.winner) event(game, 'win', 0, 0)
+}
+
+// ---------- TEAM UP: the volcano boss ----------
+
+function teamUpdate(game, inA, inD, dt) {
+  const vs = game.vs
+  const b = vs.boss
+  const u = vs.ufo
+  const r = vs.rex
+  b.t += dt
+  b.hurt = Math.max(0, b.hurt - dt)
+  // knocked-out players come back after a few seconds
+  for (const [p, side] of [[u, 'aliens'], [r, 'dinos']]) {
+    if (p.down <= 0) continue
+    p.down -= dt
+    if (p.down <= 0) {
+      p.down = 0
+      p.inv = 2
+      if (side === 'aliens') {
+        p.hp = 3
+        p.fuel = Math.max(p.fuel, 0.6)
+        p.x = VX - 520
+        p.y = 160
+      } else {
+        p.lives = 2
+        p.x = VX + 520
+        p.y = GROUND
+      }
+      event(game, 'back', p.x, side === 'aliens' ? p.y : p.y - 100)
+    }
+  }
+  if (u.down <= 0) updateUfo(game, inA, dt)
+  else u.beaming = false
+  if (r.down <= 0) updateRex(game, inD, dt)
+  // stay in the arena, and the volcano is solid
+  u.x = clamp(u.x, VX - ARENA, VX + ARENA)
+  r.x = clamp(r.x, VX - ARENA, VX + ARENA)
+  if (r.y > TOP && Math.abs(r.x - VX) < halfWidth(r.y) + 26) r.x = VX + Math.sign(r.x - VX || 1) * (halfWidth(r.y) + 26)
+  if (u.y > TOP - 16 && Math.abs(u.x - VX) < halfWidth(u.y + 16) + 52) {
+    u.x = VX + Math.sign(u.x - VX || 1) * (halfWidth(u.y + 16) + 52)
+    u.vx *= -0.3
+  }
+  // lasers hit the volcano
+  for (const bo of vs.bolts) {
+    bo.x += bo.vx * dt
+    bo.y += bo.vy * dt
+    bo.life -= dt
+    if (bo.y > TOP && Math.abs(bo.x - VX) < halfWidth(bo.y)) {
+      bo.life = 0
+      const onFace = bo.x > FACE.x && bo.x < FACE.x + FACE.w && bo.y > FACE.y && bo.y < FACE.y + FACE.h
+      hitBoss(game, onFace ? 3 : 1, 'aliens', bo.x, bo.y)
+    } else if (bo.y > GROUND) {
+      bo.life = 0
+      event(game, 'spark', bo.x, GROUND)
+    }
+  }
+  vs.bolts = vs.bolts.filter((x) => x.life > 0)
+  if (b.dead) {
+    b.dead += dt
+    b.balls = []
+    b.waves = []
+    if (b.dead > 2.5) {
+      vs.winner = 'team'
+      event(game, 'win', 0, 0)
+    }
+    return
+  }
+  // the volcano attacks: lava balls at one of you, then lava waves when it's really angry
+  const ph = phase(b)
+  // the volcano waits while you're both still doing the Level Quiz at the start
+  if (b.t < 20 && (inA.frozen || inD.frozen)) b.attackT = Math.max(b.attackT, 1.5)
+  b.attackT -= dt
+  b.mouth = clamp(1 - b.attackT / 0.8, 0, 1)
+  if (b.attackT <= 0) {
+    b.attackT = rand(1.3, 2.2) / (0.8 + ph * 0.25)
+    const targets = [u.down <= 0 && u, r.down <= 0 && r].filter(Boolean)
+    for (let i = 0; i < ph && targets.length; i++) {
+      const tgt = targets[Math.floor(Math.random() * targets.length)]
+      const tx = tgt.x + rand(-160, 160)
+      const time = rand(1.1, 1.6)
+      const x0 = VX + rand(-30, 30)
+      b.balls.push({ x: x0, y: TOP, vx: (tx - x0) / time, vy: -(tgt === u ? rand(380, 560) : rand(560, 720)), life: 6 })
+    }
+    event(game, 'spit', VX, TOP)
+  }
+  if (ph >= 3) {
+    b.waveT -= dt
+    if (b.waveT <= 0) {
+      b.waveT = rand(4, 6)
+      b.waves.push({ x: VX - 220, dir: -1 }, { x: VX + 220, dir: 1 })
+      event(game, 'lavawave', VX, GROUND)
+    }
+  }
+  for (const w of b.waves) w.x += w.dir * 260 * dt
+  b.waves = b.waves.filter((w) => Math.abs(w.x - VX) < ARENA + 100)
+  for (const ball of b.balls) {
+    ball.vy += 900 * dt
+    ball.x += ball.vx * dt
+    ball.y += ball.vy * dt
+    ball.life -= dt
+    if (ball.y >= GROUND - 8) {
+      ball.life = 0
+      b.puddles.push({ x: ball.x, t: 2.2 })
+      event(game, 'splash', ball.x, GROUND - 8)
+    }
+  }
+  for (const p of b.puddles) p.t -= dt
+  b.puddles = b.puddles.filter((p) => p.t > 0)
+  // does the lava hit anyone?
+  if (u.down <= 0 && u.inv <= 0) {
+    for (const ball of b.balls) {
+      if (ball.life > 0 && Math.hypot(ball.x - u.x, ball.y - u.y) < 40) {
+        ball.life = 0
+        hurtTeam(game, 'aliens')
+        break
+      }
+    }
+  }
+  if (r.down <= 0 && r.inv <= 0 && r.power?.kind !== 'shield') {
+    let hit = false
+    for (const ball of b.balls) {
+      if (ball.life > 0 && Math.abs(ball.x - r.x) < 36 && ball.y > r.y - 80 && ball.y < r.y) {
+        ball.life = 0
+        hit = true
+      }
+    }
+    if (r.y >= GROUND - 2) {
+      for (const p of b.puddles) if (Math.abs(p.x - r.x) < 34) hit = true
+      for (const w of b.waves) if (Math.abs(w.x - r.x) < 30) hit = true
+    }
+    if (hit) hurtTeam(game, 'dinos')
+  }
+  b.balls = b.balls.filter((x) => x.life > 0)
+  // both knocked out at once, or out of time: the volcano wins
+  if ((u.down > 0 && r.down > 0) || vs.t <= 0) {
+    vs.winner = 'volcano'
+    event(game, 'win', 0, 0)
+  }
+}
+
+function hurtTeam(game, side) {
+  const vs = game.vs
+  if (side === 'aliens') {
+    const u = vs.ufo
+    u.hp--
+    u.hurt = 0.2
+    u.inv = 1.2
+    u.vy = -200
+    if (u.hp <= 0) u.down = KO_TIME
+    event(game, u.hp <= 0 ? 'ko' : 'hot', u.x, u.y - 40)
+  } else {
+    const r = vs.rex
+    r.lives--
+    r.inv = 1.8
+    r.vy = -450
+    r.onGround = false
+    if (r.lives <= 0) r.down = KO_TIME
+    event(game, r.lives <= 0 ? 'ko' : 'hot', r.x, r.y - 100)
+  }
+}
+
+function hitBoss(game, amount, side, x, y) {
+  const b = game.vs.boss
+  if (!b || b.dead) return
+  b.last[side] = b.t
+  const other = side === 'aliens' ? 'dinos' : 'aliens'
+  let dmg = amount
+  const combo = b.t - b.last[other] < 1.5
+  if (combo) {
+    dmg *= 2
+    b.last[other] = -9
+  }
+  b.hp = Math.max(0, b.hp - dmg)
+  b.hurt = 0.15
+  event(game, combo ? 'combo' : 'bhit', x, y, dmg)
+  if (b.hp <= 0) {
+    b.dead = 0.01
+    event(game, 'bossdown', VX, GROUND - 260)
+  }
 }
 
 function wander(b, u, dt) {
@@ -193,7 +397,7 @@ function updateUfo(game, inp, dt) {
         }
       }
     }
-    if (!r.lifted && r.inv <= 0 && r.power?.kind !== 'shield' && inBeam(u.x, u.y, r.x, r.y - 40)) {
+    if (vs.mode !== 'team' && !r.lifted && r.inv <= 0 && r.power?.kind !== 'shield' && inBeam(u.x, u.y, r.x, r.y - 40)) {
       r.lifted = true
       event(game, 'grab', r.x, r.y - 100)
     }
@@ -266,6 +470,12 @@ function updateRex(game, inp, dt) {
     const reach = 340 * (r.power?.kind === 'mega' ? 1.6 : 1)
     const hx = r.x + r.face * 36
     const hy = r.y - 70
+    if (vs.mode === 'team') {
+      // in TEAM UP the roar hits the volcano's face, never your friend
+      event(game, 'roar', hx, hy)
+      if (vs.boss && Math.hypot(VX - hx, FACE.y + FACE.h / 2 - hy) < reach + 90) hitBoss(game, r.power?.kind === 'mega' ? 12 : 6, 'dinos', VX, FACE.y + FACE.h / 2)
+      return
+    }
     const hit = Math.hypot(u.x - hx, u.y - hy) < reach && u.inv <= 0
     event(game, hit ? 'roarhit' : 'roar', hx, hy)
     if (hit) {
@@ -299,6 +509,14 @@ export function snapshot(game) {
     b: vs.babies.map((b) => [n(b.x), n(b.y), KIND_LIST.indexOf(b.kind), STATES.indexOf(b.state), b.face, n(b.walk * 10)]),
     o: vs.bolts.map((b) => [n(b.x), n(b.y)]),
     e: vs.events,
+    md: vs.mode === 'team' ? 1 : 0,
+    dn: [u.down > 0 ? Math.ceil(u.down) : 0, r.down > 0 ? Math.ceil(r.down) : 0],
+    ...(vs.boss && {
+      bs: [vs.boss.hp, vs.boss.hurt > 0 ? 1 : 0, n(vs.boss.mouth * 100), n(vs.boss.dead * 100), n(vs.boss.t * 10)],
+      bb: vs.boss.balls.map((b) => [n(b.x), n(b.y)]),
+      bw: vs.boss.waves.map((w) => [n(w.x), w.dir]),
+      bp: vs.boss.puddles.map((p) => n(p.x)),
+    }),
   }
 }
 
@@ -306,8 +524,10 @@ export function snapshot(game) {
 export function applySnapshot(game, s) {
   const vs = game.vs
   if (!s?.u) return
-  if (s.rd !== vs.round) {
+  const mode = s.md ? 'team' : 'versus'
+  if (s.rd !== vs.round || mode !== vs.mode) {
     vs.round = s.rd
+    vs.mode = mode
     newRound(game)
   }
   vs.t = s.t
@@ -344,13 +564,26 @@ export function applySnapshot(game, s) {
     b.walk = a[5] / 10
   })
   vs.bolts = (s.o || []).map(([x, y]) => ({ x, y }))
+  u.down = s.dn?.[0] || 0
+  r.down = s.dn?.[1] || 0
+  if (vs.boss && s.bs) {
+    const b = vs.boss
+    b.hp = s.bs[0]
+    b.hurt = s.bs[1] ? 1 : 0
+    b.mouth = s.bs[2] / 100
+    b.dead = s.bs[3] / 100
+    b.t = s.bs[4] / 10
+    b.balls = (s.bb || []).map(([x, y]) => ({ x, y }))
+    b.waves = (s.bw || []).map(([x, dir]) => ({ x, dir }))
+    b.puddles = (s.bp || []).map((x) => ({ x, t: 1 }))
+  }
   for (const ev of s.e || []) playEvent(game, ev)
 }
 
 // Sounds and sparkles for things that happened, played once on each screen.
 export function playEvent(game, ev) {
   const vs = game.vs
-  const [id, type, x, y] = ev
+  const [id, type, x, y, v] = ev
   if (vs.seen.has(id)) return
   vs.seen.add(id)
   const fx = game.fx
@@ -408,12 +641,61 @@ export function playEvent(game, ev) {
       sfx.land()
       fx.dust(x, y, 8)
       break
-    case 'win':
+    case 'win': {
       beamOn(false)
-      if (vs.winner === vs.mySide) sfx.win()
+      const won = vs.winner === vs.mySide || vs.winner === 'team'
+      if (won) sfx.win()
       else sfx.lose()
-      game.earn(vs.winner === vs.mySide ? 15 : 5)
-      if (vs.winner === vs.mySide) game.gain('dna', 1)
+      game.earn(won ? (vs.winner === 'team' ? 20 : 15) : 5)
+      if (won) game.gain('dna', vs.winner === 'team' ? 2 : 1)
+      break
+    }
+    // TEAM UP events
+    case 'bhit':
+    case 'combo':
+      sfx.stun()
+      game.shake = Math.max(game.shake, 4)
+      fx.text(x, y - 20, `-${v}`, '#ffffff', 20)
+      fx.burst(x, y, 8, { speed: 160, life: 0.3, size: 4, color: ['#2ce8f5', '#fff', '#feae34'], type: 'spark' })
+      if (type === 'combo') {
+        sfx.win()
+        fx.text(VX, GROUND - 360, 'TEAM COMBO!', '#fee761', 30)
+        fx.burst(VX, GROUND - 200, 24, { speed: 320, life: 0.7, size: 7, color: ['#fee761', '#63c74d', '#2ce8f5'], type: 'star' })
+      }
+      break
+    case 'bossdown':
+      sfx.boom()
+      game.shake = 24
+      fx.boom(VX, GROUND - 260)
+      fx.boom(VX - 80, GROUND - 160)
+      fx.boom(VX + 80, GROUND - 160)
+      fx.text(VX, GROUND - 380, 'THE VOLCANO IS BEATEN!', '#fee761', 34)
+      break
+    case 'spit':
+      sfx.plasma()
+      game.shake = Math.max(game.shake, 4)
+      break
+    case 'lavawave':
+      sfx.whoosh()
+      break
+    case 'splash':
+      fx.burst(x, y, 12, { speed: 200, life: 0.4, size: 5, color: ['#feae34', '#e43b44'], type: 'spark', up: 100 })
+      break
+    case 'hot':
+      sfx.hurt()
+      game.shake = Math.max(game.shake, 8)
+      fx.text(x, y, 'HOT!', '#f77622', 24)
+      break
+    case 'ko':
+      sfx.hurt()
+      game.shake = 12
+      fx.boom(x, y)
+      fx.text(x, y - 20, 'KNOCKED OUT!', '#e43b44', 24)
+      break
+    case 'back':
+      sfx.capture()
+      fx.text(x, y - 40, 'BACK IN THE FIGHT!', '#63c74d', 22)
+      fx.burst(x, y, 16, { speed: 200, life: 0.6, size: 6, color: ['#63c74d', '#fff'], type: 'star' })
       break
   }
 }
@@ -425,13 +707,18 @@ export function drawVersus(game, ctx) {
   const t = game.time
   const u = vs.ufo
   const r = vs.rex
+  const team = vs.mode === 'team'
   game.drawWorld(ctx, getTheme('dinos'), game.cam, () => {
+    if (vs.boss) {
+      drawVolcano(ctx, vs.boss)
+      if (!vs.boss.dead) for (const ball of vs.boss.balls) if (Math.random() < 0.4) game.fx.add({ x: ball.x, y: ball.y, vx: rand(-20, 20), vy: -40, life: 0.4, size: 6, color: '#feae34', type: 'dot', drag: 1 })
+    }
     if (u.beaming) drawBeam(ctx, u.x, u.y + 12, GROUND, t, { power: 0.6 + u.energy * 0.4 })
     for (const b of vs.babies) {
       if (b.state === 'gone') continue
       b.draw(ctx, t, { lookUp: Math.abs(u.x - b.x) < 150 })
     }
-    if (!(r.inv > 0 && Math.floor(t * 12) % 2 === 0)) {
+    if (!r.down && !(r.inv > 0 && Math.floor(t * 12) % 2 === 0)) {
       ctx.save()
       ctx.translate(r.x, r.y)
       ctx.scale(r.face * 1.25, 1.25)
@@ -459,10 +746,12 @@ export function drawVersus(game, ctx) {
       ctx.stroke()
       ctx.restore()
     }
-    ctx.save()
-    ctx.translate(u.x, u.y + Math.sin(t * 3) * 3)
-    drawUFO(ctx, { time: t, tint: vs.names.aliens.ufo, evo: vs.names.aliens.evo || 0, hurt: u.hurt > 0, stun: u.stun > 0 && u.hp > 0, mood: 'happy' })
-    ctx.restore()
+    if (!u.down) {
+      ctx.save()
+      ctx.translate(u.x, u.y + Math.sin(t * 3) * 3)
+      drawUFO(ctx, { time: t, tint: vs.names.aliens.ufo, evo: vs.names.aliens.evo || 0, hurt: u.hurt > 0, stun: u.stun > 0 && u.hp > 0, mood: 'happy' })
+      ctx.restore()
+    }
     for (const b of vs.bolts) {
       ctx.fillStyle = '#2ce8f5'
       ctx.fillRect(Math.round(b.x / 3) * 3 - 6, Math.round(b.y / 3) * 3 - 6, 12, 12)
@@ -470,12 +759,12 @@ export function drawVersus(game, ctx) {
       ctx.fillRect(Math.round(b.x / 3) * 3 - 3, Math.round(b.y / 3) * 3 - 3, 6, 6)
     }
     // name tags over each player
-    text(ctx, vs.names.aliens.name, u.x, u.y - 46, 13, '#7dffb0')
-    text(ctx, vs.names.dinos.name, r.x, r.y - 112, 13, '#ffa94d')
+    if (!u.down) text(ctx, vs.names.aliens.name, u.x, u.y - 46, 13, '#7dffb0')
+    if (!r.down) text(ctx, vs.names.dinos.name, r.x, r.y - 112, 13, '#ffa94d')
   })
   // HUD: your stats on the left, the match in the middle
   const mine = vs.mySide
-  hud(ctx, 14, 12, 250, mine === 'aliens' ? 126 : 100)
+  hud(ctx, 14, 12, 244, mine === 'aliens' ? 126 : 100)
   if (mine === 'aliens') {
     stat(ctx, 'SHIELD', 34, '#9fd8ff')
     pips(ctx, u.hp, u.maxHp, 22, '#5ad1ff')
@@ -487,7 +776,7 @@ export function drawVersus(game, ctx) {
     pips(ctx, u.ammo, 15, 100, '#2ce8f5')
   } else {
     stat(ctx, 'LIVES', 34, '#ffb3c6')
-    for (let i = 0; i < 3; i++) text(ctx, '❤', 104 + i * 30, 37, 22, i < r.lives ? '#ff5a7a' : 'rgba(255,255,255,0.2)')
+    for (let i = 0; i < (team ? 4 : 3); i++) text(ctx, '❤', 104 + i * 30, 37, 22, i < r.lives ? '#ff5a7a' : 'rgba(255,255,255,0.2)')
     stat(ctx, 'ROARS', 66, '#ffe14a')
     pips(ctx, r.roars, Math.max(r.roars, 3), 54, '#ffe14a')
     if (r.power) text(ctx, `★ ${POWER_NAMES[r.power.kind]} ${r.power.t}S`, 28, 92, 13, '#63c74d', 'left')
@@ -498,23 +787,37 @@ export function drawVersus(game, ctx) {
   const s = String(secs % 60).padStart(2, '0')
   text(ctx, `${m}:${s}`, W / 2, 44, 26, vs.t < 15 ? '#ffe14a' : '#fff')
   const babies = vs.babies.filter((b) => b.state !== 'gone').length
-  text(ctx, `UFO ${'■'.repeat(u.hp)}  BABIES ${babies}  REX ${'❤'.repeat(Math.max(0, r.lives))}`, W / 2, 70, 12, '#c0cbdc')
+  if (team) text(ctx, `TEAM UP!  UFO ${'■'.repeat(Math.max(0, u.hp))}  REX ${'❤'.repeat(Math.max(0, r.lives))}`, W / 2, 70, 12, '#c0cbdc')
+  else text(ctx, `UFO ${'■'.repeat(u.hp)}  BABIES ${babies}  REX ${'❤'.repeat(Math.max(0, r.lives))}`, W / 2, 70, 12, '#c0cbdc')
+  if (vs.boss) drawBossBar(ctx, vs.boss)
   hud(ctx, W - 254, 12, 240, 74)
-  text(ctx, 'VS', W - 134, 34, 13, '#c0cbdc')
+  text(ctx, team ? 'TEAM' : 'VS', W - 134, 34, 13, '#c0cbdc')
   text(ctx, tag(vs, 'aliens'), W - 134, 54, 13, '#7dffb0')
   text(ctx, tag(vs, 'dinos'), W - 134, 74, 13, '#ffa94d')
   if (vs.bannerT < 3.5) {
     vs.bannerT += 1 / 60
     text(ctx, tag(vs, 'aliens'), W / 2, 190, 34, '#7dffb0')
-    text(ctx, 'VS', W / 2, 230, 26, '#fee761')
+    text(ctx, team ? '+' : 'VS', W / 2, 230, 26, '#fee761')
     text(ctx, tag(vs, 'dinos'), W / 2, 272, 34, '#ffa94d')
+    if (team) text(ctx, 'TEAM UP! BEAT THE VOLCANO TOGETHER!', W / 2, 320, 22, '#f77622')
+  }
+  const meP = mine === 'aliens' ? u : r
+  if (meP.down && !vs.winner) {
+    text(ctx, 'KNOCKED OUT!', W / 2, 230, 40, '#e43b44')
+    text(ctx, `BACK IN ${Math.ceil(meP.down)}...  YOUR FRIEND MUST HOLD ON!`, W / 2, 270, 18, '#fff')
   }
   if (vs.winner) {
     ctx.fillStyle = 'rgba(15,10,40,0.6)'
     ctx.fillRect(0, 0, W, H)
-    const won = vs.winner === mine
-    text(ctx, vs.winner === 'aliens' ? 'ALIENS WIN!' : 'DINOS WIN!', W / 2, 200, 60, vs.winner === 'aliens' ? '#7dffb0' : '#ffa94d')
-    text(ctx, won ? 'YOU WON! +15 $' : 'GOOD TRY! +5 $', W / 2, 250, 26, '#fee761')
+    if (team) {
+      const won = vs.winner === 'team'
+      text(ctx, won ? 'YOU BEAT THE VOLCANO!' : 'THE VOLCANO WON!', W / 2, 200, 52, won ? '#63c74d' : '#f77622')
+      text(ctx, won ? 'GREAT TEAMWORK! +20 ◆ +2 🧬' : 'GOOD TRY! +5 ◆', W / 2, 250, 26, '#fee761')
+    } else {
+      const won = vs.winner === mine
+      text(ctx, vs.winner === 'aliens' ? 'ALIENS WIN!' : 'DINOS WIN!', W / 2, 200, 60, vs.winner === 'aliens' ? '#7dffb0' : '#ffa94d')
+      text(ctx, won ? 'YOU WON! +15 ◆ +1 🧬' : 'GOOD TRY! +5 ◆', W / 2, 250, 26, '#fee761')
+    }
     text(ctx, vs.role === 'host' ? 'ENTER = PLAY AGAIN  ·  ESC = LEAVE' : 'WAITING FOR THE HOST  ·  ESC = LEAVE', W / 2, 310, 16, '#fff')
   }
   if (vs.lostT > 1) {

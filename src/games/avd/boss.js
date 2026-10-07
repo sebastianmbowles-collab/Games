@@ -12,8 +12,8 @@ import { playSong } from './music'
 import { buildLevel } from './level'
 
 export const VX = WORLD / 2 // the volcano stands in the middle of the valley
-const TOP = GROUND - 330 // crater height
-const MAX_HP = 120
+export const TOP = GROUND - 330 // crater height
+export const MAX_HP = 120
 const ARENA = 880
 const snap = (v) => Math.round(v / PX) * PX
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -21,8 +21,8 @@ const rand = (a, b) => a + Math.random() * (b - a)
 const INK = '#181425'
 
 // half the volcano's width at height y (it's wide at the bottom, narrow at the top)
-const halfWidth = (y) => 70 + ((clamp(y, TOP, GROUND) - TOP) * 150) / 330
-const FACE = { x: VX - 90, y: GROUND - 250, w: 180, h: 150 }
+export const halfWidth = (y) => 70 + ((clamp(y, TOP, GROUND) - TOP) * 150) / 330
+export const FACE = { x: VX - 90, y: GROUND - 250, w: 180, h: 150 }
 
 export function startBoss(game) {
   const side = game.side
@@ -80,7 +80,7 @@ export function startBoss(game) {
   game.levelQuiz()
 }
 
-const phase = (b) => (b.hp > MAX_HP * 0.66 ? 1 : b.hp > MAX_HP * 0.33 ? 2 : 3)
+export const phase = (b) => (b.hp > MAX_HP * 0.66 ? 1 : b.hp > MAX_HP * 0.33 ? 2 : 3)
 
 // ---------- hitting the volcano ----------
 
@@ -296,6 +296,12 @@ function updateAlly(game, dt) {
 export function drawBoss(ctx, game) {
   const b = game.boss
   if (!b) return
+  drawVolcano(ctx, b)
+  drawAlly(ctx, game, b)
+}
+
+// The volcano itself plus its lava balls, waves and puddles. b: { t, hp, hurt, dead, mouth, balls, waves, puddles }
+export function drawVolcano(ctx, b) {
   const t = b.t
   const cooled = b.dead > 0.8
   const rock = b.hurt > 0 ? '#ffffff' : cooled ? '#5a6988' : '#3e2731'
@@ -378,6 +384,9 @@ export function drawBoss(ctx, game) {
     ctx.fillStyle = '#fee761'
     ctx.fillRect(snap(ball.x) - 6, snap(ball.y) - 6, 9, 9)
   }
+}
+
+function drawAlly(ctx, game, b) {
   // your teammate
   const a = b.ally
   if (a.kind === 'ufo') {
@@ -401,8 +410,10 @@ export function drawBoss(ctx, game) {
 }
 
 export function drawBossHUD(ctx, game) {
-  const b = game.boss
-  if (!b) return
+  if (game.boss) drawBossBar(ctx, game.boss)
+}
+
+export function drawBossBar(ctx, b) {
   rrect(ctx, W / 2 - 220, 92, 440, 46, 12)
   ctx.fillStyle = 'rgba(24,20,37,0.85)'
   ctx.fill()

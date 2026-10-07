@@ -484,7 +484,7 @@ export class AliensVsDinos {
     this.applySettings()
   }
 
-  // Saves this player's name, year, coins, shop items, best scores and settings.
+  // Saves this player's name, year, money (Xenobits, Plasma Cells, Fossil Shards, DNA), shop items, best scores and settings.
   persist() {
     if (this.profile) storeAccount({ profile: this.profile, pass: this.pass, shop: this.shop, best: this.best, settings: this.settings })
   }
@@ -519,14 +519,25 @@ export class AliensVsDinos {
   }
 
   isMenuScreen() {
-    return ['title', 'settings', 'jukebox', 'shop'].includes(this.scene)
+    return ['title', 'settings', 'jukebox', 'shop', 'currency'].includes(this.scene)
   }
 
   goShop() {
-    this.shopFrom = this.scene
+    if (this.scene !== 'currency') this.shopFrom = this.scene
     this.goScene('shop')
     this.title.shopTab = this.side || 'aliens'
     this.title.shopSel = 0
+  }
+
+  // the CURRENCY page: how much of each money you have
+  goCurrency() {
+    if (this.scene !== 'currency') this.currencyFrom = this.scene
+    this.goScene('currency')
+  }
+
+  leaveCurrency() {
+    if (this.currencyFrom === 'shop') this.goShop()
+    else this.goTitle()
   }
 
   goBack() {
@@ -540,7 +551,6 @@ export class AliensVsDinos {
     return itemLevel(this.shop, this.side, key)
   }
 
-  // Coins go straight into the shop savings, so they're never lost.
   // Xenobits, the main currency
   earn(n, x, y) {
     this.gain('xeno', n, x, y)
@@ -600,8 +610,8 @@ export class AliensVsDinos {
       } else if (host) rewardSpell(this)
       else vs.sc++
       if (q.word) this.lastWord = q.word
-      this.earn(2)
-      this.gain(this.side === 'aliens' ? 'cells' : 'shards', 1)
+      this.earn(q.bonus ? 5 : 2)
+      this.gain(this.side === 'aliens' ? 'cells' : 'shards', q.bonus ? 2 : 1)
       return
     }
     if (q.bonus) {
@@ -736,11 +746,12 @@ export class AliensVsDinos {
     return tagLine(this.side, this.profile || { name: 'PLAYER', year: 3 })
   }
 
-  startVersus(role, mySide, session, them) {
+  // mode: 'versus' (fight each other) or 'team' (beat the volcano boss together)
+  startVersus(role, mySide, session, them, mode = 'versus') {
     const me = { name: this.profile.name, year: this.profile.year, ufo: this.profile.ufo, rex: this.profile.rex, evo: itemLevel(this.shop, mySide, 'evo') }
     const other = them || session.theirs() || {}
     const otherSide = mySide === 'aliens' ? 'dinos' : 'aliens'
-    this.vs = { role, mySide, session, round: role === 'host' ? 1 : 0, names: { [mySide]: me, [otherSide]: { name: other.name, year: other.year, ufo: choice(UFO_PAINTS, other.ufo), rex: choice(REX_PAINTS, other.rex), evo: [0, 1, 2].includes(other.evo) ? other.evo : 0 } }, cnt: { f: 0, j: 0, ac: 0 }, mc: 0, sc: 0, lostT: 0, evId: 0 }
+    this.vs = { role, mySide, session, round: role === 'host' ? 1 : 0, names: { [mySide]: me, [otherSide]: { name: other.name, year: other.year, ufo: choice(UFO_PAINTS, other.ufo), rex: choice(REX_PAINTS, other.rex), evo: [0, 1, 2].includes(other.evo) ? other.evo : 0 } }, cnt: { f: 0, j: 0, ac: 0 }, mc: 0, sc: 0, lostT: 0, evId: 0, mode }
     this.side = mySide
     this.ending = null
     this.run = {}
@@ -748,7 +759,7 @@ export class AliensVsDinos {
     this.scene = 'vs'
     this.fx.list = []
     this.userSong = false
-    playSong(mySide === 'aliens' ? 'ufo' : 'stomp')
+    playSong(mode === 'team' ? 'boogie' : mySide === 'aliens' ? 'ufo' : 'stomp')
     sfx.wave()
   }
 

@@ -190,6 +190,11 @@ const MP_BUTTONS = {
     { id: 'join', label: 'JOIN A GAME', color: '#6bb8ff', x: W / 2 - 160, y: 246, w: 320, h: 56 },
     { id: 'back', label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: 330, w: 220, h: 48, size: 20 },
   ],
+  mode: [
+    { id: 'versus', label: 'VERSUS', color: '#fee761', x: W / 2 - 270, y: 200, w: 250, h: 90, size: 30 },
+    { id: 'team', label: 'TEAM UP', color: '#f77622', x: W / 2 + 20, y: 200, w: 250, h: 90, size: 30 },
+    { id: 'back', label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: 330, w: 220, h: 48, size: 20 },
+  ],
   side: [
     { id: 'aliens', label: 'ALIENS', color: '#7dffb0', x: W / 2 - 270, y: 200, w: 250, h: 90, size: 30 },
     { id: 'dinos', label: 'DINOS', color: '#ffa94d', x: W / 2 + 20, y: 200, w: 250, h: 90, size: 30 },
@@ -232,6 +237,10 @@ function mpPress(game, id) {
   sfx.click()
   if (id === 'back') return mpBack(game)
   if (id === 'host') {
+    mp.step = 'mode'
+    mp.sel = 0
+  } else if (id === 'versus' || id === 'team') {
+    mp.mode = id
     mp.step = 'side'
     mp.sel = 0
   } else if (id === 'join') {
@@ -244,7 +253,7 @@ function mpPress(game, id) {
     mp.step = 'wait'
     mp.t = 0
   } else if (id === 'start') {
-    game.startVersus('host', mp.side, mp.session)
+    game.startVersus('host', mp.side, mp.session, null, mp.mode)
   }
 }
 
@@ -268,7 +277,7 @@ function typeCode(game, ch) {
 // What this player tells the other while setting up.
 function lobbyState(game) {
   const mp = game.mp
-  return { role: mp.session.role, name: game.profile.name, year: game.profile.year, pic: game.profile.pic || 'rex', color: game.profile.color || '', hat: game.profile.hat || '', title: game.profile.title || '', ufo: game.profile.ufo || '', rex: game.profile.rex || '', evo: mp.side ? itemLevel(game.shop, mp.side, 'evo') : 0, side: mp.side || '', ph: 'lobby' }
+  return { role: mp.session.role, name: game.profile.name, year: game.profile.year, pic: game.profile.pic || 'rex', color: game.profile.color || '', hat: game.profile.hat || '', title: game.profile.title || '', ufo: game.profile.ufo || '', rex: game.profile.rex || '', evo: mp.side ? itemLevel(game.shop, mp.side, 'evo') : 0, side: mp.side || '', mode: mp.mode || 'versus', ph: 'lobby' }
 }
 
 // ---------- shared hooks the game calls ----------
@@ -347,6 +356,7 @@ export function updateLobby(game, dt) {
   if (mp.step === 'wait' && them) {
     if (s.role === 'guest' && !them.side) return
     if (s.role === 'guest') mp.side = them.side === 'aliens' ? 'dinos' : 'aliens'
+    if (s.role === 'guest') mp.mode = them.mode === 'team' ? 'team' : 'versus'
     mp.step = 'lobby'
     mp.sel = 0
     sfx.select()
@@ -368,7 +378,7 @@ export function updateLobby(game, dt) {
         mp.step = 'choose'
       }
     } else mp.lost = 0
-    if (s.role === 'guest' && them?.ph === 'play') game.startVersus('guest', mp.side, s, them)
+    if (s.role === 'guest' && them?.ph === 'play') game.startVersus('guest', mp.side, s, them, them.mode === 'team' ? 'team' : 'versus')
   }
 }
 
@@ -454,8 +464,11 @@ export function drawLobby(game, ctx) {
   const mp = game.mp
   text(ctx, '2 PLAYERS', W / 2, 80, 40, '#63c74d')
   if (mp.step === 'choose') {
-    text(ctx, 'Play against a friend! One of you is the UFO, one is the T. rex.', W / 2, 128, 15, '#c0cbdc')
+    text(ctx, 'Play with a friend! One of you is the UFO, one is the T. rex.', W / 2, 128, 15, '#c0cbdc')
     text(ctx, 'Both players need this game open on their own screen.', W / 2, 420, 14, '#c0cbdc')
+  } else if (mp.step === 'mode') {
+    text(ctx, 'WHAT DO YOU WANT TO PLAY?', W / 2, 150, 22, '#ffffff')
+    text(ctx, 'VERSUS: fight each other.   TEAM UP: beat the volcano boss together!', W / 2, 180, 14, '#c0cbdc')
   } else if (mp.step === 'side') {
     text(ctx, 'WHICH SIDE DO YOU WANT TO BE?', W / 2, 150, 22, '#ffffff')
     text(ctx, 'Your friend gets the other side', W / 2, 180, 14, '#c0cbdc')
@@ -497,8 +510,9 @@ export function drawLobby(game, ctx) {
     if (titleOf(alienP)) text(ctx, titleOf(alienP), W / 2, 212, 12, '#c0cbdc')
     if (titleOf(dinoP)) text(ctx, titleOf(dinoP), W / 2, 314, 12, '#c0cbdc')
     text(ctx, line('aliens', aliens), W / 2, 190, 32, '#7dffb0')
-    text(ctx, 'VS', W / 2, 240, 28, '#fee761')
+    text(ctx, mp.mode === 'team' ? '+' : 'VS', W / 2, 240, 28, '#fee761')
     text(ctx, line('dinos', dinos), W / 2, 292, 32, '#ffa94d')
+    text(ctx, mp.mode === 'team' ? 'TEAM UP: BEAT THE VOLCANO BOSS TOGETHER!' : 'VERSUS: WHO WILL WIN?', W / 2, 138, 18, mp.mode === 'team' ? '#f77622' : '#fee761')
     text(ctx, `You are the ${mp.side === 'aliens' ? 'UFO' : 'T. REX'}!  Your friend is the ${other === 'aliens' ? 'UFO' : 'T. REX'}.`, W / 2, 336, 15, '#c0cbdc')
     if (mp.session?.role !== 'host') text(ctx, `Waiting for ${safeName(them.name)} to start${'.'.repeat(1 + (Math.floor(t * 2) % 3))}`, W / 2, 404, 18, '#ffffff')
   }

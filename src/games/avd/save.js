@@ -1,4 +1,4 @@
-// Remembers every player: name, school year, coins, shop items, best scores and settings.
+// Remembers every player: name, school year, money (Xenobits, Plasma Cells, Fossil Shards, DNA), shop items, best scores and settings.
 // Log out, close the browser, come back, type your name again, and it's all still there.
 //
 // This is the game's own login: you type your name, and the game remembers you in this browser.

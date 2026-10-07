@@ -43,7 +43,7 @@ function titleButtons() {
   return [
     { label: '▶  PLAY', color: '#ffe14a', x: W / 2 - 150, y: 156, w: 300, h: 44 },
     { label: '2 PLAYERS', color: '#f77622', x: W / 2 - 150, y: 208, w: 300, h: 44 },
-    { label: '$  SHOP', color: '#63c74d', x: W / 2 - 150, y: 260, w: 300, h: 44 },
+    { label: '◆  SHOP', color: '#63c74d', x: W / 2 - 150, y: 260, w: 300, h: 44 },
     { label: '⚙  SETTINGS', color: '#6bb8ff', x: W / 2 - 150, y: 312, w: 300, h: 44 },
     { label: '♫  JUKEBOX', color: '#ff8fb0', x: W / 2 - 150, y: 364, w: 300, h: 44 },
   ]
@@ -234,6 +234,7 @@ export function drawButton(ctx, b, selected, t) {
 }
 
 const LOGIN_BTN = { x: W - 196, y: 12, w: 182, h: 38, size: 16 }
+const CUR_BTN = { x: 14, y: 12, w: 182, h: 38, size: 16 }
 
 function updateTitle(game, dt) {
   const s = game.title
@@ -291,6 +292,7 @@ function drawTitle(game, ctx) {
   const tl = pl && titleOf(pl)
   text(ctx, pl ? `PLAYER: ${pl.name}${tl ? ` · ${tl}` : ''} · ${yearLabel(pl.year)}` : 'NOT LOGGED IN', W / 2, 140, 14, pl ? colourOf(pl) : '#fee761')
   if (pl) drawAvatar(ctx, pl.pic, W - 230, 31, false, { color: colourOf(pl), hat: pl.hat })
+  drawButton(ctx, { ...CUR_BTN, label: '◆ CURRENCY', color: '#63c74d' }, inside(game.mouse, CUR_BTN), t)
   drawButton(ctx, { ...LOGIN_BTN, label: game.profile ? 'LOG OUT' : 'LOG IN', color: game.profile ? '#f6757a' : '#63c74d' }, inside(game.mouse, LOGIN_BTN), t)
   text(ctx, `Best: Aliens ${best.aliens || 0}  ·  Dinos ${best.dinos || 0}`, W / 2, 512, 15, '#fff')
   text(ctx, '↑ ↓ to choose · Enter or tap to pick', W / 2, 532, 12, 'rgba(255,255,255,0.8)')
@@ -637,6 +639,7 @@ const TAB_BTNS = [
   { side: 'dinos', label: 'DINOS', color: '#ffa94d', x: 380, y: 96, w: 200, h: 40 },
   { side: 'evolve', label: '🧬 EVOLVE', color: '#f6757a', x: 600, y: 96, w: 200, h: 40 },
 ]
+const SHOP_CUR_BTN = { x: W - 196, y: 20, w: 182, h: 38, size: 16 }
 const SHOP_BACK = { label: '◀  BACK', color: '#ffe14a', x: 40, y: 476, w: 180, h: 46, size: 20 }
 
 function shopRow(i) {
@@ -732,6 +735,10 @@ function clickShop(game, p) {
     sfx.click()
     game.goBack()
   }
+  if (inside(p, SHOP_CUR_BTN)) {
+    sfx.click()
+    game.goCurrency()
+  }
 }
 
 function drawShop(game, ctx) {
@@ -741,7 +748,8 @@ function drawShop(game, ctx) {
   drawTitleWorld(game, ctx)
   ctx.fillStyle = 'rgba(15,10,40,0.7)'
   ctx.fillRect(0, 0, W, H)
-  text(ctx, '$ SHOP', W / 2, 52, 34, '#7dffb0')
+  text(ctx, '◆ SHOP', W / 2, 52, 34, '#7dffb0')
+  drawButton(ctx, { ...SHOP_CUR_BTN, label: '◆ CURRENCY', color: '#63c74d' }, inside(game.mouse, SHOP_CUR_BTN), t)
   drawWallet(ctx, game.shop, W / 2, 82, 16)
   for (const tb of TAB_BTNS) {
     const on = tb.side === tab
@@ -790,6 +798,73 @@ function drawShop(game, ctx) {
   game.fx.draw(ctx)
 }
 
+// ---------- CURRENCY: how much of each money you have, how to earn it, what it buys ----------
+
+const CURRENCY_INFO = {
+  xeno: { earn: 'Almost everything! Waves, quizzes, wins, bosses', spend: 'Evolving, and the gold UFO and gold T. rex' },
+  cells: { earn: 'Solving math as the UFO, fuel orbs, zapping rival UFOs', spend: 'Alien upgrades: shields, fuel tank, beam, lasers' },
+  shards: { earn: 'Spelling dino words as the T. rex, grabbing gems', spend: 'Dino upgrades: lives, roars, super legs' },
+  dna: { earn: 'RARE! Beat the volcano, find hidden DNA, win 2-player', spend: 'Evolving your UFO and your T. rex' },
+}
+const CUR_BACK = { label: '◀  BACK', color: '#ffe14a', x: 40, y: 476, w: 180, h: 46, size: 20 }
+const CUR_SHOP = { label: '◆  SHOP', color: '#63c74d', x: W - 220, y: 476, w: 180, h: 46, size: 20 }
+
+function updateCurrency(game, dt) {
+  updateTitleWorld(game, dt)
+  const k = game.pressed
+  if (k.has('pause') || k.has('enter') || k.has('action')) {
+    sfx.click()
+    game.leaveCurrency()
+  }
+}
+
+function clickCurrency(game, p) {
+  if (inside(p, CUR_BACK)) {
+    sfx.click()
+    game.leaveCurrency()
+  } else if (inside(p, CUR_SHOP)) {
+    sfx.click()
+    game.goShop()
+  }
+}
+
+function drawCurrency(game, ctx) {
+  const t = game.time
+  const shop = game.shop
+  drawTitleWorld(game, ctx)
+  ctx.fillStyle = 'rgba(15,10,40,0.75)'
+  ctx.fillRect(0, 0, W, H)
+  text(ctx, '◆ CURRENCY', W / 2, 52, 34, '#63c74d')
+  text(ctx, game.profile ? `${game.profile.name}'S MONEY` : 'NOT LOGGED IN: LOG IN TO KEEP YOUR MONEY SAFE', W / 2, 82, 14, '#c0cbdc')
+  CURRENCY_ORDER.forEach((key, i) => {
+    const c = CURRENCIES[key]
+    const info = CURRENCY_INFO[key]
+    const y = 104 + i * 88
+    rrect(ctx, 60, y, W - 120, 78, 14)
+    ctx.fillStyle = 'rgba(15,10,40,0.85)'
+    ctx.fill()
+    ctx.lineWidth = 3
+    ctx.strokeStyle = c.color
+    ctx.stroke()
+    text(ctx, c.icon, 108, y + 50 + Math.sin(t * 3 + i) * 3, 36, c.color)
+    text(ctx, c.name, 150, y + 28, 20, c.color, 'left')
+    text(ctx, `EARN: ${info.earn}`, 150, y + 50, 12, '#ffffff', 'left')
+    text(ctx, `BUYS: ${info.spend}`, 150, y + 68, 12, '#c0cbdc', 'left')
+    text(ctx, String(shop[key] || 0), W - 90, y + 50, 34, '#ffffff', 'right')
+  })
+  // what you're saving up for
+  const next = SHOP_ITEMS.evolve
+    .filter((it) => it.key === 'evo')
+    .map((it) => {
+      const lvl = itemLevel(shop, it.side, it.key)
+      const cost = it.costs[lvl]
+      return cost ? `${it.side === 'aliens' ? 'UFO' : 'T. REX'} → ${it.stages[lvl]}: ${costText(cost)}` : `${it.stages[lvl - 1]} DONE!`
+    })
+  text(ctx, `NEXT EVOLUTIONS:  ${next.join('   ·   ')}`, W / 2, 462, 13, '#f6757a')
+  drawButton(ctx, CUR_BACK, inside(game.mouse, CUR_BACK), t)
+  drawButton(ctx, CUR_SHOP, inside(game.mouse, CUR_SHOP), t)
+}
+
 // ---------- what the game calls ----------
 
 export function updateScreen(game, dt) {
@@ -797,6 +872,7 @@ export function updateScreen(game, dt) {
   else if (game.scene === 'settings') updateSettings(game, dt)
   else if (game.scene === 'jukebox') updateJukebox(game, dt)
   else if (game.scene === 'shop') updateShop(game, dt)
+  else if (game.scene === 'currency') updateCurrency(game, dt)
 }
 
 export function drawScreen(game, ctx) {
@@ -804,6 +880,7 @@ export function drawScreen(game, ctx) {
   else if (game.scene === 'settings') drawSettings(game, ctx)
   else if (game.scene === 'jukebox') drawJukebox(game, ctx)
   else if (game.scene === 'shop') drawShop(game, ctx)
+  else if (game.scene === 'currency') drawCurrency(game, ctx)
 }
 
 export function clickScreen(game, p) {
@@ -814,9 +891,14 @@ export function clickScreen(game, p) {
       sfx.click()
       game.loginPressed()
     }
+    if (inside(p, CUR_BTN) && game.sceneT > 0.3) {
+      sfx.click()
+      game.goCurrency()
+    }
   } else if (game.scene === 'settings') clickSettings(game, p)
   else if (game.scene === 'jukebox') clickJukebox(game, p)
   else if (game.scene === 'shop') clickShop(game, p)
+  else if (game.scene === 'currency') clickCurrency(game, p)
 }
 
 export const MENU_BACK = { x: 16, y: 14, w: 110, h: 40 }
