@@ -58,6 +58,13 @@ export function wakeAudio() {
   if (ctx.state === 'suspended') ctx.resume()
 }
 
+// Browsers only let a page make sound once it's allowed to. This quietly asks again; it starts
+// the music the moment the browser says yes (straight away if you clicked to get here).
+export function tryStartAudio() {
+  if (!ctx) wakeAudio()
+  if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {})
+}
+
 export function audioRunning() {
   return !!ctx && ctx.state === 'running'
 }

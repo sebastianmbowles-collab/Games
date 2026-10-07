@@ -29,7 +29,7 @@ import {
   drawMoon,
   text,
 } from './art'
-import { sfx, wakeAudio, beamOn, setVolumes, unlockAudio } from './sound'
+import { sfx, wakeAudio, beamOn, setVolumes, unlockAudio, tryStartAudio, audioRunning } from './sound'
 import { playSong, stopMusic, currentSong, songBeat, playlistSteps, nextSongId } from './music'
 import { PX, retroColors, flushText } from './pixel'
 
@@ -54,7 +54,7 @@ const POWER_NAMES = { mega: 'MEGA ROAR', shield: 'SHIELD', speed: 'SPEED BOOST' 
 const GAME_SPEED = 1.3
 const WAVE_SECONDS = 40
 const AFK_OK = { x: W / 2 - 90, y: 360, w: 180, h: 52 }
-const UNLOCK_EVENTS = ['pointerup', 'touchend', 'click', 'keydown']
+const UNLOCK_EVENTS = ['pointerdown', 'mousedown', 'touchstart', 'pointerup', 'touchend', 'click', 'keydown']
 const DIFF = {
   easy: { mul: 0.75, hp: 7, lives: 5 },
   normal: { mul: 1, hp: 5, lives: 3 },
@@ -884,6 +884,12 @@ export class AliensVsDinos {
     this.flash = Math.max(0, this.flash - realDt * 2.5)
 
     this.sceneT += realDt
+    // keep trying to start the music until the browser allows it
+    this.audioTry = (this.audioTry || 0) - realDt
+    if (this.audioTry <= 0 && !audioRunning()) {
+      this.audioTry = 0.5
+      tryStartAudio()
+    }
     this.updatePlaylist()
     this.checkAfk(realDt)
     if (this.afk && this.scene !== 'vs') {

@@ -1,7 +1,7 @@
 // The title screen (PLAY / SETTINGS / JUKEBOX), the settings page and the jukebox.
 
 import { W, H, TAU, INK, drawAvatar, circle, rrect, text, drawDino, drawUFO, drawAlien, drawBeam, drawSky, drawBackdrop, mixTheme, getTheme } from './art'
-import { sfx, audioRunning } from './sound'
+import { sfx } from './sound'
 import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels, playlistSteps, nextSongId } from './music'
 import { SHOP_ITEMS, itemLevel, buy } from './shop'
 import { yearLabel } from './names'
@@ -284,9 +284,6 @@ function drawTitle(game, ctx) {
       ctx.restore()
     }
     ctx.restore()
-  }
-  if (!audioRunning() && Math.floor(t * 2) % 2 === 0) {
-    text(ctx, '♪ TAP OR PRESS A KEY FOR MUSIC ♪', W / 2, 470, 18, '#fee761')
   }
   const best = game.best
   text(ctx, game.profile ? `PLAYER: ${game.profile.name} · ${yearLabel(game.profile.year)}` : 'NOT LOGGED IN', W / 2, 140, 14, '#fee761')
