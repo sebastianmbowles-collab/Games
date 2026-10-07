@@ -3,6 +3,7 @@
 import { W, H, INK, rrect, text, AVATARS, drawAvatar, drawUFO, drawDino } from './art'
 import { COLOURS, HATS, TITLES, UFO_PAINTS, REX_PAINTS, choice, colourOf, titleOf } from './custom'
 import { sfx } from './sound'
+import { isAdmin } from './testmode'
 import { inside, drawButton, drawTitleWorld, updateTitleWorld, drawWallet } from './menus'
 import { itemLevel, evoName } from './shop'
 import { checkName, safeName, yearLabel, YEAR_LEVELS, MAX_NAME } from './names'
@@ -87,7 +88,14 @@ function typeName(game, ch) {
     const old = findAccount(pf.name)
     pf.acc = old
     pf.pw = ''
-    if (old) {
+    if (isAdmin({ name: pf.name })) {
+      // the ADMIN test player doesn't need a password
+      pf.passHash = null
+      if (old) {
+        game.logIn(old)
+        pf.next()
+      } else pf.step = 'year'
+    } else if (old) {
       // played before: type your password (players from before passwords make one now)
       pf.step = old.pass ? 'pass' : 'newpass'
     } else if (accountCount() >= MAX_ACCOUNTS) {
