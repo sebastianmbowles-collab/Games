@@ -4704,7 +4704,11 @@ function nmEnding() {
   ], () => {
     state.mode = 'end'; document.exitPointerLock?.();
     document.querySelector('#endScreen .logo').innerHTML = 'Now play<br>Dreamland';
-    $('eMsg').textContent = 'You were the dream self. You found all 5 memories. Play Dreamland to see what happens when Sebastian finds you.';
+    const A = AREAS;
+    $('eMsg').textContent = `You were the dream self. You found all 5 memories. ` +
+      `Sadness: ${A.ocean.happyN || 0}/6 happy memories. Fear: ${A.mirror.braveN || 0}/6 fears faced. Anger: you learned to breathe. ` +
+      `Chaos: ${A.forest.calmN || 0} storms calmed. Pride: ${A.cloud.humbleN || 0}/6 statues broken. ` +
+      `Now play Dreamland to see what happens when Sebastian finds you.`;
     $('endScreen').hidden = false; achieve('Know Yourself', 'Finish the dream self\'s story');
   });
 }
