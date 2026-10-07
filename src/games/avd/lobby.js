@@ -73,6 +73,14 @@ export function openProfile(game, next, mode = 'login') {
   game.goScene('profile')
 }
 
+// The ADMIN test player: no password, no school year, straight into Test mode.
+function adminLogin(game) {
+  const old = findAccount('ADMIN')
+  if (old) game.logIn(old)
+  else game.newPlayer({ name: 'ADMIN', year: 7 }, null)
+  openTest(game)
+}
+
 function typeName(game, ch) {
   const pf = game.prof
   pf.err = null
@@ -88,14 +96,8 @@ function typeName(game, ch) {
     const old = findAccount(pf.name)
     pf.acc = old
     pf.pw = ''
-    if (isAdmin({ name: pf.name })) {
-      // the ADMIN test player doesn't need a password
-      pf.passHash = null
-      if (old) {
-        game.logIn(old)
-        openTest(game)
-      } else pf.step = 'year'
-    } else if (old) {
+    if (isAdmin({ name: pf.name })) return adminLogin(game)
+    if (old) {
       // played before: type your password (players from before passwords make one now)
       pf.step = old.pass ? 'pass' : 'newpass'
     } else if (accountCount() >= MAX_ACCOUNTS) {
@@ -107,6 +109,8 @@ function typeName(game, ch) {
     return
   } else if (pf.name.length < MAX_NAME && !(ch === ' ' && (!pf.name || pf.name.endsWith(' ')))) pf.name += ch
   sfx.click()
+  // typing the name ADMIN goes straight into Test mode, no need to press OK
+  if (isAdmin({ name: pf.name })) adminLogin(game)
 }
 
 // Typing a password: letters and numbers, shown as stars.
