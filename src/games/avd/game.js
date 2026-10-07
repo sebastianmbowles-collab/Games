@@ -46,6 +46,8 @@ import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawL
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
 import { drawWallet, drawButton, inside } from './menus'
 import { secretKey, secretClick, updateSecrets, drawTitleSecrets, drawSecretPopup } from './secrets'
+import { startBronto, updateBronto, brontoBlock, drawBronto, drawBrontoHUD } from './bronto'
+import { startEggUfo, updateEggUfo, roarEggUfo, drawEggUfo } from './eggufo'
 import { startSnipers, updateSnipers, drawSnipers, roarSnipers } from './snipers'
 import { isAdmin, openTest, updateTest, clickTest, drawTest, testKey } from './testmode'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
@@ -866,6 +868,8 @@ export class AliensVsDinos {
     if (this.side === 'aliens') this.setupAliens()
     else this.setupDinos()
     startSnipers(this)
+    startBronto(this)
+    startEggUfo(this)
     this.level = buildLevel(this.side, 1, this.playerX())
     this.cam.x = clamp(this.playerX(), W / 2, WORLD - W / 2)
     this.cam.y = H / 2
@@ -1583,6 +1587,8 @@ export class AliensVsDinos {
     for (const u of this.ufos) this.ufoDinoAI(u, dt)
     this.ufos = this.ufos.filter((u) => !u.dead)
     updateSnipers(this, dt)
+    updateBronto(this, dt)
+    updateEggUfo(this, dt)
 
     if (alive && !this.boss) {
       this.waveTime -= dt / GAME_SPEED
@@ -1645,6 +1651,8 @@ export class AliensVsDinos {
       this.fx.text(r.x, r.y - 120, 'SHIELD SAVED YOU!', '#63c74d', 18)
       return
     }
+    // your bronto buddy blocks it with its long neck
+    if (brontoBlock(this)) return
     r.lives--
     r.inv = 2
     r.vy = -520
@@ -1755,7 +1763,9 @@ export class AliensVsDinos {
     } else if (u.state === 'beam') {
       u.beaming = true
       // grab anyone standing in the beam
-      if (!r.liftedBy && r.inv <= 0 && !this.hasPower('shield') && !this.ending && inBeam(u.x, u.y, r.x, r.y - 40)) {
+      if (!r.liftedBy && r.inv <= 0 && !this.hasPower('shield') && !this.ending && inBeam(u.x, u.y, r.x, r.y - 40) && brontoBlock(this, 'NO GRAB!')) {
+        this.ufoCool(u)
+      } else if (!r.liftedBy && r.inv <= 0 && !this.hasPower('shield') && !this.ending && inBeam(u.x, u.y, r.x, r.y - 40)) {
         r.liftedBy = u
         r.plat = null
         r.onGround = false
@@ -1877,6 +1887,7 @@ export class AliensVsDinos {
     }
     if (this.boss) bossRoar(this, hx, hy, reach, this.hasPower('mega'))
     roarSnipers(this, hx, hy, reach)
+    roarEggUfo(this, hx, hy, reach)
     if (hits) {
       sfx.stun()
       this.slowmo = Math.max(this.slowmo, 0.12)
@@ -2078,6 +2089,8 @@ export class AliensVsDinos {
     const r = this.rex
     drawLevel(ctx, this.level)
     drawBoss(ctx, this)
+    drawBronto(ctx, this)
+    drawEggUfo(ctx, this)
     drawSnipers(ctx, this)
     for (const lf of this.pickups) drawLeaf(ctx, lf.x, lf.y, t)
     for (const u of this.ufos) {
@@ -2200,6 +2213,7 @@ export class AliensVsDinos {
     if (r.roars > 10) text(ctx, `+${r.roars - 10}`, 248, 68, 12, '#ffe14a', 'right')
     if (r.roars <= 0) text(ctx, 'ENTER = SPELL', 96, 68, 12, '#ff8fa0', 'left')
     if (this.power) text(ctx, `★ ${POWER_NAMES[this.power.kind]} ${Math.ceil(this.power.t)}S`, 28, 104, 14, '#63c74d', 'left')
+    drawBrontoHUD(ctx, this, this.power ? 124 : 104)
     hudPanel(ctx, W / 2 - 120, 12, 240, 74)
     text(ctx, this.boss ? 'BOSS LEVEL!' : `${Math.max(0, Math.ceil(this.waveTime))}s left`, W / 2, 44, 24, this.boss ? '#feae34' : this.waveTime < 6 ? '#ffe14a' : '#fff')
     const babies = this.babies.filter((b) => b.state !== 'gone').length
