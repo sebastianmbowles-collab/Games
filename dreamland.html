@@ -2809,23 +2809,37 @@ const zoneOf = (name, b) => { ZONES[name] = b; };
   for (let k = 0; k < 4; k++) { const w = 16 - k * 3.2, lf = mesh(boxG(w, 2.4, w), mat(pick([0x3fd0a0, 0x5fe0b0, 0x2fb090]))); lf.position.set(T.x, tg + 23.6 + k * 2.2, T.z); a.group.add(lf); }
   // the spiral of platforms (some glitch in and out!)
   a.flicker = [];
-  for (let i = 0; i < 22; i++) {
-    const ang = i * .55 + Math.PI, rr = 3.5, y = tg + .3 + i * .9, x = T.x + Math.sin(ang) * rr, z = T.z + Math.cos(ang) * rr;
-    const plat = aBox(a, 1.6, .35, 1.6, i % 3 === 2 ? 0xff6fc8 : 0x9ff0c0, x, y, z); plat.rotation.y = ang;
+  for (let i = 0; i < 27; i++) {
+    const ang = i * .5 + Math.PI, rr = 3.6, y = tg + .3 + i * .74, x = T.x + Math.sin(ang) * rr, z = T.z + Math.cos(ang) * rr;
+    const plat = aBox(a, 2, .35, 2, i % 3 === 2 && i > 3 ? 0xff6fc8 : 0x9ff0c0, x, y, z); plat.rotation.y = ang;
     if (i % 3 === 2 && i > 3) a.flicker.push({ m: plat, sd: a.solids[a.solids.length - 1], t: i * .7 }); // pink ones blink
   }
   aKey(a, 3, 0x7ff0d8, T.x, tg + 20.6, T.z); // on top of the trunk
+  // the halfway platform has a glowing leaf: once you've reached it, falling from higher up floats you back to it
+  { const an = 12 * .5 + Math.PI; a.half = { x: T.x + Math.sin(an) * 3.6, z: T.z + Math.cos(an) * 3.6, y: tg + .3 + 12 * .74 + .35, reached: false };
+    const lf = mesh(new THREE.OctahedronGeometry(.35, 0), glow(0x9ff0c0)); lf.scale.y = .3; lf.position.set(a.half.x, a.half.y + 1.4, a.half.z); a.group.add(lf); lf.add(halo(0x9ff0c0, 2, .6)); a.half.m = lf; }
   a.portal = makePortal(0x7ff0d8); a.portal.position.set(0, a.h(0, 74), 74); a.group.add(a.portal);
   // robots
-  [[-10, 20, 1], [12, 18, 0], [-16, 32, 0], [8, 36, 1], [18, 44, 1], [-12, 50, 0], [4, 56, 1], [-20, 62, 1], [14, 62, 0]].forEach(([x, z, h]) => aRobot(a, x, z, !!h));
+  [[-10, 20, 1], [12, 18, 0], [-16, 32, 1], [8, 36, 1], [18, 44, 1], [-12, 50, 0], [4, 56, 1], [-20, 62, 1], [14, 62, 1], [22, 28, 1]].forEach(([x, z, h]) => aRobot(a, x, z, !!h)); // 8 kids in the forest
   // gems and a hidden message
   [['pink', 2, 10], ['blue', -6, 22], ['green', 10, 30], ['purple', -14, 44], ['pink', 6, 52], ['blue', -4, 66], ['rainbow', 24, 88]].forEach(([t, x, z]) => aGem(a, t, x, z));
   aNote(a, ['the animals glitch', 'because i do.'], 22, 1.6, 86, -Math.PI / 3);
   a.update = (dt, time) => {
     a.glitchCubes.forEach((c, i) => { c.visible = Math.sin(time * 3 + i * 1.7) > -.3; c.rotation.x += dt; c.rotation.y += dt * .7; if (Math.random() < .005) c.position.x += rand(-1, 1); });
     { const q = a.flies.geometry.attributes.position; for (let i = 0; i < q.count; i++) q.setY(i, q.getY(i) + Math.sin(time * 2 + i) * dt * .3); q.needsUpdate = true; a.flies.material.opacity = .6 + Math.sin(time * 4) * .3; }
+    // the halfway leaf: reach it once, and it will catch you if you fall from higher up
+    if (a.half) { a.half.m.rotation.y += dt * 2;
+      if (!a.half.reached && Math.hypot(P.x - a.half.x, P.z - a.half.z) < 1.2 && Math.abs(P.y - a.half.y) < .4) { a.half.reached = true; sfx('message'); toast('Halfway!', 'If you fall now, the leaf will catch you'); }
+      if (a.half.reached && P.vy < -9 && P.y < a.half.y - .5 && P.y > a.half.y - 6 && Math.hypot(P.x - T.x, P.z - T.z) < 9) {
+        Object.assign(P, { x: a.half.x, z: a.half.z, y: a.half.y + .05, vy: 0, kx: 0, kz: 0 }); burst(P.x, P.y + 1, P.z, [0x9ff0c0, 0x5fe0b0], 14); sfx('whoosh'); toast('', 'The leaf caught you!'); } }
     // pink platforms blink: solid for a while, then gone
-    a.flicker.forEach(f => { const on = Math.sin(time * 1.4 + f.t) > -.35; f.m.visible = on || Math.random() < .1; f.sd.on = on; f.m.material.opacity = on ? 1 : .3; });
+    a.ft = (a.ft || 0) + dt; // game time, so slow computers aren't harder
+    a.flicker.forEach(f => { const v = Math.sin(a.ft * 1.1 + f.t), warn0 = v > -.55 && v < -.25;
+      // standing on it? it gives you at least 1.5 seconds before it can vanish
+      const onIt = P.onGround && P.x > f.sd.x0 - .3 && P.x < f.sd.x1 + .3 && P.z > f.sd.z0 - .3 && P.z < f.sd.z1 + .3 && Math.abs(P.y - f.sd.y1) < .2;
+      f.stood = onIt ? (f.stood || 0) + dt : 0;
+      const on = v > -.55 || (f.sd.on && onIt && f.stood < 1.5), warn = on && (warn0 || v <= -.55); // a fast blink warns you before it vanishes
+      f.m.visible = on ? (!warn || Math.floor(a.ft * 12) % 2 === 0) : Math.random() < .08; f.sd.on = on; });
     // animals hop around; if you get close they glitch away… unless you're very sneaky (or really close)
     a.animals.forEach(an => {
       an.hop += dt * (an.found ? 6 : 3);
