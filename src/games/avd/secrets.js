@@ -1,18 +1,18 @@
-// EASTER EGGS: secret things hidden around the game. Finding one for the first time gives
-// +25 Xenobits and +1 DNA, and the CURRENCY page counts how many you've found.
+// EASTER EGGS: secret things hidden on the title screen. They're meant to be tricky!
+// Finding one for the first time gives +25 Xenobits and +1 DNA, and the CURRENCY page
+// counts how many you've found. (Spoilers below!)
 //
-//   PARTY TIME    on the title screen, press ↑ ↑ ↓ ↓ ← → ← → B A
-//   BIG ROAR      on the title screen, type R O A R
-//   HELLO MOON    tap the moon on the title screen 5 times
-//   TICKLE REX    tap the T. rex on the hill 5 times
-//   JOKE TIME     tap your own picture on the title screen
-//   SPACE COW     as the UFO, fly all the way right and beam up the cow
-//   GRANDPA DINO  as the T. rex, go all the way left and roar at the sleeping old dino
+//   PARTY TIME   press ↑ ↑ ↓ ↓ ← → ← → B A
+//   BIG ROAR     type R O A R, pressing the last R while the hill T. rex is roaring
+//   HELLO MOON   tap the moon 7 times in 3 seconds
+//   TICKLE REX   tap the T. rex on the hill 10 times in 4 seconds
+//   JOKE TIME    tap your own picture until you've heard 5 different jokes
+//   DINO RESCUE  tap a UFO while it's beaming up a dino, 3 times
+//   WISH UPON    tap a shooting star (one zooms across the sky every half a minute or so)
 
-import { W, H, GROUND, WORLD, rrect, text, drawDino } from './art'
+import { W, H, rrect, text } from './art'
 import { PX } from './pixel'
 import { sfx } from './sound'
-import { inBeam } from './game'
 import { REX_X, hillY } from './menus'
 
 export const SECRETS = [
@@ -21,8 +21,8 @@ export const SECRETS = [
   { id: 'moon', name: 'HELLO MOON' },
   { id: 'tickle', name: 'TICKLE REX' },
   { id: 'joke', name: 'JOKE TIME' },
-  { id: 'cow', name: 'SPACE COW' },
-  { id: 'grandpa', name: 'GRANDPA DINO' },
+  { id: 'rescue', name: 'DINO RESCUE' },
+  { id: 'star', name: 'WISH UPON A STAR' },
 ]
 
 const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA']
@@ -43,7 +43,8 @@ const JOKES = [
 const snap = (v) => Math.round(v / PX) * PX
 const pick = (a) => a[Math.floor(Math.random() * a.length)]
 
-export const secretsFound = (shop) => (shop.secrets || []).length
+// only counts secrets that still exist (old saves may have ones that were taken out)
+export const secretsFound = (shop) => SECRETS.filter((x) => (shop.secrets || []).includes(x.id)).length
 
 // You found a secret! The first time it pays out; after that it's just for fun.
 export function foundSecret(game, id) {
@@ -54,7 +55,7 @@ export function foundSecret(game, id) {
   game.shop.secrets.push(id)
   game.earn(25)
   game.gain('dna', 1)
-  game.secretPopup = { name: s.name, n: game.shop.secrets.length, t: 0 }
+  game.secretPopup = { name: s.name, n: secretsFound(game.shop), t: 0 }
   sfx.win()
 }
 
@@ -72,22 +73,57 @@ export function secretKey(game, code) {
     foundSecret(game, 'party')
   } else if (ends(ROAR)) {
     game.keyLog = []
-    game.title.roarTimer = 0
+    if (game.title.roar <= 0) {
+      // a hint: the T. rex wants to roar WITH you
+      game.fx.text(REX_X, hillY(REX_X) - 150, 'rawr...?', '#c0cbdc', 14)
+      return
+    }
+    game.title.roar = 0.8
     game.shake = 16
     game.fx.text(REX_X, hillY(REX_X) - 160, 'ROOOOOAAAAR!', '#ffe14a', 34)
     foundSecret(game, 'roar')
   }
 }
 
+// was this tapped n times within the last `secs` seconds?
+function taps(game, key, n, secs) {
+  const list = (game.secretTaps = game.secretTaps || {})
+  list[key] = [...(list[key] || []), game.time].filter((t) => game.time - t < secs)
+  if (list[key].length < n) return false
+  list[key] = []
+  return true
+}
+
 // taps on the title screen; returns true if a secret used the tap
 export function secretClick(game, p) {
-  const sc = (game.secretClicks = game.secretClicks || { moon: 0, rex: 0 })
+  const st = game.star
+  if (st && Math.hypot(p.x - st.x, p.y - st.y) < 45) {
+    game.star = null
+    game.fx.burst(p.x, p.y, 24, { speed: 260, life: 0.8, size: 6, color: ['#fee761', '#ffffff', '#2ce8f5'], type: 'star' })
+    game.fx.text(p.x, p.y + 30, 'MAKE A WISH!', '#fee761', 22)
+    foundSecret(game, 'star')
+    return true
+  }
+  // a UFO beaming up a dino: tap it to save the dino!
+  for (const u of game.title.ufos) {
+    if (u.beam > 0 && u.target && Math.hypot(p.x - u.x, p.y - u.y) < 50) {
+      u.target.held = false
+      u.target = null
+      u.beam = 0
+      u.timer = 5
+      u.vx = Math.sign(u.vx || 1) * 260
+      sfx.stun()
+      game.fx.burst(u.x, u.y, 14, { speed: 220, life: 0.5, size: 5, color: ['#2ce8f5', '#ffffff'], type: 'spark' })
+      game.fx.text(u.x, u.y - 40, 'DINO SAVED!', '#63c74d', 20)
+      game.rescues = (game.rescues || 0) + 1
+      if (game.rescues >= 3) foundSecret(game, 'rescue')
+      return true
+    }
+  }
   if (Math.hypot(p.x - MOON.x, p.y - MOON.y) < MOON.r) {
-    sc.moon++
     sfx.click()
     game.fx.burst(p.x, p.y, 6, { speed: 120, life: 0.5, size: 4, color: '#fee761', type: 'star' })
-    if (sc.moon >= 5) {
-      sc.moon = 0
+    if (taps(game, 'moon', 7, 3)) {
       game.moonWink = 3
       game.fx.text(MOON.x - 80, MOON.y + 70, `THE MOON SAYS: HI ${game.profile?.name || 'FRIEND'}!`, '#fee761', 18)
       foundSecret(game, 'moon')
@@ -96,11 +132,10 @@ export function secretClick(game, p) {
   }
   const ry = hillY(REX_X) - 60
   if (Math.abs(p.x - REX_X) < 70 && Math.abs(p.y - ry) < 70) {
-    sc.rex++
     sfx.squeak()
-    game.fx.text(REX_X, ry - 90, sc.rex >= 5 ? 'HA HA HA! STOP IT!' : 'HEE HEE!', '#ffa94d', 20)
-    if (sc.rex >= 5) {
-      sc.rex = 0
+    const done = taps(game, 'rex', 10, 4)
+    game.fx.text(REX_X, ry - 90, done ? 'HA HA HA! STOP IT!' : 'HEE HEE!', '#ffa94d', 20)
+    if (done) {
       game.title.roar = 0.8
       foundSecret(game, 'tickle')
     }
@@ -108,14 +143,32 @@ export function secretClick(game, p) {
   }
   if (game.profile && Math.abs(p.x - (W - 230)) < 32 && Math.abs(p.y - 31) < 32) {
     game.joke = { text: pick(JOKES.filter((j) => j !== game.joke?.text)), t: 6 }
+    game.jokesHeard = game.jokesHeard || new Set()
+    game.jokesHeard.add(game.joke.text)
     sfx.select()
-    foundSecret(game, 'joke')
+    if (game.jokesHeard.size >= 5) foundSecret(game, 'joke')
     return true
   }
   return false
 }
 
 export function updateSecrets(game, dt) {
+  // now and then a shooting star zooms across the title screen sky
+  if (game.scene === 'title') {
+    game.starT = (game.starT ?? 20 + Math.random() * 20) - dt
+    if (game.starT <= 0) {
+      game.starT = 25 + Math.random() * 20
+      const dir = Math.random() < 0.5 ? 1 : -1
+      game.star = { x: dir > 0 ? -20 : W + 20, y: 40 + Math.random() * 60, vx: dir * (520 + Math.random() * 200), vy: 90, t: 0 }
+    }
+  }
+  const st = game.star
+  if (st) {
+    st.t += dt
+    st.x += st.vx * dt
+    st.y += st.vy * dt
+    if (st.x < -40 || st.x > W + 40 || game.scene !== 'title') game.star = null
+  }
   if (game.party > 0) {
     game.party -= dt
     if (game.scene === 'title' && Math.random() < dt * 12) {
@@ -142,6 +195,13 @@ export function drawTitleSecrets(game, ctx) {
     ctx.fillStyle = ['#e43b44', '#feae34', '#fee761', '#63c74d', '#2ce8f5', '#b55088'][Math.floor(t * 6) % 6]
     ctx.fillRect(0, 0, W, H)
     ctx.restore()
+  }
+  if (game.star) {
+    const st = game.star
+    for (let i = 0; i < 8; i++) {
+      ctx.fillStyle = i ? `rgba(254,231,97,${0.7 - i * 0.08})` : '#ffffff'
+      ctx.fillRect(snap(st.x - st.vx * i * 0.012) - 3, snap(st.y - st.vy * i * 0.012) - 3, i ? 6 : 9, i ? 6 : 9)
+    }
   }
   if (game.moonWink > 0) {
     // a happy face on the moon, and a wink
@@ -178,83 +238,4 @@ export function drawSecretPopup(game, ctx) {
   ctx.stroke()
   text(ctx, `🥚 EASTER EGG FOUND! ${p.n} OF ${SECRETS.length}`, W / 2, y + 28, 18, '#fee761')
   text(ctx, `${p.name}   +25 ◆  +1 🧬`, W / 2, y + 56, 16, '#ffffff')
-}
-
-// ---------- in-game secrets ----------
-
-export function startSecrets(game) {
-  game.cow = game.side === 'aliens' ? { x: WORLD - 110, lift: 0, gone: false, t: 0 } : null
-  game.grandpa = game.side === 'dinos' ? { x: 110, awake: 0 } : null
-}
-
-// the space cow, far over on the right side of the world
-export function updateCow(game, dt) {
-  const c = game.cow
-  const p = game.ufo
-  if (!c || c.gone) return
-  c.t += dt
-  if (p.beaming && inBeam(p.x, p.y, c.x, GROUND - 20 - c.lift)) {
-    c.lift += 90 * dt
-    c.x += (p.x - c.x) * Math.min(1, dt * 2)
-    if (Math.random() < dt * 3) game.fx.text(c.x, GROUND - 60 - c.lift, 'MOO?', '#ffffff', 16)
-    if (GROUND - c.lift - 20 < p.y + 20) {
-      c.gone = true
-      sfx.capture()
-      game.fx.text(Math.min(p.x, WORLD - 230), p.y - 60, 'MOO! WRONG PLANET, COW!', '#ffffff', 22)
-      game.fx.burst(p.x, p.y, 20, { speed: 220, life: 0.7, size: 6, color: ['#ffffff', '#181425', '#f6757a'], type: 'star' })
-      foundSecret(game, 'cow')
-    }
-  } else c.lift = Math.max(0, c.lift - 160 * dt)
-}
-
-export function drawCow(ctx, game) {
-  const c = game.cow
-  if (!c || c.gone) return
-  const x = snap(c.x)
-  const y = snap(GROUND - c.lift)
-  const bob = c.lift > 0 ? 0 : Math.floor(c.t * 2) % 2 ? PX : 0
-  const r = (dx, dy, w, h, col) => {
-    ctx.fillStyle = col
-    ctx.fillRect(x + dx, y + dy, w, h)
-  }
-  r(-27, -45, 54, 30, '#181425')
-  r(-24, -42, 48, 24, '#ffffff')
-  r(-15, -42, 12, 9, '#181425')
-  r(6, -33, 12, 9, '#181425')
-  for (const lx of [-21, -9, 6, 15]) r(lx, -18, 6, 18, '#181425')
-  // head (eating grass when it's on the ground)
-  r(21, -48 + bob * 3, 18, 18, '#181425')
-  r(24, -45 + bob * 3, 12, 12, '#ffffff')
-  r(27, -36 + bob * 3, 12, 6, '#f6757a')
-  r(27, -42 + bob * 3, 3, 3, '#181425')
-  r(-33, -42, 6, 3, '#181425')
-}
-
-// Grandpa Dino sleeps at the far left. Roar near him and he wakes up!
-export function roarAtGrandpa(game, x) {
-  const g = game.grandpa
-  if (!g || g.awake > 0 || Math.abs(x - g.x) > 380) return
-  g.awake = 6
-  sfx.roar(true)
-  game.fx.text(g.x + 220, GROUND - 230, 'WHO WOKE ME UP?! IN MY DAY WE', '#c0cbdc', 16)
-  game.fx.text(g.x + 220, GROUND - 205, 'HAD TO ROAR UPHILL BOTH WAYS!', '#c0cbdc', 16)
-  foundSecret(game, 'grandpa')
-}
-
-export function updateGrandpa(game, dt) {
-  const g = game.grandpa
-  if (g && g.awake > 0) g.awake -= dt
-}
-
-export function drawGrandpa(ctx, game) {
-  const g = game.grandpa
-  if (!g) return
-  const t = game.time
-  ctx.save()
-  ctx.translate(g.x, GROUND)
-  ctx.scale(1.3, 1.3)
-  drawDino(ctx, 'bronto', { time: t, blink: g.awake <= 0, roar: g.awake > 5 ? 1 : 0, angry: g.awake > 0 })
-  ctx.restore()
-  if (g.awake <= 0) text(ctx, 'Zzz', g.x + 40, GROUND - 150 - ((t * 15) % 25), 18, '#c0cbdc')
-  else text(ctx, 'GRANDPA DINO', g.x, GROUND - 175, 12, '#c0cbdc')
 }

@@ -6,7 +6,7 @@ import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevel
 import { SHOP_ITEMS, SHOP_TABS, CURRENCIES, CURRENCY_ORDER, itemLevel, buy, costText, shortOf } from './shop'
 import { yearLabel } from './names'
 import { colourOf, titleOf } from './custom'
-import { SECRETS } from './secrets'
+import { SECRETS, secretsFound } from './secrets'
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const rand = (a, b) => a + Math.random() * (b - a)
@@ -862,7 +862,7 @@ function drawCurrency(game, ctx) {
       return cost ? `${it.side === 'aliens' ? 'UFO' : 'T. REX'} → ${it.stages[lvl]}: ${costText(cost)}` : `${it.stages[lvl - 1]} DONE!`
     })
   text(ctx, `NEXT EVOLUTIONS:  ${next.join('   ·   ')}`, W / 2, 462, 13, '#f6757a')
-  text(ctx, `🥚 EASTER EGGS FOUND: ${(shop.secrets || []).length} OF ${SECRETS.length}   (each one gives +25 ◆ +1 🧬)`, W / 2, 505, 13, '#fee761')
+  text(ctx, `🥚 EASTER EGGS FOUND: ${secretsFound(shop)} OF ${SECRETS.length}   (each one gives +25 ◆ +1 🧬)`, W / 2, 505, 13, '#fee761')
   drawButton(ctx, CUR_BACK, inside(game.mouse, CUR_BACK), t)
   drawButton(ctx, CUR_SHOP, inside(game.mouse, CUR_SHOP), t)
 }

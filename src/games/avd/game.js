@@ -45,7 +45,7 @@ import { choice, UFO_PAINTS, REX_PAINTS } from './custom'
 import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
 import { drawWallet, drawButton, inside } from './menus'
-import { secretKey, secretClick, updateSecrets, drawTitleSecrets, drawSecretPopup, startSecrets, updateCow, drawCow, roarAtGrandpa, updateGrandpa, drawGrandpa } from './secrets'
+import { secretKey, secretClick, updateSecrets, drawTitleSecrets, drawSecretPopup } from './secrets'
 import { isAdmin, openTest, updateTest, clickTest, drawTest, testKey } from './testmode'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
 
@@ -864,7 +864,6 @@ export class AliensVsDinos {
     this.run = {}
     if (this.side === 'aliens') this.setupAliens()
     else this.setupDinos()
-    startSecrets(this)
     this.level = buildLevel(this.side, 1, this.playerX())
     this.cam.x = clamp(this.playerX(), W / 2, WORLD - W / 2)
     this.cam.y = H / 2
@@ -1121,7 +1120,6 @@ export class AliensVsDinos {
     const fx = this.fx
     const k = this.keys
     const alive = !this.ending
-    updateCow(this, dt)
 
     // smooth flying: push with the arrows, then glide to a stop
     // fuel burns as you fly; when it runs low you solve a math problem to refuel
@@ -1474,7 +1472,6 @@ export class AliensVsDinos {
     const fx = this.fx
     const k = this.keys
     const alive = !this.ending
-    updateGrandpa(this, dt)
 
     r.inv = Math.max(0, r.inv - dt)
     if (this.power) {
@@ -1875,7 +1872,6 @@ export class AliensVsDinos {
       }
     }
     if (this.boss) bossRoar(this, hx, hy, reach, this.hasPower('mega'))
-    roarAtGrandpa(this, r.x)
     if (hits) {
       sfx.stun()
       this.slowmo = Math.max(this.slowmo, 0.12)
@@ -2037,7 +2033,6 @@ export class AliensVsDinos {
     const p = this.ufo
     drawLevel(ctx, this.level)
     drawBoss(ctx, this)
-    drawCow(ctx, this)
     for (const egg of this.eggs) drawEgg(ctx, egg.x, GROUND, egg.t / 2, t)
     for (const e of this.enemies) if (e.beaming) drawBeam(ctx, e.x, e.y + 10, GROUND, t, { enemy: true })
     if (p.beaming) drawBeam(ctx, p.x, p.y + 12, GROUND, t, { power: 0.6 + p.energy * 0.4, width: this.beamWidth() })
@@ -2077,7 +2072,6 @@ export class AliensVsDinos {
     const r = this.rex
     drawLevel(ctx, this.level)
     drawBoss(ctx, this)
-    drawGrandpa(ctx, this)
     for (const lf of this.pickups) drawLeaf(ctx, lf.x, lf.y, t)
     for (const u of this.ufos) {
       if (u.state === 'charge') {
