@@ -3131,7 +3131,7 @@ function updateBolts(dt) {
   a.portal = makePortal(0xc8dcff); a.portal.position.set(E.x - 6, 0, E.z + 3); a.group.add(a.portal);
   zoneOf('mirror', { x0: -26, x1: 26, z0: 4, z1: 70 });
   // robots wandering the halls (some carry kids)
-  [[2, 2, 1], [6, 4, 0], [9, 7, 1], [3, 9, 1], [11, 11, 0], [7, 10, 1], [0, 8, 0], [12, 3, 1]].forEach(([i, j, h]) => aRobot(a, cx(i), cz(j), !!h));
+  [[2, 2, 1], [6, 4, 1], [9, 7, 1], [3, 9, 1], [11, 11, 0], [7, 10, 1], [0, 8, 1], [12, 3, 1]].forEach(([i, j, h]) => aRobot(a, cx(i), cz(j), !!h)); // 7 kids
   [['pink', 1, 1], ['blue', 4, 6], ['green', 8, 2], ['purple', 5, 11], ['pink', 10, 8], ['rainbow', 0, 12]].forEach(([t, i, j]) => aGem(a, t, cx(i), cz(j), .8));
   aNote(a, ['every mirror', 'shows only me.'], cx(6), 1.8, cz(6) + 1.6);
   // THE GLIMPSES: the dream self, standing at the end of a hallway
@@ -3142,7 +3142,14 @@ function updateBolts(dt) {
     [-.09, .09].forEach(x => g.add(at(halo(0xff6fc8, .25, 1), x, 1.5, .25)));
     g.position.set(cx(i), 0, cz(j)); a.group.add(g); return { g, pale, found: false, gone: 0 };
   });
+  // glowing footprints: you leave a trail, so you can tell where you've already been
+  a.steps = []; a.stepGeo = new THREE.CircleGeometry(.14, 10); a.stepMat = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: .55, depthWrite: false });
   a.update = (dt, time) => {
+    if (P.onGround && state.mode === 'play') { const last = a.steps[a.steps.length - 1];
+      if (!last || Math.hypot(last.position.x - P.x, last.position.z - P.z) > .9) {
+        const f = mesh(a.stepGeo, a.stepMat); f.rotation.x = -Math.PI / 2; f.scale.set(1, 1.6, 1); f.rotation.z = -P.yaw;
+        const side = a.steps.length % 2 ? .12 : -.12; f.position.set(P.x + Math.cos(P.yaw) * side, .02, P.z - Math.sin(P.yaw) * side); a.group.add(f); a.steps.push(f);
+        if (a.steps.length > 400) a.group.remove(a.steps.shift()); } }
     mirrorM.emissive.setHSL(.63 + Math.sin(time * .3) * .05, .5, .12 + Math.sin(time * .7) * .03); // the mirrors shimmer
     for (const gl of a.glimpses) {
       if (gl.found && gl.gone <= 0) { gl.g.visible = false; continue; }
