@@ -3261,7 +3261,7 @@ function updateBolts(dt) {
       t.g.position.set(t.x, Math.abs(Math.sin(t.step)) * .05, t.z); t.g.rotation.y = t.face;
       if (t.limbs) { const sw = Math.sin(t.step) * .5 * (t.look > 0 ? 0 : 1); t.limbs[0].rotation.x = sw; t.limbs[1].rotation.x = -sw; t.limbs[2].rotation.x = -sw; t.limbs[3].rotation.x = sw; }
       t.cone.position.set(t.x, .04, t.z); t.cone.rotation.z = t.face - Math.PI / 2;
-      const sees = state.mode === 'play' && !cine && seesYou(t);
+      const sees = state.mode === 'play' && !cine && P.z < 52.5 && seesYou(t); // in the gym you're safe from teachers
       // they notice you slowly: a "?" first, and only when it fills up are you caught. Get out of the light!
       t.sus = clamp((t.sus || 0) + (sees ? dt / .9 : -dt / 1.5), 0, 1);
       if (!t.q) { t.q = mesh(new THREE.PlaneGeometry(.6, .6), new THREE.MeshBasicMaterial({ map: paint(64, 64, k => { k.fillStyle = '#ffe27f'; k.font = 'bold 56px sans-serif'; k.textAlign = 'center'; k.fillText('?', 32, 52); }), transparent: true, depthTest: false })); t.q.renderOrder = 9; a.group.add(t.q); }
