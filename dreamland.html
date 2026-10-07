@@ -3539,9 +3539,10 @@ function updateBolts(dt) {
     } else if (LO.phase === 'hide') {
       // they all drift slowly towards you. The real one's tear glints now and then
       [LO.real, ...LO.copies].forEach(g => { if (!g.visible) return; const dx = P.x - g.position.x, dz = P.z - g.position.z, d = Math.hypot(dx, dz) || 1;
-        g.position.x += dx / d * (1 + LO.dark) * dt; g.position.z += dz / d * (1 + LO.dark) * dt; g.rotation.y = Math.atan2(dx, dz);
+        g.position.x += dx / d * (.8 + LO.dark * .7) * dt; g.position.z += dz / d * (.8 + LO.dark * .7) * dt; g.rotation.y = Math.atan2(dx, dz);
         g.position.y = Math.sin(time * 2 + g.id) * .2;
-        if (d < 1.6) { hurt(1, g.position.x, g.position.z); LO.dark = Math.min(.95, LO.dark + .1); } });
+        if (d < 1.6) { if (g === LO.real) { if (P.hurtT <= 0) { hurt(1, g.position.x, g.position.z); LO.dark = Math.min(.85, LO.dark + .05); } }
+          else { g.visible = false; burst(g.position.x, 3, g.position.z, [0x0c0818, 0x3a3060], 10); LO.dark = Math.min(.85, LO.dark + .06); sfx('whoosh'); } } }); // copies just fade into you and make it darker
       LO.real.userData.tear.visible = Math.sin(time * 3) > -.6; // a little blink so it's tricky
       // punching a copy: it bursts into shadow and the room gets darker
       for (const c of LO.copies) {
