@@ -39,6 +39,7 @@ import { makeMath, makeSpell, quizKey, quizClick, drawQuiz } from './quiz'
 import { itemLevel } from './shop'
 import { loadSave, currentAccount, storeAccount, logOut } from './save'
 import { tagLine } from './names'
+import { buildLevel, updateLevel, rexInLevel, ufoInLevel, landMeteors, poolAt, drawLevel, drawLevelFront, EVENT_NAMES } from './level'
 import { choice, UFO_PAINTS, REX_PAINTS } from './custom'
 import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
@@ -813,6 +814,7 @@ export class AliensVsDinos {
     this.coinsRun = 0
     if (this.side === 'aliens') this.setupAliens()
     else this.setupDinos()
+    this.level = buildLevel(this.side, 1, this.playerX())
     this.cam.x = clamp(this.playerX(), W / 2, WORLD - W / 2)
     this.cam.y = H / 2
     this.cam.zoom = 1
@@ -923,6 +925,7 @@ export class AliensVsDinos {
         if (this.pressed.has('enter') && !this.quiz) this.openQuiz()
         if (frozen) beamOn(false)
         else {
+          if (this.level) updateLevel(this.level, dt, this.cam.x)
           if (this.side === 'aliens') this.updateAliens(dt)
           else this.updateDinos(dt)
           this.updateCamera(dt)
@@ -1057,6 +1060,8 @@ export class AliensVsDinos {
     p.x = clamp(p.x, 60, WORLD - 60)
     p.y = clamp(p.y, 70, 330)
     if (ix) p.face = ix
+    if (!this.ending && ufoInLevel(this, p) === 'hurt') this.hurtUfo(0, 0, 'BZZT!')
+    landMeteors(this, null)
     p.tilt = approach(p.tilt, p.vx / 430 * 0.3, 8, dt)
     p.inv = Math.max(0, p.inv - dt)
     p.hurt = Math.max(0, p.hurt - dt)
@@ -1311,17 +1316,7 @@ export class AliensVsDinos {
       }
       if (!this.ending && p.inv <= 0 && Math.hypot(s.x - p.x, s.y - p.y) < 40) {
         s.life = 0
-        p.hp--
-        p.inv = 1.4
-        p.hurt = 0.2
-        p.vx += s.vx * 0.8
-        p.vy += s.vy * 0.8
-        this.shake = 14
-        this.flash = 0.5
-        fx.burst(p.x, p.y, 18, { speed: 300, life: 0.5, size: 5, color: ['#ff8fb0', '#fff'], type: 'spark' })
-        fx.text(p.x, p.y - 50, p.hp > 0 ? 'Ouch!' : 'Mayday!', '#ff8fa0', 24)
-        sfx.hurt()
-        if (p.hp <= 0) this.finish(false)
+        this.hurtUfo(s.vx * 0.8, s.vy * 0.8)
       }
     }
     this.plasma = this.plasma.filter((s) => s.life > 0)
@@ -1356,7 +1351,8 @@ export class AliensVsDinos {
     this.earn(10)
     this.captured = 0
     this.goal = 4 + this.wave * 2
-    this.banner = { text: `WAVE ${this.wave}`, sub: `Beam up ${this.goal} dinos! More rivals!`, t: 0 }
+    this.level = buildLevel('aliens', this.wave, this.ufo.x)
+    this.banner = { text: `WAVE ${this.wave}`, sub: this.level.event ? `${EVENT_NAMES[this.level.event]} Beam up ${this.goal} dinos!` : `Beam up ${this.goal} dinos! More rivals!`, t: 0 }
     this.ufo.hp = Math.min(this.ufo.maxHp, this.ufo.hp + 1)
     this.enemyRespawn.push({ t: 2 })
     sfx.wave()
@@ -1409,14 +1405,18 @@ export class AliensVsDinos {
       if (alive && (this.pressed.has('up') || this.pressed.has('fire')) && r.onGround) {
         r.vy = this.lvl('jump') || this.hasPower('speed') ? -800 : -640
         r.onGround = false
+        r.plat = null
         r.squash = 0.6
-        fx.dust(r.x, GROUND, 6)
+        fx.dust(r.x, r.y, 6)
         sfx.jump()
       }
       r.vy += 1700 * dt
       r.x += r.vx * dt
+      const oldY = r.y
       r.y += r.vy * dt
+      if (rexInLevel(this, r, oldY, dt) === 'hurt') this.hurtRex()
       if (r.y >= GROUND) {
+        r.plat = null
         if (!r.onGround) {
           r.squash = 1
           fx.dust(r.x, GROUND, 10)
@@ -1431,8 +1431,9 @@ export class AliensVsDinos {
       const step = Math.floor(r.walk / Math.PI)
       r.walk += Math.abs(r.vx) * dt * 0.07
       if (r.onGround && Math.abs(r.vx) > 60 && Math.floor(r.walk / Math.PI) !== step) sfx.step()
-      if (r.onGround && Math.abs(r.vx) > 200 && Math.random() < dt * 8) fx.dust(r.x - r.face * 20, GROUND, 1)
+      if (r.onGround && Math.abs(r.vx) > 200 && Math.random() < dt * 8) fx.dust(r.x - r.face * 20, r.y, 1)
     }
+    if (landMeteors(this, r) === 'hurt') this.hurtRex()
 
     if (alive && this.pressed.has('action') && r.roarCd <= 0) {
       if (r.roars > 0 || this.hasPower('mega')) this.roar()
@@ -1450,10 +1451,16 @@ export class AliensVsDinos {
     }
 
     // leaves to munch for points and a quick roar refill
-    if (this.pickups.length < 4 && Math.random() < dt * 0.5) this.pickups.push({ x: rand(100, WORLD - 100), t: 0 })
+    if (this.pickups.length < 4 && Math.random() < dt * 0.5) {
+      const still = (this.level?.plats || []).filter((p) => !p.moving)
+      if (still.length && Math.random() < 0.5) {
+        const p = pick(still)
+        this.pickups.push({ x: p.x + p.w / 2, y: p.y, t: 0 })
+      } else this.pickups.push({ x: rand(100, WORLD - 100), y: GROUND, t: 0 })
+    }
     for (const lf of this.pickups) {
       lf.t += dt
-      if (!r.liftedBy && Math.abs(lf.x - r.x) < 40 && r.y > GROUND - 120) {
+      if (!r.liftedBy && Math.abs(lf.x - r.x) < 40 && Math.abs(lf.y - r.y) < 60) {
         lf.done = true
         this.score += 25
         r.roarCd = 0
@@ -1492,7 +1499,8 @@ export class AliensVsDinos {
           this.ufoSpawn = 3
           this.score += 500
           this.earn(10)
-          this.banner = { text: `WAVE ${this.wave}`, sub: `You survived! +500. Now ${this.ufoQuota} UFOs at once!`, t: 0 }
+          this.level = buildLevel('dinos', this.wave, this.rex.x)
+          this.banner = { text: `WAVE ${this.wave}`, sub: this.level.event ? `+500! ${EVENT_NAMES[this.level.event]}` : `You survived! +500. Now ${this.ufoQuota} UFOs at once!`, t: 0 }
           sfx.wave()
         }
       }
@@ -1510,11 +1518,55 @@ export class AliensVsDinos {
       b.target = Math.random() < 0.3 ? b.x : clamp(b.x + rand(-320, 320), 200, WORLD - 200)
     }
     const speed = danger ? 210 : 70
-    const want = Math.abs(b.target - b.x) > 10 ? Math.sign(b.target - b.x) * speed : 0
+    let want = Math.abs(b.target - b.x) > 10 ? Math.sign(b.target - b.x) * speed : 0
+    if (want && this.level && poolAt(this.level, b.x + Math.sign(want) * 30)) {
+      // lava ahead! turn around
+      b.target = clamp(b.x - Math.sign(want) * 220, 80, WORLD - 80)
+      want = -want
+      b.vx = 0
+    }
     b.vx = approach(b.vx, want, 5, dt)
     b.x += b.vx * dt
     if (Math.abs(b.vx) > 5) b.face = Math.sign(b.vx)
     b.walk += Math.abs(b.vx) * dt * 0.12
+  }
+
+  // Lava, kill bricks and meteors cost a life (a shield power-up protects you).
+  hurtRex() {
+    const r = this.rex
+    if (r.inv > 0 || this.ending) return
+    if (this.hasPower('shield')) {
+      r.inv = 1
+      this.fx.text(r.x, r.y - 120, 'SHIELD SAVED YOU!', '#63c74d', 18)
+      return
+    }
+    r.lives--
+    r.inv = 2
+    r.vy = -520
+    r.onGround = false
+    r.plat = null
+    this.flash = 0.6
+    this.shake = 12
+    sfx.hurt()
+    this.fx.text(r.x, r.y - 120, r.lives > 0 ? 'OUCH! HOT HOT HOT!' : 'OH NO!', '#ff8fa0', 22)
+    this.fx.burst(r.x, r.y - 40, 16, { speed: 260, life: 0.5, size: 6, color: ['#feae34', '#e43b44', '#fff'], type: 'spark' })
+    if (r.lives <= 0) this.finish(false)
+  }
+
+  hurtUfo(vx = 0, vy = 0, words = 'Ouch!') {
+    const p = this.ufo
+    if (this.ending || p.inv > 0) return
+    p.hp--
+    p.inv = 1.4
+    p.hurt = 0.2
+    p.vx += vx
+    p.vy += vy
+    this.shake = 14
+    this.flash = 0.5
+    this.fx.burst(p.x, p.y, 18, { speed: 300, life: 0.5, size: 5, color: ['#ff8fb0', '#fff'], type: 'spark' })
+    this.fx.text(p.x, p.y - 50, p.hp > 0 ? words : 'Mayday!', '#ff8fa0', 24)
+    sfx.hurt()
+    if (p.hp <= 0) this.finish(false)
   }
 
   hasPower(kind) {
@@ -1600,6 +1652,7 @@ export class AliensVsDinos {
       // grab anyone standing in the beam
       if (!r.liftedBy && r.inv <= 0 && !this.hasPower('shield') && !this.ending && inBeam(u.x, u.y, r.x, r.y - 40)) {
         r.liftedBy = u
+        r.plat = null
         r.onGround = false
         fx.text(r.x, r.y - 110, 'ROAR to escape!', '#ffe14a', 22)
         sfx.squeak()
@@ -1863,6 +1916,7 @@ export class AliensVsDinos {
 
   drawAliensActors(ctx, t) {
     const p = this.ufo
+    drawLevel(ctx, this.level)
     for (const egg of this.eggs) drawEgg(ctx, egg.x, GROUND, egg.t / 2, t)
     for (const e of this.enemies) if (e.beaming) drawBeam(ctx, e.x, e.y + 10, GROUND, t, { enemy: true })
     if (p.beaming) drawBeam(ctx, p.x, p.y + 12, GROUND, t, { power: 0.6 + p.energy * 0.4, width: this.beamWidth() })
@@ -1895,11 +1949,13 @@ export class AliensVsDinos {
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(snap(s.x) - PX, snap(s.y) - PX, PX, PX)
     }
+    drawLevelFront(ctx, this.level, this.fx)
   }
 
   drawDinosActors(ctx, t) {
     const r = this.rex
-    for (const lf of this.pickups) drawLeaf(ctx, lf.x, GROUND, t)
+    drawLevel(ctx, this.level)
+    for (const lf of this.pickups) drawLeaf(ctx, lf.x, lf.y, t)
     for (const u of this.ufos) {
       if (u.state === 'charge') {
         // warning: a thin flickering beam shows where it's about to grab
@@ -1947,6 +2003,7 @@ export class AliensVsDinos {
       ctx.restore()
     }
     for (const u of this.ufos) u.draw(ctx, t)
+    drawLevelFront(ctx, this.level, this.fx)
   }
 
   drawEdgeArrows(ctx) {

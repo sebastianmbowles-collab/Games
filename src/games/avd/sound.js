@@ -177,6 +177,7 @@ export function beamOn(on) {
 }
 
 export const sfx = {
+  boing: () => tone('triangle', 180, 620, 0.3, 0.16),
   // night-time sounds
   cricket: () => {
     const f = 4000 + Math.random() * 800
