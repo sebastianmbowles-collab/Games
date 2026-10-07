@@ -2,7 +2,7 @@
 
 import { W, H, TAU, INK, drawAvatar, circle, rrect, text, drawDino, drawUFO, drawAlien, drawBeam, drawSky, drawBackdrop, mixTheme, getTheme } from './art'
 import { sfx, audioRunning } from './sound'
-import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels } from './music'
+import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels, playlistSteps, nextSongId } from './music'
 import { SHOP_ITEMS, itemLevel, buy } from './shop'
 import { yearLabel } from './names'
 
@@ -452,6 +452,13 @@ function songRect(i) {
 }
 const STOP_BTN = { label: '■  STOP', color: '#ff8fb0', x: 700, y: 470, w: 200, h: 50, size: 20 }
 const BACK_BTN = { label: '◀  BACK', color: '#ffe14a', x: 40, y: 470, w: 200, h: 50, size: 20 }
+const AUTO_BTN = { x: 470, y: 470, w: 210, h: 50, size: 16 }
+
+function toggleAuto(game) {
+  game.settings.autoNext = !game.settings.autoNext
+  game.saveSettings()
+  sfx.click()
+}
 
 function updateJukebox(game) {
   const s = game.title
@@ -464,6 +471,7 @@ function updateJukebox(game) {
   if (game.mouseMoved && hover >= 0) s.jukeSel = hover
   if (k.has('enter') || k.has('action')) pickSong(game, s.jukeSel)
   if (k.has('fire')) stopMusic()
+  if (k.has('left') || k.has('right')) toggleAuto(game)
   if (k.has('pause')) game.goTitle()
   // music notes float up from the speakers in time with the song
   const beat = Math.floor(songBeat() / 2)
@@ -494,6 +502,7 @@ function clickJukebox(game, p) {
     sfx.click()
     game.goTitle()
   }
+  if (inside(p, AUTO_BTN)) toggleAuto(game)
 }
 
 function drawJukebox(game, ctx) {
@@ -565,6 +574,15 @@ function drawJukebox(game, ctx) {
   const song = playing && songById(playing)
   text(ctx, song ? 'NOW PLAYING' : 'PICK A SONG!', 695, 130, 15, '#c9c2ff')
   text(ctx, song ? `${song.emoji} ${song.name}` : '♪ ♪ ♪', 695, 162, 26, '#fff')
+  if (song) {
+    // how far through this song the playlist is, and what comes next
+    const f = game.settings.autoNext ? Math.min(1, songBeat() / playlistSteps(song.id)) : 0
+    rrect(ctx, 490, 266, 410 * f + 4, 6, 3)
+    ctx.fillStyle = '#fee761'
+    ctx.fill()
+    const next = songById(nextSongId(song.id))
+    text(ctx, game.settings.autoNext ? `UP NEXT: ${next.emoji} ${next.name}` : 'AUTO NEXT IS OFF: THIS SONG REPEATS', 695, 294, 13, '#c9c2ff')
+  }
   const lv = musicLevels()
   for (let i = 0; i < 24; i++) {
     const v = lv[i] / 255
@@ -608,7 +626,8 @@ function drawJukebox(game, ctx) {
   game.fx.draw(ctx)
   drawButton(ctx, BACK_BTN, false, t)
   drawButton(ctx, STOP_BTN, false, t)
-  text(ctx, 'Enter = play · Z = stop · Esc = back', 470, 545 - 12, 12, 'rgba(255,255,255,0.7)')
+  drawButton(ctx, { ...AUTO_BTN, label: `AUTO NEXT: ${game.settings.autoNext ? 'ON' : 'OFF'}`, color: game.settings.autoNext ? '#63c74d' : '#8b9bb4' }, inside(game.mouse, AUTO_BTN), t)
+  text(ctx, 'Enter = play · Z = stop · ← → = auto next · Esc = back', 470, 545 - 12, 12, 'rgba(255,255,255,0.7)')
 }
 
 // ---------- shop ----------

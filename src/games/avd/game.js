@@ -30,7 +30,7 @@ import {
   text,
 } from './art'
 import { sfx, wakeAudio, beamOn, setVolumes, unlockAudio } from './sound'
-import { playSong, stopMusic } from './music'
+import { playSong, stopMusic, currentSong, songBeat, playlistSteps, nextSongId } from './music'
 import { PX, retroColors, flushText } from './pixel'
 
 // Snap a position to the chunky pixel grid.
@@ -60,7 +60,7 @@ const DIFF = {
   normal: { mul: 1, hp: 5, lives: 3 },
   hard: { mul: 1.3, hp: 3, lives: 2 },
 }
-const DEFAULT_SETTINGS = { music: 6, sound: 8, difficulty: 'normal', shake: true, cutscenes: true }
+const DEFAULT_SETTINGS = { music: 6, sound: 8, difficulty: 'normal', shake: true, cutscenes: true, autoNext: true }
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const lerp = (a, b, t) => a + (b - a) * t
@@ -627,6 +627,13 @@ export class AliensVsDinos {
     if (!this.userSong) playSong('title')
   }
 
+  // Songs picked in the jukebox play one after another, like a playlist.
+  updatePlaylist() {
+    if (!this.userSong || !this.settings.autoNext) return
+    const id = currentSong()
+    if (id && songBeat() >= playlistSteps(id)) playSong(nextSongId(id))
+  }
+
   // ---------- "are you still there?" ----------
 
   checkAfk(dt) {
@@ -877,6 +884,7 @@ export class AliensVsDinos {
     this.flash = Math.max(0, this.flash - realDt * 2.5)
 
     this.sceneT += realDt
+    this.updatePlaylist()
     this.checkAfk(realDt)
     if (this.afk && this.scene !== 'vs') {
       // everything waits until you press OK

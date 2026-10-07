@@ -119,6 +119,25 @@ for (const s of SONGS) s.steps = parseTune(s.lead.tune)
 
 export const songById = (id) => SONGS.find((s) => s.id === id)
 
+// One full time through a song, in 16th-note steps.
+export function songSteps(id) {
+  const s = songById(id)
+  return Math.max(s.chords.length * 16, s.steps.length)
+}
+
+// The playlist moves on after about 45 seconds, always at the end of a time through the song.
+export function playlistSteps(id) {
+  const s = songById(id)
+  const loop = songSteps(id)
+  const secs = (loop * 60) / s.bpm / 4
+  return loop * Math.max(2, Math.round(45 / secs))
+}
+
+export function nextSongId(id) {
+  const i = SONGS.findIndex((s) => s.id === id)
+  return SONGS[(i + 1) % SONGS.length].id
+}
+
 let song = null
 let pending = null
 let step = 0
