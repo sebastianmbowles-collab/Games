@@ -27,7 +27,8 @@ export function buildLevel(side, wave, startX) {
   const L = {
     side,
     wave,
-    event: EVENTS[side][wave - 1] ?? 'everything',
+    // waves past the list get everything (wave 1 is null = calm, so don't use ??)
+    event: wave - 1 < EVENTS[side].length ? EVENTS[side][wave - 1] : 'everything',
     t: 0,
     plats: [],
     kills: [],

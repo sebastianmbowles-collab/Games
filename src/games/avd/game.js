@@ -39,6 +39,7 @@ import { makeMath, makeSpell, quizKey, quizClick, drawQuiz } from './quiz'
 import { itemLevel } from './shop'
 import { loadSave, currentAccount, storeAccount, logOut } from './save'
 import { tagLine } from './names'
+import { startBoss, updateBoss, bossRoar, bossBolt, drawBoss, drawBossHUD } from './boss'
 import { buildLevel, updateLevel, rexInLevel, ufoInLevel, landMeteors, poolAt, drawLevel, drawLevelFront, EVENT_NAMES } from './level'
 import { choice, UFO_PAINTS, REX_PAINTS } from './custom'
 import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
@@ -811,6 +812,7 @@ export class AliensVsDinos {
     this.plasma = []
     this.ending = null
     this.quiz = null
+    this.boss = null
     this.coinsRun = 0
     if (this.side === 'aliens') this.setupAliens()
     else this.setupDinos()
@@ -926,6 +928,7 @@ export class AliensVsDinos {
         if (frozen) beamOn(false)
         else {
           if (this.level) updateLevel(this.level, dt, this.cam.x)
+          if (this.boss) updateBoss(this, dt)
           if (this.side === 'aliens') this.updateAliens(dt)
           else this.updateDinos(dt)
           this.updateCamera(dt)
@@ -1133,7 +1136,7 @@ export class AliensVsDinos {
 
     // eggs hatch new dinos so there are always some to catch
     const living = this.dinos.filter((d) => d.state !== 'gone').length + this.eggs.length
-    if (living < 7 && Math.random() < dt * 0.8) {
+    if (!this.boss && living < 7 && Math.random() < dt * 0.8) {
       let x = rand(150, WORLD - 150)
       if (Math.abs(x - p.x) < 300) x = clamp(x + 600, 150, WORLD - 150)
       this.eggs.push({ x, t: 0 })
@@ -1165,8 +1168,8 @@ export class AliensVsDinos {
     this.enemyRespawn = this.enemyRespawn.filter((r) => r.t > 0)
 
     // wave cleared?
-    if (alive && this.captured >= this.goal) {
-      if (this.wave >= WAVES) this.finish(true)
+    if (alive && !this.boss && this.captured >= this.goal) {
+      if (this.wave >= WAVES) startBoss(this)
       else this.nextWave()
     }
   }
@@ -1296,6 +1299,7 @@ export class AliensVsDinos {
     for (const b of this.bolts) {
       b.x += b.vx * dt
       b.life -= dt
+      if (b.life > 0 && bossBolt(this, b)) b.life = 0
       for (const e of this.enemies) {
         if (e.dead || b.life <= 0) continue
         if (Math.abs(b.x - e.x) < 58 && Math.abs(b.y - e.y) < 26) {
@@ -1474,7 +1478,7 @@ export class AliensVsDinos {
     this.pickups = this.pickups.filter((lf) => !lf.done)
 
     // alien UFOs arrive over time
-    if (alive && this.waveTime > 0) {
+    if (alive && this.waveTime > 0 && !this.boss) {
       this.ufoSpawn -= dt
       const active = this.ufos.filter((u) => u.state !== 'leave' && u.state !== 'crash').length
       if (this.ufoSpawn <= 0 && active < this.ufoQuota) {
@@ -1486,12 +1490,12 @@ export class AliensVsDinos {
     for (const u of this.ufos) this.ufoDinoAI(u, dt)
     this.ufos = this.ufos.filter((u) => !u.dead)
 
-    if (alive) {
+    if (alive && !this.boss) {
       this.waveTime -= dt / GAME_SPEED
       if (this.waveTime <= 0) {
         for (const u of this.ufos) this.ufoLeave(u)
         this.releaseRex()
-        if (this.wave >= WAVES) this.finish(true)
+        if (this.wave >= WAVES) startBoss(this)
         else {
           this.wave++
           this.waveTime = WAVE_SECONDS
@@ -1769,6 +1773,7 @@ export class AliensVsDinos {
         fx.text(u.x, u.y - 50, 'POW!', '#fff', 24)
       }
     }
+    if (this.boss) bossRoar(this, hx, hy, reach, this.hasPower('mega'))
     if (hits) {
       sfx.stun()
       this.slowmo = Math.max(this.slowmo, 0.12)
@@ -1905,6 +1910,7 @@ export class AliensVsDinos {
     })
     if (this.side === 'aliens') this.drawAliensHUD(ctx)
     else this.drawDinosHUD(ctx)
+    drawBossHUD(ctx, this)
     this.drawEdgeArrows(ctx)
     if (this.banner && !this.quiz) this.drawBanner(ctx, this.banner)
     text(ctx, `$ ${this.shop.coins}`, W - 30, 106, 16, '#fee761', 'right')
@@ -1917,6 +1923,7 @@ export class AliensVsDinos {
   drawAliensActors(ctx, t) {
     const p = this.ufo
     drawLevel(ctx, this.level)
+    drawBoss(ctx, this)
     for (const egg of this.eggs) drawEgg(ctx, egg.x, GROUND, egg.t / 2, t)
     for (const e of this.enemies) if (e.beaming) drawBeam(ctx, e.x, e.y + 10, GROUND, t, { enemy: true })
     if (p.beaming) drawBeam(ctx, p.x, p.y + 12, GROUND, t, { power: 0.6 + p.energy * 0.4, width: this.beamWidth() })
@@ -1955,6 +1962,7 @@ export class AliensVsDinos {
   drawDinosActors(ctx, t) {
     const r = this.rex
     drawLevel(ctx, this.level)
+    drawBoss(ctx, this)
     for (const lf of this.pickups) drawLeaf(ctx, lf.x, lf.y, t)
     for (const u of this.ufos) {
       if (u.state === 'charge') {
@@ -2054,7 +2062,7 @@ export class AliensVsDinos {
     text(ctx, 'BEAM', 28, 66, 13, '#9fffd0', 'left')
     bar(ctx, 92, 56, 154, 16, p.energy, p.overheat ? '#ff8f6b' : '#7dffb0')
     hudPanel(ctx, W / 2 - 120, 12, 240, 74)
-    text(ctx, `Dinos ${this.captured} / ${this.goal}`, W / 2, 44, 24, '#fff')
+    text(ctx, this.boss ? 'BOSS LEVEL!' : `Dinos ${this.captured} / ${this.goal}`, W / 2, 44, 24, this.boss ? '#feae34' : '#fff')
     text(ctx, `Wave ${this.wave} of ${WAVES}`, W / 2, 70, 14, '#c9c2ff')
     hudPanel(ctx, W - 214, 12, 200, 74)
     text(ctx, `${this.score}`, W - 114, 48, 28, '#ffe14a')
@@ -2076,7 +2084,7 @@ export class AliensVsDinos {
     if (r.roars <= 0) text(ctx, 'ENTER = SPELL', 96, 68, 12, '#ff8fa0', 'left')
     if (this.power) text(ctx, `★ ${POWER_NAMES[this.power.kind]} ${Math.ceil(this.power.t)}S`, 28, 104, 14, '#63c74d', 'left')
     hudPanel(ctx, W / 2 - 120, 12, 240, 74)
-    text(ctx, `${Math.max(0, Math.ceil(this.waveTime))}s left`, W / 2, 44, 24, this.waveTime < 6 ? '#ffe14a' : '#fff')
+    text(ctx, this.boss ? 'BOSS LEVEL!' : `${Math.max(0, Math.ceil(this.waveTime))}s left`, W / 2, 44, 24, this.boss ? '#feae34' : this.waveTime < 6 ? '#ffe14a' : '#fff')
     const babies = this.babies.filter((b) => b.state !== 'gone').length
     text(ctx, `Wave ${this.wave} of ${WAVES}  ·  Babies safe: ${babies}`, W / 2, 70, 14, '#d5f5c8')
     hudPanel(ctx, W - 214, 12, 200, 74)
