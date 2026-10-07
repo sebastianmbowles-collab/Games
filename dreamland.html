@@ -3772,7 +3772,7 @@ function revealCine() {
   DS.aura = halo(0xffffff, 5, 0); DS.self.add(at(DS.aura, 0, 1, 0));
   const EMO = {
     Anger:   { c: 0xff3a2a, sub: 'It charges! Dodge sideways, then hit it.', say: '"Everyone ALWAYS leaves! They wake up and FORGET me!"' },
-    Sadness: { c: 0x3a7aff, sub: 'It floats away crying. Dodge the tears and chase it!', say: '"Every morning you woke up… and I was alone again."' },
+    Sadness: { c: 0x3a7aff, sub: 'It floats away. When it sits down to cry, catch it!', say: '"Every morning you woke up… and I was alone again."' },
     Fear:    { c: 0x9a4ad0, sub: 'It turns invisible. Watch for the glowing eyes…', say: '"What if you go away and never come back?"' },
     Chaos:   { c: 0xffffff, sub: 'It jumps around! Hit it while it lands.', say: '"If I can\'t keep you here, I\'ll break EVERYTHING!"' },
     Pride:   { c: 0xffc83a, sub: 'Pride gets BIGGER every time you hit it!', say: '"I don\'t NEED anyone! …I don\'t."' },
@@ -3804,11 +3804,12 @@ function revealCine() {
     }
     DS.active = true; $('bossbar').hidden = false; setBar(); sfx('roar'); state.shake = .5;
   };
-  const nextEmo = () => { const order = ['Anger', 'Sadness', 'Fear', 'Chaos', 'Pride']; DS.emoI = Math.min(4, DS.emoI + 1); DS.emo = order[DS.emoI]; DS.t = 0; DS.hop = 0; DS.eyes.visible = DS.emo === 'Fear';
+  const nextEmo = () => { const order = ['Anger', 'Sadness', 'Fear', 'Chaos', 'Pride']; DS.emoI = Math.min(4, DS.emoI + 1); DS.emo = order[DS.emoI]; DS.t = 0; DS.hop = 0; DS.eyes.visible = DS.emo === 'Fear'; DS.self.position.y = 0; DS.self.rotation.x = 0;
     DS.selfM.color.setHex(EMO[DS.emo].c); DS.selfM.emissive.setHex(EMO[DS.emo].c).multiplyScalar(.3); DS.aura.material.color.setHex(EMO[DS.emo].c); DS.aura.material.opacity = .8;
     DS.self.scale.setScalar(DS.emo === 'Pride' ? 1.4 : 1.2); DS.selfM.transparent = DS.emo === 'Fear'; DS.selfM.opacity = 1;
     toast(DS.emo.toUpperCase(), EMO[DS.emo].say); const e0 = DS.emo; setTimeout(() => { if (DS.emo === e0 && DS.form === 'emo') toast('', EMO[e0].sub); }, 3200); sfx('roar'); burst(DS.self.position.x, 1.5, DS.self.position.z, [EMO[DS.emo].c, 0xffffff], 20); setBar(); };
-  DS.onHit = () => { setBar(); if (DS.form === 'emo' && DS.emo === 'Pride') { DS.self.scale.setScalar(Math.min(2.4, DS.self.scale.x * 1.1)); toast('', '"I\'m not weak!"'); } cheer(.4); if (DS.form === 'emo' && DS.emo === 'Fear') DS.selfM.opacity = 1; };
+  DS.onHit = () => { setBar(); if (DS.form === 'emo' && DS.emo === 'Pride') { DS.self.scale.setScalar(Math.min(2.4, DS.self.scale.x * 1.1)); toast('', '"I\'m not weak!"'); } cheer(.4); if (DS.form === 'emo' && DS.emo === 'Fear') { DS.selfM.opacity = 1; // it gets scared and jumps back
+    const q = DS.self.position, dx = q.x - P.x, dz = q.z - P.z, d = Math.hypot(dx, dz) || 1; q.x += dx / d * 5; q.z += dz / d * 5; burst(q.x, 1, q.z, [0x9a4ad0, 0xffffff], 8); } };
   a.rain = null; a.fires = []; a.orbs = []; a.kidsG = []; a.hearts = []; a.heartT = 6;
   const makeKids = () => {
     a.kidsG.forEach(k => a.group.remove(k.g)); a.kidsG = [];
@@ -3883,12 +3884,14 @@ function revealCine() {
       if (DS.emo === 'Anger') { // charges at you, leaving fire rings
         if (DS.t % 2.4 < 1.2) { p.x += dx / d * 9 * dt; p.z += dz / d * 9 * dt; if (d < 1.5) hurt(1, p.x, p.z); if (Math.random() < .05) { const f = mesh(new THREE.TorusGeometry(1, .12, 6, 32), new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true })); f.rotation.x = Math.PI / 2; f.position.set(p.x, .2, p.z); a.group.add(f); a.fires.push({ m: f, r: 1, x: p.x, z: p.z }); } }
       } else if (DS.emo === 'Sadness') { // floats away from you and makes it rain (you walk slower)
-        p.x -= dx / d * 3 * dt; p.z -= dz / d * 3 * dt; P.kx -= Math.sign(P.kx) * Math.min(Math.abs(P.kx), dt * 30);
+        const tired = DS.t % 4.5 > 2.6; // every few seconds it gets tired and sits down to cry: that's your chance!
+        if (!tired) { p.x -= dx / d * 2.6 * dt; p.z -= dz / d * 2.6 * dt; p.y = 0; DS.self.rotation.x = 0; }
+        else { p.y = -.3; DS.self.rotation.x = .25; if (Math.random() < dt * 6) burst(p.x + rand(-.3, .3), 1, p.z + rand(-.3, .3), [0x5a8aff], 1, .05); }
         if (Math.random() < .3) burst(P.x + rand(-4, 4), 8, P.z + rand(-4, 4), [0x5a8aff], 1, .1);
-        if (Math.random() < dt * .8) { const o = mesh(new THREE.SphereGeometry(.3, 10, 8), glow(0x5a8aff)); o.position.set(p.x, 1.3, p.z); a.group.add(o); a.orbs.push({ m: o, vx: dx / d * 7, vz: dz / d * 7, life: 4 }); } // tears
+        if (!tired && Math.random() < dt * .6) { const o = mesh(new THREE.SphereGeometry(.3, 10, 8), glow(0x5a8aff)); o.position.set(p.x, 1.3, p.z); a.group.add(o); a.orbs.push({ m: o, vx: dx / d * 5, vz: dz / d * 5, life: 4 }); } // tears
       } else if (DS.emo === 'Fear') { // goes nearly invisible and sneaks up behind you
         DS.selfM.opacity = Math.max(.08, DS.selfM.opacity - dt * .5);
-        p.x += dx / d * 3.5 * dt; p.z += dz / d * 3.5 * dt; if (d < 1.4) { hurt(1, p.x, p.z); DS.selfM.opacity = 1; const a2 = rand(0, 6); p.x = P.x + Math.cos(a2) * 9; p.z = P.z + Math.sin(a2) * 9; }
+        p.x += dx / d * 3 * dt; p.z += dz / d * 3 * dt; if (d < 1.2) { hurt(1, p.x, p.z); DS.selfM.opacity = 1; const a2 = rand(0, 6); p.x = P.x + Math.cos(a2) * 9; p.z = P.z + Math.sin(a2) * 9; }
       } else if (DS.emo === 'Chaos') { // teleports all over and sprays orbs in every direction
         DS.hop += dt; if (DS.hop > 2.6) { DS.hop = 0; burst(p.x, 1, p.z, [0xff3fd0, 0x5ff6ff], 10); sfx('whoosh'); const a2 = rand(0, 6), r = rand(4, 12); p.x = clamp(P.x + Math.cos(a2) * r, -20, 20); p.z = clamp(P.z + Math.sin(a2) * r, -20, 20); }
         if (DS.hop > .5 && Math.random() < dt * 2.2) { const an = rand(0, Math.PI * 2), o = mesh(new THREE.SphereGeometry(.25, 8, 6), glow(pick([0xff3fd0, 0x5ff6ff, 0xffe27f]))); o.position.set(p.x, 1.2, p.z); a.group.add(o); a.orbs.push({ m: o, vx: Math.cos(an) * 6, vz: Math.sin(an) * 6, life: 3 }); }
