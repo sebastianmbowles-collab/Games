@@ -906,6 +906,15 @@ hexIsland(1.5, 6.5, 2.75, 12.2, 0xfff0fb);
       [-.25, .25].forEach(z => { const rope = mesh(new THREE.CylinderGeometry(.02, .02, 2.2, 4), mat(0xffffff)); rope.position.set(z, -1.1, 0); piv.add(rope); });
       const seat = mesh(boxG(.7, .08, .35), mat(0xff8fd0)); seat.position.y = -2.2; piv.add(seat); return piv; });
     sw.position.set(13, terrainH(13, 5), 5); sw.rotation.y = .4; scene.add(sw); solid(11.3, 0, 4.4, 14.7, 3.1, 5.6).climb = false; }
+  // a vine trellis up the outside wall of the house: climb it to reach the roof
+  { const tr = new THREE.Group(), vine = mat(0x7fe096), wood = mat(0xf0e0ff);
+    for (let k = 0; k < 5; k++) { const v = mesh(boxG(.06, 4.3, .06), wood); v.position.set(-.6 + k * .3, 2.15, 0); tr.add(v); const h = mesh(boxG(1.3, .06, .06), wood); h.position.set(0, .4 + k * .9, 0); tr.add(h); }
+    for (let k = 0; k < 14; k++) { const l = mesh(new THREE.OctahedronGeometry(.13, 0), vine); l.position.set(rand(-.6, .6), rand(.3, 4.2), .05); tr.add(l); if (k % 4 === 0) { const f = mesh(new THREE.OctahedronGeometry(.08, 0), glow(0xff9ad5)); f.position.set(l.position.x, l.position.y + .1, .1); tr.add(f); } }
+    tr.position.set(-3.6, 0, 5.32); scene.add(tr); }
+  // the roof: walk on top of the house! A secret up here
+  solid(-5.3, 4.15, -5.3, 5.3, 4.3, 5.3);
+  { const n = note(['you can see', 'everything from here.'], 1.4, .82); n.position.set(0, 5.1, -3.5); n.rotation.y = Math.PI; scene.add(n);
+    const post = mesh(boxG(.12, .9, .12), mat(0xe2d6f2)); post.position.set(0, 4.7, -3.5); scene.add(post); addMessage(n, 0, 4.3, -3.5); }
   // signposts pointing the way
   { const sign = (x, z, ry, lines) => { const g = new THREE.Group(), post = mesh(boxG(.12, 1.8, .12), mat(0xf0e0ff)); post.position.y = .9; g.add(post);
       lines.forEach(([t, dir], i) => { const b = mesh(new THREE.PlaneGeometry(1.5, .38), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, map: paint(256, 64, k => { k.fillStyle = '#ffe0f4'; k.beginPath(); if (dir > 0) { k.moveTo(0, 0); k.lineTo(220, 0); k.lineTo(256, 32); k.lineTo(220, 64); k.lineTo(0, 64); } else { k.moveTo(256, 0); k.lineTo(36, 0); k.lineTo(0, 32); k.lineTo(36, 64); k.lineTo(256, 64); } k.fill(); k.fillStyle = '#5a24a8'; k.font = 'bold 34px "Baloo 2",sans-serif'; k.textAlign = 'center'; k.fillText(t, 128, 45); }) }));
@@ -1267,7 +1276,7 @@ key1.m.position.set(6.5, 3.8, 12.2); pickups.push(key1);
 const key2 = { kind: 'key', n: 2, m: makeKey(0xff9ad5), base: 0, taken: false, active: false };
 key2.m.visible = false; pickups.push(key2);
 // meadow gems
-addGem('pink', 3, 3, 0.7); addGem('blue', 2.2, 8.3, 2.3); addGem('green', 4.3, 9.9, 2.9);
+addGem('pink', 3, 3, 0.7); addGem('blue', 2.2, 8.4, 2.3); addGem('green', 4.5, 10.1, 2.9); addGem('pink', 3, -3, 5); // the last one is up on the roof
 addGem('purple', -6, 9); addGem('pink', 12, 8); addGem('blue', -10, 16);
 // a secret rainbow gem on top of the biggest dome (climb it!)
 const rainbowGem = addGem('rainbow', 26, 16, 5.6);
@@ -3441,6 +3450,22 @@ function updateBolts(dt) {
   [['pink', -6, 0], ['pink', 6, 0], ['blue', 0, 8], ['green', -12, 4]].forEach(([t, x, z]) => aGem(a, t, x, z, .8));
   aKey(a, 8, 0x8a9aff, 0, 1.5, 0); a.key.active = false; a.key.m.visible = false;
   a.portal = makePortal(0x5ff6ff); a.portal.position.set(0, 0, W - 3); a.group.add(a.portal);
+  // Sebastian's drawings of every place he's been, pinned up on the big walls (one appears for each key)
+  a.drawings = [
+    [3, k => { k.strokeStyle = '#3fd0a0'; k.fillStyle = '#3fd0a0'; k.fillRect(52, 20, 24, 24); k.fillRect(40, 44, 48, 24); k.fillStyle = '#6a4a8a'; k.fillRect(58, 68, 12, 40); }],
+    [4, k => { k.strokeStyle = '#8ab0ff'; k.beginPath(); k.arc(44, 64, 18, 0, 7); k.arc(70, 56, 22, 0, 7); k.arc(92, 66, 16, 0, 7); k.stroke(); k.strokeStyle = '#ffd36b'; k.beginPath(); k.moveTo(70, 80); k.lineTo(60, 100); k.lineTo(74, 100); k.lineTo(64, 120); k.stroke(); }],
+    [5, k => { k.strokeStyle = '#8a9ad8'; k.strokeRect(24, 24, 80, 80); k.strokeRect(40, 40, 48, 48); k.strokeRect(56, 56, 16, 16); }],
+    [6, k => { k.strokeStyle = '#e8a050'; k.beginPath(); k.moveTo(24, 40); k.lineTo(64, 110); k.lineTo(104, 40); k.closePath(); k.stroke(); k.strokeRect(34, 20, 60, 20); }],
+    [7, k => { k.strokeStyle = '#333'; k.strokeRect(34, 56, 60, 50); k.beginPath(); k.moveTo(28, 58); k.lineTo(64, 24); k.lineTo(100, 58); k.stroke(); k.strokeStyle = '#ff5fa8'; k.beginPath(); k.arc(64, 82, 8, 0, 7); k.stroke(); }],
+    [8, k => { k.strokeStyle = '#5a4a8a'; k.strokeRect(20, 70, 40, 24); k.strokeRect(68, 70, 40, 24); k.fillStyle = '#5ff6ff'; k.beginPath(); k.arc(96, 40, 6, 0, 7); k.fill(); }],
+    [9, k => { k.strokeStyle = '#3fe0ff'; k.beginPath(); for (let x = 10; x < 120; x += 4) k.lineTo(x, 70 + Math.sin(x * .15) * 10); k.stroke(); k.strokeStyle = '#9a4ad0'; k.beginPath(); k.arc(64, 50, 14, Math.PI, 0); k.stroke(); }],
+  ].map(([n, draw], i) => {
+    const t = paint(128, 128, k => { k.fillStyle = '#efe4f2'; k.fillRect(0, 0, 128, 128); k.lineWidth = 6; k.lineCap = 'round'; draw(k); });
+    const m = mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: t, color: 0xd6cce0 }));
+    const side = i % 2 ? 1 : -1; m.position.set(side * (W - .4), 4, -10 + i * 3.2); m.rotation.y = -side * Math.PI / 2; m.rotation.z = rand(-.08, .08); a.group.add(m);
+    const pin = mesh(new THREE.SphereGeometry(.08, 8, 6), glow(0xff5fa8)); pin.position.set(0, 1, .05); m.add(pin);
+    return { m, n };
+  });
 
   // ---------- LONELINESS ----------
   // a tall, thin, sad shadow with a single glowing blue tear
@@ -3471,7 +3496,7 @@ function updateBolts(dt) {
   };
   const place = (g, x, z) => { g.position.set(x, 0, z); g.visible = true; g.userData.m.opacity = .92; };
   const spots = () => Array.from({ length: 5 }, () => { for (;;) { const x = rand(-W + 3, W - 3), z = rand(-W + 3, W - 3); if (Math.hypot(x - P.x, z - P.z) > 7) return [x, z]; } });
-  a.enter = () => { if (!LO.started) { LO.started = true; LO.phase = 'wait'; LO.t = 0; } };
+  a.enter = () => { a.drawings.forEach(d => d.m.visible = state.keys >= d.n); if (!LO.started) { LO.started = true; LO.phase = 'wait'; LO.t = 0; } };
   a.leave = () => { aBoss = null; $('bossbar').hidden = true; scene.fog.near = 12; };
   a.onRespawn = () => { if (LO.active) { LO.phase = 'scatter'; LO.t = 0; LO.dark = Math.max(0, LO.dark - .3); } };
   a.update = (dt, time) => {
@@ -3647,7 +3672,7 @@ function updateBolts(dt) {
   // key 10 glows under the second bed
   const bx = B.bed2.position.x, bz = B.bed2.position.z;
   const k = { kind: 'key', n: 10, m: makeKey(0xffffff), base: .5, taken: false, active: false, area: 'home10' }; scene.remove(k.m); B.group.add(k.m); k.m.position.set(bx, .5, bz + 4.8); k.m.visible = false; pickups.push(k); a.key = k; // peeking out from under the bed
-  a.enter = () => { B.bed2.visible = true; B.portal.visible = false; B.key.m.visible = false; k.active = true; k.m.visible = true; scene.fog.near = 14; scene.fog.far = 60; if (B.LO) { B.LO.real.visible = false; B.LO.copies.forEach(c => c.visible = false); } };
+  a.enter = () => { B.drawings.forEach(d => d.m.visible = true); B.bed2.visible = true; B.portal.visible = false; B.key.m.visible = false; k.active = true; k.m.visible = true; scene.fog.near = 14; scene.fog.far = 60; if (B.LO) { B.LO.real.visible = false; B.LO.copies.forEach(c => c.visible = false); } };
   a.update = (dt, time) => { B.screens.forEach((sc, i) => sc.material.opacity = .15 + Math.random() * .2); B.strips.forEach(st => st.visible = Math.random() > .3); };
 }
 // what happens when you pick up key 10: THE REVEAL
@@ -3865,7 +3890,7 @@ const wardrobe = new THREE.Group();
 let wardNear = false;
 function wardrobeTick(time) {
   wardrobe.userData.star.rotation.y = time * 2;
-  const near = curArea === 'home' && Math.hypot(P.x + 3.9, P.z - 3.2) < 1.1;
+  const near = curArea === 'home' && P.y < 1.5 && Math.hypot(P.x + 3.9, P.z - 3.2) < 1.1;
   if (near && !wardNear && state.mode === 'play' && !cine) openWardrobe(); // opens once each time you walk up to it
   wardNear = near;
 }

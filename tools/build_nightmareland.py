@@ -29,8 +29,10 @@ R('<div class="chip">Kids <b id="hKids">0</b>/50</div>', '<div class="chip" hidd
 R("const prog = [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60], [48, 52, 55, 59]];",
   "const prog = [[45, 48, 52, 55], [44, 47, 50, 53], [41, 44, 48, 51], [40, 43, 46, 50]]; // minor and spooky")
 # ---------- the dream self's prologue ----------
-R("""    { text: 'Sebastian climbs into bed and closes his eyes…', d: 3, snap: true, pos: [1.5, 2.6, 1.5], look: [-3.4, .8, -3] },
-    { text: 'When he opens them, his room is different. His toys are floating!', d: 3.5, pos: [0, 2.3, 0], look: [-.5, 2, -1.2] },
+R("""    { text: 'The real world. Bedtime. Sebastian climbs into bed and closes his eyes…', d: 3.4, snap: true, pos: [1.5, 2.6, 1.5], look: [-3.4, .8, -3],
+      on: () => { $('game').style.transition = 'filter 1.6s'; $('game').style.filter = 'grayscale(1) brightness(.7)'; } }, // the real world is grey and ordinary
+    { text: 'When he opens them, his room is different. His toys are floating!', d: 3.5, pos: [0, 2.3, 0], look: [-.5, 2, -1.2],
+      on: () => { $('game').style.filter = ''; setTimeout(() => $('game').style.transition = '', 1700); sfx('fanfare'); } },
     { text: 'Is this a dream? Something sparkles outside the window.', d: 3.5, pos: [0, 2, 2.5], look: [6.5, 3.5, 11.8] },
   ], () => { objective('Find the key outside your window'); toast('Dreamland', 'Tip: jump on the toy chest to reach the window'); });""",
 """    { text: 'Long before Sebastian ever came to Dreamland… someone was already here.', d: 4, snap: true, pos: [1.5, 2.6, 1.5], look: [-3.4, .8, -3] },
