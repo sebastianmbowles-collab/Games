@@ -3277,7 +3277,8 @@ function updateBolts(dt) {
     a.caught++; a.detentions += by === 'principal' ? 1 : 0; sfx('alert'); state.mode = 'dead';
     $('fadeText').textContent = 'DETENTION!'; $('fade').style.opacity = 1;
     if (a.detentions >= 5) achieve('Detention', 'Get caught by the robot principal 5 times');
-    setTimeout(() => { const st = by === 'principal' ? { x: 0, z: 54.5 } : a.start; Object.assign(P, { x: st.x, z: st.z, y: 0, vy: 0, yaw: Math.PI, pitch: 0, kx: 0, kz: 0, hurtT: 1.5 }); state.mode = 'play'; $('fade').style.opacity = 0; toast('Caught!', by === 'principal' ? 'The principal sent you out. Try again!' : 'Back to the entrance. Stay out of their light!'); }, 900);
+    a.teachers.forEach(t => t.sus = 0);
+    setTimeout(() => { const st = by === 'principal' ? { x: 0, z: 54.5 } : a.cp || a.start; Object.assign(P, { x: st.x, z: st.z, y: 0, vy: 0, yaw: Math.PI, pitch: 0, kx: 0, kz: 0, hurtT: 1.5 }); state.mode = 'play'; $('fade').style.opacity = 0; toast('Caught!', by === 'principal' ? 'The principal sent you out. Try again!' : 'Back to the last classroom. Stay out of their light!'); }, 900);
   };
   a.onRespawn = () => { a.rulers.forEach(r => a.group.remove(r.m)); a.rulers = []; a.waves.forEach(w => a.group.remove(w.m)); a.waves = []; };
   a.leave = () => { aBoss = null; $('bossbar').hidden = true; };
@@ -3295,12 +3296,19 @@ function updateBolts(dt) {
       if (t.limbs) { const sw = Math.sin(t.step) * .5 * (t.look > 0 ? 0 : 1); t.limbs[0].rotation.x = sw; t.limbs[1].rotation.x = -sw; t.limbs[2].rotation.x = -sw; t.limbs[3].rotation.x = sw; }
       t.cone.position.set(t.x, .04, t.z); t.cone.rotation.z = t.face - Math.PI / 2;
       const sees = state.mode === 'play' && !cine && seesYou(t);
-      t.cone.material.color.setHex(sees ? 0xff4040 : 0xfff27f); t.cone.material.opacity = sees ? .3 : .16;
-      if (sees) caught('teacher');
+      // they notice you slowly: a "?" first, and only when it fills up are you caught. Get out of the light!
+      t.sus = clamp((t.sus || 0) + (sees ? dt / .9 : -dt / 1.5), 0, 1);
+      if (!t.q) { t.q = mesh(new THREE.PlaneGeometry(.6, .6), new THREE.MeshBasicMaterial({ map: paint(64, 64, k => { k.fillStyle = '#ffe27f'; k.font = 'bold 56px sans-serif'; k.textAlign = 'center'; k.fillText('?', 32, 52); }), transparent: true, depthTest: false })); t.q.renderOrder = 9; a.group.add(t.q); }
+      t.q.visible = t.sus > .02; t.q.position.set(t.x, 3.1 + t.sus * .3, t.z); t.q.lookAt(camera.position); t.q.scale.setScalar(.6 + t.sus);
+      if (sees && t.sus > 0 && !t.warned) { t.warned = true; sfx('warn'); } if (!sees) t.warned = false;
+      t.cone.material.color.setHex(t.sus > .02 ? 0xff4040 : 0xfff27f); t.cone.material.opacity = .16 + t.sus * .2;
+      if (t.sus >= 1) { t.sus = 0; caught('teacher'); }
       // a punch from behind stuns them for a few seconds
       const punched = t.lastPunch !== undefined && t.lastPunch !== punchCount; t.lastPunch = punchCount;
       if (punched && Math.hypot(P.x - t.x, P.z - t.z) < 2) { t.stun = 4; sfx('hit'); burst(t.x, 1.8, t.z, [0xfff27f, 0xffffff], 8); }
     }
+    // classroom checkpoints: the furthest classroom you've reached
+    for (const [cx, cz] of rooms) if (Math.abs(P.x - cx) < 6 && Math.abs(P.z - cz) < 3.5 && (!a.cp || cz > a.cp.z)) { a.cp = { x: cx, z: cz }; }
     // entering the gym starts the fight
     if (!PR.active && PR.hp > 0 && P.z > 55 && state.mode === 'play' && !cine) { startABoss(PR); sfx('alert'); toast('THE ROBOT PRINCIPAL', 'Jump over the bell waves and dodge the rulers!'); }
     // ---- the principal's brain ----
