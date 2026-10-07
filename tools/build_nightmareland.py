@@ -53,6 +53,9 @@ R("// everything solid casts and catches shadows (glowing things and the sky don
 R("  updateFar(time);\n", "  updateFar(time);\n  nightmareTick(dt, time);\n  emotionTick(dt, time);\n")
 R("function introCine() {", "let introCine = function () {")
 R("name: 'Glitch Octopus'", "name: 'Sadness Octopus'")
+# CHAOS can change gravity, speed, and swap left and right
+R("  const sp = 5.2;\n", "  if (P.swap) s = -s;\n  const sp = 5.2 * (P.speedMul || 1);\n")
+R("  else P.vy -= 18 * dt;\n", "  else P.vy -= 18 * (P.gravMul || 1) * dt;\n")
 R("name: 'Storm Machine'", "name: 'Storm of Pride'")
 R("name: 'Robot Principal'", "name: 'Angry Principal'")
 i = s.rindex('</style>'); s = s[:i] + NM_CSS + s[i:]

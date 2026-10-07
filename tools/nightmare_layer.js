@@ -489,6 +489,41 @@ function nightmareTick(dt, time) {
     const oldLeave = a.leave; a.leave = () => { if (oldLeave) oldLeave(); breath.classList.remove('on'); document.body.classList.remove('angry'); };
     const oldEnter2 = a.enter; a.enter = () => { if (oldEnter2) oldEnter2(); NM.anger = 20; lastCaught = a.caught || 0; document.body.classList.add('angry'); };
   }
+  // ---------- CHAOS: glitch storms in the Glitching Forest ----------
+  // Every so often the world goes haywire for a few seconds. Stand on a green CALM STONE to make it stop.
+  {
+    const a = AREAS.forest;
+    const STORMS = [
+      { id: 'moon', t: 'MOON GRAVITY!', s: 'Everything floats…', on: () => P.gravMul = .55 },
+      { id: 'zoom', t: 'SUPER SPEED!', s: 'You can\'t stop running!', on: () => P.speedMul = 1.8 },
+      { id: 'flip', t: 'LEFT IS RIGHT!', s: 'Your feet got mixed up!', on: () => P.swap = true },
+      { id: 'tilt', t: 'THE WORLD TILTS!', s: 'Hold on…', on: () => $('game').classList.add('tilt') },
+    ];
+    const calm = () => { P.gravMul = 1; P.speedMul = 1; P.swap = false; $('game').classList.remove('tilt'); };
+    a.storm = null; a.stormT = 14; a.calmN = 0;
+    a.stones = [[2.5, 6], [-1.5, 21], [6.5, 33], [-3.5, 48], [5.5, 62], [7, 74]].map(([x, z]) => {
+      const y = a.h(x, z), g = new THREE.Group();
+      g.add(at(mesh(boxG(1, .35, 1), glow(0x3aff9a)), 0, .17, 0)); g.add(at(halo(0x3aff9a, 3, .55), 0, .6, 0));
+      const l = new THREE.PointLight(0x3aff9a, .9, 6, 1.6); l.position.y = 1; g.add(l);
+      g.position.set(x, y, z); a.group.add(g); return { g, x, z, y };
+    });
+    a.nmTick = (dt, time) => {
+      const nearStone = a.stones.find(st => Math.hypot(P.x - st.x, P.z - st.z) < 2.2 && Math.abs(P.y - st.y) < 2);
+      a.stones.forEach((st, i) => st.g.children[0].rotation.y = time + i);
+      if (a.storm) {
+        a.storm.left -= dt;
+        if (Math.random() < dt * 6) $('game').style.filter = 'hue-rotate(' + rand(60, 300) + 'deg) contrast(1.3)';
+        if (nearStone || a.storm.left <= 0) { calm(); $('game').style.filter = '';
+          if (nearStone) { a.calmN++; burst(nearStone.x, nearStone.y + 1, nearStone.z, [0x3aff9a, 0xffffff], 20); sfx('kid'); toast('Calm…', 'The glitch storm stopped. Everything is still again.'); if (a.calmN === 3) achieve('Eye of the Storm', 'Stop 3 glitch storms on calm stones'); }
+          a.storm = null; a.stormT = rand(16, 24); }
+        return;
+      }
+      if (nearStone) return; // no storms while you stand on a calm stone
+      if ((a.stormT -= dt) <= 0) { const S = pick(STORMS); calm(); S.on(); a.storm = { ...S, left: 7 }; sfx('whoosh'); state.shake = .4; toast(S.t, S.s + ' (find a green calm stone!)'); }
+    };
+    const oldLeave = a.leave; a.leave = () => { if (oldLeave) oldLeave(); calm(); a.storm = null; };
+    const oldResp = a.onRespawn; a.onRespawn = () => { if (oldResp) oldResp(); calm(); a.storm = null; a.stormT = 12; };
+  }
   // renamed bosses
   // the prologue: the portal waits just outside the bedroom window
   homePortal.position.set(0, terrainH(0, 10.5), 10.5);
