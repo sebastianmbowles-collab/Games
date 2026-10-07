@@ -34,6 +34,24 @@ export const PAL = {
   pink: '#f6757a',
 }
 
+// a lighter colour for the top edge of each body colour, so sprites look rounder
+const HI = {
+  [PAL.green]: '#9de64e',
+  [PAL.orange]: PAL.amber,
+  [PAL.magenta]: PAL.pink,
+  [PAL.blue]: PAL.cyan,
+  [PAL.tan]: PAL.peach,
+  [PAL.yellow]: PAL.white,
+  [PAL.red]: PAL.pink,
+  [PAL.purple]: PAL.magenta,
+  [PAL.dkslate]: PAL.slate,
+  [PAL.steel]: PAL.silver,
+  [PAL.amber]: PAL.yellow,
+  [PAL.cyan]: PAL.white,
+  [PAL.pink]: PAL.peach,
+}
+const hi = (c) => (HI[c] ? { [c]: HI[c] } : {})
+
 const DINO_COLORS = {
   rex: { body: PAL.green, shade: PAL.dkgreen, belly: PAL.cream, extra: PAL.dkgreen },
   trike: { body: PAL.orange, shade: PAL.rust, belly: PAL.peach, extra: PAL.amber },
@@ -265,7 +283,7 @@ function buildDino(kind, o) {
       g.rect(22, 12, 2, 1, C.body)
       g.px(23, 13, C.body)
     }
-    g.shade({ [C.body]: C.shade })
+    g.shade({ [C.body]: C.shade }, hi(C.body))
     if (!open) {
       g.line(23, 6, 27, 6, PAL.ink)
       g.px(25, 7, PAL.white)
@@ -313,7 +331,7 @@ function buildDino(kind, o) {
     for (const x of [9, 11, 13]) g.px(x, 7, C.shade)
     g.px(18, 9, C.body)
     g.px(19, 10, C.body)
-    g.shade({ [C.body]: C.shade })
+    g.shade({ [C.body]: C.shade }, hi(C.body))
     for (const [x, y] of [
       [17, 1],
       [18, 1],
@@ -324,51 +342,78 @@ function buildDino(kind, o) {
     eye(g, 20, 3, { ...o, scared: o.scared || frame === 'lift' }, C.body)
     anchor = [13, 20]
   } else if (kind === 'bronto') {
-    g = new Grid(40, 32)
+    // a big gentle long-neck: round body, S-curved neck, small smiley head, long whip tail
+    g = new Grid(50, 38)
     legs(
       g,
       [
-        [9, 25, 4, 5, true],
-        [19, 25, 4, 5, true],
-        [12, 25, 4, 5, false],
-        [22, 25, 4, 5, false],
+        [12, 30, 4, 6, true],
+        [24, 30, 4, 6, true],
+        [16, 30, 4, 6, false],
+        [28, 30, 4, 6, false],
       ],
       frame,
       C.shade,
       C.body,
     )
+    // whip tail, thick at the hips and thin at the tip
     g.poly(
       [
-        [9, 19],
-        [0, 25],
-        [1, 26],
-        [10, 25],
+        [12, 22],
+        [5, 27],
+        [0, 31],
+        [1, 32],
+        [7, 30],
+        [13, 28],
       ],
       C.body,
     )
-    g.ellipse(16, 21, 10, 6.5, C.body)
-    g.poly(
-      [
-        [21, 19],
-        [27, 5],
-        [31, 6],
-        [26, 21],
-      ],
-      C.body,
-    )
-    g.ellipse(31, 4.5, 4.5, 2.6, C.body)
-    if (frame === 'lift') g.rect(33, 5, 2, 1, PAL.dkred)
-    g.ellipse(18, 24, 6, 2, C.belly)
+    // round body with a high back
+    g.ellipse(21, 26, 12, 7.5, C.body)
+    g.ellipse(19, 23, 8, 5, C.body, true)
+    // S-curved neck made of overlapping blobs
+    const lift = frame === 'lift' ? -1 : 0
+    for (const [x, y, r] of [
+      [30, 22, 4],
+      [33, 18, 3.6],
+      [35, 14, 3.3],
+      [36, 10, 3],
+      [38, 7 + lift, 2.8],
+    ])
+      g.ellipse(x, y, r, r * 0.95, C.body)
+    // head
+    g.ellipse(42, 5 + lift, 5, 3, C.body)
+    g.rect(43, 6 + lift, 4, 2, C.body)
+    // big friendly smile and a nostril
+    if (frame === 'lift' || frame === 'roar') g.rect(43, 8 + lift, 3, 1, PAL.dkred)
+    else {
+      g.px(44, 7 + lift, C.shade)
+      g.px(45, 7 + lift, C.shade)
+      g.px(46, 6 + lift, C.shade)
+    }
+    g.px(46, 4 + lift, C.shade)
+    // creamy belly and throat
+    g.ellipse(22, 30, 8, 2.5, C.belly)
     for (const [x, y] of [
-      [12, 17],
-      [16, 16],
-      [20, 17],
-      [14, 19],
+      [31, 24],
+      [33, 20],
+      [35, 16],
+    ])
+      g.px(x, y, C.belly)
+    // spots along the back
+    for (const [x, y] of [
+      [14, 21],
+      [18, 19],
+      [23, 19],
+      [27, 21],
+      [16, 24],
+      [21, 22],
+      [25, 24],
     ])
       g.px(x, y, C.shade)
-    g.shade({ [C.body]: C.shade })
-    eye(g, 31, 3, { ...o, scared: o.scared || frame === 'lift' }, C.body)
-    anchor = [16, 31]
+    g.shade({ [C.body]: C.shade }, hi(C.body))
+    eye(g, 41, 3 + lift, { ...o, scared: o.scared || frame === 'lift' }, C.body)
+    anchor = [21, 37]
   } else {
     // trike and stego share a four-legged body
     g = new Grid(34, 24)
@@ -439,7 +484,7 @@ function buildDino(kind, o) {
       [12, 12],
     ])
       g.px(x, y, C.shade)
-    g.shade({ [C.body]: C.shade })
+    g.shade({ [C.body]: C.shade }, hi(C.body))
     eye(g, kind === 'trike' ? 27 : 27, kind === 'trike' ? 11 : 14, { ...o, scared: o.scared || frame === 'lift' }, C.body)
     anchor = [15, 23]
   }
@@ -491,7 +536,7 @@ function buildBaby(kind, o) {
   }
   if (kind === 'trike') g.px(15, hy - 3, PAL.cream)
   g.ellipse(7, 11, 2.5, 1, C.belly)
-  g.shade({ [C.body]: C.shade })
+  g.shade({ [C.body]: C.shade }, hi(C.body))
   if (o.frame === 'lift') g.px(15, hy + 1, PAL.dkred)
   eye(g, 13, Math.round(hy) - 2, { ...o, scared: o.scared || o.frame === 'lift' }, C.body)
   g.outline()
@@ -562,7 +607,7 @@ function buildAlien(o) {
   g.rect(6, 17, 2, 1, PAL.dkslate)
   g.rect(9, 17, 2, 1, PAL.dkslate)
   g.ellipse(8.5, 7.5, 5.8, 5, skin)
-  g.shade({ [skin]: dark })
+  g.shade({ [skin]: dark }, hi(skin))
   g.px(5, 0, PAL.yellow)
   g.px(11, 0, PAL.yellow)
   if (o.mood === 'dizzy') {
