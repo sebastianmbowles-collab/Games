@@ -21,7 +21,7 @@ const ROWS = [
   { id: 'eggs', label: () => 'FIND ALL EASTER EGGS' },
   { id: 'noeggs', label: () => 'HIDE ALL EASTER EGGS AGAIN' },
   { id: 'afk', label: () => 'SHOW THE AFK WARNING' },
-  { id: 'back', label: () => '◀  BACK' },
+  { id: 'back', label: () => '◀  BACK TO THE GAME' },
 ]
 const row = (i) => ({ x: W / 2 - 250, y: 104 + i * 44, w: 500, h: 38, size: 15 })
 
@@ -29,6 +29,7 @@ export function openTest(game) {
   game.test = game.test || { god: false, auto: false }
   game.testSel = 0
   game.goScene('test')
+  game.toast = { text: 'HI ADMIN! TEST MODE IS ON', t: 2.5 }
 }
 
 function press(game, id) {

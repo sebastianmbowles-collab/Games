@@ -53,7 +53,7 @@ export { W, H }
 
 
 const WAVES = 5
-const TEST_BTN = { x: 14, y: 56, w: 182, h: 38, size: 16 } // only for the ADMIN player
+const TEST_BTN = { x: 14, y: 488, w: 210, h: 40, size: 16 } // only for the ADMIN player
 // After this long without playing, the game asks if you're still there.
 const AFK_SECONDS = 120
 const POWER_NAMES = { mega: 'MEGA ROAR', shield: 'SHIELD', speed: 'SPEED BOOST' }

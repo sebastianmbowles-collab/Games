@@ -3,7 +3,7 @@
 import { W, H, INK, rrect, text, AVATARS, drawAvatar, drawUFO, drawDino } from './art'
 import { COLOURS, HATS, TITLES, UFO_PAINTS, REX_PAINTS, choice, colourOf, titleOf } from './custom'
 import { sfx } from './sound'
-import { isAdmin } from './testmode'
+import { isAdmin, openTest } from './testmode'
 import { inside, drawButton, drawTitleWorld, updateTitleWorld, drawWallet } from './menus'
 import { itemLevel, evoName } from './shop'
 import { checkName, safeName, yearLabel, YEAR_LEVELS, MAX_NAME } from './names'
@@ -93,7 +93,7 @@ function typeName(game, ch) {
       pf.passHash = null
       if (old) {
         game.logIn(old)
-        pf.next()
+        openTest(game)
       } else pf.step = 'year'
     } else if (old) {
       // played before: type your password (players from before passwords make one now)
@@ -187,7 +187,9 @@ function pickYear(game, year) {
     game.persist()
   } else game.newPlayer({ name: pf.name, year }, pf.passHash)
   sfx.capture()
-  pf.next()
+  // logging in as Admin goes straight into Test mode
+  if (pf.mode !== 'year' && isAdmin(game.profile)) openTest(game)
+  else pf.next()
 }
 
 // ---------- 2 players ----------
