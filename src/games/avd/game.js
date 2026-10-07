@@ -36,7 +36,7 @@ import { PX, retroColors, flushText } from './pixel'
 // Snap a position to the chunky pixel grid.
 const snap = (v) => Math.round(v / PX) * PX
 import { makeMath, makeSpell, quizKey, quizClick, drawQuiz } from './quiz'
-import { itemLevel } from './shop'
+import { itemLevel, normalizeShop, CURRENCIES, evoName } from './shop'
 import { loadSave, currentAccount, storeAccount, logOut } from './save'
 import { tagLine } from './names'
 import { startBoss, updateBoss, bossRoar, bossBolt, drawBoss, drawBossHUD } from './boss'
@@ -44,6 +44,7 @@ import { buildLevel, updateLevel, rexInLevel, ufoInLevel, landMeteors, poolAt, d
 import { choice, UFO_PAINTS, REX_PAINTS } from './custom'
 import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
+import { drawWallet } from './menus'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
 
 export { W, H }
@@ -477,7 +478,7 @@ export class AliensVsDinos {
   useAccount(acc) {
     this.profile = acc?.profile || null
     this.pass = acc?.pass || null
-    this.shop = acc?.shop || { coins: 0, owned: {} }
+    this.shop = normalizeShop(acc?.shop)
     this.best = acc?.best || { aliens: 0, dinos: 0 }
     this.settings = { ...DEFAULT_SETTINGS, ...(acc?.settings || this.settings || {}) }
     this.applySettings()
@@ -540,11 +541,23 @@ export class AliensVsDinos {
   }
 
   // Coins go straight into the shop savings, so they're never lost.
+  // Xenobits, the main currency
   earn(n, x, y) {
-    this.shop.coins += n
-    this.coinsRun += n
+    this.gain('xeno', n, x, y)
+  }
+
+  // kind: 'xeno', 'cells' (Plasma Cells), 'shards' (Fossil Shards) or 'dna'
+  gain(kind, n, x, y) {
+    this.shop[kind] = (this.shop[kind] || 0) + n
+    this.run = this.run || {}
+    this.run[kind] = (this.run[kind] || 0) + n
     this.persist()
-    if (x !== undefined) this.fx.text(x, y, `+${n} $`, '#fee761', 18)
+    if (x !== undefined) this.fx.text(x, y, `+${n} ${CURRENCIES[kind].icon}`, CURRENCIES[kind].color, 18)
+  }
+
+  // how evolved your UFO or T. rex is: 0, 1 or 2
+  get evo() {
+    return this.lvl('evo')
   }
 
   // ---------- math and spelling quizzes ----------
@@ -554,10 +567,13 @@ export class AliensVsDinos {
     return this.profile?.year || 3
   }
 
-  openQuiz(hint) {
+  // The UFO always gets math; the T. rex always gets dinosaur words.
+  // bonus: the Level Quiz at the start of every wave and the boss fight.
+  openQuiz(hint, bonus = false) {
     if (this.quiz || this.ending) return
     this.quiz = this.side === 'aliens' ? makeMath(this.quizLevel()) : makeSpell(this.quizLevel(), this.lastWord)
     this.quiz.hint = hint
+    this.quiz.bonus = bonus
     sfx.warn()
   }
 
@@ -585,7 +601,14 @@ export class AliensVsDinos {
       else vs.sc++
       if (q.word) this.lastWord = q.word
       this.earn(2)
+      this.gain(this.side === 'aliens' ? 'cells' : 'shards', 1)
       return
+    }
+    if (q.bonus) {
+      const me = this.side === 'aliens' ? this.ufo : this.rex
+      this.earn(5)
+      this.gain(this.side === 'aliens' ? 'cells' : 'shards', 2, me.x, me.y - (this.side === 'aliens' ? 80 : 150))
+      this.fx.text(me.x, me.y - (this.side === 'aliens' ? 110 : 180), 'LEVEL BONUS!', '#fee761', 24)
     }
     if (this.side === 'aliens') {
       const p = this.ufo
@@ -596,7 +619,8 @@ export class AliensVsDinos {
       this.fx.text(p.x, p.y - 60, 'REFUELED! +5 LASERS', '#2ce8f5', 22)
       this.fx.burst(p.x, p.y, 16, { speed: 200, life: 0.6, size: 6, color: ['#2ce8f5', '#ffffff'], type: 'star' })
       this.score += 50
-      this.earn(3)
+      this.earn(2)
+      this.gain('cells', 2)
     } else {
       const r2 = this.rex
       const add = 3 + this.lvl('pouch')
@@ -610,7 +634,8 @@ export class AliensVsDinos {
       if (kind === 'shield') this.releaseRex()
       this.fx.burst(r2.x, r2.y - 80, 16, { speed: 200, life: 0.6, size: 6, color: ['#feae34', '#ffffff'], type: 'star' })
       this.score += 20 * q.word.length
-      this.earn(2 + Math.ceil(q.word.length / 2))
+      this.earn(2)
+      this.gain('shards', 1 + Math.ceil(q.word.length / 3))
     }
   }
 
@@ -712,13 +737,13 @@ export class AliensVsDinos {
   }
 
   startVersus(role, mySide, session, them) {
-    const me = { name: this.profile.name, year: this.profile.year, ufo: this.profile.ufo, rex: this.profile.rex }
+    const me = { name: this.profile.name, year: this.profile.year, ufo: this.profile.ufo, rex: this.profile.rex, evo: itemLevel(this.shop, mySide, 'evo') }
     const other = them || session.theirs() || {}
     const otherSide = mySide === 'aliens' ? 'dinos' : 'aliens'
-    this.vs = { role, mySide, session, round: role === 'host' ? 1 : 0, names: { [mySide]: me, [otherSide]: { name: other.name, year: other.year, ufo: choice(UFO_PAINTS, other.ufo), rex: choice(REX_PAINTS, other.rex) } }, cnt: { f: 0, j: 0, ac: 0 }, mc: 0, sc: 0, lostT: 0, evId: 0 }
+    this.vs = { role, mySide, session, round: role === 'host' ? 1 : 0, names: { [mySide]: me, [otherSide]: { name: other.name, year: other.year, ufo: choice(UFO_PAINTS, other.ufo), rex: choice(REX_PAINTS, other.rex), evo: [0, 1, 2].includes(other.evo) ? other.evo : 0 } }, cnt: { f: 0, j: 0, ac: 0 }, mc: 0, sc: 0, lostT: 0, evId: 0 }
     this.side = mySide
     this.ending = null
-    this.coinsRun = 0
+    this.run = {}
     newRound(this)
     this.scene = 'vs'
     this.fx.list = []
@@ -813,7 +838,7 @@ export class AliensVsDinos {
     this.ending = null
     this.quiz = null
     this.boss = null
-    this.coinsRun = 0
+    this.run = {}
     if (this.side === 'aliens') this.setupAliens()
     else this.setupDinos()
     this.level = buildLevel(this.side, 1, this.playerX())
@@ -823,6 +848,11 @@ export class AliensVsDinos {
     this.userSong = false
     playSong(this.side === 'aliens' ? 'ufo' : 'stomp')
     sfx.wave()
+    this.levelQuiz()
+  }
+
+  levelQuiz() {
+    this.openQuiz(this.side === 'aliens' ? 'LEVEL QUIZ! SOLVE IT FOR BONUS ⚡ AND ◆' : 'LEVEL QUIZ! SPELL IT FOR BONUS 🦴 AND ◆', true)
   }
 
   playerX() {
@@ -1014,7 +1044,7 @@ export class AliensVsDinos {
   // ---------- ALIENS mode: you fly the UFO ----------
 
   setupAliens() {
-    this.ufo = { x: 600, y: 170, vx: 0, vy: 0, hp: this.diff.hp + this.lvl('shield'), maxHp: this.diff.hp + this.lvl('shield'), fuel: 1, ammo: 6, energy: 1, overheat: false, beaming: false, tilt: 0, inv: 0, laserCd: 0, face: 1, hurt: 0 }
+    this.ufo = { x: 600, y: 170, vx: 0, vy: 0, hp: this.diff.hp + this.lvl('shield') + this.lvl('evo'), maxHp: this.diff.hp + this.lvl('shield') + this.lvl('evo'), fuel: 1, ammo: 6, energy: 1, overheat: false, beaming: false, tilt: 0, inv: 0, laserCd: 0, face: 1, hurt: 0 }
     this.dinos = []
     for (let i = 0; i < 7; i++) this.dinos.push(new Dino(rand(200, WORLD - 200), pick(KIND_LIST)))
     this.enemies = [new Saucer(WORLD - 200, -80)]
@@ -1025,7 +1055,7 @@ export class AliensVsDinos {
   }
 
   beamWidth() {
-    return 70 * (1 + 0.25 * this.lvl('beam'))
+    return 70 * (1 + 0.25 * this.lvl('beam') + 0.15 * this.lvl('evo'))
   }
 
   updateAliens(dt) {
@@ -1103,7 +1133,7 @@ export class AliensVsDinos {
     } else if (alive && engine && this.pressed.has('fire') && p.laserCd <= 0) {
       p.ammo--
       p.laserCd = 0.28
-      const ys = this.lvl('laser') ? [-6, 14] : [4]
+      const ys = this.lvl('laser') || this.lvl('evo') >= 2 ? [-6, 14] : [4]
       for (const dy of ys) this.bolts.push({ x: p.x + p.face * 50, y: p.y + dy, vx: p.face * 950 + p.vx * 0.3, life: 0.9 })
       fx.burst(p.x + p.face * 50, p.y + 4, 5, { speed: 120, life: 0.25, size: 4, color: '#9fffd0', type: 'spark' })
       sfx.laser()
@@ -1342,7 +1372,8 @@ export class AliensVsDinos {
       fx.boom(e.x, e.y)
       fx.text(e.x, e.y - 40, '+250', '#ffe14a', 28)
       this.score += 250
-      this.earn(5, e.x, e.y - 70)
+      this.earn(3, e.x, e.y - 70)
+      this.gain('cells', 1)
       this.shake = 18
       this.slowmo = 0.25
       sfx.boom()
@@ -1353,9 +1384,11 @@ export class AliensVsDinos {
   nextWave() {
     this.wave++
     this.earn(10)
+    this.gain('cells', 3)
     this.captured = 0
     this.goal = 4 + this.wave * 2
     this.level = buildLevel('aliens', this.wave, this.ufo.x)
+    this.levelQuiz()
     this.banner = { text: `WAVE ${this.wave}`, sub: this.level.event ? `${EVENT_NAMES[this.level.event]} Beam up ${this.goal} dinos!` : `Beam up ${this.goal} dinos! More rivals!`, t: 0 }
     this.ufo.hp = Math.min(this.ufo.maxHp, this.ufo.hp + 1)
     this.enemyRespawn.push({ t: 2 })
@@ -1365,7 +1398,7 @@ export class AliensVsDinos {
   // ---------- DINOS mode: you are the T. rex ----------
 
   setupDinos() {
-    this.rex = { x: 700, y: GROUND, vx: 0, vy: 0, face: 1, walk: 0, onGround: true, lives: this.diff.lives + this.lvl('life'), maxLives: this.diff.lives + this.lvl('life'), roars: 3, roarCd: 0, roarT: 0, liftedBy: null, inv: 0, squash: 0 }
+    this.rex = { x: 700, y: GROUND, vx: 0, vy: 0, face: 1, walk: 0, onGround: true, lives: this.diff.lives + this.lvl('life') + this.lvl('evo'), maxLives: this.diff.lives + this.lvl('life') + this.lvl('evo'), roars: 3, roarCd: 0, roarT: 0, liftedBy: null, inv: 0, squash: 0 }
     this.babies = ['trike', 'stego', 'raptor', 'bronto'].map((kind, i) => {
       const b = new Dino(560 + i * 90, kind, 0.55)
       b.offset = [-170, -90, 90, 170][i]
@@ -1503,7 +1536,9 @@ export class AliensVsDinos {
           this.ufoSpawn = 3
           this.score += 500
           this.earn(10)
+          this.gain('shards', 3)
           this.level = buildLevel('dinos', this.wave, this.rex.x)
+          this.levelQuiz()
           this.banner = { text: `WAVE ${this.wave}`, sub: this.level.event ? `+500! ${EVENT_NAMES[this.level.event]}` : `You survived! +500. Now ${this.ufoQuota} UFOs at once!`, t: 0 }
           sfx.wave()
         }
@@ -1740,7 +1775,7 @@ export class AliensVsDinos {
     r.roarT = 0.6
     if (!this.hasPower('mega')) r.roars--
     if (r.roars <= 0 && !this.hasPower('mega')) this.openQuiz('OUT OF ROARS! SPELL IT TO ROAR!')
-    const reach = 340 * (1 + 0.25 * this.lvl('roar')) * (this.hasPower('mega') ? 1.6 : 1)
+    const reach = 340 * (1 + 0.25 * this.lvl('roar') + 0.2 * this.lvl('evo')) * (this.hasPower('mega') ? 1.6 : 1)
     const hx = r.x + r.face * 36
     const hy = r.y - 70
     for (let i = 0; i < 3; i++) fx.add({ x: hx, y: hy, size: reach, color: i ? 'rgba(255,240,180,0.8)' : '#fff', type: 'ring', life: 0.5 + i * 0.12, width: 10 - i * 3 })
@@ -1766,7 +1801,8 @@ export class AliensVsDinos {
         u.vy = -200
         fx.text(u.x, u.y - 50, 'CRASH! +300', '#ffe14a', 26)
         this.score += 300
-        this.earn(5)
+        this.earn(3)
+        this.gain('shards', 1)
       } else {
         u.state = 'stunned'
         u.stun = 1.6
@@ -1913,7 +1949,7 @@ export class AliensVsDinos {
     drawBossHUD(ctx, this)
     this.drawEdgeArrows(ctx)
     if (this.banner && !this.quiz) this.drawBanner(ctx, this.banner)
-    text(ctx, `$ ${this.shop.coins}`, W - 30, 106, 16, '#fee761', 'right')
+    drawWallet(ctx, this.shop, W - 20, 106, 11, 'right')
     if (this.quiz) {
       drawQuiz(ctx, this.quiz, this.time, this.quiz.hint)
       if (this.quiz.doneT) text(ctx, 'CORRECT!', W / 2, 286, 40, '#63c74d')
@@ -1935,7 +1971,7 @@ export class AliensVsDinos {
     if (!(p.inv > 0 && Math.floor(t * 14) % 2 === 0)) {
       ctx.save()
       ctx.translate(p.x, p.y + Math.sin(t * 3) * 3)
-      drawUFO(ctx, { time: t, gold: this.lvl('gold') > 0, tint: this.profile?.ufo, tilt: p.tilt, beam: p.beaming, hurt: p.hurt > 0, mood: this.ending && !this.ending.won ? 'dizzy' : 'happy' })
+      drawUFO(ctx, { time: t, gold: this.lvl('gold') > 0, tint: this.profile?.ufo, evo: this.lvl('evo'), tilt: p.tilt, beam: p.beaming, hurt: p.hurt > 0, mood: this.ending && !this.ending.won ? 'dizzy' : 'happy' })
       ctx.restore()
     }
     for (const b of this.bolts) {
@@ -2007,6 +2043,7 @@ export class AliensVsDinos {
         blink: t % 3.7 < 0.12,
         gold: this.lvl('gold') > 0,
         skin: this.profile?.rex,
+        evo: this.lvl('evo'),
       })
       ctx.restore()
     }
@@ -2124,10 +2161,11 @@ export class AliensVsDinos {
     ctx.scale(bounce, bounce)
     text(ctx, won ? 'YOU WIN!' : 'GAME OVER', 0, 0, 72, won ? '#ffe14a' : '#ff8fa0')
     ctx.restore()
-    text(ctx, this.tag(), W / 2, 200, 20, '#c9c2ff')
+    text(ctx, `${this.tag()} · ${evoName(this.side, this.lvl('evo'))}`, W / 2, 200, 18, '#c9c2ff')
     text(ctx, `Score: ${this.score}`, W / 2, 270, 44, '#fff')
     text(ctx, this.newBest ? '★ New best score! ★' : `Best: ${this.best[this.side] || 0}`, W / 2, 316, 22, this.newBest ? '#ffe14a' : '#c9c2ff')
-    text(ctx, `Coins earned: $${this.coinsRun}   ·   You have $${this.shop.coins}`, W / 2, 358, 18, '#fee761')
+    const got = ['xeno', 'cells', 'shards', 'dna'].filter((k) => this.run?.[k]).map((k) => `${CURRENCIES[k].icon} +${this.run[k]}`)
+    text(ctx, got.length ? `YOU EARNED  ${got.join('   ')}` : 'Play again to earn Xenobits!', W / 2, 352, 18, '#fee761')
     for (const [i, b] of this.overButtons().entries()) {
       const hover = this.mouse.x > b.x && this.mouse.x < b.x + b.w && this.mouse.y > b.y && this.mouse.y < b.y + b.h
       rrect(ctx, b.x, b.y + (hover ? -3 : 0), b.w, b.h, 28)

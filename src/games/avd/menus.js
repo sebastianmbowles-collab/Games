@@ -3,7 +3,7 @@
 import { W, H, TAU, INK, drawAvatar, circle, rrect, text, drawDino, drawUFO, drawAlien, drawBeam, drawSky, drawBackdrop, mixTheme, getTheme } from './art'
 import { sfx } from './sound'
 import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels, playlistSteps, nextSongId } from './music'
-import { SHOP_ITEMS, itemLevel, buy } from './shop'
+import { SHOP_ITEMS, SHOP_TABS, CURRENCIES, CURRENCY_ORDER, itemLevel, buy, costText, shortOf } from './shop'
 import { yearLabel } from './names'
 import { colourOf, titleOf } from './custom'
 
@@ -632,36 +632,53 @@ function drawJukebox(game, ctx) {
 
 // ---------- shop ----------
 
-const SHOP_TABS = [
-  { side: 'aliens', label: 'ALIENS', color: '#7dffb0', x: 250, y: 96, w: 220, h: 40 },
-  { side: 'dinos', label: 'DINOS', color: '#ffa94d', x: 490, y: 96, w: 220, h: 40 },
+const TAB_BTNS = [
+  { side: 'aliens', label: 'ALIENS', color: '#7dffb0', x: 160, y: 96, w: 200, h: 40 },
+  { side: 'dinos', label: 'DINOS', color: '#ffa94d', x: 380, y: 96, w: 200, h: 40 },
+  { side: 'evolve', label: '🧬 EVOLVE', color: '#f6757a', x: 600, y: 96, w: 200, h: 40 },
 ]
 const SHOP_BACK = { label: '◀  BACK', color: '#ffe14a', x: 40, y: 476, w: 180, h: 46, size: 20 }
 
 function shopRow(i) {
-  return { x: 110, y: 150 + i * 62, w: 740, h: 54 }
+  return { x: 110, y: 150 + i * 70, w: 740, h: 62 }
 }
 function buyRect(i) {
   const r = shopRow(i)
-  return { x: r.x + r.w - 160, y: r.y + 8, w: 146, h: r.h - 16 }
+  return { x: r.x + r.w - 196, y: r.y + 9, w: 182, h: r.h - 18 }
+}
+
+// A line showing how much of each currency you have.
+export function drawWallet(ctx, shop, x, y, size = 16, align = 'center') {
+  const parts = CURRENCY_ORDER.map((k) => ({ k, s: `${CURRENCIES[k].icon} ${shop[k] || 0}` }))
+  const gap = size * 1.4
+  const widths = parts.map((p) => [...p.s].length * size * 0.6)
+  const total = widths.reduce((a, b) => a + b, 0) + gap * (parts.length - 1)
+  let px = align === 'right' ? x - total : align === 'left' ? x : x - total / 2
+  parts.forEach((p, i) => {
+    text(ctx, p.s, px, y, size, CURRENCIES[p.k].color, 'left')
+    px += widths[i] + gap
+  })
 }
 
 function shopBuy(game, i) {
   const s = game.title
-  const side = s.shopTab || 'aliens'
-  const item = SHOP_ITEMS[side][i]
-  const lvl = itemLevel(game.shop, side, item.key)
-  if (lvl >= item.prices.length) {
+  const item = SHOP_ITEMS[s.shopTab || 'aliens'][i]
+  const lvl = itemLevel(game.shop, item.side, item.key)
+  const cost = item.costs[lvl]
+  if (!cost) {
     s.shopMsg = { text: 'ALREADY MAXED OUT!', t: 1.5 }
     sfx.click()
-  } else if (buy(game.shop, side, item)) {
+  } else if (buy(game.shop, item)) {
     game.persist()
-    s.shopMsg = { text: `YOU BOUGHT ${item.name.toUpperCase()}!`, t: 1.8 }
+    const what = item.stages ? `YOUR ${item.side === 'aliens' ? 'UFO' : 'T. REX'} EVOLVED INTO ${item.stages[lvl]}!` : `YOU BOUGHT ${item.name.toUpperCase()}!`
+    s.shopMsg = { text: what, t: 2.2 }
     sfx.capture()
+    if (item.stages) sfx.win()
     const r = buyRect(i)
-    game.fx.burst(r.x + r.w / 2, r.y + r.h / 2, 20, { speed: 220, life: 0.7, size: 7, color: ['#fee761', '#7dffb0', '#ffffff'], type: 'star' })
+    game.fx.burst(r.x + r.w / 2, r.y + r.h / 2, 24, { speed: 220, life: 0.7, size: 7, color: ['#fee761', '#7dffb0', '#f6757a', '#ffffff'], type: 'star' })
   } else {
-    s.shopMsg = { text: `YOU NEED ${item.prices[lvl] - game.shop.coins} MORE COINS`, t: 1.8 }
+    const short = shortOf(game.shop, cost)
+    s.shopMsg = { text: `YOU NEED ${short.need} MORE ${CURRENCIES[short.kind].name}`, t: 2 }
     sfx.warn()
   }
 }
@@ -671,24 +688,27 @@ function updateShop(game, dt) {
   const s = game.title
   const k = game.pressed
   s.shopSel = s.shopSel ?? 0
+  s.shopTab = s.shopTab || 'aliens'
   if (s.shopMsg) {
     s.shopMsg.t -= dt
     if (s.shopMsg.t <= 0) s.shopMsg = null
   }
-  if (k.has('left') || k.has('right')) {
-    s.shopTab = (s.shopTab || 'aliens') === 'aliens' ? 'dinos' : 'aliens'
-    sfx.click()
-  }
-  if (k.has('up')) s.shopSel = (s.shopSel + 5) % 6
-  if (k.has('down')) s.shopSel = (s.shopSel + 1) % 6
+  const ti = SHOP_TABS.indexOf(s.shopTab)
+  if (k.has('left')) s.shopTab = SHOP_TABS[(ti + SHOP_TABS.length - 1) % SHOP_TABS.length]
+  if (k.has('right')) s.shopTab = SHOP_TABS[(ti + 1) % SHOP_TABS.length]
+  if (k.has('left') || k.has('right')) sfx.click()
+  const n = SHOP_ITEMS[s.shopTab].length
+  if (k.has('up')) s.shopSel = (s.shopSel + n) % (n + 1)
+  if (k.has('down')) s.shopSel = (s.shopSel + 1) % (n + 1)
   if (k.has('up') || k.has('down')) sfx.click()
+  if (s.shopSel > n) s.shopSel = n
   if (game.mouseMoved) {
-    const hover = [0, 1, 2, 3, 4].findIndex((i) => inside(game.mouse, shopRow(i)))
+    const hover = SHOP_ITEMS[s.shopTab].findIndex((_, i) => inside(game.mouse, shopRow(i)))
     if (hover >= 0) s.shopSel = hover
-    if (inside(game.mouse, SHOP_BACK)) s.shopSel = 5
+    if (inside(game.mouse, SHOP_BACK)) s.shopSel = n
   }
   if (k.has('enter') || k.has('action')) {
-    if (s.shopSel === 5) game.goBack()
+    if (s.shopSel === n) game.goBack()
     else shopBuy(game, s.shopSel)
   }
   if (k.has('pause')) game.goBack()
@@ -696,13 +716,14 @@ function updateShop(game, dt) {
 
 function clickShop(game, p) {
   const s = game.title
-  for (const tab of SHOP_TABS) {
+  for (const tab of TAB_BTNS) {
     if (inside(p, tab)) {
       s.shopTab = tab.side
+      s.shopSel = 0
       sfx.click()
     }
   }
-  const i = [0, 1, 2, 3, 4].findIndex((k) => inside(p, shopRow(k)))
+  const i = SHOP_ITEMS[s.shopTab || 'aliens'].findIndex((_, k) => inside(p, shopRow(k)))
   if (i >= 0) {
     s.shopSel = i
     shopBuy(game, i)
@@ -716,55 +737,56 @@ function clickShop(game, p) {
 function drawShop(game, ctx) {
   const t = game.time
   const s = game.title
-  const side = s.shopTab || 'aliens'
+  const tab = s.shopTab || 'aliens'
   drawTitleWorld(game, ctx)
   ctx.fillStyle = 'rgba(15,10,40,0.7)'
   ctx.fillRect(0, 0, W, H)
-  text(ctx, '$ SHOP', W / 2, 70, 40, '#7dffb0')
-  text(ctx, `$ ${game.shop.coins} COINS`, W - 30, 52, 20, '#fee761', 'right')
-  for (const tab of SHOP_TABS) {
-    const on = tab.side === side
-    rrect(ctx, tab.x, tab.y, tab.w, tab.h, 12)
-    ctx.fillStyle = on ? tab.color : 'rgba(255,255,255,0.12)'
+  text(ctx, '$ SHOP', W / 2, 52, 34, '#7dffb0')
+  drawWallet(ctx, game.shop, W / 2, 82, 16)
+  for (const tb of TAB_BTNS) {
+    const on = tb.side === tab
+    rrect(ctx, tb.x, tb.y, tb.w, tb.h, 12)
+    ctx.fillStyle = on ? tb.color : 'rgba(255,255,255,0.12)'
     ctx.fill()
     ctx.lineWidth = 3
     ctx.strokeStyle = INK
     ctx.stroke()
-    text(ctx, tab.label, tab.x + tab.w / 2, tab.y + 28, 20, on ? INK : '#c0cbdc', 'center', !on)
+    text(ctx, tb.label, tb.x + tb.w / 2, tb.y + 28, 18, on ? INK : '#c0cbdc', 'center', !on)
   }
-  for (const [i, item] of SHOP_ITEMS[side].entries()) {
+  const items = SHOP_ITEMS[tab]
+  for (const [i, item] of items.entries()) {
     const r = shopRow(i)
     const sel = s.shopSel === i
-    const lvl = itemLevel(game.shop, side, item.key)
-    const maxed = lvl >= item.prices.length
-    const price = item.prices[lvl]
+    const lvl = itemLevel(game.shop, item.side, item.key)
+    const cost = item.costs[lvl]
     rrect(ctx, r.x, r.y, r.w, r.h, 14)
     ctx.fillStyle = sel ? 'rgba(125,255,176,0.22)' : 'rgba(15,10,40,0.85)'
     ctx.fill()
     ctx.lineWidth = sel ? 4 : 2
     ctx.strokeStyle = sel ? '#7dffb0' : 'rgba(255,255,255,0.25)'
     ctx.stroke()
-    text(ctx, item.name, r.x + 20, r.y + 26, 20, '#ffffff', 'left')
-    text(ctx, item.desc, r.x + 20, r.y + 45, 13, '#c0cbdc', 'left')
-    // one pip per level you can buy
-    for (let k = 0; k < item.prices.length; k++) {
-      rrect(ctx, r.x + 400 + k * 24, r.y + 19, 16, 16, 4)
+    text(ctx, item.name, r.x + 20, r.y + 28, 20, '#ffffff', 'left')
+    const desc = item.stages ? (lvl ? `NOW: ${item.stages[lvl - 1]}` : item.desc) + (cost ? `  ·  NEXT: ${item.stages[lvl]}` : '') : item.desc
+    text(ctx, desc, r.x + 20, r.y + 50, 13, item.stages ? '#f6757a' : '#c0cbdc', 'left')
+    for (let k = 0; k < item.costs.length; k++) {
+      rrect(ctx, r.x + 420 + k * 24, r.y + 23, 16, 16, 4)
       ctx.fillStyle = k < lvl ? '#fee761' : 'rgba(255,255,255,0.18)'
       ctx.fill()
     }
     const b = buyRect(i)
-    const afford = !maxed && game.shop.coins >= price
+    const afford = cost && !shortOf(game.shop, cost)
     rrect(ctx, b.x, b.y, b.w, b.h, 10)
-    ctx.fillStyle = maxed ? '#3a4466' : afford ? '#fee761' : '#5a6988'
+    ctx.fillStyle = !cost ? '#3a4466' : afford ? '#fee761' : '#5a6988'
     ctx.fill()
     ctx.lineWidth = 3
     ctx.strokeStyle = INK
     ctx.stroke()
-    text(ctx, maxed ? 'MAXED' : `BUY $${price}`, b.x + b.w / 2, b.y + 27, 18, maxed ? '#c0cbdc' : INK, 'center', false)
+    text(ctx, !cost ? (item.stages ? 'FULLY EVOLVED' : 'MAXED') : `${item.stages ? 'EVOLVE' : 'BUY'} ${costText(cost)}`, b.x + b.w / 2, b.y + 28, 15, !cost ? '#c0cbdc' : INK, 'center', false)
   }
-  drawButton(ctx, SHOP_BACK, s.shopSel === 5, t)
-  if (s.shopMsg) text(ctx, s.shopMsg.text, W / 2 + 90, 505, 18, '#fee761')
-  else text(ctx, 'Earn coins by playing, solving math and spelling words!', W / 2 + 90, 505, 14, '#c0cbdc')
+  drawButton(ctx, SHOP_BACK, s.shopSel === items.length, t)
+  const hint = tab === 'evolve' ? 'DNA is rare! Beat the volcano boss and find hidden DNA strands.' : tab === 'aliens' ? 'Earn Plasma Cells by solving math as the UFO!' : 'Earn Fossil Shards by spelling dino words as the T. rex!'
+  if (s.shopMsg) text(ctx, s.shopMsg.text, W / 2 + 90, 505, 16, '#fee761')
+  else text(ctx, hint, W / 2 + 90, 505, 13, '#c0cbdc')
   game.fx.draw(ctx)
 }
 

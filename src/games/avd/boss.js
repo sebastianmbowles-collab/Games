@@ -48,6 +48,7 @@ export function startBoss(game) {
   L.rocks = []
   L.mines = []
   L.gates = []
+  L.dna = null
   L.meteors = []
   L.gems = []
   L.pads = L.pads.filter((p) => Math.abs(p.x - VX) > 300 && Math.abs(p.x - VX) < ARENA)
@@ -76,6 +77,7 @@ export function startBoss(game) {
   sfx.roar(true)
   game.userSong = false
   playSong('boogie')
+  game.levelQuiz()
 }
 
 const phase = (b) => (b.hp > MAX_HP * 0.66 ? 1 : b.hp > MAX_HP * 0.33 ? 2 : 3)
@@ -111,6 +113,7 @@ function damage(game, amount, who, x, y) {
     game.fx.text(VX, GROUND - 380, 'THE VOLCANO IS BEATEN!', '#fee761', 34)
     game.score += 2000
     game.earn(25)
+    game.gain('dna', 3, VX, GROUND - 420)
     sfx.boom()
   }
 }

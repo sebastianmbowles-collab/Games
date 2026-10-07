@@ -413,6 +413,7 @@ export function playEvent(game, ev) {
       if (vs.winner === vs.mySide) sfx.win()
       else sfx.lose()
       game.earn(vs.winner === vs.mySide ? 15 : 5)
+      if (vs.winner === vs.mySide) game.gain('dna', 1)
       break
   }
 }
@@ -436,6 +437,7 @@ export function drawVersus(game, ctx) {
       ctx.scale(r.face * 1.25, 1.25)
       drawDino(ctx, 'rex', {
         skin: vs.names.dinos.rex,
+        evo: vs.names.dinos.evo || 0,
         time: t,
         walk: r.walk,
         moving: r.onGround && Math.abs(r.vx) > 20,
@@ -459,7 +461,7 @@ export function drawVersus(game, ctx) {
     }
     ctx.save()
     ctx.translate(u.x, u.y + Math.sin(t * 3) * 3)
-    drawUFO(ctx, { time: t, tint: vs.names.aliens.ufo, hurt: u.hurt > 0, stun: u.stun > 0 && u.hp > 0, mood: 'happy' })
+    drawUFO(ctx, { time: t, tint: vs.names.aliens.ufo, evo: vs.names.aliens.evo || 0, hurt: u.hurt > 0, stun: u.stun > 0 && u.hp > 0, mood: 'happy' })
     ctx.restore()
     for (const b of vs.bolts) {
       ctx.fillStyle = '#2ce8f5'

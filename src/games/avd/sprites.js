@@ -225,6 +225,17 @@ function buildDino(kind, o) {
       ],
       C.body,
     )
+    if (o.evo >= 1)
+      for (const x of [8, 11.5, 15]) {
+        g.poly(
+          [
+            [x - 2, 9],
+            [x, 3.5],
+            [x + 2, 9],
+          ],
+          o.evo >= 2 ? PAL.red : PAL.amber,
+        )
+      }
     g.ellipse(14.5, 13, 7.5, 6, C.body)
     g.rect(18, 5, 5, 7, C.body)
     g.rect(18, 1, 11, 6, C.body)
@@ -261,6 +272,15 @@ function buildDino(kind, o) {
     }
     eye(g, 21, 2, { ...o, scared: o.scared || frame === 'lift' }, C.body)
     g.px(27, 2, PAL.ink)
+    if (o.evo >= 2) {
+      g.px(24, 0, PAL.cream)
+      g.px(25, 0, PAL.cream)
+      if (!o.blink && !o.scared && frame !== 'lift') {
+        g.px(21, 2, PAL.yellow)
+        g.px(22, 2, PAL.yellow)
+        g.px(21, 3, PAL.yellow)
+      }
+    }
     anchor = [15, 25]
   } else if (kind === 'raptor') {
     g = new Grid(30, 21)
@@ -509,13 +529,21 @@ function buildUFO(o) {
   }
   g.px(15, 4, PAL.silver)
   g.px(16, 3, PAL.silver)
+  if (o.evo >= 1) {
+    g.poly([[5, 12], [0, 18], [10, 14]], lo)
+    g.poly([[36, 12], [41, 18], [31, 14]], lo)
+  }
+  if (o.evo >= 2) {
+    g.px(20, 0, PAL.yellow)
+    g.px(20, 1, PAL.silver)
+  }
   g.ellipse(20.5, 11.5, 19, 3.6, metal)
   g.ellipse(20.5, 14.2, 8, 1.6, PAL.dkslate)
   g.shade({ [metal]: lo }, { [metal]: hi })
   const lights = [5, 10, 15, 20, 25, 30, 35]
   lights.forEach((x, i) => {
     const on = (i + o.light) % 3 === 0
-    g.px(x, 12, on ? (enemy ? PAL.yellow : PAL.cyan) : enemy ? PAL.dkred : PAL.dkslate)
+    g.px(x, 12, on ? (enemy || o.evo >= 2 ? PAL.yellow : PAL.cyan) : enemy ? PAL.dkred : PAL.dkslate)
   })
   if (o.hurt) g.recolor((v) => (v === PAL.ink ? v : PAL.white))
   g.outline()

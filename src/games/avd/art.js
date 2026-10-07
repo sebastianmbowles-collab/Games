@@ -87,6 +87,7 @@ export function drawDino(ctx, kind, o = {}) {
     angry: !!o.angry,
     gold: !!o.gold,
     skin: o.skin || '',
+    evo: o.evo || 0,
   })
   const t = o.time || 0
   const ox = o.flail ? Math.round(Math.sin(t * 18)) : 0
@@ -104,6 +105,7 @@ export function drawUFO(ctx, o = {}) {
     hurt: !!o.hurt,
     gold: !!o.gold,
     tint: o.tint || '',
+    evo: o.evo || 0,
   })
   const p = blit(ctx, s, 0, 0, { scale: o.scale || 1, ox: o.stun ? Math.round(Math.sin(t * 30)) : 0 })
   if (o.stun) {

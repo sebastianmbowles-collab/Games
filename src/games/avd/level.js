@@ -74,6 +74,9 @@ export function buildLevel(side, wave, startX) {
         if (!clear(px)) L.kills.push({ x: px, y: snap(r(GROUND - 260, GROUND - 150)), w: 36, h: 36, float: true, phase: r(0, TAU) })
       }
     }
+    // a rare DNA strand, up on the highest platform
+    const still = L.plats.filter((p) => !p.moving).sort((a, b) => a.y - b.y)
+    if (still.length) L.dna = { x: still[0].x + still[0].w / 2, y: still[0].y - 40 }
   } else {
     for (let i = 0; i < 6 + wave; i++) {
       const px = snap(r(150, WORLD - 150))
@@ -84,6 +87,10 @@ export function buildLevel(side, wave, startX) {
       if (!clear(px, 260)) L.mines.push({ x: px, y: r(90, 320), phase: r(0, TAU), dead: 0 })
     }
     for (let i = 0; i < 5; i++) L.orbs.push({ x: r(150, WORLD - 150), y: r(100, 320), phase: r(0, TAU), wait: 0 })
+    // a rare DNA strand, guarded by mines
+    const far = startX < WORLD / 2 ? r(WORLD - 600, WORLD - 150) : r(150, 600)
+    L.dna = { x: far, y: r(110, 200) }
+    L.mines.push({ x: far - 70, y: L.dna.y + 30, phase: 0, dead: 0 }, { x: far + 70, y: L.dna.y - 20, phase: 2, dead: 0 })
     if (has(L, 'gates')) {
       for (let i = 0; i < 4; i++) {
         const px = snap(r(250, WORLD - 250))
@@ -200,11 +207,13 @@ export function rexInLevel(game, r, oldY, dt) {
     if (Math.abs(gx - r.x) < 40 && Math.abs(gy - (r.y - 40)) < 50) {
       gm.got = true
       game.score += 30
-      game.earn(2, gx, gy - 20)
+      game.earn(1)
+      game.gain('shards', 1, gx, gy - 20)
       sfx.pickup()
       game.fx.burst(gx, gy, 12, { speed: 180, life: 0.5, size: 6, color: ['#2ce8f5', '#ffffff'], type: 'star' })
     }
   }
+  grabDna(game, r.x, r.y - 50)
   if (r.inv > 0) return null
   const bx = r.x - 22
   const by = r.y - 64
@@ -222,6 +231,18 @@ export function rexInLevel(game, r, oldY, dt) {
     }
   }
   return null
+}
+
+function grabDna(game, x, y) {
+  const L = game.level
+  if (!L?.dna || L.dna.got) return
+  if (Math.hypot(L.dna.x - x, L.dna.y - y) < 55) {
+    L.dna.got = true
+    game.gain('dna', 1, L.dna.x, L.dna.y - 30)
+    game.fx.text(L.dna.x, L.dna.y - 60, 'RARE DNA!', '#f6757a', 26)
+    game.fx.burst(L.dna.x, L.dna.y, 26, { speed: 240, life: 0.8, size: 7, color: ['#f6757a', '#2ce8f5', '#ffffff'], type: 'star' })
+    sfx.win()
+  }
 }
 
 // Meteors that reach the ground explode (and hurt anyone close by).
@@ -269,11 +290,12 @@ export function ufoInLevel(game, p) {
       o.wait = 10
       p.fuel = Math.min(1, p.fuel + 0.3)
       game.fx.text(o.x, o.y - 30, '+FUEL', '#feae34', 18)
-      game.earn(1)
+      game.gain('cells', 1)
       sfx.pickup()
       o.x = 150 + Math.random() * (WORLD - 300)
     }
   }
+  grabDna(game, p.x, p.y)
   if (p.inv > 0) return null
   for (const m of L.mines) {
     if (m.dead > 0) continue
@@ -421,6 +443,26 @@ export function drawLevel(ctx, L) {
     } else if (gateWarn(L, g) && Math.floor(t * 8) % 2) {
       ctx.fillStyle = 'rgba(255,0,68,0.5)'
       for (let y = 88; y < 336; y += 18) ctx.fillRect(g.x - 3, y, 6, 9)
+    }
+  }
+  if (L.dna && !L.dna.got) {
+    const x = snap(L.dna.x)
+    const y = snap(L.dna.y + Math.sin(t * 2) * 6)
+    ctx.fillStyle = 'rgba(246,117,122,0.25)'
+    circle(ctx, x, y, 30)
+    ctx.fill()
+    for (let i = 0; i < 7; i++) {
+      const s = Math.sin(t * 4 + i * 0.9) * 12
+      ctx.fillStyle = INK
+      ctx.fillRect(snap(x + s) - 6, y - 21 + i * 6, 12, 9)
+      ctx.fillRect(snap(x - s) - 6, y - 21 + i * 6, 12, 9)
+    }
+    for (let i = 0; i < 7; i++) {
+      const s = Math.sin(t * 4 + i * 0.9) * 12
+      ctx.fillStyle = '#f6757a'
+      ctx.fillRect(snap(x + s) - 3, y - 18 + i * 6, 6, 3)
+      ctx.fillStyle = '#2ce8f5'
+      ctx.fillRect(snap(x - s) - 3, y - 18 + i * 6, 6, 3)
     }
   }
   // where meteors are about to land

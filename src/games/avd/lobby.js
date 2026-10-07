@@ -3,7 +3,8 @@
 import { W, H, INK, rrect, text, AVATARS, drawAvatar, drawUFO, drawDino } from './art'
 import { COLOURS, HATS, TITLES, UFO_PAINTS, REX_PAINTS, choice, colourOf, titleOf } from './custom'
 import { sfx } from './sound'
-import { inside, drawButton, drawTitleWorld, updateTitleWorld } from './menus'
+import { inside, drawButton, drawTitleWorld, updateTitleWorld, drawWallet } from './menus'
+import { itemLevel, evoName } from './shop'
 import { checkName, safeName, yearLabel, YEAR_LEVELS, MAX_NAME } from './names'
 import { findAccount, accountCount, hashPassword, MAX_ACCOUNTS, deleteAccount } from './save'
 import { startSession, cleanCode } from './net'
@@ -267,7 +268,7 @@ function typeCode(game, ch) {
 // What this player tells the other while setting up.
 function lobbyState(game) {
   const mp = game.mp
-  return { role: mp.session.role, name: game.profile.name, year: game.profile.year, pic: game.profile.pic || 'rex', color: game.profile.color || '', hat: game.profile.hat || '', title: game.profile.title || '', ufo: game.profile.ufo || '', rex: game.profile.rex || '', side: mp.side || '', ph: 'lobby' }
+  return { role: mp.session.role, name: game.profile.name, year: game.profile.year, pic: game.profile.pic || 'rex', color: game.profile.color || '', hat: game.profile.hat || '', title: game.profile.title || '', ufo: game.profile.ufo || '', rex: game.profile.rex || '', evo: mp.side ? itemLevel(game.shop, mp.side, 'evo') : 0, side: mp.side || '', ph: 'lobby' }
 }
 
 // ---------- shared hooks the game calls ----------
@@ -660,14 +661,15 @@ function drawAccount(game, ctx) {
     text(ctx, p.name, W / 2 - 250, 316, 28, colourOf(p))
     if (titleOf(p)) text(ctx, titleOf(p), W / 2 - 250, 342, 15, '#ffffff')
     text(ctx, yearLabel(p.year), W / 2 - 250, 366, 15, '#c0cbdc')
-    text(ctx, `$ ${game.shop.coins} COINS  ·  BEST: ALIENS ${game.best.aliens || 0}  ·  DINOS ${game.best.dinos || 0}`, W / 2, 412, 14, '#fee761')
+    drawWallet(ctx, game.shop, W / 2, 400, 15)
+    text(ctx, `UFO: ${evoName('aliens', itemLevel(game.shop, 'aliens', 'evo'))}  ·  T. REX: ${evoName('dinos', itemLevel(game.shop, 'dinos', 'evo'))}  ·  BEST: ALIENS ${game.best.aliens || 0} · DINOS ${game.best.dinos || 0}`, W / 2, 422, 12, '#c0cbdc')
   } else if (a.step === 'pick') {
     text(ctx, FIELDS[a.field].title, W / 2, 76, 34, '#fee761')
     text(ctx, FIELDS[a.field].hint, W / 2, 106, 14, '#c0cbdc')
   } else if (a.step === 'del1') {
     text(ctx, '⚠ WARNING ⚠', W / 2, 120, 40, '#e43b44')
     text(ctx, `DELETE ${p.name}'S ACCOUNT?`, W / 2, 180, 28, '#ffffff')
-    text(ctx, 'All your coins, shop upgrades and best scores will be gone.', W / 2, 230, 16, '#c0cbdc')
+    text(ctx, 'All your Xenobits, Cells, Shards, DNA, upgrades and scores will be gone.', W / 2, 230, 16, '#c0cbdc')
     text(ctx, 'Your name and password will be forgotten too.', W / 2, 258, 16, '#c0cbdc')
   } else {
     const flash = Math.floor(t * 4) % 2 ? '#e43b44' : '#fee761'
