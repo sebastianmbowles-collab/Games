@@ -32,3 +32,13 @@ body.title #fear,body.cine #fear{display:none}
 #loading{background:radial-gradient(ellipse at 50% 40%,#3a0a1a,#05020a 70%)}
 .lmoon{color:#ff3a2a;text-shadow:0 0 30px rgba(255,40,30,.7)}
 .lz{color:#8a7a90}
+
+/* the anger meter (only in the school) and the breathing circle */
+#fear .angerRow{display:none}
+body.angry #fear .angerRow{display:block}
+#angerFill{height:100%;width:0;background:linear-gradient(90deg,#ff9a3a,#ff1a1a);transition:width .2s}
+#breath{position:fixed;left:50%;top:62%;transform:translate(-50%,-50%);z-index:6;pointer-events:none;display:grid;place-items:center;opacity:0;transition:opacity .5s}
+#breath.on{opacity:1}
+#breath .ring{width:110px;height:110px;border-radius:50%;border:4px solid rgba(160,220,255,.8);box-shadow:0 0 24px rgba(120,200,255,.6),inset 0 0 24px rgba(120,200,255,.4);transition:transform .25s linear}
+#breath b{position:absolute;white-space:nowrap;font:700 16px var(--f-body);color:#d8f0ff;text-shadow:0 0 8px #000;letter-spacing:.06em}
+body.title #breath,body.cine #breath{display:none}

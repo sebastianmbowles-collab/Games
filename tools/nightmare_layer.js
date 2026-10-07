@@ -456,6 +456,39 @@ function nightmareTick(dt, time) {
       });
     };
   }
+  // ---------- ANGER: the anger meter in the Upside-Down School ----------
+  // Anger goes up when teachers spot you, when you punch and when you're caught.
+  // When you're VERY angry you stomp, and teachers can hear you. Stand still and breathe to calm down.
+  {
+    const a = AREAS.school;
+    const row = document.createElement('span'); row.textContent = 'ANGER'; row.className = 'angerRow';
+    const tr = document.createElement('div'); tr.className = 'track angerRow'; tr.innerHTML = '<div id="angerFill"></div>'; fearEl.append(row, tr);
+    const breath = document.createElement('div'); breath.id = 'breath'; breath.innerHTML = '<div class="ring"></div><b>breathe in…</b>'; document.body.appendChild(breath);
+    NM.anger = 0; let lastX = 0, lastZ = 0, still = 0, lastPunch = punchCount, lastCaught = 0, heardTold = false, calmTold = false;
+    a.nmTick = (dt, time) => {
+      const moved = Math.hypot(P.x - lastX, P.z - lastZ) / Math.max(dt, 1e-3); lastX = P.x; lastZ = P.z;
+      still = moved < .4 ? still + dt : 0;
+      let up = 1; // it slowly builds up on its own
+      if (a.teachers.some(t => t.sus > .02)) up += 22;
+      if (punchCount !== lastPunch) { lastPunch = punchCount; NM.anger += 8; }
+      if (a.caught > lastCaught) { lastCaught = a.caught; NM.anger += 30; }
+      const breathing = still > 1;
+      NM.anger = clamp(NM.anger + (breathing ? -24 : up) * dt, 0, 100);
+      if (breathing && NM.anger > 5 && !calmTold) { calmTold = true; toast('Deep breaths…', 'Standing still calms your anger down'); }
+      // the breathing circle grows and shrinks
+      breath.classList.toggle('on', breathing && NM.anger > 1);
+      if (breathing) { const ph = (still - 1) % 8 < 4; breath.lastChild.textContent = ph ? 'breathe in…' : 'breathe out…'; breath.firstChild.style.transform = `scale(${ph ? .6 + ((still - 1) % 4) / 4 * .6 : 1.2 - ((still - 1) % 4) / 4 * .6})`; }
+      // VERY angry: you stomp so loudly the teachers hear you
+      const loud = NM.anger > 60 && moved > 1;
+      if (loud) { if (Math.random() < dt * 3) { state.shake = Math.max(state.shake, .08); dustRing(P.x, P.y, P.z, .8, 0xff4030); }
+        a.teachers.forEach(t => { if (t.stun > 0 || P.z > 52.5) return; if (Math.hypot(P.x - t.x, P.z - t.z) < 6) { t.sus = Math.min(1, t.sus + dt * 1.4);
+          if (!heardTold) { heardTold = true; toast('They can HEAR you stomping!', 'Too angry! Stand still and breathe.'); } } }); }
+      $('angerFill').style.width = NM.anger + '%';
+      document.body.style.setProperty('--fearRed', Math.max(+document.body.style.getPropertyValue('--fearRed') || 0, NM.anger / 100 * .6).toFixed(2));
+    };
+    const oldLeave = a.leave; a.leave = () => { if (oldLeave) oldLeave(); breath.classList.remove('on'); document.body.classList.remove('angry'); };
+    const oldEnter2 = a.enter; a.enter = () => { if (oldEnter2) oldEnter2(); NM.anger = 20; lastCaught = a.caught || 0; document.body.classList.add('angry'); };
+  }
   // renamed bosses
   // the prologue: the portal waits just outside the bedroom window
   homePortal.position.set(0, terrainH(0, 10.5), 10.5);
