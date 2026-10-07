@@ -416,6 +416,46 @@ function nightmareTick(dt, time) {
         } });
     };
   }
+  // ---------- FEAR: shadow fears in the Mirror Maze ----------
+  // Turn your back on one and it creeps after you, growing bigger. LOOK at it, and it shrinks away.
+  {
+    const a = AREAS.mirror, cell = (i, j) => [-26 + i * 4 + 2, 4 + j * 4 + 2];
+    a.fears = [[3, 2], [8, 3], [2, 7], [10, 6], [6, 10], [11, 11]].map(([i, j], n) => {
+      const [x, z] = cell(i, j), f = model('Sebastian') || makeSebastian();
+      const shade = new THREE.MeshBasicMaterial({ color: 0x07020c, transparent: true, opacity: .9 });
+      f.traverse(o => { if (o.isMesh && !o.userData.isInk) o.material = shade; if (o.userData.isInk) o.visible = false; });
+      [-.09, .09].forEach(ex => { const e = mesh(new THREE.SphereGeometry(.045, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff1a1a, fog: false })); e.position.set(ex, 1.5, .23); f.add(e); });
+      f.add(at(halo(0x6a0010, 3, .5), 0, 1, 0));
+      f.position.set(x, 0, z); a.group.add(f);
+      return { g: f, x, z, hx: x, hz: z, size: 1.3, gone: false, ph: n };
+    });
+    a.braveN = 0;
+    // is there a mirror wall between you and it?
+    const sees = (ax, az, bx, bz) => { const n = Math.ceil(Math.hypot(bx - ax, bz - az) / .4);
+      for (let k = 1; k < n; k++) { const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n;
+        if (a.solids.some(sd => sd.on !== false && sd.y0 < 1 && sd.y1 > 1 && x > sd.x0 && x < sd.x1 && z > sd.z0 && z < sd.z1)) return false; }
+      return true; };
+    a.nmTick = (dt, time) => {
+      const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+      a.fears.forEach(F => { if (F.gone) return;
+        const dx = F.x - P.x, dz = F.z - P.z, d = Math.hypot(dx, dz) || 1, looking = (dx * fx + dz * fz) / d > .82;
+        if ((F.losT = (F.losT || 0) - dt) <= 0) { F.losT = .2; F.los = d < 11 && sees(P.x, P.z, F.x, F.z); }
+        F.g.rotation.y = Math.atan2(-dx, -dz); F.g.position.y = Math.sin(time * 2 + F.ph) * .06;
+        if (!F.los) { F.size = Math.min(1.3, F.size + dt * .1); const hx = F.hx - F.x, hz = F.hz - F.z, hd = Math.hypot(hx, hz); if (hd > .1) { F.x += hx / hd * Math.min(hd, dt); F.z += hz / hd * Math.min(hd, dt); } }
+        else if (looking) { // you face it… and it gets smaller
+          F.size -= dt * .45; if (Math.random() < .3) burst(F.x, F.size, F.z, [0x2a1030, 0xffffff], 1);
+          if (F.size < .3) { F.gone = true; a.group.remove(F.g); a.braveN++; NM.fear = Math.max(0, NM.fear - 35);
+            burst(F.x, .6, F.z, [0xffffff, 0xffe27f, 0xaab4f0], 24); sfx('kid');
+            toast(`You faced your fear! ${a.braveN} of 6`, pick(['It was smaller than it looked.', 'It was only a shadow.', 'Being brave is being scared and doing it anyway.']));
+            if (a.braveN === 6) setTimeout(() => achieve('Brave Heart', 'Face every shadow fear in the Mirror Maze'), 2500); }
+        } else { // your back is turned: it creeps closer, and grows
+          F.size = Math.min(2.2, F.size + dt * .15); F.x -= dx / d * 1.6 * dt; F.z -= dz / d * 1.6 * dt; NM.fear = Math.min(100, NM.fear + 3 * dt);
+          if (d < 1.2) { NM.fear = Math.min(100, NM.fear + 35); state.shake = .3; sfx('whoosh'); toast('', '"Boo."'); F.x = F.hx; F.z = F.hz; F.size = 1.6; }
+        }
+        F.g.position.x = F.x; F.g.position.z = F.z; F.g.scale.setScalar(Math.max(.3, F.size));
+      });
+    };
+  }
   // renamed bosses
   // the prologue: the portal waits just outside the bedroom window
   homePortal.position.set(0, terrainH(0, 10.5), 10.5);
