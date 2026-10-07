@@ -3771,36 +3771,73 @@ function revealCine() {
   DS.self.traverse(o => { if (o.isMesh && !o.userData.isInk) o.material = DS.selfM; }); DS.self.visible = false; a.group.add(DS.self);
   DS.aura = halo(0xffffff, 5, 0); DS.self.add(at(DS.aura, 0, 1, 0));
   const EMO = {
-    Anger:   { c: 0xff3a2a, sub: 'It charges! Dodge, then hit it.' },
-    Sadness: { c: 0x3a7aff, sub: 'Rain slows you down. Chase it!' },
-    Fear:    { c: 0x9a4ad0, sub: 'It turns invisible. Watch for the eyes…' },
-    Chaos:   { c: 0xffffff, sub: 'Everything goes wild!' },
-    Pride:   { c: 0xffc83a, sub: 'Pride gets BIGGER every time you hit it!' },
+    Anger:   { c: 0xff3a2a, sub: 'It charges! Dodge sideways, then hit it.', say: '"Everyone ALWAYS leaves! They wake up and FORGET me!"' },
+    Sadness: { c: 0x3a7aff, sub: 'It floats away crying. Dodge the tears and chase it!', say: '"Every morning you woke up… and I was alone again."' },
+    Fear:    { c: 0x9a4ad0, sub: 'It turns invisible. Watch for the glowing eyes…', say: '"What if you go away and never come back?"' },
+    Chaos:   { c: 0xffffff, sub: 'It jumps around! Hit it while it lands.', say: '"If I can\'t keep you here, I\'ll break EVERYTHING!"' },
+    Pride:   { c: 0xffc83a, sub: 'Pride gets BIGGER every time you hit it!', say: '"I don\'t NEED anyone! …I don\'t."' },
   };
+  const EMO_HP = 6;
+  // Fear's glowing eyes: they never go invisible, so you can always find it
+  DS.eyes = new THREE.Group(); [-.09, .09].forEach(x => { const e = mesh(new THREE.SphereGeometry(.06, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe0ff, depthTest: false })); e.position.set(x, 1.55, .26); e.renderOrder = 9; DS.eyes.add(e); });
+  DS.eyes.add(at(halo(0xd08aff, .9, .7), 0, 1.55, .3)); DS.eyes.visible = false; DS.self.add(DS.eyes);
   DS.balls = () => {
     if (DS.form === 'giant') { const g = DS.giant.g.position; return [{ x: g.x, y: 2, z: g.z, r: 2.4 }, { x: g.x, y: 6, z: g.z, r: 2.6 }]; }
     const sc = DS.self.scale.x, p = DS.self.position; return [{ x: p.x, y: p.y + .9 * sc, z: p.z, r: .8 * sc }];
   };
-  const setBar = () => { $('bossbar').querySelector('span').textContent = DS.form === 'emo' ? 'Dream Self · ' + DS.emo : DS.form === 'giant' ? 'Dream Self · Robot Giant' : 'Dream Self · Copycat'; $('bossfill').style.width = DS.hp / DS.maxHp * 100 + '%'; };
+  const setBar = () => { $('bossbar').querySelector('span').textContent = DS.form === 'emo' ? `Dream Self · ${DS.emo} (${DS.emoI + 1}/5)` : DS.form === 'giant' ? 'Dream Self · Robot Giant' : 'Dream Self · Copycat'; $('bossfill').style.width = DS.hp / DS.maxHp * 100 + '%'; };
   DS.die = () => {
     if (DS.form === 'giant') { burst(DS.giant.g.position.x, 4, DS.giant.g.position.z, [0xff3fd0, 0xffffff], 30); sfx('break'); DS.giant.g.visible = false;
-      DS.form = 'copy'; DS.hp = DS.maxHp = 12; DS.self.visible = true; DS.self.scale.setScalar(1.1); DS.self.position.set(0, 0, 8); toast('COPYCAT!', 'It copies everything you do. Meet it in the middle!'); }
+      DS.form = 'copy'; DS.hp = DS.maxHp = 12; DS.self.visible = true; DS.self.scale.setScalar(1.1); DS.self.position.set(0, 0, 8); cheer(); toast('COPYCAT!', 'It copies everything you do. Meet it in the middle!'); }
     else if (DS.form === 'copy') { burst(DS.self.position.x, 1, DS.self.position.z, [0x9aa8e8, 0xffffff], 24); sfx('whoosh');
-      DS.form = 'emo'; DS.hp = DS.maxHp = 30; DS.emoI = -1; nextEmo(); }
-    else { // beaten for real
-      aBoss = null; $('bossbar').hidden = true; DS.done = true; achieve('Know Yourself', 'Beat the final boss');
-      if (!state.bedsRun) achieve('Lucid Dreamer', 'Beat the game without going back to bed once');
-      goodbyeCine(); return;
+      cheer(); DS.form = 'emo'; DS.hp = DS.maxHp = EMO_HP; DS.emoI = -1; nextEmo(); }
+    else if (DS.emoI < 4) { burst(DS.self.position.x, 1.4, DS.self.position.z, [EMO[DS.emo].c, 0xffffff], 30); sfx('break'); DS.hp = DS.maxHp = EMO_HP; nextEmo(); cheer(); }
+    else { // all 5 feelings are out. Now he's just a lonely kid sitting on the floor.
+      aBoss = null; $('bossbar').hidden = true; DS.form = 'alone';
+      a.orbs.forEach(o => a.group.remove(o.m)); a.orbs = []; a.fires.forEach(f => a.group.remove(f.m)); a.fires = [];
+      burst(DS.self.position.x, 1.4, DS.self.position.z, [0xffc83a, 0xffffff, 0x9aa8e8], 40); sfx('whoosh'); state.shake = .4;
+      DS.self.scale.setScalar(1); DS.selfM.color.setHex(0x9aa8e8); DS.selfM.emissive.setHex(0x2a2a6a); DS.selfM.transparent = false; DS.selfM.opacity = 1; DS.aura.material.opacity = 0; DS.eyes.visible = false;
+      DS.self.position.y = -.35; DS.self.rotation.x = .25; // sitting, head down
+      a.kidsG.forEach(k => k.cheer = 0);
+      toast('…', 'The dream self sits down. He isn\'t fighting any more.'); objective('Go to your dream self');
+      return;
     }
     DS.active = true; $('bossbar').hidden = false; setBar(); sfx('roar'); state.shake = .5;
   };
-  const nextEmo = () => { const order = ['Anger', 'Sadness', 'Fear', 'Chaos', 'Pride']; DS.emoI = (DS.emoI + 1) % 5; DS.emo = order[DS.emoI]; DS.t = 0;
+  const nextEmo = () => { const order = ['Anger', 'Sadness', 'Fear', 'Chaos', 'Pride']; DS.emoI = Math.min(4, DS.emoI + 1); DS.emo = order[DS.emoI]; DS.t = 0; DS.hop = 0; DS.eyes.visible = DS.emo === 'Fear';
     DS.selfM.color.setHex(EMO[DS.emo].c); DS.selfM.emissive.setHex(EMO[DS.emo].c).multiplyScalar(.3); DS.aura.material.color.setHex(EMO[DS.emo].c); DS.aura.material.opacity = .8;
     DS.self.scale.setScalar(DS.emo === 'Pride' ? 1.4 : 1.2); DS.selfM.transparent = DS.emo === 'Fear'; DS.selfM.opacity = 1;
-    toast(DS.emo.toUpperCase(), EMO[DS.emo].sub); sfx('roar'); burst(DS.self.position.x, 1.5, DS.self.position.z, [EMO[DS.emo].c, 0xffffff], 20); setBar(); };
-  DS.onHit = () => { setBar(); if (DS.form === 'emo' && DS.emo === 'Pride') { DS.self.scale.multiplyScalar(1.08); toast('', '"I\'m not weak!"'); } if (DS.form === 'emo' && DS.emo === 'Fear') DS.selfM.opacity = 1; };
-  a.rain = null; a.fires = []; a.orbs = [];
-  a.enter = () => { DS.active = false; DS.form = 'giant'; DS.hp = DS.maxHp = 18; DS.giant.g.visible = true; DS.giant.g.position.set(0, 0, 8); DS.self.visible = false;
+    toast(DS.emo.toUpperCase(), EMO[DS.emo].say); const e0 = DS.emo; setTimeout(() => { if (DS.emo === e0 && DS.form === 'emo') toast('', EMO[e0].sub); }, 3200); sfx('roar'); burst(DS.self.position.x, 1.5, DS.self.position.z, [EMO[DS.emo].c, 0xffffff], 20); setBar(); };
+  DS.onHit = () => { setBar(); if (DS.form === 'emo' && DS.emo === 'Pride') { DS.self.scale.setScalar(Math.min(2.4, DS.self.scale.x * 1.1)); toast('', '"I\'m not weak!"'); } cheer(.4); if (DS.form === 'emo' && DS.emo === 'Fear') DS.selfM.opacity = 1; };
+  a.rain = null; a.fires = []; a.orbs = []; a.kidsG = []; a.hearts = []; a.heartT = 6;
+  const makeKids = () => {
+    a.kidsG.forEach(k => a.group.remove(k.g)); a.kidsG = [];
+    const n = Math.min(24, state.kids);
+    for (let i = 0; i < n; i++) {
+      const an = (i + .5) / n * Math.PI * 2, pjC = pick([0x7fd8ff, 0xffe27f, 0x9ff0a0, 0xffa8e4, 0xc8a6ff]);
+      const g = model('Sebastian', { pj: mat(pjC, { flatShading: false }), pj2: mat(new THREE.Color(pjC).multiplyScalar(.8).getHex(), { flatShading: false }),
+        hair: mat(pick([0x5a3a22, 0x2a1a10, 0xd8a050, 0xa04a20]), { flatShading: false }), skin: mat(pick([0xffd2b0, 0xe0ac80, 0xa8704a]), { flatShading: false }) }) || (() => { const q = new THREE.Group(); q.add(at(mesh(boxG(.4, .9, .3), mat(pjC)), 0, .45, 0)); q.add(at(mesh(new THREE.IcosahedronGeometry(.25, 1), mat(0xffd2b0)), 0, 1.1, 0)); return q; })();
+      g.scale.setScalar(.7); g.position.set(Math.cos(an) * 21.5, 0, Math.sin(an) * 21.5); g.rotation.y = Math.atan2(-g.position.x, -g.position.z); g.add(halo(pjC, 1.6, .3));
+      a.group.add(g); a.kidsG.push({ g, an, cheer: 0, ph: rand(0, 6) });
+    }
+    if (n) setTimeout(() => toast(`${state.kids} kids came to help!`, 'The kids you saved are cheering for you. They\'ll throw you hearts!'), 4200);
+  };
+  function cheer(k = 1) { a.kidsG.forEach(q => q.cheer = Math.max(q.cheer, k * rand(.6, 1.2))); if (k >= 1) sfx('kid'); }
+  function kidsTick(dt, time) {
+    a.kidsG.forEach(k => { k.cheer = Math.max(0, k.cheer - dt); const jump = k.cheer > 0 ? Math.abs(Math.sin(time * 9 + k.ph)) * .7 : Math.abs(Math.sin(time * 2 + k.ph)) * .08; k.g.position.y = jump; });
+    // hearts: when you're hurt, a kid throws you one
+    if (DS.active && !DS.done && a.kidsG.length && P.hp < 5 && a.hearts.length === 0 && (a.heartT -= dt) <= 0) {
+      a.heartT = Math.max(5, 12 - state.kids / 6);
+      const k = pick(a.kidsG), an = rand(0, Math.PI * 2), r = rand(3, 10), tx = clamp(P.x + Math.cos(an) * r, -18, 18), tz = clamp(P.z + Math.sin(an) * r, -18, 18);
+      const m = mesh(new THREE.SphereGeometry(.32, 12, 10), glow(0xff6fc8)); m.add(halo(0xff6fc8, 2.2, .6)); a.group.add(m); k.cheer = 1;
+      a.hearts.push({ m, x0: k.g.position.x, z0: k.g.position.z, tx, tz, t: 0 }); sfx('pop');
+    }
+    for (let i = a.hearts.length - 1; i >= 0; i--) { const h = a.hearts[i]; h.t = Math.min(1, h.t + dt * .8);
+      h.m.position.set(h.x0 + (h.tx - h.x0) * h.t, .7 + Math.sin(h.t * Math.PI) * 7 + Math.sin(time * 4) * .1, h.z0 + (h.tz - h.z0) * h.t); h.m.rotation.y += dt * 3;
+      if (h.t >= 1 && Math.hypot(P.x - h.tx, P.z - h.tz) < 1.3 && P.y < 2) { P.hp = Math.min(5, P.hp + 1); hud(); sfx('kid'); burst(P.x, P.y + 1.2, P.z, [0xff6fc8, 0xffffff], 12); toast('+1 heart', 'Thanks, kids!'); a.group.remove(h.m); a.hearts.splice(i, 1); } }
+  }
+  a.enter = () => { DS.active = false; DS.form = 'giant'; DS.hp = DS.maxHp = 18; DS.giant.g.visible = true; DS.giant.g.position.set(0, 0, 8); DS.self.visible = false; DS.done = false;
+    DS.self.rotation.x = 0; DS.self.position.y = 0; a.hearts.forEach(h => a.group.remove(h.m)); a.hearts = []; a.heartT = 6; makeKids();
     setTimeout(() => { startABoss(DS); setBar(); objective('Beat your dream self'); toast('ROBOT GIANT', 'Watch its stomps. Punch its legs!'); }, 1500); };
   a.leave = () => { aBoss = null; $('bossbar').hidden = true; $('game').style.filter = ''; };
   a.onRespawn = () => { a.fires.forEach(f => a.group.remove(f.m)); a.fires = []; a.orbs.forEach(o => a.group.remove(o.m)); a.orbs = []; };
@@ -3812,6 +3849,17 @@ function revealCine() {
       if (!f.hit && Math.abs(Math.hypot(P.x - f.x, P.z - f.z) - f.r) < .6 && P.y < .6) { f.hit = true; hurt(1, f.x, f.z); } if (f.r > 20) { a.group.remove(f.m); a.fires.splice(i, 1); } }
     for (let i = a.orbs.length - 1; i >= 0; i--) { const o = a.orbs[i]; o.life -= dt; o.m.position.x += o.vx * dt; o.m.position.z += o.vz * dt;
       if (touchesYou(o.m.position.x, o.m.position.y, o.m.position.z, .4)) { hurt(1, o.m.position.x, o.m.position.z); o.life = 0; } if (o.life <= 0) { a.group.remove(o.m); a.orbs.splice(i, 1); } }
+    kidsTick(dt, time);
+    if (DS.form === 'alone' && !DS.done) { // he just sits there, crying a little
+      if (Math.random() < dt * 2) burst(DS.self.position.x + rand(-.2, .2), .9, DS.self.position.z + rand(-.2, .2), [0x5a8aff], 1, .05);
+      DS.self.rotation.y = Math.atan2(P.x - DS.self.position.x, P.z - DS.self.position.z) * .3;
+      if (Math.hypot(P.x - DS.self.position.x, P.z - DS.self.position.z) < 2.2 && state.mode === 'play') {
+        DS.done = true; achieve('Know Yourself', 'Beat the final boss');
+        if (!state.bedsRun) achieve('Lucid Dreamer', 'Beat the game without going back to bed once');
+        goodbyeCine();
+      }
+      return;
+    }
     if (!DS.active || DS.done) return;
     DS.t += dt; DS.flash = Math.max(0, DS.flash - dt);
     if (DS.form === 'giant') { // stomps toward you; each stomp sends a ring along the floor (jump it!)
@@ -3842,14 +3890,13 @@ function revealCine() {
         DS.selfM.opacity = Math.max(.08, DS.selfM.opacity - dt * .5);
         p.x += dx / d * 3.5 * dt; p.z += dz / d * 3.5 * dt; if (d < 1.4) { hurt(1, p.x, p.z); DS.selfM.opacity = 1; const a2 = rand(0, 6); p.x = P.x + Math.cos(a2) * 9; p.z = P.z + Math.sin(a2) * 9; }
       } else if (DS.emo === 'Chaos') { // teleports all over and sprays orbs in every direction
-        if (Math.random() < dt * 1.2) { burst(p.x, 1, p.z, [0xff3fd0, 0x5ff6ff], 10); const a2 = rand(0, 6), r = rand(4, 14); p.x = Math.cos(a2) * r; p.z = Math.sin(a2) * r; }
-        if (Math.random() < dt * 3) { const an = rand(0, Math.PI * 2), o = mesh(new THREE.SphereGeometry(.25, 8, 6), glow(pick([0xff3fd0, 0x5ff6ff, 0xffe27f]))); o.position.set(p.x, 1.2, p.z); a.group.add(o); a.orbs.push({ m: o, vx: Math.cos(an) * 6, vz: Math.sin(an) * 6, life: 3 }); }
+        DS.hop += dt; if (DS.hop > 2.6) { DS.hop = 0; burst(p.x, 1, p.z, [0xff3fd0, 0x5ff6ff], 10); sfx('whoosh'); const a2 = rand(0, 6), r = rand(4, 12); p.x = clamp(P.x + Math.cos(a2) * r, -20, 20); p.z = clamp(P.z + Math.sin(a2) * r, -20, 20); }
+        if (DS.hop > .5 && Math.random() < dt * 2.2) { const an = rand(0, Math.PI * 2), o = mesh(new THREE.SphereGeometry(.25, 8, 6), glow(pick([0xff3fd0, 0x5ff6ff, 0xffe27f]))); o.position.set(p.x, 1.2, p.z); a.group.add(o); a.orbs.push({ m: o, vx: Math.cos(an) * 6, vz: Math.sin(an) * 6, life: 3 }); }
         DS.selfM.color.setHSL(time % 1, 1, .6);
       } else if (DS.emo === 'Pride') { // walks slowly towards you, swatting hard
         p.x += dx / d * 1.4 * dt; p.z += dz / d * 1.4 * dt; if (d < 1.2 * DS.self.scale.x && DS.t % 1.6 < .05) { hurt(1, p.x, p.z); state.shake = .3; }
       }
       p.x = clamp(p.x, -22, 22); p.z = clamp(p.z, -22, 22);
-      if (DS.t > 9) nextEmo(); // switches emotion mid-fight
     }
   };
   a.DS = DS;
@@ -3862,6 +3909,7 @@ function goodbyeCine() {
   Object.assign(P, { x: p.x, z: p.z - 3, yaw: 0 });
   playCine([
     { text: 'The glitch goes quiet.', d: 2.6, snap: true, pos: [p.x + 3, 2, p.z - 4], look: [p.x, 1.2, p.z] },
+    { text: 'Sebastian sits down next to him… and gives him a hug.', d: 3.4, pos: [p.x + 2, 1.4, p.z - 3], look: [p.x, .9, p.z], on: () => { burst(p.x, 1.2, p.z, [0xff6fc8, 0xffffff], 20); sfx('kid'); } },
     { text: '"I just didn\'t want to be alone."', d: 3.4, pos: [p.x, 1.6, p.z - 2.6], look: [p.x, 1.5, p.z] },
     { text: '"The kids are free. You were brave… braver than me."', d: 3.8, pos: [p.x, 1.6, p.z - 2.4], look: [p.x, 1.5, p.z] },
     { text: '"Maybe a part of me can come with you. Wake up, Sebastian."', d: 4, pos: [p.x, 1.6, p.z - 2.2], look: [p.x, 1.5, p.z], speed: .3,
