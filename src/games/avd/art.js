@@ -3,6 +3,7 @@
 
 import { PX } from './pixel'
 import { sprite, PAL } from './sprites'
+import { drawHat } from './custom'
 
 export const W = 960
 export const H = 540
@@ -85,6 +86,7 @@ export function drawDino(ctx, kind, o = {}) {
     lookUp: !!o.lookUp,
     angry: !!o.angry,
     gold: !!o.gold,
+    skin: o.skin || '',
   })
   const t = o.time || 0
   const ox = o.flail ? Math.round(Math.sin(t * 18)) : 0
@@ -101,6 +103,7 @@ export function drawUFO(ctx, o = {}) {
     mood: o.stun || o.mood === 'dizzy' ? 'dizzy' : '',
     hurt: !!o.hurt,
     gold: !!o.gold,
+    tint: o.tint || '',
   })
   const p = blit(ctx, s, 0, 0, { scale: o.scale || 1, ox: o.stun ? Math.round(Math.sin(t * 30)) : 0 })
   if (o.stun) {
@@ -422,14 +425,15 @@ export const AVATARS = [
 ]
 
 // Draws a profile picture in a round frame centred on (x, y). big = the large version.
-export function drawAvatar(ctx, pic, x, y, big = false) {
+// look: { color (frame colour), hat }
+export function drawAvatar(ctx, pic, x, y, big = false, look = {}) {
   const r = big ? 64 : 24
   ctx.save()
   circle(ctx, x, y, r)
   ctx.fillStyle = '#262b44'
   ctx.fill()
   ctx.lineWidth = big ? 6 : 3
-  ctx.strokeStyle = '#fee761'
+  ctx.strokeStyle = look.color || '#fee761'
   ctx.stroke()
   if (pic === 'alien' || pic === 'alien2') {
     ctx.translate(x, y - (big ? 6 : 2))
@@ -442,4 +446,5 @@ export function drawAvatar(ctx, pic, x, y, big = false) {
     drawDino(ctx, pic === 'goldrex' ? 'rex' : pic || 'rex', { gold: pic === 'goldrex' })
   }
   ctx.restore()
+  if (look.hat) drawHat(ctx, look.hat, x, y - r + (big ? 10 : 5), big ? 9 : 3)
 }

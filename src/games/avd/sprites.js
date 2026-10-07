@@ -42,6 +42,28 @@ const DINO_COLORS = {
   bronto: { body: PAL.tan, shade: PAL.brown, belly: PAL.cream, extra: PAL.brown },
 }
 
+// Paint jobs you can pick on your profile (the gold shop skins win if you own them).
+const REX_SKINS = {
+  blue: { body: PAL.blue, shade: PAL.navy, belly: PAL.silver, extra: PAL.navy },
+  orange: { body: PAL.orange, shade: PAL.rust, belly: PAL.peach, extra: PAL.rust },
+  purple: { body: PAL.magenta, shade: PAL.purple, belly: PAL.pink, extra: PAL.purple },
+  pink: { body: PAL.pink, shade: PAL.magenta, belly: PAL.cream, extra: PAL.magenta },
+  red: { body: PAL.red, shade: PAL.dkred, belly: PAL.peach, extra: PAL.dkred },
+}
+const UFO_TINTS = {
+  blue: [PAL.blue, PAL.cyan, PAL.navy],
+  green: [PAL.green, PAL.cream, PAL.dkgreen],
+  pink: [PAL.pink, PAL.peach, PAL.magenta],
+  purple: [PAL.magenta, PAL.pink, PAL.purple],
+  black: [PAL.dkslate, PAL.slate, PAL.night],
+}
+
+function dinoColors(kind, o) {
+  if (o.gold) return { body: PAL.yellow, shade: PAL.amber, belly: PAL.cream, extra: PAL.amber }
+  if (kind === 'rex' && REX_SKINS[o.skin]) return REX_SKINS[o.skin]
+  return DINO_COLORS[kind]
+}
+
 class Grid {
   constructor(w, h) {
     this.w = w
@@ -178,7 +200,7 @@ function legs(g, list, frame, colBack, colFront) {
 }
 
 function buildDino(kind, o) {
-  const C = o.gold ? { body: PAL.yellow, shade: PAL.amber, belly: PAL.cream, extra: PAL.amber } : DINO_COLORS[kind]
+  const C = dinoColors(kind, o)
   const { frame } = o
   let g
   let anchor
@@ -406,7 +428,7 @@ function buildDino(kind, o) {
 }
 
 function buildBaby(kind, o) {
-  const C = DINO_COLORS[kind]
+  const C = dinoColors(kind, o)
   const g = new Grid(19, 15)
   legs(
     g,
@@ -458,9 +480,10 @@ function buildBaby(kind, o) {
 
 function buildUFO(o) {
   const enemy = o.enemy
-  const metal = enemy ? PAL.red : o.gold ? PAL.amber : PAL.steel
-  const hi = enemy ? PAL.pink : o.gold ? PAL.yellow : PAL.silver
-  const lo = enemy ? PAL.dkred : o.gold ? PAL.orange : PAL.slate
+  const tint = !enemy && !o.gold && UFO_TINTS[o.tint]
+  const metal = enemy ? PAL.red : o.gold ? PAL.amber : tint ? tint[0] : PAL.steel
+  const hi = enemy ? PAL.pink : o.gold ? PAL.yellow : tint ? tint[1] : PAL.silver
+  const lo = enemy ? PAL.dkred : o.gold ? PAL.orange : tint ? tint[2] : PAL.slate
   const glass = enemy ? PAL.purple : PAL.navy
   const skin = enemy ? PAL.magenta : PAL.green
   const g = new Grid(41, 19)

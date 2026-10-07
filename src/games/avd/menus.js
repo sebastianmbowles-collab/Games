@@ -5,6 +5,7 @@ import { sfx } from './sound'
 import { SONGS, playSong, stopMusic, currentSong, songById, songBeat, musicLevels, playlistSteps, nextSongId } from './music'
 import { SHOP_ITEMS, itemLevel, buy } from './shop'
 import { yearLabel } from './names'
+import { colourOf, titleOf } from './custom'
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const rand = (a, b) => a + Math.random() * (b - a)
@@ -286,8 +287,10 @@ function drawTitle(game, ctx) {
     ctx.restore()
   }
   const best = game.best
-  text(ctx, game.profile ? `PLAYER: ${game.profile.name} · ${yearLabel(game.profile.year)}` : 'NOT LOGGED IN', W / 2, 140, 14, '#fee761')
-  if (game.profile) drawAvatar(ctx, game.profile.pic, W - 230, 31)
+  const pl = game.profile
+  const tl = pl && titleOf(pl)
+  text(ctx, pl ? `PLAYER: ${pl.name}${tl ? ` · ${tl}` : ''} · ${yearLabel(pl.year)}` : 'NOT LOGGED IN', W / 2, 140, 14, pl ? colourOf(pl) : '#fee761')
+  if (pl) drawAvatar(ctx, pl.pic, W - 230, 31, false, { color: colourOf(pl), hat: pl.hat })
   drawButton(ctx, { ...LOGIN_BTN, label: game.profile ? 'LOG OUT' : 'LOG IN', color: game.profile ? '#f6757a' : '#63c74d' }, inside(game.mouse, LOGIN_BTN), t)
   text(ctx, `Best: Aliens ${best.aliens || 0}  ·  Dinos ${best.dinos || 0}`, W / 2, 512, 15, '#fff')
   text(ctx, '↑ ↓ to choose · Enter or tap to pick', W / 2, 532, 12, 'rgba(255,255,255,0.8)')

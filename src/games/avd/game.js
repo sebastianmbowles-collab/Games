@@ -39,6 +39,7 @@ import { makeMath, makeSpell, quizKey, quizClick, drawQuiz } from './quiz'
 import { itemLevel } from './shop'
 import { loadSave, currentAccount, storeAccount, logOut } from './save'
 import { tagLine } from './names'
+import { choice, UFO_PAINTS, REX_PAINTS } from './custom'
 import { openProfile, openAccount, openMultiplayer, lobbyKey, updateLobby, drawLobby, clickLobby } from './lobby'
 import { newRound, hostUpdate, snapshot, applySnapshot, playEvent, drawVersus, rewardMath, rewardSpell } from './versus'
 import { initTitle, updateScreen, drawScreen, clickScreen, drawBackButton, MENU_BACK } from './menus'
@@ -709,10 +710,10 @@ export class AliensVsDinos {
   }
 
   startVersus(role, mySide, session, them) {
-    const me = { name: this.profile.name, year: this.profile.year }
+    const me = { name: this.profile.name, year: this.profile.year, ufo: this.profile.ufo, rex: this.profile.rex }
     const other = them || session.theirs() || {}
     const otherSide = mySide === 'aliens' ? 'dinos' : 'aliens'
-    this.vs = { role, mySide, session, round: role === 'host' ? 1 : 0, names: { [mySide]: me, [otherSide]: { name: other.name, year: other.year } }, cnt: { f: 0, j: 0, ac: 0 }, mc: 0, sc: 0, lostT: 0, evId: 0 }
+    this.vs = { role, mySide, session, round: role === 'host' ? 1 : 0, names: { [mySide]: me, [otherSide]: { name: other.name, year: other.year, ufo: choice(UFO_PAINTS, other.ufo), rex: choice(REX_PAINTS, other.rex) } }, cnt: { f: 0, j: 0, ac: 0 }, mc: 0, sc: 0, lostT: 0, evId: 0 }
     this.side = mySide
     this.ending = null
     this.coinsRun = 0
@@ -1873,7 +1874,7 @@ export class AliensVsDinos {
     if (!(p.inv > 0 && Math.floor(t * 14) % 2 === 0)) {
       ctx.save()
       ctx.translate(p.x, p.y + Math.sin(t * 3) * 3)
-      drawUFO(ctx, { time: t, gold: this.lvl('gold') > 0, tilt: p.tilt, beam: p.beaming, hurt: p.hurt > 0, mood: this.ending && !this.ending.won ? 'dizzy' : 'happy' })
+      drawUFO(ctx, { time: t, gold: this.lvl('gold') > 0, tint: this.profile?.ufo, tilt: p.tilt, beam: p.beaming, hurt: p.hurt > 0, mood: this.ending && !this.ending.won ? 'dizzy' : 'happy' })
       ctx.restore()
     }
     for (const b of this.bolts) {
@@ -1941,6 +1942,7 @@ export class AliensVsDinos {
         angry: r.roarT > 0,
         blink: t % 3.7 < 0.12,
         gold: this.lvl('gold') > 0,
+        skin: this.profile?.rex,
       })
       ctx.restore()
     }

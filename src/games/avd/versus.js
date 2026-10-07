@@ -435,6 +435,7 @@ export function drawVersus(game, ctx) {
       ctx.translate(r.x, r.y)
       ctx.scale(r.face * 1.25, 1.25)
       drawDino(ctx, 'rex', {
+        skin: vs.names.dinos.rex,
         time: t,
         walk: r.walk,
         moving: r.onGround && Math.abs(r.vx) > 20,
@@ -458,7 +459,7 @@ export function drawVersus(game, ctx) {
     }
     ctx.save()
     ctx.translate(u.x, u.y + Math.sin(t * 3) * 3)
-    drawUFO(ctx, { time: t, hurt: u.hurt > 0, stun: u.stun > 0 && u.hp > 0, mood: 'happy' })
+    drawUFO(ctx, { time: t, tint: vs.names.aliens.ufo, hurt: u.hurt > 0, stun: u.stun > 0 && u.hp > 0, mood: 'happy' })
     ctx.restore()
     for (const b of vs.bolts) {
       ctx.fillStyle = '#2ce8f5'

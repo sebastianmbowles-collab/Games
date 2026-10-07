@@ -1,6 +1,7 @@
 // Screens for typing your name, picking your school year, and setting up a 2-player game.
 
-import { W, H, INK, rrect, text, AVATARS, drawAvatar } from './art'
+import { W, H, INK, rrect, text, AVATARS, drawAvatar, drawUFO, drawDino } from './art'
+import { COLOURS, HATS, TITLES, UFO_PAINTS, REX_PAINTS, choice, colourOf, titleOf } from './custom'
 import { sfx } from './sound'
 import { inside, drawButton, drawTitleWorld, updateTitleWorld } from './menus'
 import { checkName, safeName, yearLabel, YEAR_LEVELS, MAX_NAME } from './names'
@@ -266,7 +267,7 @@ function typeCode(game, ch) {
 // What this player tells the other while setting up.
 function lobbyState(game) {
   const mp = game.mp
-  return { role: mp.session.role, name: game.profile.name, year: game.profile.year, pic: game.profile.pic || 'rex', side: mp.side || '', ph: 'lobby' }
+  return { role: mp.session.role, name: game.profile.name, year: game.profile.year, pic: game.profile.pic || 'rex', color: game.profile.color || '', hat: game.profile.hat || '', title: game.profile.title || '', ufo: game.profile.ufo || '', rex: game.profile.rex || '', side: mp.side || '', ph: 'lobby' }
 }
 
 // ---------- shared hooks the game calls ----------
@@ -488,8 +489,12 @@ export function drawLobby(game, ctx) {
     const dinos = mp.side === 'dinos' ? me : them
     const pics = AVATARS.map((x) => x.id)
     const picOf = (who) => (pics.includes(who.pic) ? who.pic : 'rex')
-    drawAvatar(ctx, picOf(mp.side === 'aliens' ? game.profile : them), 110, 178)
-    drawAvatar(ctx, picOf(mp.side === 'dinos' ? game.profile : them), 110, 280)
+    const alienP = mp.side === 'aliens' ? game.profile : them
+    const dinoP = mp.side === 'dinos' ? game.profile : them
+    drawAvatar(ctx, picOf(alienP), 110, 178, false, lookOf(alienP))
+    drawAvatar(ctx, picOf(dinoP), 110, 280, false, lookOf(dinoP))
+    if (titleOf(alienP)) text(ctx, titleOf(alienP), W / 2, 212, 12, '#c0cbdc')
+    if (titleOf(dinoP)) text(ctx, titleOf(dinoP), W / 2, 314, 12, '#c0cbdc')
     text(ctx, line('aliens', aliens), W / 2, 190, 32, '#7dffb0')
     text(ctx, 'VS', W / 2, 240, 28, '#fee761')
     text(ctx, line('dinos', dinos), W / 2, 292, 32, '#ffa94d')
@@ -500,9 +505,38 @@ export function drawLobby(game, ctx) {
   if (mp.err) text(ctx, mp.err, W / 2, mp.step === 'code' ? 244 : 516, 16, '#ff8fa0')
 }
 
-// ---------- My Profile: picture, school year, delete account ----------
+// ---------- My Profile: picture, colour, hat, title, paint jobs, school year, delete account ----------
 
-const PIC_GRID = AVATARS.map((a, i) => ({ id: `pic:${a.id}`, pic: a.id, x: W / 2 - 330 + (i % 4) * 170, y: 150 + Math.floor(i / 4) * 150, w: 150, h: 136 }))
+const FIELDS = {
+  pic: { title: 'PICK YOUR PICTURE', hint: 'Tap a dino or an alien', list: AVATARS },
+  color: { title: 'FAVOURITE COLOUR', hint: 'For your name and your picture frame', list: COLOURS },
+  hat: { title: 'PICK A HAT', hint: 'It sits on your profile picture', list: HATS },
+  title: { title: 'PICK A TITLE', hint: 'It shows under your name', list: TITLES },
+  ufo: { title: 'UFO PAINT', hint: 'Your UFO when you play as the aliens', list: UFO_PAINTS },
+  rex: { title: 'T. REX PAINT', hint: 'Your T. rex when you play as the dinos', list: REX_PAINTS },
+}
+
+const MAIN_ITEMS = [
+  ['pic', 'PICTURE', '#63c74d'],
+  ['color', 'COLOUR', '#fee761'],
+  ['hat', 'HAT', '#f6757a'],
+  ['title', 'TITLE', '#2ce8f5'],
+  ['ufo', 'UFO PAINT', '#8b9bb4'],
+  ['rex', 'T. REX PAINT', '#63c74d'],
+  ['year', 'SCHOOL YEAR', '#6bb8ff'],
+  ['del', 'DELETE ACCOUNT', '#e43b44'],
+]
+
+// how your picture looks: frame colour and hat
+export const lookOf = (p) => ({ color: colourOf(p), hat: choice(HATS, p?.hat) })
+
+function pickerTiles(field) {
+  const list = FIELDS[field].list
+  const rows = Math.ceil(list.length / 4)
+  const h = rows > 2 ? 96 : 136
+  const gap = rows > 2 ? 10 : 14
+  return list.map((opt, i) => ({ id: `set:${field}:${opt.id}`, opt, field, x: W / 2 - 330 + (i % 4) * 170, y: 128 + Math.floor(i / 4) * (h + gap), w: 150, h }))
+}
 
 export function openAccount(game) {
   game.acct = { step: 'main', sel: 0 }
@@ -513,12 +547,10 @@ function accountButtons(game) {
   const step = game.acct.step
   if (step === 'main')
     return [
-      { id: 'pic', label: 'CHANGE PICTURE', color: '#63c74d', x: W / 2 + 10, y: 150, w: 320, h: 52, size: 20 },
-      { id: 'year', label: 'CHANGE SCHOOL YEAR', color: '#6bb8ff', x: W / 2 + 10, y: 216, w: 320, h: 52, size: 20 },
-      { id: 'del', label: 'DELETE ACCOUNT', color: '#e43b44', x: W / 2 + 10, y: 282, w: 320, h: 52, size: 20 },
+      ...MAIN_ITEMS.map(([id, label, color], i) => ({ id, label, color, x: i % 2 ? W / 2 + 185 : W / 2 - 25, y: 116 + Math.floor(i / 2) * 58, w: 200, h: 48, size: 15 })),
       { id: 'back', label: '◀  BACK', color: '#ffe14a', x: W / 2 - 110, y: 440, w: 220, h: 48, size: 20 },
     ]
-  if (step === 'pic') return [...PIC_GRID, { id: 'main', label: '◀  DONE', color: '#ffe14a', x: W / 2 - 110, y: 470, w: 220, h: 46, size: 20 }]
+  if (step === 'pick') return [...pickerTiles(game.acct.field), { id: 'main', label: '◀  DONE', color: '#ffe14a', x: W / 2 - 110, y: 470, w: 220, h: 46, size: 20 }]
   if (step === 'del1')
     return [
       { id: 'main', label: 'NO, KEEP IT', color: '#63c74d', x: W / 2 - 300, y: 330, w: 280, h: 60, size: 22 },
@@ -532,8 +564,9 @@ function accountButtons(game) {
 
 function accountPress(game, id) {
   const a = game.acct
-  if (id.startsWith('pic:')) {
-    game.profile.pic = id.slice(4)
+  if (id.startsWith('set:')) {
+    const [, field, value] = id.split(':')
+    game.profile[field] = value
     game.persist()
     sfx.capture()
     return
@@ -541,8 +574,12 @@ function accountPress(game, id) {
   sfx.click()
   if (id === 'back') game.goScene('settings')
   else if (id === 'year') openProfile(game, () => openAccount(game), 'year')
-  else if (id === 'pic' || id === 'main' || id === 'del2') {
-    a.step = id === 'del' ? 'del1' : id
+  else if (FIELDS[id]) {
+    a.step = 'pick'
+    a.field = id
+    a.sel = 0
+  } else if (id === 'main' || id === 'del2') {
+    a.step = id
     a.sel = 0
     if (id === 'del2') sfx.warn()
   } else if (id === 'del') {
@@ -579,6 +616,38 @@ function updateAccount(game) {
   if (k.has('enter') || k.has('action')) accountPress(game, btns[a.sel].id)
 }
 
+function drawTile(ctx, game, b, selected) {
+  const p = game.profile
+  const t = game.time
+  const { field, opt } = b
+  const on = choice(FIELDS[field].list, p[field]) === opt.id
+  rrect(ctx, b.x, b.y, b.w, b.h, 16)
+  ctx.fillStyle = on ? '#3a4466' : selected ? '#262b44' : '#181425'
+  ctx.fill()
+  ctx.lineWidth = on ? 5 : 2
+  ctx.strokeStyle = on ? colourOf(p) : 'rgba(255,255,255,0.3)'
+  ctx.stroke()
+  const cx = b.x + b.w / 2
+  const look = lookOf(p)
+  if (field === 'pic') drawAvatar(ctx, opt.id, cx, b.y + 60, false, look)
+  else if (field === 'color') drawAvatar(ctx, p.pic, cx, b.y + 50, false, { ...look, color: opt.hex })
+  else if (field === 'hat') drawAvatar(ctx, p.pic, cx, b.y + 56, false, { ...look, hat: opt.id })
+  else if (field === 'title') text(ctx, opt.name, cx, b.y + b.h / 2 + 6, 14, colourOf(p))
+  else if (field === 'ufo') {
+    ctx.save()
+    ctx.translate(cx, b.y + 58)
+    drawUFO(ctx, { time: t, tint: opt.id, mood: 'happy' })
+    ctx.restore()
+  } else if (field === 'rex') {
+    ctx.save()
+    ctx.translate(cx, b.y + 98)
+    ctx.scale(-1, 1)
+    drawDino(ctx, 'rex', { time: t, skin: opt.id })
+    ctx.restore()
+  }
+  if (field !== 'title') text(ctx, opt.name, cx, b.y + b.h - 12, 12, '#ffffff')
+}
+
 function drawAccount(game, ctx) {
   const t = game.time
   const a = game.acct
@@ -586,14 +655,15 @@ function drawAccount(game, ctx) {
   if (!p) return
   const btns = accountButtons(game)
   if (a.step === 'main') {
-    text(ctx, 'MY PROFILE', W / 2, 80, 40, '#fee761')
-    drawAvatar(ctx, p.pic, W / 2 - 200, 220, true)
-    text(ctx, p.name, W / 2 - 200, 330, 28, '#ffffff')
-    text(ctx, yearLabel(p.year), W / 2 - 200, 362, 18, '#c0cbdc')
-    text(ctx, `$ ${game.shop.coins} COINS  ·  BEST: ALIENS ${game.best.aliens || 0}  ·  DINOS ${game.best.dinos || 0}`, W / 2, 408, 14, '#fee761')
-  } else if (a.step === 'pic') {
-    text(ctx, 'PICK YOUR PICTURE', W / 2, 80, 34, '#fee761')
-    text(ctx, 'Tap a dino or an alien', W / 2, 110, 14, '#c0cbdc')
+    text(ctx, 'MY PROFILE', W / 2, 70, 40, '#fee761')
+    drawAvatar(ctx, p.pic, W / 2 - 250, 210, true, lookOf(p))
+    text(ctx, p.name, W / 2 - 250, 316, 28, colourOf(p))
+    if (titleOf(p)) text(ctx, titleOf(p), W / 2 - 250, 342, 15, '#ffffff')
+    text(ctx, yearLabel(p.year), W / 2 - 250, 366, 15, '#c0cbdc')
+    text(ctx, `$ ${game.shop.coins} COINS  ·  BEST: ALIENS ${game.best.aliens || 0}  ·  DINOS ${game.best.dinos || 0}`, W / 2, 412, 14, '#fee761')
+  } else if (a.step === 'pick') {
+    text(ctx, FIELDS[a.field].title, W / 2, 76, 34, '#fee761')
+    text(ctx, FIELDS[a.field].hint, W / 2, 106, 14, '#c0cbdc')
   } else if (a.step === 'del1') {
     text(ctx, '⚠ WARNING ⚠', W / 2, 120, 40, '#e43b44')
     text(ctx, `DELETE ${p.name}'S ACCOUNT?`, W / 2, 180, 28, '#ffffff')
@@ -606,17 +676,7 @@ function drawAccount(game, ctx) {
     text(ctx, 'This can NOT be undone. Your game will be gone forever!', W / 2, 230, 16, '#ff8fa0')
   }
   for (const [i, b] of btns.entries()) {
-    if (b.pic) {
-      const on = p.pic === b.pic || (!p.pic && b.pic === 'rex')
-      const hover = a.sel === i || inside(game.mouse, b)
-      rrect(ctx, b.x, b.y, b.w, b.h, 16)
-      ctx.fillStyle = on ? '#3a4466' : hover ? '#262b44' : '#181425'
-      ctx.fill()
-      ctx.lineWidth = on ? 5 : 2
-      ctx.strokeStyle = on ? '#fee761' : 'rgba(255,255,255,0.3)'
-      ctx.stroke()
-      drawAvatar(ctx, b.pic, b.x + b.w / 2, b.y + 56)
-      text(ctx, AVATARS.find((x) => x.id === b.pic).name, b.x + b.w / 2, b.y + 118, 12, '#ffffff')
-    } else drawButton(ctx, b, a.sel === i, t)
+    if (b.opt) drawTile(ctx, game, b, a.sel === i || inside(game.mouse, b))
+    else drawButton(ctx, b, a.sel === i, t)
   }
 }
