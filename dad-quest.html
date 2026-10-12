@@ -1964,6 +1964,7 @@ function titleScene(skipIntro) {
         }
         txt('Z/SPACE=A  ARROWS', 10, 180, { size: 5, c: '#9c9' });
         txt('A GAME BY SEBBY', 310, 180, { a: 'right', size: 5, c: '#9c9' });
+        txt('HAPPY BIRTHDAY DAD! LOVE FROM SEBBY', 160, 166, { a: 'center', size: 6, c: ['#ffd800', '#ff7ab8', '#8fe8ff', '#fff'][(frame >> 4) % 4] });
       }
       for (const p of pts) { g.fillStyle = p.c; g.fillRect(p.x, p.y, 2, 2); }
     },
