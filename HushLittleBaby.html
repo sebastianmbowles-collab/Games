@@ -431,7 +431,7 @@ const cam = { x: 0, y: 0 };
 function newGame() {
   buildWorld();
   P = { x: 59.5, y: 59.5, z: 1, vz: 0, r: .28, h: .9, onGround: true, coyote: 0, jumpBuf: 0, dashT: 0, dashCd: 0, airDash: true, dashDir: [1, 0],
-    face: 1, lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
+    face: 1, dir: 'down', lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
   cam.x = P.x * 16; cam.y = P.y * 16 - P.z * 6;
   lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false;
   state = 'play';
@@ -510,6 +510,7 @@ function updatePlayer(dt) {
   const ml = Math.hypot(mx, my);
   if (ml > 1e-3) { const s = Math.min(1, Math.hypot(ix, iy)) / ml; mx *= s; my *= s; } else { mx = my = 0; }
   if (Math.abs(ix) > .2) P.face = ix > 0 ? 1 : -1;
+  if (Math.hypot(ix, iy) > .2) P.dir = Math.abs(iy) > Math.abs(ix) ? (iy < 0 ? 'up' : 'down') : 'side';
   if (ml > .1) P.dashDir = [mx / Math.hypot(mx, my), my / Math.hypot(mx, my)];
 
   P.coyote -= dt; P.jumpBuf -= dt; P.dashCd -= dt; P.inv -= dt; P.slowT -= dt;
@@ -820,7 +821,8 @@ const PALC = {
   k: '#000000', w: '#ffffff', s: '#f6d2b4', S: '#d8a888', b: '#9ad0ff', B: '#2a3a7a', r: '#d02838', R: '#6a1010',
   y: '#f8e070', Y: '#b89a30', o: '#e08020', n: '#7b5234', N: '#3a2414', p: '#f09ab0', P: '#b05a70', g: '#a0a0a8',
   G: '#4a4a52', v: '#6a2a8a', V: '#b08ad8', c: '#f0e8d0', h: '#d8b048', e: '#ff2020', u: '#b07038', U: '#7a4a20',
-  l: '#e8e8f8', m: '#3a8a3a', t: '#c8a070'
+  l: '#e8e8f8', m: '#3a8a3a', t: '#c8a070',
+  q: '#6aa0d8', x: '#c8c0b8', a: '#e0b090', d: '#a07850', f: '#ffc0d0', i: '#8a1a24', j: '#fff6b8', z: '#5a3a20'
 };
 function spriteFromRows(rows) {
   const w = Math.max(...rows.map(r => r.length)), c = document.createElement('canvas'); c.width = w; c.height = rows.length;
@@ -859,19 +861,122 @@ function grid(w, h) {
 const SPR = {};
 function buildSprites() {
   const R = spriteFromRows;
-  const babyTop = ['....NN......', '...sNNss....', '..ssssssss..', '.ssssssssss.', '.ssksssskss.', '.ssssssssss.', '.ssssppssss.',
-    '..ssssssss..', '..bbbbbbbb..', '.sbbbbbbbbs.', '.sbbbbbbbbs.', '..wwwwwwww..', '..wwwwwwww..'];
-  SPR.baby = [R([...babyTop, '..ss....ss..']), R([...babyTop, '...ss..ss...'])];
-  const toyTop = ['.nn......nn.', 'nNNn....nNNn', '.nnnnnnnnnn.', 'nnknnnnnnknn', 'nknknnnnknkn', 'nnknnnnnnknn', 'nnnnccccnnnn',
-    '.nnncGGcnnn.', '..nnnnnnnn..', '.nnnnnnnnnng', 'nnnnnccnnnng', 'nnnnnnnnnnnn'];
-  SPR.toy = [R([...toyTop, '.nnn....nnn.']), R([...toyTop, '..nnn..nnn..'])];
-  SPR.pig = R(['..pp......pp..', '.pPpp....ppPp.', '.pppppppppppp.', 'ppkeppppppkepp', 'pppppPPPPppppp', 'ppppPkPPkPpppp',
-    'pppppPPPPppppp', '.pppppppppppp.', '.pp.pp..pp.pp.', '.PP.PP..PP.PP.']);
-  SPR.littlebun = R(['...uuuuuu...', '.uuuucUuuuu.', 'uuuuucuuuuuu', 'cccccccccccc', 'ukeuucuuukeu', 'uuuuucuuuuuu', 'uuRRucuuRRuu',
-    '.uuuucuuuuu.', '..uuuuuuuu..', '...UUUUUU...']);
-  SPR.duckling = R(['...yyyy...', '..yyyyyy..', '..yyyykyoo', '..yyyyyyoo', '...yyyy...', '.yyyyyyy..', 'yyYYyyyyy.', '.yyyyyyy..', '..o...o...']);
-  SPR.tinyspider = [R(['k..k....k..k', '.k.k....k.k.', '..kkkkkkkk..', 'kkkkRRRRkkkk', '..kkkkkkkk..', 'kkkkekekkkkk', '..kkkkkkkk..', '.k.k....k.k.', 'k..k....k..k']),
-    R(['.k.k....k.k.', 'k..k....k..k', '..kkkkkkkk..', 'kkkkRRRRkkkk', '..kkkkkkkk..', 'kkkkekekkkkk', '..kkkkkkkk..', 'k..k....k..k', '.k.k....k.k.'])];
+  // --- the baby: front, back and side, two walking frames each ---
+  const babyBody = (g, side) => {
+    if (side) g.ell(7.5, 13.5, 4, 3.5, 'b').swap('b', 'q', (i, j) => j > 14 || i < 5).rect(4, 14, 7, 2, 'w').rect(4, 15, 7, 1, 'x').rect(9, 11, 3, 2, 's').px(11, 11, 'a');
+    else g.ell(8, 13.5, 5, 3.5, 'b').swap('b', 'q', (i, j) => j > 14 || i > 11).rect(5, 14, 6, 2, 'w').rect(5, 15, 6, 1, 'x').rect(2, 11, 2, 3, 's').rect(12, 11, 2, 3, 'a');
+  };
+  const legs = (g, f, side) => {
+    if (side) { if (f) g.rect(4, 16, 2, 2, 's').rect(9, 16, 2, 1, 's'); else g.rect(5, 16, 2, 2, 's').rect(8, 16, 2, 2, 's'); }
+    else if (f) g.rect(5, 16, 2, 2, 's').rect(9, 16, 2, 1, 's');
+    else g.rect(5, 16, 2, 1, 's').rect(9, 16, 2, 2, 's');
+  };
+  const babyFront = f => {
+    const g = grid(16, 19); babyBody(g); legs(g, f);
+    g.ell(8, 6, 6, 5.5, 's').swap('s', 'a', (i, j) => i > 11 && j < 11).px(8, 0, 'N').px(7, 1, 'N').px(9, 1, 'N').px(8, 2, 'N')
+      .rect(5, 6, 2, 2, 'k').rect(10, 6, 2, 2, 'k').px(5, 6, 'w').px(10, 6, 'w').px(4, 9, 'p').px(12, 9, 'p').rect(7, 9, 3, 1, 'P');
+    return g.outline('k').done();
+  };
+  const babyBack = f => {
+    const g = grid(16, 19); babyBody(g); legs(g, f);
+    g.ell(8, 6, 6, 5.5, 's').swap('s', 'a', (i, j) => i > 11).swap('s', 'N', (i, j) => j < 5).swap('a', 'N', (i, j) => j < 5)
+      .px(8, 0, 'N').px(7, 1, 'N').px(9, 1, 'N').px(2, 6, 'S').px(14, 6, 'S').px(8, 5, 'N').px(7, 6, 'n').px(9, 6, 'n');
+    return g.outline('k').done();
+  };
+  const babySide = f => {
+    const g = grid(16, 19); babyBody(g, true); legs(g, f, true);
+    g.ell(8, 6, 5.5, 5.5, 's').swap('s', 'N', (i, j) => j < 4 && i < 10).px(14, 7, 's').px(7, 0, 'N').px(6, 1, 'N').px(8, 1, 'N')
+      .px(5, 6, 'a').px(5, 7, 'a').rect(10, 5, 2, 2, 'k').px(10, 5, 'w').px(11, 9, 'p').px(13, 9, 'P');
+    return g.outline('k').done();
+  };
+  SPR.baby = { down: [babyFront(0), babyFront(1)], up: [babyBack(0), babyBack(1)], side: [babySide(0), babySide(1)] };
+  // --- small enemies ---
+  SPR.toy = [0, 1].map(f => {
+    const g = grid(19, 20);
+    g.ell(4, 3, 3, 3, 'n').ell(14, 3, 3, 3, 'n').ell(4, 3, 1.5, 1.5, 'd').ell(14, 3, 1.5, 1.5, 'd')
+      .ell(9, 13.5, 6, 5, 'n').ell(9, 14, 3.5, 3, 'd').ell(9, 7, 6.5, 5.5, 'n').swap('n', 'U', i => i > 12)
+      .ell(9, 9, 2.5, 1.8, 'd').px(9, 8, 'k').px(6, 6, 'k').px(5, 5, 'k').px(7, 5, 'k').px(5, 7, 'k').px(7, 7, 'k')
+      .rect(11, 5, 3, 3, 'k').px(11, 5, 'e').line(7, 11, 11, 11, 'N').px(8, 10, 'N').px(10, 10, 'N')
+      .px(9, 15, 'c').px(10, 16, 'c').px(8, 16, 'c').rect(16, 12, 2, 1, 'g').rect(17, 10, 1, 5, 'g');
+    if (f) g.rect(4, 17, 3, 2, 'U').rect(11, 18, 3, 1, 'U'); else g.rect(4, 18, 3, 1, 'U').rect(11, 17, 3, 2, 'U');
+    return g.outline('k').done();
+  });
+  SPR.pig = grid(20, 16).ell(10, 9, 8.5, 5.5, 'p').swap('p', 'P', (i, j) => j > 11).poly([[3, 5], [6, 1], [8, 6]], 'p').poly([[17, 5], [14, 1], [12, 6]], 'p')
+    .ell(10, 9.5, 3.5, 2.5, 'f').px(9, 9, 'R').px(11, 9, 'R').rect(5, 6, 2, 2, 'k').px(5, 6, 'e').rect(13, 6, 2, 2, 'k').px(14, 6, 'e')
+    .rect(4, 13, 2, 2, 'P').rect(14, 13, 2, 2, 'P').outline('k').done();
+  SPR.littlebun = grid(16, 13).ell(8, 6.5, 6.5, 5.5, 'u').rect(2, 6, 13, 4, 'u').swap('u', 'U', (i, j) => j > 8).ell(5, 3, 2, 1, 'o')
+    .rect(2, 5, 13, 2, 'c').rect(7, 1, 2, 9, 'c').px(4, 3, 'e').px(5, 3, 'e').px(11, 3, 'e').px(12, 3, 'e')
+    .px(4, 8, 'R').px(5, 8, 'R').px(11, 8, 'R').px(12, 8, 'R').outline('k').done();
+  SPR.duckling = grid(15, 14).ell(6, 9, 5, 3.5, 'y').ell(8.5, 4.5, 3.5, 3.5, 'y').swap('y', 'Y', (i, j) => j > 10).poly([[11, 4], [14, 5], [11, 6.5]], 'o')
+    .px(9, 3, 'k').px(9, 4, 'e').ell(4.5, 9, 2.5, 1.5, 'Y').px(4, 12, 'o').px(7, 12, 'o').outline('k').done();
+  SPR.tinyspider = [0, 1].map(f => {
+    const g = grid(17, 13);
+    for (let k = 0; k < 4; k++) for (const s of [-1, 1]) { const w = (f + k) & 1; g.line(8, 5 + k * .7, 8 + s * 4, 2 + k * 2 + w, 'k').line(8 + s * 4, 2 + k * 2 + w, 8 + s * 7, 4 + k * 2.2, 'k'); }
+    return g.ell(8, 4.5, 3.5, 3, 'k').ell(8, 8.5, 2.5, 2, 'k').px(8, 4, 'R').px(8, 5, 'R').px(7, 8, 'e').px(9, 8, 'e').outline('G').done();
+  });
+  // --- bosses ---
+  {
+    const g = grid(28, 38);
+    g.rect(23, 6, 1, 30, 'z').rect(20, 2, 7, 1, 'g').rect(20, 0, 1, 3, 'g').rect(23, 0, 1, 3, 'g').rect(26, 0, 1, 3, 'g'); // pitchfork
+    g.rect(8, 27, 4, 7, 'B').rect(14, 27, 4, 7, 'B').rect(7, 34, 5, 3, 'N').rect(14, 34, 5, 3, 'N');                     // legs and boots
+    g.rect(5, 16, 16, 12, 'r'); for (let k = 5; k < 21; k += 3) g.rect(k, 16, 1, 12, 'i'); for (let k = 18; k < 28; k += 3) g.rect(5, k, 16, 1, 'i'); // plaid shirt
+    g.rect(8, 19, 10, 9, 'B').rect(8, 16, 2, 3, 'B').rect(16, 16, 2, 3, 'B').px(9, 20, 'y').px(16, 20, 'y');            // overalls
+    g.rect(2, 17, 3, 8, 'r').rect(21, 17, 3, 6, 'r').rect(2, 25, 3, 2, 'c').rect(21, 23, 3, 3, 'c');                     // arms
+    g.ell(13, 11, 6, 5.5, 'c').swap('c', 'x', (i, j) => i > 16 && j > 5 && j < 17)
+      .ell(10.5, 10, 1.6, 2, 'k').ell(15.5, 10, 1.6, 2, 'k').px(10, 10, 'e').px(15, 10, 'e').line(9, 14, 17, 14, 'R').px(8, 13, 'R').px(18, 13, 'R');
+    for (let k = 10; k <= 16; k += 2) g.px(k, 14, 'w');
+    g.ell(13, 6, 10, 2, 'h').rect(8, 1, 10, 5, 'h').rect(8, 4, 10, 1, 'R').swap('h', 'Y', (i, j) => j === 7 || (i > 15 && j < 4));
+    SPR.mac = g.outline('k').done();
+  }
+  {
+    const pts = []; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? 6.5 : 15.5; pts.push([17 + Math.cos(a) * rr, 18 + Math.sin(a) * rr]); }
+    const g = grid(34, 35).poly(pts, 'y').swap('y', 'Y', (i, j) => (i - 17) + (j - 18) > 7).swap('y', 'j', (i, j) => (i - 17) + (j - 18) < -12);
+    g.ell(12, 16, 2.5, 3.5, 'k').ell(22, 16, 2.5, 3.5, 'k').px(12, 15, 'w').px(22, 15, 'w').px(11, 17, 'e').px(21, 17, 'e').line(11, 23, 23, 23, 'N');
+    for (let k = 11; k <= 23; k += 2) g.px(k, 22, 'N').px(k + 1, 24, 'N');
+    g.px(9, 12, 'Y').px(10, 11, 'Y').px(24, 11, 'Y').px(25, 12, 'Y');
+    SPR.starBoss = g.outline('k').done();
+  }
+  {
+    const g = grid(36, 30);
+    g.ell(18, 15, 16, 11, 'u').rect(2, 15, 32, 8, 'u').swap('u', 'U', (i, j) => j > 20 || i > 30).ell(11, 8, 5, 2.5, 'o').px(9, 7, 'j').px(10, 7, 'j')
+      .rect(3, 13, 30, 3, 'c').rect(16, 4, 4, 19, 'c').swap('c', 'x', (i, j) => j === 15 || i === 19)
+      .rect(7, 8, 5, 3, 'k').rect(8, 9, 2, 1, 'e').rect(24, 8, 5, 3, 'k').rect(26, 9, 2, 1, 'e')
+      .rect(7, 18, 6, 2, 'R').rect(23, 18, 6, 2, 'R').px(8, 18, 'w').px(11, 18, 'w').px(24, 18, 'w').px(27, 18, 'w').rect(2, 23, 32, 1, 'z');
+    for (const sx of [10, 18, 26]) g.px(sx, 2, 'l').px(sx + 1, 1, 'l').px(sx, 0, 'l');
+    SPR.bun = g.outline('k').done();
+  }
+  SPR.spider = [0, 1].map(f => {
+    const g = grid(42, 32), cx = 21;
+    for (let k = 0; k < 4; k++) for (const s of [-1, 1]) {
+      const w = (f + k) % 2 ? 1 : -1, kx = cx + s * (11 + k * 2), ky = 3 + k * 6 + w;
+      g.line(cx, 10 + k * 2, kx, ky, 'G').line(kx, ky, cx + s * (18 + k), 12 + k * 5, 'G').px(kx, ky, 'g');
+    }
+    g.ell(cx, 10, 9, 8, 'k').ell(cx - 3, 6, 3, 2, 'G').rect(cx - 1, 7, 2, 2, 'r').rect(cx - 2, 9, 4, 1, 'r').rect(cx - 1, 10, 2, 2, 'r').ell(cx, 21, 6, 5, 'k');
+    for (const [ex, ey] of [[-2, 19], [2, 19], [-4, 21], [4, 21], [-1, 22], [1, 22]]) g.px(cx + ex, ey, 'e');
+    return g.px(cx - 2, 26, 'w').px(cx + 2, 26, 'w').px(cx - 2, 27, 'w').px(cx + 2, 27, 'w').outline('G').done();
+  });
+  SPR.duck = grid(37, 37).ell(14, 25, 13, 8.5, 'c').poly([[1, 20], [7, 15], [9, 23]], 'c').rect(18, 11, 7, 12, 'c').ell(22, 10, 7, 6.5, 'c')
+    .swap('c', 'x', (i, j) => j > 29 || (j > 16 && i < 4)).poly([[28, 8], [35, 10], [28, 13]], 'o').line(28, 10, 34, 10, 'z').px(30, 9, 'z')
+    .rect(23, 7, 3, 3, 'k').px(24, 8, 'e').line(22, 5, 26, 6, 'k').ell(12, 24, 8, 4.5, 'g').line(5, 24, 18, 24, 'G')
+    .ell(8, 27, 2, 2, 'v').ell(12, 28, 2, 2, 'v').ell(10, 30, 2, 2, 'v').px(7, 26, 'V').px(11, 27, 'V')
+    .rect(10, 33, 2, 3, 'o').rect(18, 33, 2, 3, 'o').rect(9, 35, 4, 1, 'o').rect(17, 35, 4, 1, 'o').outline('k').done();
+  {
+    const head = grid(32, 32).ell(16, 16, 14, 14, 's').swap('s', 'a', i => i > 22).swap('s', 'N', (i, j) => j < 10).swap('a', 'N', (i, j) => j < 10)
+      .rect(7, 9, 18, 2, 'N').px(6, 11, 'N').px(25, 11, 'N').ell(11, 17, 3.5, 4.5, 'k').ell(21, 17, 3.5, 4.5, 'k').px(11, 16, 'w').px(21, 16, 'w')
+      .line(23, 4, 19, 11, 'k').line(19, 11, 22, 14, 'k').line(11, 25, 21, 25, 'R').px(10, 24, 'R').px(22, 24, 'R')
+      .rect(5, 21, 2, 1, 'p').rect(25, 21, 2, 1, 'p');
+    const shoulders = grid(36, 28).rect(8, 7, 20, 19, 'v').swap('v', 'V', (i, j) => i < 11 && j < 18).ell(8, 8, 6.5, 4.5, 's').ell(28, 8, 6.5, 4.5, 's')
+      .rect(1, 10, 5, 16, 's').rect(30, 10, 5, 16, 'a').rect(1, 24, 5, 3, 'S').rect(30, 24, 5, 3, 'S').ell(18, 6.5, 4.5, 2, 'k').ell(18, 17, 5, 6, 'R').ell(18, 17, 3, 4, 'k');
+    for (let k = 14; k <= 22; k += 2) shoulders.px(k, 12, 'w');
+    for (let k = 15; k <= 21; k += 2) shoulders.px(k, 22, 'w');
+    const knees = grid(32, 28).rect(6, 14, 7, 13, 'a').rect(19, 14, 7, 13, 'a').ell(9.5, 11, 7.5, 7.5, 's').ell(22.5, 11, 7.5, 7.5, 's')
+      .swap('s', 'a', (i, j) => j > 15).ell(7, 9, 1.5, 2, 'k').ell(12, 9, 1.5, 2, 'k').ell(20, 9, 1.5, 2, 'k').ell(25, 9, 1.5, 2, 'k')
+      .px(7, 8, 'e').px(12, 8, 'e').px(20, 8, 'e').px(25, 8, 'e').line(7, 14, 12, 14, 'R').line(20, 14, 25, 14, 'R').px(9, 14, 'w').px(22, 14, 'w')
+      .rect(6, 25, 7, 2, 'S').rect(19, 25, 7, 2, 'S');
+    const toes = grid(38, 24).rect(4, 1, 11, 13, 's').swap('s', 'a', i => i > 11).ell(17, 16, 15, 6.5, 's').swap('s', 'a', (i, j) => j > 19);
+    [[25, 11, 3.2], [29, 12, 2.8], [32, 14, 2.4], [34, 16, 2.1], [35, 18.5, 1.8]].forEach(([x, y, r]) => { toes.ell(x, y, r, r, 's'); toes.px(x, y - 1, 'k'); toes.px(x - 1, y, 'R'); });
+    SPR.final = [head, shoulders, knees, toes].map(g => g.outline('k').done());
+  }
   SPR.bottle = R(['...t...', '..ttt..', '.bbbbb.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '..www..']);
   SPR.pacifier = R(['...ppp...', '..p...p..', '..p...p..', '...ppp...', '.bbbbbbb.', 'bbbbbbbbb', '.bbpppbb.', '...ppp...', '...ppp...']);
   SPR.doll = R(['..NNNN..', '.NccccN.', '.ckcccc.', '.cccGcc.', '.ccRRcc.', '..cccc..', '.RRRRRR.', 'RRRRRRRR', 'cRRRRRRc', '.RRRRRR.', '.RRRRRR.', '..c..c..']);
@@ -890,48 +995,6 @@ function buildSprites() {
   SPR.eye = R(['..ccccc..', '.ccRRRcc.', 'ccRRkRRcc', '.ccRRRcc.', '..ccccc..']);
   SPR.eyeShut = R(['.........', '.........', 'ccccccccc', '.........', '.........']);
   SPR.door = grid(16, 24).rect(1, 2, 14, 21, 'c').ell(8, 3, 7, 3, 'c').rect(4, 4, 1, 18, 'Y').rect(8, 3, 1, 19, 'Y').rect(11, 4, 1, 18, 'Y').outline('y').done();
-  // --- bosses ---
-  SPR.mac = R([
-    '.................g.g', '.................g.g', '.......YYYYYY....ggg', '.......YhhhhY.....N.', '.......hhhhhh.....N.', '.......RRRRRR.....N.',
-    '....YYYYYYYYYYYY..N.', '......cccccccc....N.', '......ckkcckkc....N.', '......ckecckec....N.', '......cccccccc....N.', '......cRwRwRwc....N.',
-    '.......cRRRRc.....N.', '........cccc......N.', '....rrrrrrrrrrrr..N.', '...rRrrBBBBBBrrRr.N.', '..rrRrrBBBBBBrrRrrcN', '..rrRr.BBBBBB.rRrrcN',
-    '..cc...BBBBBB...cc.N', '.......BBBBBB......N', '.......BBBBBB......N', '.......BBB.BBB.....N', '.......BBB.BBB.....N', '.......BBB.BBB.....N',
-    '.......BBB.BBB......', '......NNNN.NNNN.....']);
-  {
-    const pts = []; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? 5.5 : 13; pts.push([14 + Math.cos(a) * rr, 15 + Math.sin(a) * rr]); }
-    const g = grid(28, 29).poly(pts, 'y').swap('y', 'Y', (i, j) => j > 20);
-    g.rect(9, 12, 3, 4, 'k').rect(16, 12, 3, 4, 'k').px(10, 13, 'w').px(17, 13, 'w').rect(10, 19, 8, 1, 'N');
-    for (let k = 10; k < 18; k += 2) g.px(k, 18, 'N').px(k + 1, 20, 'N');
-    SPR.starBoss = g.outline('k').done();
-  }
-  SPR.bun = grid(32, 24).ell(16, 12, 15, 10, 'u').rect(2, 12, 28, 8, 'u').ell(10, 6, 4, 2, 'o').rect(3, 10, 26, 3, 'c').rect(14, 2, 4, 18, 'c')
-    .rect(7, 6, 4, 3, 'k').px(8, 7, 'e').px(9, 7, 'e').rect(21, 6, 4, 3, 'k').px(22, 7, 'e').px(23, 7, 'e').rect(7, 15, 5, 2, 'R').rect(20, 15, 5, 2, 'R')
-    .rect(2, 19, 28, 1, 'U').outline('k').done();
-  SPR.spider = [0, 1].map(f => {
-    const g = grid(38, 28);
-    for (let k = 0; k < 4; k++) for (const s of [-1, 1]) {
-      const w = (f + k) % 2 ? 1 : -1, kx = 19 + s * (10 + k * 2), ky = 3 + k * 5 + w;
-      g.line(19, 9 + k * 2, kx, ky, 'k').line(kx, ky, 19 + s * (16 + k), 10 + k * 5, 'k');
-    }
-    g.ell(19, 9, 8, 7, 'k').ell(19, 9, 2, 3, 'R').ell(19, 19, 5, 4, 'k');
-    for (const [ex, ey] of [[17, 18], [21, 18], [16, 20], [22, 20], [19, 21]]) g.px(ex, ey, 'e');
-    return g.outline('G').done();
-  });
-  SPR.duck = grid(33, 33).ell(13, 23, 12, 8, 'c').poly([[1, 19], [6, 14], [8, 21]], 'c').rect(17, 10, 6, 11, 'c').ell(20, 9, 6, 6, 'c')
-    .poly([[25, 7], [31, 9], [25, 11]], 'o').rect(21, 7, 2, 2, 'k').px(22, 7, 'e').ell(11, 22, 7, 4, 'g').ell(7, 26, 2, 2, 'v').ell(11, 27, 2, 2, 'v')
-    .rect(9, 30, 2, 3, 'o').rect(16, 30, 2, 3, 'o').outline('k').done();
-  {
-    const head = grid(30, 30).ell(15, 15, 13, 13, 's');
-    head.swap('s', 'N', (i, j) => j < 9).rect(8, 8, 14, 2, 'N').ell(10, 16, 3, 4, 'k').ell(20, 16, 3, 4, 'k').px(10, 15, 'w').px(20, 15, 'w')
-      .line(21, 4, 18, 10, 'k').line(18, 10, 20, 13, 'k').line(10, 23, 20, 23, 'R').px(9, 22, 'R').px(21, 22, 'R');
-    const shoulders = grid(34, 26).rect(7, 7, 20, 17, 'v').ell(7, 8, 6, 4, 's').ell(27, 8, 6, 4, 's').rect(1, 9, 4, 15, 's').rect(29, 9, 4, 15, 's')
-      .ell(17, 6, 4, 2, 'k').ell(17, 16, 4, 5, 'R').px(15, 12, 'w').px(17, 12, 'w').px(19, 12, 'w').px(16, 20, 'w').px(18, 20, 'w');
-    const knees = grid(30, 26).rect(5, 12, 6, 13, 'S').rect(19, 12, 6, 13, 'S').ell(8, 10, 7, 7, 's').ell(22, 10, 7, 7, 's')
-      .rect(5, 7, 2, 2, 'k').rect(10, 7, 2, 2, 'k').rect(19, 7, 2, 2, 'k').rect(24, 7, 2, 2, 'k').line(6, 12, 10, 12, 'R').line(20, 12, 24, 12, 'R');
-    const toes = grid(36, 22).rect(4, 1, 10, 12, 's').ell(16, 15, 14, 6, 's');
-    [[23, 10, 3], [27, 11, 2.6], [30, 13, 2.3], [32, 15, 2], [33, 17, 1.7]].forEach(([x, y, r]) => { toes.ell(x, y, r, r, 'S'); toes.px(x, y - 1, 'k'); });
-    SPR.final = [head, shoulders, knees, toes].map(g => g.outline('k').done());
-  }
 }
 
 // --- tile textures: two variants per tile type, drawn pixel by pixel ---
@@ -1023,13 +1086,13 @@ function drawBaby(ghostly) {
   if (!ghostly) shadow(P.x, P.y, P.z, 10);
   if (!ghostly && P.inv > 0 && Math.floor(time * 14) % 2) return;
   const moving = Math.abs(keys.left || keys.right || keys.up || keys.down || stick.x || stick.y ? 1 : 0);
-  const img = SPR.baby[P.onGround && moving ? Math.floor(P.walkT / 2) & 1 : 0];
+  const img = SPR.baby[P.dir][P.onGround && moving ? Math.floor(P.walkT / 2) & 1 : 0];
   if (ghostly) ctx.globalAlpha = .3;
-  const [sx, sy] = spr(img, P.x, P.y, P.z, P.face < 0);
+  const [sx, sy] = spr(img, P.x, P.y, P.z, P.dir === 'side' && P.face < 0);
   ctx.globalAlpha = 1;
   if (ghostly) return;
-  if (P.shield && Math.floor(time * 6) % 2) pixelRing(sx + 6, sy + 7, 10, '#ff6fb8');
-  if (P.slowT > 0) { ctx.fillStyle = PALC.l; for (let k = 0; k < 4; k++) ctx.fillRect(sx - 1, sy + 2 + k * 3, 14, 1); ctx.fillRect(sx + 3, sy, 1, 14); ctx.fillRect(sx + 8, sy, 1, 14); }
+  if (P.shield && Math.floor(time * 6) % 2) pixelRing(sx + 8, sy + 9, 11, '#ff6fb8');
+  if (P.slowT > 0) { ctx.fillStyle = PALC.l; for (let k = 0; k < 4; k++) ctx.fillRect(sx, sy + 3 + k * 4, 16, 1); ctx.fillRect(sx + 4, sy + 1, 1, 17); ctx.fillRect(sx + 11, sy + 1, 1, 17); }
 }
 function drawEnemy(e) {
   const flip = P.x < e.x;
@@ -1145,7 +1208,7 @@ function render() {
   const LW = lo.width, LH = lo.height;
   if (state === 'title') {
     drawVoid(time * 8, time * 4);
-    const b = SPR.baby[Math.floor(time * 3) & 1]; ctx.drawImage(b, (LW >> 1) - 6, Math.round(LH * .66));
+    const b = SPR.baby.down[Math.floor(time * 3) & 1]; ctx.drawImage(b, (LW >> 1) - 8, Math.round(LH * .66));
     crispPass(); drawTitle(); return;
   }
   cam.x += (P.x * TS - cam.x) * .15; cam.y += (P.y * TS - P.z * ELEV - cam.y) * .15;
@@ -1177,7 +1240,7 @@ function render() {
   ctx.globalAlpha = 1;
   drawBaby(true); // ghost outline so you never lose the baby behind walls
   // darkness around the baby, in 8-bit steps
-  const px = SX(P.x), py = SY(P.y, P.z) - 6, R = Math.min(LW, LH) * (door ? .9 : activeBoss() ? .7 : .55);
+  const px = SX(P.x), py = SY(P.y, P.z) - 6, R = Math.min(LW, LH) * (door ? .85 : activeBoss() ? .56 : .42);
   const flick = Math.random() < .02 ? .9 : 1;
   const dk = ctx.createRadialGradient(px, py, 0, px, py, R * flick);
   [[0, 0], [.5, 0], [.5, .3], [.68, .3], [.68, .6], [.85, .6], [.85, .88], [1, .88]].forEach(([s, a]) => dk.addColorStop(s, `rgba(6,0,12,${a})`));
@@ -1276,7 +1339,7 @@ function drawWin() {
   // the happy ending...
   ctx.textAlign = 'center'; ctx.fillStyle = '#5a3a6a'; ctx.font = `${Math.min(30, vw / 20)}px ${PF}`;
   ctx.fillText('YOU WOKE UP!', vw / 2, vh / 2 - 30);
-  ctx.drawImage(SPR.baby[0], vw / 2 - 18, vh / 2 - 110, 36, 42);
+  ctx.drawImage(SPR.baby.down[0], vw / 2 - 24, vh / 2 - 120, 48, 57);
   ctx.font = `10px ${PF}`; ctx.fillStyle = '#6a4a5a';
   ctx.fillText('Mommy: "Good morning, sweetie. It was only a dream."', vw / 2, vh / 2 + 14);
   // ...and the creepy hint
