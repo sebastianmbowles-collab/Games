@@ -342,23 +342,26 @@ function kick(t) {
   g.gain.setValueAtTime(.25, t); g.gain.exponentialRampToValueAtTime(.0001, t + .15);
   o.connect(g); g.connect(musicGain); o.start(t); o.stop(t + .2);
 }
-function sfx(kind) {
-  if (!AC) return;
-  const t = AC.currentTime;
-  const tone = (type, f0, f1, dur, vol) => {
-    const o = AC.createOscillator(), g = AC.createGain();
+// v is the loudness (1 = normal); far-away enemies are quieter
+function sfx(kind, v = 1) {
+  if (!AC || v <= 0) return;
+  const t0 = AC.currentTime;
+  const tone = (type, f0, f1, dur, vol, at = 0) => {
+    const o = AC.createOscillator(), g = AC.createGain(), t = t0 + at;
     o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    g.gain.setValueAtTime(vol * v, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
     o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .02);
   };
-  const noise = (dur, vol, freq) => {
+  const noise = (dur, vol, freq, at = 0, type = 'lowpass') => {
     const b = AC.createBuffer(1, AC.sampleRate * dur, AC.sampleRate), d = b.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
     const s = AC.createBufferSource(), g = AC.createGain(), f = AC.createBiquadFilter();
-    f.type = 'lowpass'; f.frequency.value = freq; s.buffer = b; g.gain.value = vol;
-    s.connect(f); f.connect(g); g.connect(master); s.start(t);
+    f.type = type; f.frequency.value = freq; s.buffer = b; g.gain.value = vol * v;
+    s.connect(f); f.connect(g); g.connect(master); s.start(t0 + at);
+    return f;
   };
-  const arp = (notes, gap, vol) => notes.forEach((f, i) => { const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = f; g.gain.setValueAtTime(vol, t + i * gap); g.gain.exponentialRampToValueAtTime(.0001, t + i * gap + .5); o.connect(g); g.connect(master); o.start(t + i * gap); o.stop(t + i * gap + .55); });
+  const t = t0;
+  const arp = (notes, gap, vol) => notes.forEach((f, i) => { const o = AC.createOscillator(), g = AC.createGain(); o.frequency.value = f; g.gain.setValueAtTime(vol * v, t + i * gap); g.gain.exponentialRampToValueAtTime(.0001, t + i * gap + .5); o.connect(g); g.connect(master); o.start(t + i * gap); o.stop(t + i * gap + .55); });
   if (kind === 'jump') tone('sine', 300, 620, .16, .18);
   else if (kind === 'dash') noise(.2, .35, 1800);
   else if (kind === 'stomp') { noise(.15, .5, 500); tone('square', 220, 60, .15, .12); }
@@ -376,12 +379,29 @@ function sfx(kind) {
   else if (kind === 'jack') tone('square', 300, 1200, .12, .1);
   else if (kind === 'win') arp([523, 659, 784, 1047], .15, .15);
   else if (kind === 'beat') arp([392, 330, 262, 196], .12, .15);
+  // --- footsteps, creepy noises and enemy sounds ---
+  else if (kind === 'step') noise(.05, .1, 700 + Math.random() * 300);
+  else if (kind === 'splash') noise(.12, .14, 2600);
+  else if (kind === 'land') { noise(.12, .3, 350); tone('sine', 120, 50, .12, .15); }
+  else if (kind === 'whisper') { // a breathy "shhhh" that moves around
+    const f = noise(1.6, .5, 1200, 0, 'bandpass'); f.Q.value = 6;
+    f.frequency.setValueAtTime(900, t); f.frequency.linearRampToValueAtTime(2600, t + .7); f.frequency.linearRampToValueAtTime(1100, t + 1.6);
+  }
+  else if (kind === 'creak') { tone('sawtooth', 75, 52, 1.1, .05); tone('sawtooth', 110, 90, .6, .03, .4); }
+  else if (kind === 'heart') { tone('sine', 70, 40, .14, .45); tone('sine', 65, 38, .14, .35, .2); }
+  else if (kind === 'wind') for (let k = 0; k < 5; k++) tone('square', 2200, 1900, .02, .05, k * .07); // wind-up toy clicks
+  else if (kind === 'oink') { tone('sawtooth', 200, 120, .22, .1); tone('sawtooth', 180, 110, .18, .08, .25); }
+  else if (kind === 'peep') { tone('sine', 1900, 2500, .07, .07); tone('sine', 1900, 2600, .07, .07, .12); }
+  else if (kind === 'sizzle') noise(.5, .1, 5000, 0, 'highpass');
+  else if (kind === 'skitter') for (let k = 0; k < 6; k++) noise(.025, .2, 3500, k * .05 + Math.random() * .02, 'highpass');
 }
-function say(text, pitch, rate) {
+const ENEMY_SOUND = { toy: 'wind', pig: 'oink', duckling: 'peep', littlebun: 'sizzle', tinyspider: 'skitter' };
+const WHISPERS = ['Hush, little baby.', "Don't say a word.", 'Mommy is not coming.', 'Go back to sleep.', 'We can see you.'];
+function say(text, pitch, rate, vol = .9) {
   try {
     if (!window.speechSynthesis) return;
     speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.pitch = pitch; u.rate = rate; u.volume = .9;
+    const u = new SpeechSynthesisUtterance(text); u.pitch = pitch; u.rate = rate; u.volume = vol;
     speechSynthesis.speak(u);
   } catch (e) { /* no voice available */ }
 }
@@ -426,14 +446,14 @@ cv.addEventListener('pointerdown', () => { initAudio(); pressed.start = true; })
 
 // ===== Game state =====
 const MOM_ASKS = 10;
-let state = 'title', P, time = 0, banner = { text: '', sub: '', t: 0 }, lastZone = -1, mapT = 0, momMsgT = 0, shake = 0, endT = 0, mapDirty = true, coveOpen = false;
+let state = 'title', P, time = 0, banner = { text: '', sub: '', t: 0 }, lastZone = -1, mapT = 0, momMsgT = 0, shake = 0, endT = 0, mapDirty = true, coveOpen = false, ambT = 8, heartT = 0;
 const cam = { x: 0, y: 0 };
 function newGame() {
   buildWorld();
   P = { x: 59.5, y: 59.5, z: 1, vz: 0, r: .28, h: .9, onGround: true, coyote: 0, jumpBuf: 0, dashT: 0, dashCd: 0, airDash: true, dashDir: [1, 0],
     face: 1, dir: 'down', lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
   cam.x = P.x * 16; cam.y = P.y * 16 - P.z * 6;
-  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false;
+  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0;
   state = 'play';
   showBanner("Baby can't wake up.", 'Find and beat all the nursery rhyme bosses.', 5);
 }
@@ -479,6 +499,15 @@ function update(dt) {
   }
 
   updateEnemies(dt);
+  ambT -= dt;
+  if (ambT <= 0) {
+    ambT = 10 + Math.random() * 16;
+    if (!activeBoss()) {
+      const r = Math.random();
+      if (r < .4) sfx('whisper'); else if (r < .75) sfx('creak'); else say(WHISPERS[Math.random() * WHISPERS.length | 0], .1, .5, .35);
+    }
+  }
+  if (P.lives === 1 && (heartT -= dt) <= 0) { heartT = .85; sfx('heart'); }
   for (const p of pickups) {
     if (p.got) continue;
     if (Math.hypot(P.x - p.x, P.y - p.y) < .6 && Math.abs(P.z - p.z) < 1) {
@@ -535,11 +564,15 @@ function updatePlayer(dt) {
   P.z += P.vz * dt;
   const g = groundAt(P.x, P.y, Math.max(P.z, zPrev), P.r); // use the higher z so fast falls can't skip through the floor
   if (g !== VOID && P.z <= g + .001) {
-    if (!P.onGround && P.vz < -3) burst(P.x, P.y, g, '#3a2a4a', 4);
+    if (!P.onGround && P.vz < -3) { burst(P.x, P.y, g, '#3a2a4a', 4); sfx('land'); }
     P.z = g; if (P.vz < 0) P.vz = 0; P.onGround = true;
   } else if (g !== VOID && g > P.z - .05 && P.vz <= 0) { P.z = g; P.vz = 0; P.onGround = true; }
   else P.onGround = false;
-  if (ml > .1 && P.onGround) P.walkT += dt * 10 * slow;
+  if (ml > .1 && P.onGround) {
+    const step = Math.floor(P.walkT / 2);
+    P.walkT += dt * 10 * slow;
+    if (Math.floor(P.walkT / 2) !== step) sfx(TY(Math.floor(P.x), Math.floor(P.y)) === T.WATER ? 'splash' : 'step');
+  }
 
   // remember a safe spot to come back to after falling
   P.safeT -= dt;
@@ -566,6 +599,7 @@ function updateEnemies(dt) {
       const nx = e.x + ax * e.sp * dt, ny = e.y + ay * e.sp * dt;
       const ah = H(Math.floor(nx + ax * .35), Math.floor(ny + ay * .35));
       const far = Math.abs(e.axis === 'x' ? nx - e.ox : ny - e.oy) > e.range;
+      e.mx = ax; e.my = ay;
       if (ah === VOID || Math.abs(ah - e.z) > STEP || far) e.dir = -e.dir; else { e.x = nx; e.y = ny; e.z = groundAt(e.x, e.y, e.z, .2); }
     } else if (e.kind === 'tinyspider' && e.hang) {
       if (d < 2.6) { e.z -= 9 * dt; if (e.z <= e.base) { e.z = e.base; e.hang = false; } }
@@ -573,10 +607,13 @@ function updateEnemies(dt) {
       // chasers: pigs, little buns, ducklings and tiny spiders on the floor
       const sp = { pig: 2.1, littlebun: 2.4, duckling: 2.9, tinyspider: 2 }[e.kind];
       if (d < 9) {
+        e.mx = dx / d; e.my = dy / d;
         const nx = e.x + dx / d * sp * dt, ny = e.y + dy / d * sp * dt, g = groundAt(nx, ny, e.z, e.r);
         if (!blocked(nx, ny, e.z, e.r) && g !== VOID && Math.abs(g - e.z) <= STEP) { e.x = nx; e.y = ny; e.z = g; }
       }
     }
+    e.snd = (e.snd === undefined ? Math.random() * 2 : e.snd) - dt;
+    if (d < 7 && e.snd <= 0 && !(e.kind === 'tinyspider' && e.hang)) { e.snd = 1.5 + Math.random() * 2.5; sfx(ENEMY_SOUND[e.kind], (1 - d / 7) * .9); }
     const box = e.kind === 'littlebun' ? { x: e.x, y: e.y, z: e.z + Math.abs(Math.sin(e.t * 6)) * .5, r: e.r, h: e.h } : e;
     if (overlap(P, box)) {
       if (stompCheck(box)) { e.dead = true; P.vz = 7.5; P.airDash = true; sfx('stomp'); burst(e.x, e.y, e.z + .5, { pig: '#e89ab0', littlebun: '#c08040', duckling: '#ffe060', tinyspider: '#222' }[e.kind] || '#d8c8a8', 14); }
@@ -890,29 +927,66 @@ function buildSprites() {
     return g.outline('k').done();
   };
   SPR.baby = { down: [babyFront(0), babyFront(1)], up: [babyBack(0), babyBack(1)], side: [babySide(0), babySide(1)] };
-  // --- small enemies ---
-  SPR.toy = [0, 1].map(f => {
+  // --- small enemies: front (down), back (up) and side views, two frames each ---
+  const four = make => ({ down: [make('down', 0), make('down', 1)], up: [make('up', 0), make('up', 1)], side: [make('side', 0), make('side', 1)] });
+  SPR.toy = four((dir, f) => {
     const g = grid(19, 20);
-    g.ell(4, 3, 3, 3, 'n').ell(14, 3, 3, 3, 'n').ell(4, 3, 1.5, 1.5, 'd').ell(14, 3, 1.5, 1.5, 'd')
-      .ell(9, 13.5, 6, 5, 'n').ell(9, 14, 3.5, 3, 'd').ell(9, 7, 6.5, 5.5, 'n').swap('n', 'U', i => i > 12)
-      .ell(9, 9, 2.5, 1.8, 'd').px(9, 8, 'k').px(6, 6, 'k').px(5, 5, 'k').px(7, 5, 'k').px(5, 7, 'k').px(7, 7, 'k')
-      .rect(11, 5, 3, 3, 'k').px(11, 5, 'e').line(7, 11, 11, 11, 'N').px(8, 10, 'N').px(10, 10, 'N')
-      .px(9, 15, 'c').px(10, 16, 'c').px(8, 16, 'c').rect(16, 12, 2, 1, 'g').rect(17, 10, 1, 5, 'g');
-    if (f) g.rect(4, 17, 3, 2, 'U').rect(11, 18, 3, 1, 'U'); else g.rect(4, 18, 3, 1, 'U').rect(11, 17, 3, 2, 'U');
+    if (dir === 'side') {
+      g.ell(8, 3, 3, 3, 'n').ell(8, 3, 1.5, 1.5, 'd').ell(8, 13.5, 5, 5, 'n').ell(10, 14, 2.5, 3, 'd').ell(9, 7, 5.5, 5.5, 'n').swap('n', 'U', (i, j) => j > 10 && i < 6)
+        .ell(14, 8.5, 2.5, 1.8, 'd').px(16, 8, 'k').rect(11, 5, 2, 2, 'k').px(11, 5, 'e').line(12, 10, 15, 10, 'N').px(13, 11, 'N')
+        .rect(1, 12, 2, 1, 'g').rect(1, 10, 1, 5, 'g').px(11, 16, 'c');
+      if (f) g.rect(5, 17, 3, 2, 'U').rect(10, 18, 3, 1, 'U'); else g.rect(5, 18, 3, 1, 'U').rect(10, 17, 3, 2, 'U');
+    } else {
+      g.ell(4, 3, 3, 3, 'n').ell(14, 3, 3, 3, 'n').ell(9, 13.5, 6, 5, 'n').ell(9, 7, 6.5, 5.5, 'n').swap('n', 'U', i => i > 12);
+      if (dir === 'down') g.ell(4, 3, 1.5, 1.5, 'd').ell(14, 3, 1.5, 1.5, 'd').ell(9, 14, 3.5, 3, 'd').ell(9, 9, 2.5, 1.8, 'd').px(9, 8, 'k')
+        .px(6, 6, 'k').px(5, 5, 'k').px(7, 5, 'k').px(5, 7, 'k').px(7, 7, 'k').rect(11, 5, 3, 3, 'k').px(11, 5, 'e')
+        .line(7, 11, 11, 11, 'N').px(8, 10, 'N').px(10, 10, 'N').px(9, 15, 'c').px(10, 16, 'c').px(8, 16, 'c').rect(16, 12, 2, 1, 'g').rect(17, 10, 1, 5, 'g');
+      else g.line(9, 4, 9, 18, 'U').px(8, 7, 'N').px(10, 9, 'N').px(8, 11, 'N').rect(7, 12, 5, 1, 'g').rect(9, 10, 1, 5, 'g').rect(6, 11, 1, 3, 'g').rect(12, 11, 1, 3, 'g'); // seam and wind-up key on its back
+      if (f) g.rect(4, 17, 3, 2, 'U').rect(11, 18, 3, 1, 'U'); else g.rect(4, 18, 3, 1, 'U').rect(11, 17, 3, 2, 'U');
+    }
     return g.outline('k').done();
   });
-  SPR.pig = grid(20, 16).ell(10, 9, 8.5, 5.5, 'p').swap('p', 'P', (i, j) => j > 11).poly([[3, 5], [6, 1], [8, 6]], 'p').poly([[17, 5], [14, 1], [12, 6]], 'p')
-    .ell(10, 9.5, 3.5, 2.5, 'f').px(9, 9, 'R').px(11, 9, 'R').rect(5, 6, 2, 2, 'k').px(5, 6, 'e').rect(13, 6, 2, 2, 'k').px(14, 6, 'e')
-    .rect(4, 13, 2, 2, 'P').rect(14, 13, 2, 2, 'P').outline('k').done();
-  SPR.littlebun = grid(16, 13).ell(8, 6.5, 6.5, 5.5, 'u').rect(2, 6, 13, 4, 'u').swap('u', 'U', (i, j) => j > 8).ell(5, 3, 2, 1, 'o')
-    .rect(2, 5, 13, 2, 'c').rect(7, 1, 2, 9, 'c').px(4, 3, 'e').px(5, 3, 'e').px(11, 3, 'e').px(12, 3, 'e')
-    .px(4, 8, 'R').px(5, 8, 'R').px(11, 8, 'R').px(12, 8, 'R').outline('k').done();
-  SPR.duckling = grid(15, 14).ell(6, 9, 5, 3.5, 'y').ell(8.5, 4.5, 3.5, 3.5, 'y').swap('y', 'Y', (i, j) => j > 10).poly([[11, 4], [14, 5], [11, 6.5]], 'o')
-    .px(9, 3, 'k').px(9, 4, 'e').ell(4.5, 9, 2.5, 1.5, 'Y').px(4, 12, 'o').px(7, 12, 'o').outline('k').done();
-  SPR.tinyspider = [0, 1].map(f => {
+  SPR.pig = four((dir, f) => {
+    const g = grid(22, 17);
+    if (dir === 'side') {
+      g.ell(10, 9, 8.5, 5, 'p').swap('p', 'P', (i, j) => j > 11).poly([[13, 5], [15, 1], [17, 6]], 'p').ell(18.5, 9, 2, 2.5, 'f').px(19, 8, 'R').px(19, 10, 'R')
+        .rect(14, 6, 2, 2, 'k').px(15, 6, 'e').line(2, 6, 1, 4, 'P').px(2, 3, 'P')
+        .rect(4, 13 + f, 2, 3 - f, 'P').rect(8, 14 - f, 2, 2 + f, 'P').rect(12, 13 + f, 2, 3 - f, 'P').rect(15, 14 - f, 2, 2 + f, 'P');
+    } else {
+      g.ell(11, 9, 8.5, 5.5, 'p').swap('p', 'P', (i, j) => j > 11).poly([[4, 5], [7, 1], [9, 6]], 'p').poly([[18, 5], [15, 1], [13, 6]], 'p')
+        .rect(5, 13 + f, 2, 2, 'P').rect(15, 14 - f, 2, 2, 'P');
+      if (dir === 'down') g.ell(11, 9.5, 3.5, 2.5, 'f').px(10, 9, 'R').px(12, 9, 'R').rect(6, 6, 2, 2, 'k').px(6, 6, 'e').rect(14, 6, 2, 2, 'k').px(15, 6, 'e');
+      else g.px(11, 12, 'P').px(12, 13, 'P').px(11, 14, 'P').px(12, 14, 'P'); // curly tail
+    }
+    return g.outline('k').done();
+  });
+  SPR.littlebun = four((dir, f) => {
+    const g = grid(16, 14);
+    g.ell(8, 6.5 + f, 6.5, 5.5 - f * .5, 'u').rect(2, 6 + f, 13, 4, 'u').swap('u', 'U', (i, j) => j > 8 + f).ell(5, 3 + f, 2, 1, 'o');
+    if (dir === 'side') g.rect(2, 5 + f, 13, 2, 'c').rect(5, 1 + f, 2, 9, 'c').px(11, 3 + f, 'e').px(12, 3 + f, 'e').px(11, 8 + f, 'R').px(12, 8 + f, 'R').px(13, 8 + f, 'R');
+    else {
+      g.rect(2, 5 + f, 13, 2, 'c').rect(7, 1 + f, 2, 9, 'c');
+      if (dir === 'down') g.px(4, 3 + f, 'e').px(5, 3 + f, 'e').px(11, 3 + f, 'e').px(12, 3 + f, 'e').px(4, 8 + f, 'R').px(5, 8 + f, 'R').px(11, 8 + f, 'R').px(12, 8 + f, 'R');
+    }
+    return g.outline('k').done();
+  });
+  SPR.duckling = four((dir, f) => {
+    const g = grid(15, 15);
+    if (dir === 'side') g.ell(6, 9, 5, 3.5, 'y').ell(8.5, 4.5, 3.5, 3.5, 'y').swap('y', 'Y', (i, j) => j > 10).poly([[11, 4], [14, 5], [11, 6.5]], 'o')
+      .px(9, 3, 'k').px(9, 4, 'e').ell(4.5, 9, 2.5, 1.5, 'Y').px(4 + f, 13, 'o').px(7 - f, 13, 'o');
+    else {
+      g.ell(7, 9.5, 5, 3.5, 'y').ell(7, 5, 4, 3.5, 'y').swap('y', 'Y', (i, j) => j > 11).px(5 + f, 13, 'o').px(9 - f, 13, 'o');
+      if (dir === 'down') g.rect(6, 6, 3, 2, 'o').px(5, 4, 'k').px(9, 4, 'k').px(5, 3, 'e').px(9, 3, 'e').px(2, 9, 'Y').px(12, 9, 'Y');
+      else g.px(7, 1, 'Y').px(6, 2, 'Y').px(7, 12, 'Y').px(6, 12, 'Y').px(8, 12, 'Y');
+    }
+    return g.outline('k').done();
+  });
+  SPR.tinyspider = four((dir, f) => {
     const g = grid(17, 13);
     for (let k = 0; k < 4; k++) for (const s of [-1, 1]) { const w = (f + k) & 1; g.line(8, 5 + k * .7, 8 + s * 4, 2 + k * 2 + w, 'k').line(8 + s * 4, 2 + k * 2 + w, 8 + s * 7, 4 + k * 2.2, 'k'); }
-    return g.ell(8, 4.5, 3.5, 3, 'k').ell(8, 8.5, 2.5, 2, 'k').px(8, 4, 'R').px(8, 5, 'R').px(7, 8, 'e').px(9, 8, 'e').outline('G').done();
+    if (dir === 'up') g.ell(8, 4, 2.5, 2, 'k').ell(8, 8, 3.5, 3, 'k').px(8, 8, 'R').px(8, 9, 'R');
+    else g.ell(8, 4.5, 3.5, 3, 'k').ell(8, 8.5, 2.5, 2, 'k').px(8, 4, 'R').px(8, 5, 'R').px(7, 8, 'e').px(9, 8, 'e').px(6, 9, 'e').px(10, 9, 'e');
+    return g.outline('G').done();
   });
   // --- bosses ---
   {
@@ -926,13 +1000,19 @@ function buildSprites() {
       .ell(10.5, 10, 1.6, 2, 'k').ell(15.5, 10, 1.6, 2, 'k').px(10, 10, 'e').px(15, 10, 'e').line(9, 14, 17, 14, 'R').px(8, 13, 'R').px(18, 13, 'R');
     for (let k = 10; k <= 16; k += 2) g.px(k, 14, 'w');
     g.ell(13, 6, 10, 2, 'h').rect(8, 1, 10, 5, 'h').rect(8, 4, 10, 1, 'R').swap('h', 'Y', (i, j) => j === 7 || (i > 15 && j < 4));
+    // creepier: glowing eyes, blood tears, a hanging jaw, holes in the shirt, a bloody pitchfork
+    g.px(10, 9, 'e').px(15, 9, 'e').px(10, 12, 'R').px(10, 13, 'R').px(15, 12, 'R').rect(10, 15, 7, 1, 'k').px(11, 15, 'w').px(13, 15, 'w').px(15, 15, 'w')
+      .px(6, 22, 'k').px(7, 23, 'k').px(19, 25, 'k').px(18, 20, 'k').px(20, 3, 'R').px(23, 3, 'R').px(26, 3, 'R').px(23, 4, 'R').px(26, 5, 'R').px(23, 7, 'R');
     SPR.mac = g.outline('k').done();
   }
   {
     const pts = []; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? 6.5 : 15.5; pts.push([17 + Math.cos(a) * rr, 18 + Math.sin(a) * rr]); }
     const g = grid(34, 35).poly(pts, 'y').swap('y', 'Y', (i, j) => (i - 17) + (j - 18) > 7).swap('y', 'j', (i, j) => (i - 17) + (j - 18) < -12);
-    g.ell(12, 16, 2.5, 3.5, 'k').ell(22, 16, 2.5, 3.5, 'k').px(12, 15, 'w').px(22, 15, 'w').px(11, 17, 'e').px(21, 17, 'e').line(11, 23, 23, 23, 'N');
-    for (let k = 11; k <= 23; k += 2) g.px(k, 22, 'N').px(k + 1, 24, 'N');
+    g.ell(12, 16, 2.5, 3.5, 'k').ell(22, 16, 2.5, 3.5, 'k').px(12, 15, 'w').px(22, 15, 'e').px(11, 17, 'e').px(21, 17, 'e');
+    // a wide mouth full of teeth, cracks, and bleeding eyes
+    g.rect(10, 21, 15, 4, 'k').px(16, 23, 'R').px(17, 23, 'R').px(18, 23, 'R');
+    for (let k = 10; k <= 24; k += 2) g.px(k, 21, 'w').px(k + 1, 24, 'w');
+    g.line(17, 4, 15, 10, 'k').line(15, 10, 18, 13, 'k').line(27, 15, 24, 17, 'k').px(12, 20, 'R').px(12, 21, 'R').px(22, 20, 'R').px(22, 21, 'R').px(22, 22, 'R').px(13, 26, 'R');
     g.px(9, 12, 'Y').px(10, 11, 'Y').px(24, 11, 'Y').px(25, 12, 'Y');
     SPR.starBoss = g.outline('k').done();
   }
@@ -941,7 +1021,11 @@ function buildSprites() {
     g.ell(18, 15, 16, 11, 'u').rect(2, 15, 32, 8, 'u').swap('u', 'U', (i, j) => j > 20 || i > 30).ell(11, 8, 5, 2.5, 'o').px(9, 7, 'j').px(10, 7, 'j')
       .rect(3, 13, 30, 3, 'c').rect(16, 4, 4, 19, 'c').swap('c', 'x', (i, j) => j === 15 || i === 19)
       .rect(7, 8, 5, 3, 'k').rect(8, 9, 2, 1, 'e').rect(24, 8, 5, 3, 'k').rect(26, 9, 2, 1, 'e')
-      .rect(7, 18, 6, 2, 'R').rect(23, 18, 6, 2, 'R').px(8, 18, 'w').px(11, 18, 'w').px(24, 18, 'w').px(27, 18, 'w').rect(2, 23, 32, 1, 'z');
+      .rect(2, 23, 32, 1, 'z');
+    // one huge jagged mouth, a cracked crust, and glaze dripping like goo
+    g.rect(6, 17, 24, 4, 'k').rect(14, 19, 8, 1, 'R');
+    for (let k = 6; k < 30; k += 2) g.px(k, 17, 'w').px(k + 1, 20, 'w');
+    g.line(28, 7, 31, 12, 'z').line(5, 9, 3, 13, 'z').px(9, 9, 'R').px(25, 9, 'R').px(17, 23, 'c').px(17, 24, 'c').px(18, 24, 'c').px(17, 25, 'c');
     for (const sx of [10, 18, 26]) g.px(sx, 2, 'l').px(sx + 1, 1, 'l').px(sx, 0, 'l');
     SPR.bun = g.outline('k').done();
   }
@@ -953,18 +1037,27 @@ function buildSprites() {
     }
     g.ell(cx, 10, 9, 8, 'k').ell(cx - 3, 6, 3, 2, 'G').rect(cx - 1, 7, 2, 2, 'r').rect(cx - 2, 9, 4, 1, 'r').rect(cx - 1, 10, 2, 2, 'r').ell(cx, 21, 6, 5, 'k');
     for (const [ex, ey] of [[-2, 19], [2, 19], [-4, 21], [4, 21], [-1, 22], [1, 22]]) g.px(cx + ex, ey, 'e');
-    return g.px(cx - 2, 26, 'w').px(cx + 2, 26, 'w').px(cx - 2, 27, 'w').px(cx + 2, 27, 'w').outline('G').done();
+    // bigger red-tipped fangs, drool, extra eyes and a skull mark on its back
+    g.px(cx - 3, 18, 'e').px(cx + 3, 18, 'e').px(cx, 17, 'e').rect(cx - 3, 4, 2, 1, 'w').rect(cx + 2, 4, 2, 1, 'w').px(cx - 1, 5, 'w').px(cx + 1, 5, 'w');
+    return g.rect(cx - 2, 26, 1, 2, 'w').rect(cx + 2, 26, 1, 2, 'w').px(cx - 2, 28, 'r').px(cx + 2, 28, 'r').px(cx, 27, 'l').px(cx, 28, 'l').px(cx, 29, 'l').outline('G').done();
   });
   SPR.duck = grid(37, 37).ell(14, 25, 13, 8.5, 'c').poly([[1, 20], [7, 15], [9, 23]], 'c').rect(18, 11, 7, 12, 'c').ell(22, 10, 7, 6.5, 'c')
     .swap('c', 'x', (i, j) => j > 29 || (j > 16 && i < 4)).poly([[28, 8], [35, 10], [28, 13]], 'o').line(28, 10, 34, 10, 'z').px(30, 9, 'z')
     .rect(23, 7, 3, 3, 'k').px(24, 8, 'e').line(22, 5, 26, 6, 'k').ell(12, 24, 8, 4.5, 'g').line(5, 24, 18, 24, 'G')
     .ell(8, 27, 2, 2, 'v').ell(12, 28, 2, 2, 'v').ell(10, 30, 2, 2, 'v').px(7, 26, 'V').px(11, 27, 'V')
-    .rect(10, 33, 2, 3, 'o').rect(18, 33, 2, 3, 'o').rect(9, 35, 4, 1, 'o').rect(17, 35, 4, 1, 'o').outline('k').done();
+    .rect(10, 33, 2, 3, 'o').rect(18, 33, 2, 3, 'o').rect(9, 35, 4, 1, 'o').rect(17, 35, 4, 1, 'o')
+    // a beak full of teeth, a bigger red eye and missing feathers
+    .line(29, 11, 34, 11, 'k').px(30, 10, 'w').px(32, 10, 'w').px(31, 12, 'w').px(33, 12, 'w').px(34, 9, 'R').px(35, 12, 'R')
+    .rect(23, 7, 3, 3, 'e').px(24, 8, 'k').px(16, 22, 'R').px(17, 23, 'R').px(21, 27, 'x').px(22, 28, 'x').outline('k').done();
   {
     const head = grid(32, 32).ell(16, 16, 14, 14, 's').swap('s', 'a', i => i > 22).swap('s', 'N', (i, j) => j < 10).swap('a', 'N', (i, j) => j < 10)
       .rect(7, 9, 18, 2, 'N').px(6, 11, 'N').px(25, 11, 'N').ell(11, 17, 3.5, 4.5, 'k').ell(21, 17, 3.5, 4.5, 'k').px(11, 16, 'w').px(21, 16, 'w')
       .line(23, 4, 19, 11, 'k').line(19, 11, 22, 14, 'k').line(11, 25, 21, 25, 'R').px(10, 24, 'R').px(22, 24, 'R')
-      .rect(5, 21, 2, 1, 'p').rect(25, 21, 2, 1, 'p');
+      .rect(5, 21, 2, 1, 'p').rect(25, 21, 2, 1, 'p')
+      // one empty socket with a red pupil, blood tears, a sewn-shut mouth and a missing chunk
+      .px(21, 16, 'k').px(21, 17, 'e').px(11, 22, 'R').px(11, 23, 'R').px(11, 24, 'R').px(21, 22, 'R').px(21, 23, 'R').rect(26, 12, 2, 3, 'k');
+    for (let k = 11; k <= 21; k += 2) head.px(k, 24, 'k').px(k, 26, 'k');
+    head.px(16, 15, 'k');
     const shoulders = grid(36, 28).rect(8, 7, 20, 19, 'v').swap('v', 'V', (i, j) => i < 11 && j < 18).ell(8, 8, 6.5, 4.5, 's').ell(28, 8, 6.5, 4.5, 's')
       .rect(1, 10, 5, 16, 's').rect(30, 10, 5, 16, 'a').rect(1, 24, 5, 3, 'S').rect(30, 24, 5, 3, 'S').ell(18, 6.5, 4.5, 2, 'k').ell(18, 17, 5, 6, 'R').ell(18, 17, 3, 4, 'k');
     for (let k = 14; k <= 22; k += 2) shoulders.px(k, 12, 'w');
@@ -975,6 +1068,11 @@ function buildSprites() {
       .rect(6, 25, 7, 2, 'S').rect(19, 25, 7, 2, 'S');
     const toes = grid(38, 24).rect(4, 1, 11, 13, 's').swap('s', 'a', i => i > 11).ell(17, 16, 15, 6.5, 's').swap('s', 'a', (i, j) => j > 19);
     [[25, 11, 3.2], [29, 12, 2.8], [32, 14, 2.4], [34, 16, 2.1], [35, 18.5, 1.8]].forEach(([x, y, r]) => { toes.ell(x, y, r, r, 's'); toes.px(x, y - 1, 'k'); toes.px(x - 1, y, 'R'); });
+    // scabs on the knees, black toenails and stitches on the foot
+    knees.rect(4, 5, 2, 1, 'R').px(5, 6, 'R').rect(25, 13, 2, 1, 'R').px(26, 14, 'R').line(15, 18, 17, 20, 'k').line(16, 18, 16, 21, 'k');
+    [[26, 9], [30, 10], [33, 12], [35, 14]].forEach(([x, y]) => toes.rect(x - 1, y - 1, 2, 1, 'G'));
+    for (let k = 6; k <= 12; k += 2) toes.px(k, 6, 'k').px(k + 1, 7, 'k');
+    toes.line(5, 7, 13, 7, 'R');
     SPR.final = [head, shoulders, knees, toes].map(g => g.outline('k').done());
   }
   SPR.bottle = R(['...t...', '..ttt..', '.bbbbb.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '..www..']);
@@ -1095,17 +1193,17 @@ function drawBaby(ghostly) {
   if (P.slowT > 0) { ctx.fillStyle = PALC.l; for (let k = 0; k < 4; k++) ctx.fillRect(sx, sy + 3 + k * 4, 16, 1); ctx.fillRect(sx + 4, sy + 1, 1, 17); ctx.fillRect(sx + 11, sy + 1, 1, 17); }
 }
 function drawEnemy(e) {
-  const flip = P.x < e.x;
   if (e.kind === 'tinyspider' && e.hang) {
     const sx = SX(e.x), sy = SY(e.y, e.z); ctx.fillStyle = 'rgba(230,230,240,.5)'; ctx.fillRect(sx, sy - 60, 1, 52);
-    spr(SPR.tinyspider[0], e.x, e.y, e.z, false); return;
+    spr(SPR.tinyspider.down[0], e.x, e.y, e.z, false); return;
   }
+  // face the way it is moving, like the baby
+  const mx = e.mx || 0, my = e.my === undefined ? 1 : e.my;
+  const dir = Math.abs(my) > Math.abs(mx) ? (my < 0 ? 'up' : 'down') : 'side';
   const hop = e.kind === 'littlebun' ? Math.abs(Math.sin(e.t * 6)) * .5 : 0;
   shadow(e.x, e.y, e.z + hop, 10);
   const f = Math.floor(e.t * 6) & 1;
-  const img = { toy: SPR.toy[f], pig: SPR.pig, littlebun: SPR.littlebun, duckling: SPR.duckling, tinyspider: SPR.tinyspider[f] }[e.kind];
-  const bob = e.kind === 'pig' || e.kind === 'duckling' ? f : 0;
-  spr(img, e.x, e.y, e.z + hop + bob / ELEV, e.kind === 'toy' ? e.dir < 0 : flip);
+  spr(SPR[e.kind][dir][f], e.x, e.y, e.z + hop, dir === 'side' && mx < 0);
 }
 function drawShot(s) {
   shadow(s.x, s.y, s.z, 8);
@@ -1240,7 +1338,7 @@ function render() {
   ctx.globalAlpha = 1;
   drawBaby(true); // ghost outline so you never lose the baby behind walls
   // darkness around the baby, in 8-bit steps
-  const px = SX(P.x), py = SY(P.y, P.z) - 6, R = Math.min(LW, LH) * (door ? .85 : activeBoss() ? .56 : .42);
+  const px = SX(P.x), py = SY(P.y, P.z) - 6, R = Math.min(LW, LH) * (door ? .85 : activeBoss() ? .48 : .3);
   const flick = Math.random() < .02 ? .9 : 1;
   const dk = ctx.createRadialGradient(px, py, 0, px, py, R * flick);
   [[0, 0], [.5, 0], [.5, .3], [.68, .3], [.68, .6], [.85, .6], [.85, .88], [1, .88]].forEach(([s, a]) => dk.addColorStop(s, `rgba(6,0,12,${a})`));
