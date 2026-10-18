@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Hush Little Baby</title>
-<link href="https://fonts.googleapis.com/css2?family=Creepster&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
 html,body{margin:0;height:100%;background:#05010a;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 canvas{display:block;position:absolute;left:0;top:0}
@@ -26,8 +26,12 @@ canvas{display:block;position:absolute;left:0;top:0}
 <script>
 'use strict';
 // ===== Canvas =====
-const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-let cw = 0, ch = 0, zoom = 1, vw = 0, vh = 0, dpr = 1;
+const cv = document.getElementById('c'), mainCtx = cv.getContext('2d');
+// The world is drawn small on a hidden canvas, then blown up with no smoothing: chunky 8-bit pixels.
+const lo = document.createElement('canvas'), loCtx = lo.getContext('2d');
+let ctx = mainCtx;
+const PF = '"Press Start 2P", monospace';
+let cw = 0, ch = 0, zoom = 1, vw = 0, vh = 0, dpr = 1, PIX = 3;
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
   cw = window.innerWidth; ch = window.innerHeight;
@@ -35,7 +39,20 @@ function resize() {
   cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
   zoom = Math.max(0.7, Math.min(1.4, Math.min(cw, ch) / 620));
   vw = cw / zoom; vh = ch / zoom;
+  PIX = Math.max(2, Math.round(2.6 * zoom * dpr));
+  lo.width = Math.ceil(cw * dpr / PIX); lo.height = Math.ceil(ch * dpr / PIX);
 }
+// shrink any text that would run off the screen (the pixel font is wide)
+{
+  const ft = mainCtx.fillText.bind(mainCtx);
+  mainCtx.fillText = (t, x, y) => {
+    const w = mainCtx.measureText(t).width, max = vw - 16;
+    if (w <= max) return ft(t, x, y);
+    const f = mainCtx.font, px = parseFloat(f);
+    mainCtx.font = f.replace(/^[\d.]+px/, (px * max / w).toFixed(1) + 'px'); ft(t, x, y); mainCtx.font = f;
+  };
+}
+let labels = []; // text found while drawing the world, drawn crisp on top afterwards
 window.addEventListener('resize', resize); resize();
 
 // ===== Helpers =====
@@ -726,6 +743,7 @@ function updateBoss(b, dt) {
     b.mv = b.queue.shift(); b.t = 0;
   }
   if (b.bubbleT > 0) b.bubbleT -= dt;
+  updateCameo(b, dt);
 
   // touching the boss
   const box = { x: b.x, y: b.y, z: b.z + b.air, r: b.def.r, h: b.def.h };
@@ -735,6 +753,43 @@ function updateBoss(b, dt) {
     else hurt(b.x, b.y);
   }
 }
+const CAMEO_ORDER = ['mac', 'star', 'bun', 'spider', 'duck'];
+const CAMEO_SPOTS = [[41.5, 52.9], [47.1, 59.5], [41.5, 66.6], [35.9, 59.5]];
+// In the final fight the old bosses come back one at a time as ghosts and throw their own attacks.
+// You can't hurt them - just dodge.
+function updateCameo(b, dt) {
+  if (b.id !== 'final' || b.state !== 'fight' || b.mv.m === 'intro') return;
+  const c = b.cameo || (b.cameo = { i: 0, gap: 2, cur: null });
+  if (!c.cur) {
+    c.gap -= dt;
+    if (c.gap <= 0) {
+      const id = CAMEO_ORDER[c.i % CAMEO_ORDER.length], [gx, gy] = CAMEO_SPOTS[c.i % CAMEO_SPOTS.length]; c.i++;
+      c.cur = { id, def: BOSS_DEFS[id], x: gx, y: gy, z: b.z, air: 0, hp: 1, state: 'ghost', t: 0, atk: 1.4, life: 9, mv: { m: 'ghost' }, face: 1, hurtT: 0, sq: 0, bubbleT: 0 };
+      showBanner(BOSS_DEFS[id].name + ' came back!', 'Dodge its attacks!', 2.2); sfx('boss');
+    }
+    return;
+  }
+  const g = c.cur;
+  g.t += dt; g.life -= dt; g.atk -= dt; g.bubbleT -= dt; g.sq = Math.max(0, g.sq - dt * 3);
+  g.air = g.id === 'star' ? 2 : g.id === 'spider' ? 2.5 : 0;
+  g.face = (P.x - g.x) - (P.y - g.y) > 0 ? 1 : -1;
+  if (g.atk <= 0 && g.life > 1) {
+    g.atk = 1.8;
+    const a = Math.atan2(P.y - g.y, P.x - g.x);
+    if (g.id === 'mac') { fire(g, 'hay', a, 5.5); sfx('shoot'); }
+    else if (g.id === 'star') { const off = Math.random() * 6; for (let i = 0; i < 8; i++) fire(g, 'star', off + i * Math.PI / 4, 3.5); sfx('shoot'); }
+    else if (g.id === 'bun') { g.sq = 1; g.atk = 2.4; sfx('slam'); waves.push({ x: g.x, y: g.y, z: g.z, rad: .6, sp: 4.5, life: 2.6 }); }
+    else if (g.id === 'spider') { fire(g, 'web', a, 6); sfx('web'); }
+    else {
+      g.bubbleT = 1.5; sfx('quack');
+      for (let k = 0; k < 3; k++) {
+        const fx = P.x + (Math.random() - .5) * 2.4, fy = P.y + (Math.random() - .5) * 2.4, gz = groundAt(fx, fy, 20, .1);
+        if (gz !== VOID) falls.push({ kind: 'grape', x: fx, y: fy, z: gz, t: -k * .3, delay: .9 });
+      }
+    }
+  }
+  if (g.life <= 0) { c.cur = null; c.gap = 3; }
+}
 function hitBoss(b) {
   const oldPhase = b.id === 'final' ? finalPhase(b) : 0;
   b.hp--; b.hurtT = 1.1; P.vz = 9; P.airDash = true; sfx('stomp'); shake = .4; burst(b.x, b.y, b.z + 1.5, '#ffd23a', 18);
@@ -743,6 +798,7 @@ function hitBoss(b) {
     enemies = enemies.filter(e => e.kind !== b.def.minion || !inArena(b, e.x, e.y));
     mapDirty = true;
     if (b.id === 'final') {
+      b.cameo = null;
       door = { x: b.x, y: b.y, z: b.z, t: 0 };
       showBanner('You beat them all!', 'Walk into the light to wake up.', 5);
       say('Hush, little baby. Time to wake up.', 1.1, .8);
@@ -807,7 +863,7 @@ function drawTile(i, j) {
     ctx.strokeStyle = 'rgba(140,220,220,.25)'; ctx.lineWidth = 1; const w = Math.sin(time * 2 + i + j) * 6;
     ctx.beginPath(); ctx.moveTo(m[0] - 12 + w, m[1]); ctx.lineTo(m[0] - 2 + w, m[1]); ctx.stroke();
   } else if (t === T.SEAL) {
-    ctx.fillStyle = 'rgba(220,160,255,.8)'; ctx.font = '14px Creepster, fantasy'; ctx.textAlign = 'center'; ctx.fillText('X', m[0], m[1] + 4);
+    ctx.fillStyle = 'rgba(220,160,255,.8)'; ctx.font = `8px ${PF}`; ctx.textAlign = 'center'; ctx.fillText('X', m[0], m[1] + 4);
   } else if (t === T.RAFTER) {
     ctx.strokeStyle = '#21160a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.moveTo(b[0], b[1]); ctx.lineTo(d[0], d[1]); ctx.stroke();
   }
@@ -965,13 +1021,13 @@ function drawBoss(b) {
   const topY = sy - (b.id === 'mac' ? 112 : b.id === 'final' ? 120 : 96);
   if (vuln) for (let k = 0; k < 3; k++) { const a = time * 4 + k * 2.1; drawStar(sx + Math.cos(a) * 22, topY + Math.sin(a) * 6, 6, '#ffe24a'); }
   const bubble = (b.mv && b.mv.m === 'intro') || b.bubbleT > 0;
-  if (bubble && b.state === 'fight') {
+  if ((bubble && b.state === 'fight') || (b.state === 'ghost' && b.bubbleT > 0)) labels.push(() => {
     const txt = b.id === 'final' ? PARTS[finalPhase(b)] + '!' : b.def.bubble;
-    ctx.font = 'bold 16px monospace'; ctx.textAlign = 'center';
+    ctx.font = `10px ${PF}`; ctx.textAlign = 'center';
     const w = ctx.measureText(txt).width + 16;
     ctx.fillStyle = 'rgba(240,235,225,.92)'; ctx.fillRect(sx - w / 2, topY - 36, w, 24);
     ctx.fillStyle = '#7a0010'; ctx.fillText(txt, sx, topY - 19);
-  }
+  });
 }
 function drawMac(b) {
   ctx.fillStyle = '#2a3a6a'; ctx.fillRect(-14, -26, 11, 26); ctx.fillRect(3, -26, 11, 26);
@@ -1112,12 +1168,12 @@ function drawProp(p) {
     ctx.restore();
   } else if (p.kind === 'sign') {
     const d = Math.hypot(P.x - p.x, P.y - p.y);
-    if (d < 3.5) {
+    if (d < 3.5) labels.push(() => {
       ctx.globalAlpha = clamp((3.5 - d) / 1.5, 0, 1) * (.75 + Math.sin(time * 7) * .1);
-      ctx.font = '18px Creepster, fantasy'; ctx.textAlign = 'center'; ctx.fillStyle = '#c0283a';
+      ctx.font = `9px ${PF}`; ctx.textAlign = 'center'; ctx.fillStyle = '#e03048';
       ctx.fillText(p.text, sx, sy - 70);
       ctx.globalAlpha = 1;
-    }
+    });
   }
 }
 function drawDoor() {
@@ -1148,9 +1204,16 @@ function drawVoid() {
     ctx.restore();
   }
 }
+function worldPass() { ctx = loCtx; ctx.setTransform(zoom * dpr / PIX, 0, 0, zoom * dpr / PIX, 0, 0); labels = []; }
+function crispPass() {
+  mainCtx.setTransform(1, 0, 0, 1, 0, 0); mainCtx.imageSmoothingEnabled = false;
+  mainCtx.drawImage(lo, 0, 0, lo.width * PIX, lo.height * PIX);
+  ctx = mainCtx; ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
+  for (const fn of labels) fn();
+}
 function render() {
-  ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
-  if (state === 'title') { drawTitle(); return; }
+  worldPass();
+  if (state === 'title') { cam.x = Math.sin(time * .1) * 300; cam.y = time * 10; drawVoid(); crispPass(); drawTitle(); return; }
   const tgt = iso(P.x, P.y, P.z);
   cam.x += (tgt[0] - cam.x) * .12; cam.y += (tgt[1] - 20 - cam.y) * .12;
   ox = oy = 0; if (shake > 0) { ox = (Math.random() - .5) * 12 * shake; oy = (Math.random() - .5) * 12 * shake; }
@@ -1165,6 +1228,8 @@ function render() {
   for (const s of shots) add(s.x, s.y, () => drawShot(s));
   for (const f of falls) add(f.x, f.y, () => drawFall(f));
   for (const id of BOSS_ORDER) { const b = bosses[id]; if (near(b.x, b.y)) add(b.x, b.y, () => drawBoss(b)); }
+  const ghost = bosses.final.cameo && bosses.final.cameo.cur;
+  if (ghost) add(ghost.x, ghost.y, () => { ctx.globalAlpha = clamp(Math.min(ghost.t, ghost.life) * 2, 0, 1) * .6; drawBoss(ghost); ctx.globalAlpha = 1; });
   if (door) add(door.x, door.y, drawDoor);
   add(P.x, P.y, () => drawBaby(false));
   const R = 24, pi = Math.floor(P.x), pj = Math.floor(P.y);
@@ -1190,6 +1255,7 @@ function render() {
   dk.addColorStop(0, 'rgba(3,0,8,0)'); dk.addColorStop(1, 'rgba(3,0,8,.94)');
   ctx.fillStyle = dk; ctx.fillRect(0, 0, vw, vh);
   if (P.inv > 1.5 && P.inv <= 2 && P.lives > 0) { ctx.fillStyle = `rgba(160,0,0,${(P.inv - 1.5) * .6})`; ctx.fillRect(0, 0, vw, vh); }
+  crispPass();
   drawHUD();
   if (mapT > 0) drawMap();
   if (state === 'pause') overlay('PAUSED', 'Press P to keep going');
@@ -1211,34 +1277,34 @@ function bossIcon(id, x, y, on) {
   else if (id === 'bun') { ctx.fillStyle = '#9a5a28'; ctx.beginPath(); ctx.arc(0, 2, 9, Math.PI, 0); ctx.fill(); ctx.strokeStyle = '#f0e8d8'; ctx.beginPath(); ctx.moveTo(-7, -1); ctx.lineTo(7, -1); ctx.moveTo(0, -7); ctx.lineTo(0, 2); ctx.stroke(); }
   else if (id === 'spider') spiderBody(0, 6, .3, 0);
   else if (id === 'duck') { ctx.fillStyle = '#f0e8d0'; ctx.beginPath(); ctx.arc(-1, -1, 7, 0, 7); ctx.fill(); ctx.fillStyle = '#e8a020'; ctx.beginPath(); ctx.moveTo(5, -2); ctx.lineTo(12, 0); ctx.lineTo(5, 2); ctx.fill(); }
-  else { ctx.fillStyle = on || coveOpen ? '#e4cdb8' : '#5a4a6a'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 7); ctx.fill(); if (!on && !coveOpen) { ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center'; ctx.fillText('?', 0, 4); } }
+  else { ctx.fillStyle = on || coveOpen ? '#e4cdb8' : '#5a4a6a'; ctx.beginPath(); ctx.arc(0, 0, 8, 0, 7); ctx.fill(); if (!on && !coveOpen) { ctx.fillStyle = '#fff'; ctx.font = `8px ${PF}`; ctx.textAlign = 'center'; ctx.fillText('?', 0, 4); } }
   if (on) { ctx.strokeStyle = '#e02030'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-10, -10); ctx.lineTo(10, 10); ctx.moveTo(10, -10); ctx.lineTo(-10, 10); ctx.stroke(); }
   ctx.restore();
 }
 function drawHUD() {
   for (let i = 0; i < P.lives; i++) heart(26 + i * 28, 16, 22, '#d02040');
-  if (P.shield) { ctx.fillStyle = '#ff6fb8'; ctx.font = 'bold 14px monospace'; ctx.textAlign = 'left'; ctx.fillText('PACIFIER SHIELD', 14, 58); }
-  ctx.textAlign = 'right'; ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#e8d8ff';
+  if (P.shield) { ctx.fillStyle = '#ff6fb8'; ctx.font = `9px ${PF}`; ctx.textAlign = 'left'; ctx.fillText('PACIFIER SHIELD', 14, 58); }
+  ctx.textAlign = 'right'; ctx.font = `9px ${PF}`; ctx.fillStyle = '#e8d8ff';
   ctx.fillText('ASK MOMMY (M)', vw - 14, 26);
   for (let i = 0; i < MOM_ASKS; i++) { ctx.fillStyle = i < P.mom ? '#ffd0f0' : '#3a2a44'; ctx.beginPath(); ctx.arc(vw - 18 - i * 14, 42, 5, 0, 7); ctx.fill(); }
   // bosses beaten
   const bx0 = vw / 2 - (BOSS_ORDER.length - 1) * 19;
   BOSS_ORDER.forEach((id, i) => bossIcon(id, bx0 + i * 38, 24, bosses[id].state === 'dead'));
-  if (momMsgT > 0) { momMsgT -= 1 / 60; ctx.textAlign = 'center'; ctx.font = '26px Creepster, fantasy'; ctx.fillStyle = '#a080c0'; ctx.fillText('Mommy is asleep. You are on your own.', vw / 2, vh - 120); }
+  if (momMsgT > 0) { momMsgT -= 1 / 60; ctx.textAlign = 'center'; ctx.font = `14px ${PF}`; ctx.fillStyle = '#a080c0'; ctx.fillText('Mommy is asleep. You are on your own.', vw / 2, vh - 120); }
   const b = activeBoss();
   if (b) {
     const bw = Math.min(380, vw - 40), bx = vw / 2 - bw / 2, by = vh - 40;
     ctx.fillStyle = '#200'; ctx.fillRect(bx, by, bw, 16);
     ctx.fillStyle = '#c01818'; ctx.fillRect(bx, by, bw * b.hp / b.def.hp, 16);
     ctx.strokeStyle = '#000'; ctx.lineWidth = 2; for (let k = 1; k < b.def.hp; k++) { ctx.beginPath(); ctx.moveTo(bx + bw * k / b.def.hp, by); ctx.lineTo(bx + bw * k / b.def.hp, by + 16); ctx.stroke(); }
-    ctx.textAlign = 'center'; ctx.font = `${Math.min(22, vw / 22)}px Creepster, fantasy`; ctx.fillStyle = '#ff4040';
+    ctx.textAlign = 'center'; ctx.font = `${Math.min(11, vw / 44)}px ${PF}`; ctx.fillStyle = '#ff4040';
     ctx.fillText(b.id === 'final' ? b.def.name + ' - ' + PARTS[finalPhase(b)] : b.def.name, vw / 2, by - 8);
   }
   if (banner.t > 0) {
     banner.t -= 1 / 60; ctx.globalAlpha = clamp(banner.t, 0, 1);
-    ctx.textAlign = 'center'; ctx.font = `${Math.min(46, vw / 12)}px Creepster, fantasy`; ctx.fillStyle = '#d8b0ff';
+    ctx.textAlign = 'center'; ctx.font = `${Math.min(24, vw / 24)}px ${PF}`; ctx.fillStyle = '#d8b0ff';
     ctx.fillText(banner.text, vw / 2, 100);
-    if (banner.sub) { ctx.font = 'bold 15px monospace'; ctx.fillStyle = '#c8b8d8'; ctx.fillText(banner.sub, vw / 2, 128); }
+    if (banner.sub) { ctx.font = `9px ${PF}`; ctx.fillStyle = '#c8b8d8'; ctx.fillText(banner.sub, vw / 2, 128); }
     ctx.globalAlpha = 1;
   }
 }
@@ -1263,7 +1329,7 @@ function drawMap() {
   const x0 = vw / 2 - mapCv.width * sc / 2, y0 = 72;
   ctx.drawImage(mapCv, x0, y0, mapCv.width * sc, mapCv.height * sc);
   const M = (x, y) => [x0 + (W * MS + (x - y) * MS) * sc, y0 + ((x + y) * MS / 2) * sc];
-  ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+  ctx.font = `8px ${PF}`; ctx.textAlign = 'center';
   for (const id of BOSS_ORDER) {
     const b = bosses[id], [bx, by] = M(b.x, b.y);
     if (b.state === 'dead') { ctx.strokeStyle = '#888'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx - 6, by - 6); ctx.lineTo(bx + 6, by + 6); ctx.moveTo(bx + 6, by - 6); ctx.lineTo(bx - 6, by + 6); ctx.stroke(); continue; }
@@ -1274,53 +1340,51 @@ function drawMap() {
   const [mx, my] = M(P.x, P.y);
   ctx.fillStyle = '#9ad0ff'; ctx.beginPath(); ctx.arc(mx, my, 5 + Math.sin(time * 8) * 2, 0, 7); ctx.fill();
   ctx.fillText('YOU', mx, my - 10);
-  ctx.font = `${Math.min(40, vw / 14)}px Creepster, fantasy`; ctx.fillStyle = '#ffd0f0';
+  ctx.font = `${Math.min(21, vw / 28)}px ${PF}`; ctx.fillStyle = '#ffd0f0';
   ctx.fillText("Mommy's Map", vw / 2, 44);
   ctx.fillStyle = '#ffd0f0'; ctx.fillRect(vw / 2 - 100, 56, 200 * mapT / 5, 6);
 }
 function overlay(t, sub) {
   ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(0, 0, vw, vh);
-  ctx.textAlign = 'center'; ctx.fillStyle = '#c0283a'; ctx.font = `${Math.min(56, vw / 11)}px Creepster, fantasy`;
+  ctx.textAlign = 'center'; ctx.fillStyle = '#c0283a'; ctx.font = `${Math.min(29, vw / 22)}px ${PF}`;
   ctx.fillText(t, vw / 2, vh / 2);
-  ctx.font = 'bold 16px monospace'; ctx.fillStyle = '#ddd'; ctx.fillText(sub, vw / 2, vh / 2 + 40);
+  ctx.font = `10px ${PF}`; ctx.fillStyle = '#ddd'; ctx.fillText(sub, vw / 2, vh / 2 + 40);
 }
 function drawWin() {
   const a = clamp(endT / 2, 0, 1);
   ctx.fillStyle = `rgba(255,244,214,${a})`; ctx.fillRect(0, 0, vw, vh);
   if (a < 1) return;
   // the happy ending...
-  ctx.textAlign = 'center'; ctx.fillStyle = '#5a3a6a'; ctx.font = `${Math.min(60, vw / 10)}px Creepster, fantasy`;
+  ctx.textAlign = 'center'; ctx.fillStyle = '#5a3a6a'; ctx.font = `${Math.min(31, vw / 20)}px ${PF}`;
   ctx.fillText('YOU WOKE UP!', vw / 2, vh / 2 - 30);
-  ctx.font = 'bold 17px monospace'; ctx.fillStyle = '#6a4a5a';
+  ctx.font = `11px ${PF}`; ctx.fillStyle = '#6a4a5a';
   ctx.fillText('Mommy: "Good morning, sweetie. It was only a dream."', vw / 2, vh / 2 + 14);
   // ...and the creepy hint
   if (endT > 6) {
     const k = clamp((endT - 6) / 2, 0, 1);
     ctx.fillStyle = `rgba(10,0,10,${k * .85})`; ctx.fillRect(0, 0, vw, vh);
-    ctx.fillStyle = `rgba(220,20,40,${k})`; ctx.font = `${Math.min(26, vw / 20)}px Creepster, fantasy`;
+    ctx.fillStyle = `rgba(220,20,40,${k})`; ctx.font = `${Math.min(14, vw / 40)}px ${PF}`;
     ctx.fillText('...but the music box under the crib is still playing.', vw / 2, vh / 2 + 60);
     ctx.fillText('Hush, little baby. Don\'t say a word.', vw / 2, vh / 2 + 92);
     const blink = Math.sin(endT * 1.3) > .9 ? .1 : 1;
     for (const ex of [-22, 22]) { ctx.save(); ctx.translate(vw / 2 + ex, vh * .8); ctx.scale(1, blink); ctx.fillStyle = `rgba(230,220,190,${k})`; ctx.beginPath(); ctx.ellipse(0, 0, 14, 7, 0, 0, 7); ctx.fill(); ctx.fillStyle = `rgba(150,0,0,${k})`; ctx.beginPath(); ctx.arc(0, 0, 4, 0, 7); ctx.fill(); ctx.restore(); }
   }
-  if (endT > 9) { ctx.fillStyle = '#8a6a8a'; ctx.font = 'bold 15px monospace'; ctx.fillText('Press Space or tap to play again', vw / 2, vh - 40); }
+  if (endT > 9) { ctx.fillStyle = '#8a6a8a'; ctx.font = `9px ${PF}`; ctx.fillText('Press Space or tap to play again', vw / 2, vh - 40); }
 }
 function drawTitle() {
-  cam.x = Math.sin(time * .1) * 300; cam.y = time * 10;
-  drawVoid();
   ctx.textAlign = 'center';
-  ctx.font = `${Math.min(84, vw / 7)}px Creepster, fantasy`;
+  ctx.font = `${Math.min(44, vw / 14)}px ${PF}`;
   ctx.fillStyle = '#5a0a16'; ctx.fillText('HUSH LITTLE BABY', vw / 2 + 3, vh * .26 + 3);
   ctx.fillStyle = '#c0283a'; ctx.fillText('HUSH LITTLE BABY', vw / 2, vh * .26);
-  ctx.font = `${Math.min(26, vw / 18)}px Creepster, fantasy`; ctx.fillStyle = '#a890c0';
+  ctx.font = `${Math.min(14, vw / 36)}px ${PF}`; ctx.fillStyle = '#a890c0';
   ctx.fillText("Don't say a word. The nursery rhymes are awake.", vw / 2, vh * .26 + 42);
-  ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#c8b8d8';
+  ctx.font = `9px ${PF}`; ctx.fillStyle = '#c8b8d8';
   const lines = isTouch
     ? ['Stick: move    JUMP: jump    DASH: dash', 'MOMMY: show the map for 5 seconds (10 times)', 'Jump on enemies to beat them. Beat all 6 bosses to wake up.']
     : ['Move: Arrow keys or WASD', 'Jump: Space or Z      Dash: Shift or X', 'Ask Mommy for the map: M (10 times)', 'Jump on enemies to beat them. Beat all 6 bosses to wake up.  Pause: P'];
   lines.forEach((l, i) => ctx.fillText(l, vw / 2, vh * .44 + i * 24));
   ctx.fillStyle = '#7a6a8a'; ctx.fillText(AC ? '' : '(press any key to hear the lullaby)', vw / 2, vh * .44 + lines.length * 24 + 12);
-  if (Math.floor(time * 2) % 2) { ctx.font = `${Math.min(30, vw / 16)}px Creepster, fantasy`; ctx.fillStyle = '#ffd0f0'; ctx.fillText(isTouch ? 'Tap JUMP to begin' : 'Press Space to begin', vw / 2, vh * .84); }
+  if (Math.floor(time * 2) % 2) { ctx.font = `${Math.min(16, vw / 32)}px ${PF}`; ctx.fillStyle = '#ffd0f0'; ctx.fillText(isTouch ? 'Tap JUMP to begin' : 'Press Space to begin', vw / 2, vh * .84); }
 }
 
 // ===== Loop =====
