@@ -278,7 +278,7 @@ export function makeVoidfly() {
 export function makeRiftstalker() {
   const g = new THREE.Group(), P = {};
   const T = { transparent: true };
-  const armr = phong(0x1c2030, { shininess: 120, specular: 0x6677aa, ...T }), trim = phong(0x3d3366, T), gun = phong(0x15171f, { shininess: 120, ...T });
+  const armr = phong(0x2c3350, { shininess: 120, specular: 0x8899cc, ...T }), trim = phong(0x3d3366, T), gun = phong(0x15171f, { shininess: 120, ...T });
   const red = glow(0xff2a2a, T);
   P.legs = [];
   for (const s of [-1, 1]) {
@@ -297,6 +297,7 @@ export function makeRiftstalker() {
   box(0.28, 0.5, 0.32, armr, 0, 0.22, 0, head).rotation.x = -0.15;
   box(0.06, 0.3, 0.42, trim, 0, 0.5, -0.05, head);
   P.eye = box(0.2, 0.06, 0.05, glow(0xff1a1a, T), 0, 0.27, 0.18, head);
+  const eg = glowSprite(0xff2020, 0.9, 0.9); eg.position.set(0, 0.27, 0.25); head.add(eg);
   for (const s of [-1, 1]) {
     const a = group(s * 0.38, 0.95, 0, body);
     box(0.12, 0.6, 0.12, armr, 0, -0.3, 0, a);

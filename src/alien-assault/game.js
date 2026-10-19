@@ -13,7 +13,7 @@ const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Ve
 const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), sph = new THREE.Sphere();
 
 let scene, camera, arms, AP, patch, PP, fx, fxBig, debris, L = {};
-let panels = [], covers = [], doorFrame, outside;
+let panels = [], covers = [], doorFrame, roof, outside;
 let P, enemies = [], balls = [], shots = [], rings = [], hazards = [], boss = null;
 let mi = 0, M = null, spawnList = [], spawnT = 0, phase = 'card', phaseT = 0, upgrades = [], scanned = new Set();
 let scanBeam, scanTarget = null, scanT = 0, paused = false, pauseSel = 0, overSel = 0, upChoices = [], upSel = 0;
@@ -81,13 +81,14 @@ function buildRoom() {
     const a = (i / 7) * Math.PI * 2, s = MD.box(rnd(0.6, 1.1), 0.18, rnd(0.4, 0.8), MD.phong(0x5a6478), Math.cos(a) * 1.3, 0.12, PZ + Math.sin(a) * 1.3, scene);
     s.rotation.set(rnd(-0.5, 0.5), a, rnd(-0.4, 0.4));
   }
-  const dome = MD.mesh(new THREE.SphereGeometry(R + 0.3, 24, 6, 0, Math.PI * 2, 0, Math.PI / 2), MD.phong(0x2e3448, { side: THREE.BackSide, map: TEX.panel }), 0, ROOM_H, 0, scene);
+  roof = MD.group(0, 0, 0, scene);
+  const dome = MD.mesh(new THREE.SphereGeometry(R + 0.3, 24, 6, 0, Math.PI * 2, 0, Math.PI / 2), MD.phong(0x2e3448, { side: THREE.BackSide, map: TEX.panel }), 0, ROOM_H, 0, roof);
   dome.scale.y = 0.32;
-  const light = MD.cyl(2.2, 2.2, 0.3, MD.glow(0xbff4ff), 0, ROOM_H + 4.3, 0, scene, 16);
+  const light = MD.cyl(2.2, 2.2, 0.3, MD.glow(0xbff4ff), 0, ROOM_H + 4.3, 0, roof, 16);
   light.userData.k = 1;
-  MD.mesh(new THREE.TorusGeometry(5.5, 0.15, 4, 32), MD.glow(0x7f5aff), 0, ROOM_H + 3.2, 0, scene).rotation.x = Math.PI / 2;
+  MD.mesh(new THREE.TorusGeometry(5.5, 0.15, 4, 32), MD.glow(0x7f5aff), 0, ROOM_H + 3.2, 0, roof).rotation.x = Math.PI / 2;
   for (let i = 0; i < 9; i++) {
-    const c = MD.cyl(0.05, 0.05, rnd(2, 5), MD.phong(0x15181f), rnd(-10, 10), 0, rnd(-9, 6), scene, 4);
+    const c = MD.cyl(0.05, 0.05, rnd(2, 5), MD.phong(0x15181f), rnd(-10, 10), 0, rnd(-9, 6), roof, 4);
     c.position.y = ROOM_H + 2 - c.geometry.parameters.height / 2;
   }
   // door frame with hazard stripes
@@ -195,6 +196,7 @@ function clearAll() {
 function restoreWall() {
   for (const p of panels) { p.grp.position.copy(p.pos); p.grp.rotation.copy(p.rot); p.grp.visible = true; p.fly = null; }
   doorFrame.visible = true; wallBroken = false;
+  roof.position.set(0, 0, 0); roof.rotation.set(0, 0, 0); roof.visible = true; roof.userData.fly = 0;
 }
 function startMission(i, skipCard) {
   mi = i; M = MISSIONS[i];
@@ -229,7 +231,7 @@ function missionClear() {
 function update(dt) {
   const pr = G.pressed;
   if (pr.enter && (phase === 'intro' || phase === 'clear' || phase === 'ending' || H.dialogBusy())) H.skipLine();
-  if (!paused && phase !== 'card' && phase !== 'upgrade' && phase !== 'over' && (pr.p || pr.escape || pr.pause)) { paused = true; pauseSel = 0; sfx.ui(); G.hud.style.cursor = 'default'; }
+  if (!paused && phase !== 'card' && phase !== 'upgrade' && phase !== 'over' && phase !== 'dead' && (pr.p || pr.escape || pr.pause)) { paused = true; pauseSel = 0; sfx.ui(); G.hud.style.cursor = 'default'; }
   else if (paused && (pr.p || pr.escape || pr.pause)) { paused = false; G.hud.style.cursor = 'none'; }
 
   if (!paused) {
@@ -426,7 +428,7 @@ function tryRepair() {
 
 function updateCamera(dt) {
   const em = boss && boss.type === 'emperor';
-  const yawT = -aimNX * 0.55, pitchT = aimNY * 0.38 + (em ? 0.16 : 0.02);
+  const yawT = -aimNX * 0.55, pitchT = aimNY * 0.38 + (em ? 0.32 : 0.02);
   cam.yaw = damp(cam.yaw, yawT, 6, dt); cam.pitch = damp(cam.pitch, pitchT, 6, dt);
   G.shake = Math.max(0, G.shake - dt * 1.4);
   const sh = G.shake * 0.35;
@@ -513,6 +515,11 @@ function updateRoom(dt) {
     const k = s.userData.t;
     s.material.opacity = k > 0 ? 1 - k : 0;
     s.scale.setScalar(6 + Math.max(0, k) * 20);
+  }
+  if (roof.userData.fly > 0) {
+    const f = (roof.userData.fly += dt);
+    roof.position.set(f * 4, f * f * 9, -f * 6); roof.rotation.set(-f * 0.4, 0, f * 0.3);
+    if (f > 4) roof.visible = false;
   }
   for (const p of panels) {
     if (!p.fly) continue;
@@ -1012,12 +1019,12 @@ function exhaust(v, time) {
 }
 
 // ===== THE NULL EMPEROR =====
-const PORTALS = [[-8, 3, -6], [8, 4, -5], [-4, 5.5, -10], [5, 2.5, -1], [0, 6, -8]];
+const PORTALS = [[-6, 3, -4], [6, 4, -3], [-3, 5.5, -8], [3.5, 2.5, 0], [0, 6.5, -6]];
 let portalGeo = null;
 function spawnEmperor() {
   const g = MD.makeEmperor();
-  g.scale.setScalar(3);
-  g.position.set(0, -28, -44);
+  g.scale.setScalar(4.5);
+  g.position.set(0, -40, -30);
   scene.add(g);
   const mats = [];
   g.traverse(m => { if (m.material && m.material.emissive) { mats.push(m.material); m.material.userData.e0 = m.material.emissive.getHex(); } });
@@ -1037,6 +1044,7 @@ function breakWall() {
     p.fly = { v: out.multiplyScalar(rnd(8, 16)).add(new THREE.Vector3(0, rnd(5, 11), 0)), s: new THREE.Vector3(rnd(-3, 3), 0, rnd(-3, 3)), t: 0 };
   }
   doorFrame.visible = false;
+  roof.userData.fly = 0.001;
   sfx.boom(); sfx.slam(); G.shake = 1.2; flashT = 0.3;
   debris.burst(tmp.set(0, 3, -14), [0x6a7590, 0x525c78, 0xffa200], 30, 10, 0.6);
   fxBig.burst(tmp, 0xffffff, 40, 12, 0.8, -4);
@@ -1072,7 +1080,7 @@ function upEmperor(dt) {
   for (const sh of Pt.shells) sh.g.rotation.y = damp(sh.g.rotation.y, open ? sh.s * 1.5 : 0, 5, dt);
   Pt.coreGlow.material.opacity = damp(Pt.coreGlow.material.opacity, open ? 0.9 : 0.15, 5, dt);
   Pt.core.scale.setScalar(open ? 1 + Math.sin(e.t * 8) * 0.08 : 0.9);
-  L.boss.position.set(0, 14, -30); L.boss.intensity = open ? 6 : 2;
+  L.boss.position.set(0, 18, -16); L.boss.intensity = open ? 6 : 2;
   for (const a of Pt.arms) { a.g.rotation.x = -0.4 + a.k * 0.1 + Math.sin(e.t * 1.3 + a.k + a.s) * 0.15; a.f.rotation.x = -0.6 + Math.sin(e.t * 1.7 + a.k) * 0.2; }
   Pt.head.rotation.y = Math.sin(e.t * 0.5) * 0.1;
   const eyeCol = e.st.endsWith('Wind') ? (Math.floor(e.t * 16) % 2 ? 0xffffff : 0xff4af0) : 0x99f6ff;
@@ -1081,12 +1089,13 @@ function upEmperor(dt) {
   switch (e.st) {
     case 'rise':
       e.stT -= dt;
-      e.g.position.y = lerp(-28, 0, smooth(1 - (e.stT - 0.5) / 5));
+      e.g.position.y = lerp(-40, 0, smooth(1 - (e.stT - 0.5) / 5));
       G.shake = Math.max(G.shake, 0.25);
       if (e.stT <= 0) { e.st = 'idle'; e.stT = 1.5; e.ready = true; sfx.roar(); }
       break;
     case 'idle':
       e.stT -= dt;
+      if (e.beam) { scene.remove(e.beam); scene.remove(e.beamCore); e.beam = null; }
       if (e.stT <= 0) {
         const p = EMP_SEQ[e.seq++ % EMP_SEQ.length];
         if (p === 'sweep') { e.st = 'sweepWind'; e.stT = 1.2 * fast; H.warn('JUMP!', '#ffb02e', 1.4); sfx.charge(); makeFloorLine(e.stT); }
@@ -1160,9 +1169,9 @@ function upEmperor(dt) {
       e.stT -= dt;
       Pt.arms[4].g.rotation.x = damp(Pt.arms[4].g.rotation.x, -2.5, 8, dt); Pt.arms[5].g.rotation.x = damp(Pt.arms[5].g.rotation.x, -2.5, 8, dt);
       if (e.stT <= 0) {
-        spawnRing(0, -15, 12, 15, 0xff4af0, 34);
+        spawnRing(0, -12, 12, 15, 0xff4af0, 34);
         sfx.slam(); G.shake = Math.max(G.shake, 0.6);
-        fxBig.burst(tmp.set(0, 0.5, -15), 0xff4af0, 30, 10, 0.6, -5);
+        fxBig.burst(tmp.set(0, 0.5, -12), 0xff4af0, 30, 10, 0.6, -5);
         e.count--;
         if (e.count > 0) e.stT = 0.75 * fast; else { e.st = 'idle'; e.stT = 1.0 * fast; }
       }
@@ -1188,7 +1197,7 @@ function upEmperor(dt) {
       }
       e.g.position.y -= dt * 1.2;
       if (e.stT <= 0) {
-        fxBig.burst(tmp.set(0, 12, -44), 0xffffff, 120, 30, 1.4, -2);
+        fxBig.burst(tmp.set(0, 18, -30), 0xffffff, 120, 30, 1.4, -2);
         sfx.boom(); sfx.bigkill(); flashT = 0.8; G.shake = 1.5;
         scene.remove(e.g); e.extra.forEach(m => scene.remove(m));
         boss = null;
@@ -1334,7 +1343,7 @@ function drawHUD(dt) {
   H.text(`MISSION ${mi + 1}: ${M.title}`, tl, 22, fs, '#7fe3ff', 'left', { max: W * 0.5 });
   if (!M.boss && phase === 'fight') H.text(`ALIENS LEFT: ${spawnList.length + enemies.length}`, tl, 40, fs, '#ffffff', 'left');
   // armour, overdrive, repair
-  const bw = small ? Math.min(150, W * 0.36) : 240, by = isTouch ? 58 : Hh - 46;
+  const bw = small ? Math.min(150, W * 0.36) : 240, by = isTouch ? 76 : Hh - 46;
   const ax = isTouch ? tl : 24;
   H.text('ARMOUR', ax, by - 12, fs, '#9fdcff', 'left');
   const af = P.armor / P.max;
@@ -1348,7 +1357,7 @@ function drawHUD(dt) {
   H.text(rr ? (isTouch ? 'PATCH REPAIR READY' : 'PATCH REPAIR READY [Q]') : `PATCH REPAIR ${Math.ceil(P.repairCD)}`, isTouch ? ax : ax, by + 30, fs - 1, rr ? '#39ff6a' : '#ff9a3c', 'left');
   // boss bar
   if (boss && boss.ready) {
-    const w = Math.min(520, W - 40), x0 = (W - w) / 2, y0 = isTouch ? 104 : 62;
+    const w = Math.min(520, W - (isTouch ? 160 : 40)), x0 = (W - w) / 2, y0 = isTouch ? 140 : 62;
     H.text(boss.name, W / 2, y0 - 14, small ? 10 : 13, '#ff4af0', 'center', { glow: '#ff4af0' });
     H.bar(x0, y0, w, 14, boss.hp / boss.max, '#ff4af0');
     let tag = '';
@@ -1356,9 +1365,9 @@ function drawHUD(dt) {
     if (boss.type === 'emperor') tag = boss.coreOpen > 0 ? 'CORE EXPOSED!' : 'CORE ARMOURED';
     if (tag) H.text(tag, W / 2, y0 + 28, small ? 8 : 10, boss.coreOpen > 0 || boss.st === 'exhausted' ? '#ffe14a' : '#9a9ab0');
   }
-  H.drawScan(dt, isTouch ? 150 : 84);
+  H.drawScan(dt, isTouch ? 196 : 84);
   H.drawWarn(dt);
-  H.drawDialog(isTouch ? Hh - 120 : Hh - 84);
+  H.drawDialog(isTouch ? Hh - 182 : Hh - 84);
 
   if (phase === 'dead' || phase === 'over') {
     H.fade(Math.min(0.7, phaseT * 0.4));
