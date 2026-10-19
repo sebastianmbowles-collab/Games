@@ -153,7 +153,7 @@ function buildWorld() {
   { const b = H(109, 70); set(110, 70, b + 1, T.BLOCK); set(111, 70, b + 2, T.BLOCK); set(112, 70, b + 3, T.BLOCK); pickups.push({ kind: 'bottle', x: 112.5, y: 70.5, z: 0 }); }
   item('pacifier', 96, 48);
   toy(95, 41, 'x', 4); toy(102, 47, 'y', 4); toy(108, 55, 'x', 4); toy(98, 66, 'y', 3); toy(105, 74, 'x', 3); toy(110, 44, 'y', 3); toy(100, 80, 'x', 4);
-  prop('jack', 100, 52); prop('jack', 108, 62); prop('jack', 96, 76); prop('doll', 112, 82); prop('sign', 102, 39, 'The farm is up there. He is waiting.');
+  prop('carousel', 103, 60); prop('jack', 100, 52); prop('jack', 108, 62); prop('jack', 96, 76); prop('doll', 112, 82); prop('sign', 102, 39, 'The farm is up there. He is waiting.');
   prop('sign', 100, 37, 'Gap too big? DASH while you JUMP!');
   // stairs up to the farm (the last gap needs a dash-jump)
   rect(102, 33, 103, 35, 3.5, T.BLOCK); rect(102, 31, 103, 32, 4, T.BLOCK); rect(102, 29, 103, 30, 4.5, T.BLOCK);
@@ -161,7 +161,8 @@ function buildWorld() {
   // --- Old MacDonald's Farm (north-east, high up) ---
   rect(86, 4, 116, 25, 5, T.FARM);
   rect(108, 8, 112, 18, 8, T.BARN);
-  prop('sign', 99, 22, 'Old MacDonald had a baby...'); prop('doll', 88, 23); prop('jack', 114, 22); item('pacifier', 90, 6);
+  prop('sign', 99, 22, 'Old MacDonald had a baby...');
+  for (const [sx, sy] of [[88, 7], [89, 12], [87, 18], [113, 6], [115, 12], [114, 18]]) prop('scarecrow', sx, sy); // they watch you prop('doll', 88, 23); prop('jack', 114, 22); item('pacifier', 90, 6);
 
   // --- The Crib Maze (south) ---
   rect(48, 72, 72, 94, 3, T.MAZEWALL);
@@ -464,7 +465,7 @@ const cam = { x: 0, y: 0 };
 function newGame() {
   buildWorld();
   P = { x: 59.5, y: 59.5, z: 1, vz: 0, r: .28, h: .9, onGround: true, coyote: 0, jumpBuf: 0, dashT: 0, dashCd: 0, airDash: true, dashDir: [1, 0],
-    face: 1, dir: 'down', secrets: 0, lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
+    face: 1, dir: 'down', secrets: 0, playT: 0, lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
   cam.x = P.x * 16; cam.y = P.y * 16 - P.z * 6;
   lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; introCard = null; freezeT = 0; flashT = 0; hitWords = [];
   state = 'play';
@@ -503,6 +504,7 @@ function update(dt) {
   if (pressed.pause || (state === 'pause' && pressed.start)) { state = state === 'pause' ? 'play' : 'pause'; }
   if (state !== 'play') return;
   if (mapT > 0) { mapT -= dt; return; } // the world waits while Mommy shows the map
+  P.playT += dt;
   if (pressed.mom) {
     if (P.mom > 0) { P.mom--; mapT = 5; sfx('mom'); say(P.mom === 0 ? 'This is the last time, sweetie.' : 'Here, sweetie. This is where you are.', 1.15, .9); }
     else { momMsgT = 2.5; say('Mommy is asleep.', .5, .7); }
@@ -1143,6 +1145,14 @@ function buildSprites() {
   SPR.musicbox = grid(12, 13).rect(1, 4, 10, 8, 'v').rect(1, 4, 10, 2, 'V').rect(3, 7, 6, 3, 'p').px(5, 8, 'y').px(6, 8, 'y').rect(10, 1, 1, 4, 'g').rect(10, 1, 2, 1, 'g').outline('k').done();
   SPR.bottle = R(['...t...', '..ttt..', '.bbbbb.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '..www..']);
   SPR.pacifier = R(['...ppp...', '..p...p..', '..p...p..', '...ppp...', '.bbbbbbb.', 'bbbbbbbbb', '.bbpppbb.', '...ppp...', '...ppp...']);
+  SPR.scarecrow = [-1, 0, 1].map(look => grid(18, 28)
+    .rect(8, 8, 2, 20, 'z').rect(1, 11, 16, 2, 'z')                               // the wooden cross
+    .rect(5, 10, 8, 10, 'r').rect(5, 13, 8, 1, 'i').rect(5, 16, 8, 1, 'i').rect(1, 10, 4, 3, 'r').rect(13, 10, 4, 3, 'r') // shirt
+    .px(1, 13, 'h').px(2, 14, 'h').px(16, 13, 'h').px(15, 14, 'h').px(7, 20, 'h').px(10, 21, 'h')                         // straw
+    .ell(9, 5, 4, 4, 't').rect(7, 4, 1, 1, 'k').rect(10, 4, 1, 1, 'k').px(7 + look, 4, 'e').px(10 + look, 4, 'e')       // sack head, eyes follow you
+    .line(7, 7, 11, 7, 'N').ell(9, 1.5, 5, 1.2, 'h').outline('k').done());
+  SPR.horse = grid(16, 13).ell(8, 6, 6, 3.5, 'c').ell(13, 3, 2.5, 2, 'c').rect(14, 4, 2, 2, 'c').rect(4, 9, 1, 3, 'c').rect(11, 9, 1, 3, 'c')
+    .px(13, 2, 'k').px(13, 3, 'e').rect(2, 2, 2, 4, 'r').rect(5, 4, 6, 1, 'r').px(7, 7, 'k').px(9, 6, 'k').outline('k').done(); // chipped paint
   SPR.doll = R(['..NNNN..', '.NccccN.', '.ckcccc.', '.cccGcc.', '.ccRRcc.', '..cccc..', '.RRRRRR.', 'RRRRRRRR', 'cRRRRRRc', '.RRRRRR.', '.RRRRRR.', '..c..c..']);
   SPR.jackbox = R(['vvvvvvvvvv', 'VVVVVVVVVV', 'vvvvvvvvvv', 'vvVvvvvVvv', 'vvvvvvvvvv', 'vvvVVVVvvv', 'vvvvvvvvvv', 'vvvvvvvvvv', 'VVVVVVVVVV']);
   SPR.jackhead = R(['..rrrr..', '.wwwwww.', 'wkwwwwkw', 'wwwrrwww', 'wwwrrwww', 'wRRRRRRw', '.wwwwww.']);
@@ -1381,6 +1391,17 @@ function drawPickup(p) {
 }
 function drawProp(p) {
   if (p.kind === 'doll') spr(SPR.doll, p.x, p.y, p.z, P.x < p.x);
+  else if (p.kind === 'scarecrow') spr(SPR.scarecrow[clamp(Math.round(P.x - p.x), -1, 1) + 1], p.x, p.y, p.z, false);
+  else if (p.kind === 'carousel') { // a broken carousel: horses on poles going slowly round
+    const cx = SX(p.x), cy = SY(p.y, p.z);
+    ctx.fillStyle = '#5a2030'; ctx.fillRect(cx - 1, cy - 44, 3, 44); ctx.fillStyle = '#c8b040'; ctx.fillRect(cx - 22, cy - 46, 45, 3);
+    const order = [0, 1, 2, 3, 4, 5].map(k => { const a = time * .5 + k * Math.PI / 3; return [Math.sin(a), Math.cos(a), k]; }).sort((a, b) => a[1] - b[1]);
+    for (const [sn, cs, k] of order) {
+      const hx = Math.round(cx + sn * 20), hy = Math.round(cy + cs * 8 - 18 + Math.sin(time * 2 + k) * 2);
+      ctx.fillStyle = '#c8b040'; ctx.fillRect(hx, cy - 44 + Math.round(cs * 3), 1, hy - (cy - 44) + 4);
+      ctx.save(); ctx.translate(hx, hy); if (cs < 0) ctx.scale(-1, 1); ctx.drawImage(SPR.horse, -8, -6); ctx.restore();
+    }
+  }
   else if (p.kind === 'jack') {
     const [sx, sy] = spr(SPR.jackbox, p.x, p.y, p.z, false);
     if (p.open) {
@@ -1676,6 +1697,10 @@ function drawWin() {
     ctx.font = `${Math.min(13, vw / 40)}px ${PF}`; ctx.fillStyle = '#e02040';
     ctx.fillText(type('...but the music box under the crib is still playing.', 11), vw / 2, vh * .1);
     if (endT > 14) ctx.fillText(type("Hush, little baby. Don't say a word.", 14), vw / 2, vh * .1 + 30);
+  }
+  if (endT > 16) {
+    const m = Math.floor(P.playT / 60), sec = String(Math.floor(P.playT % 60)).padStart(2, '0');
+    ctx.font = `9px ${PF}`; ctx.fillStyle = '#c8b8d8'; ctx.fillText('Time: ' + m + ':' + sec + '     Secret music boxes: ' + P.secrets + ' / 3', vw / 2, vh * .9 - 66);
   }
   if (endT > 17) { ctx.font = `${Math.min(26, vw / 22)}px ${PF}`; ctx.fillStyle = '#c0283a'; ctx.fillText('THE END?', vw / 2, vh * .9 - 30); }
   if (endT > 18) { ctx.fillStyle = '#8a6a8a'; ctx.font = `9px ${PF}`; ctx.fillText('Press Space or tap to play again', vw / 2, vh - 20); }
