@@ -613,6 +613,15 @@ function updatePlayer(dt) {
   }
 }
 
+// move an enemy, sliding along walls instead of getting stuck on them
+function enemyGround(e, nx, ny) { const g = groundAt(nx, ny, e.z, e.r); return !blocked(nx, ny, e.z, e.r) && g !== VOID && Math.abs(g - e.z) <= STEP ? g : null; }
+function tryMove(e, mx, my) {
+  let g;
+  if ((g = enemyGround(e, e.x + mx, e.y + my)) !== null) { e.x += mx; e.y += my; e.z = g; }
+  else if ((g = enemyGround(e, e.x + mx, e.y)) !== null) { e.x += mx; e.z = g; }
+  else if ((g = enemyGround(e, e.x, e.y + my)) !== null) { e.y += my; e.z = g; }
+  else e.wt = 0; // stuck while wandering: pick a new spot
+}
 function updateEnemies(dt) {
   for (const e of enemies) {
     if (e.dead) continue;
@@ -626,15 +635,23 @@ function updateEnemies(dt) {
       e.mx = ax; e.my = ay;
       if (ah === VOID || Math.abs(ah - e.z) > STEP || far) e.dir = -e.dir; else { e.x = nx; e.y = ny; e.z = groundAt(e.x, e.y, e.z, .2); }
     } else if (e.kind === 'tinyspider' && e.hang) {
-      if (d < 2.6) { e.z -= 9 * dt; if (e.z <= e.base) { e.z = e.base; e.hang = false; } }
+      if (d < 2.6) { e.z -= 9 * dt; if (e.z <= e.base) { e.z = e.base; e.hang = false; e.alert = true; } }
     } else {
-      // chasers: pigs, little buns, ducklings and tiny spiders on the floor
-      const sp = { pig: 2.1, littlebun: 2.4, duckling: 2.9, tinyspider: 2 }[e.kind];
-      if (d < 9) {
-        e.mx = dx / d; e.my = dy / d;
-        const nx = e.x + dx / d * sp * dt, ny = e.y + dy / d * sp * dt, g = groundAt(nx, ny, e.z, e.r);
-        if (!blocked(nx, ny, e.z, e.r) && g !== VOID && Math.abs(g - e.z) <= STEP) { e.x = nx; e.y = ny; e.z = g; }
+      // chasers (pigs, little buns, ducklings, tiny spiders) wander near home until they spot you,
+      // stop for a moment with a "!", chase you, and give up if you get far away
+      if (e.hx === undefined) { e.hx = e.x; e.hy = e.y; }
+      const sp = { pig: 2.1, littlebun: 2.4, duckling: 2.6, tinyspider: 2 }[e.kind];
+      if (!e.alert && d < 6) { e.alert = true; e.alertT = .55; sfx(ENEMY_SOUND[e.kind], .8); }
+      if (e.alert && d > 11) { e.alert = false; e.hx = e.x; e.hy = e.y; }
+      let tx = P.x, ty = P.y, v = sp;
+      if (e.alert) { if (e.alertT > 0) { e.alertT -= dt; v = 0; } }
+      else {
+        e.wt = (e.wt || 0) - dt;
+        if (e.wt <= 0 || Math.hypot(e.wx - e.x, e.wy - e.y) < .2) { e.wt = 1.5 + Math.random() * 2; e.wx = e.hx + (Math.random() - .5) * 4; e.wy = e.hy + (Math.random() - .5) * 4; }
+        tx = e.wx; ty = e.wy; v = sp * .35;
       }
+      const ddx = tx - e.x, ddy = ty - e.y, dd = Math.hypot(ddx, ddy) || 1;
+      if (dd > .05 && v > 0) { e.mx = ddx / dd; e.my = ddy / dd; tryMove(e, ddx / dd * v * dt, ddy / dd * v * dt); }
     }
     e.snd = (e.snd === undefined ? Math.random() * 2 : e.snd) - dt;
     if (d < 7 && e.snd <= 0 && !(e.kind === 'tinyspider' && e.hang)) { e.snd = 1.5 + Math.random() * 2.5; sfx(ENEMY_SOUND[e.kind], (1 - d / 7) * .9); }
@@ -710,7 +727,7 @@ function summon(b) {
   const kind = b.def.minion; if (!kind) return;
   if (enemies.filter(e => e.kind === kind).length >= 4) return;
   const [x0, y0, x1, y1] = b.def.arena;
-  for (const [px, py] of [[x0 + 2.5, y0 + 2.5], [x1 - 1.5, y1 - 1.5]]) enemies.push({ kind, x: px, y: py, z: b.z, r: .32, h: .9, t: 0, dead: false });
+  for (const [px, py] of [[x0 + 2.5, y0 + 2.5], [x1 - 1.5, y1 - 1.5]]) enemies.push({ kind, x: px, y: py, z: b.z, r: .32, h: .9, t: 0, dead: false, alert: true });
   showBanner(b.id === 'mac' ? '...and on that farm he had some PIGS' : 'More are coming!', '', 2);
 }
 function updateBoss(b, dt) {
@@ -1109,6 +1126,15 @@ function buildSprites() {
     toes.line(5, 7, 13, 7, 'R');
     SPR.final = [head, shoulders, knees, toes].map(g => g.outline('k').done());
   }
+  SPR.mommy = (() => {
+    const g = grid(22, 40);
+    g.ell(11, 6, 5, 5.5, 'N').rect(6, 6, 10, 12, 'N')                       // long hair
+      .ell(11, 7, 3.5, 4, 's').px(9, 7, 'k').px(13, 7, 'k').px(10, 9, 'P').px(11, 9, 'P').px(12, 9, 'P')
+      .poly([[6, 14], [16, 14], [19, 38], [3, 38]], 'V').swap('V', 'v', (i, j) => i > 14 || j > 34) // nightgown
+      .rect(3, 16, 3, 12, 's').rect(16, 16, 3, 10, 's').rect(17, 26, 4, 2, 's')                    // arms, one reaching to the crib
+      .rect(7, 38, 3, 2, 's').rect(12, 38, 3, 2, 's');
+    return g.outline('k').done();
+  })();
   SPR.musicbox = grid(12, 13).rect(1, 4, 10, 8, 'v').rect(1, 4, 10, 2, 'V').rect(3, 7, 6, 3, 'p').px(5, 8, 'y').px(6, 8, 'y').rect(10, 1, 1, 4, 'g').rect(10, 1, 2, 1, 'g').outline('k').done();
   SPR.bottle = R(['...t...', '..ttt..', '.bbbbb.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '..www..']);
   SPR.pacifier = R(['...ppp...', '..p...p..', '..p...p..', '...ppp...', '.bbbbbbb.', 'bbbbbbbbb', '.bbpppbb.', '...ppp...', '...ppp...']);
@@ -1256,7 +1282,8 @@ function drawEnemy(e) {
   const hop = e.kind === 'littlebun' ? Math.abs(Math.sin(e.t * 6)) * .5 : 0;
   shadow(e.x, e.y, e.z + hop, 10);
   const f = Math.floor(e.t * 6) & 1;
-  spr(SPR[e.kind][dir][f], e.x, e.y, e.z + hop, dir === 'side' && mx < 0);
+  const img = SPR[e.kind][dir][f], [sx, sy] = spr(img, e.x, e.y, e.z + hop, dir === 'side' && mx < 0);
+  if (e.alertT > 0) { const cx = sx + (img.width >> 1) - 1; ctx.fillStyle = '#ff3040'; ctx.fillRect(cx, sy - 10, 2, 5); ctx.fillRect(cx, sy - 4, 2, 2); } // "!" when it spots you
 }
 function drawShot(s) {
   shadow(s.x, s.y, s.z, 8);
@@ -1369,6 +1396,7 @@ function render() {
   if (!SPR.baby) buildSprites();
   ctx = loCtx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false; labels = [];
   const LW = lo.width, LH = lo.height;
+  if (state === 'win' && endT >= 2) { endT += 1 / 60; drawWinScene(); crispPass(); drawWin(); return; }
   if (state === 'title') {
     drawVoid(time * 8, time * 4);
     const b = SPR.baby.down[Math.floor(time * 3) & 1]; ctx.drawImage(b, (LW >> 1) - 8, Math.round(LH * .6));
@@ -1566,29 +1594,53 @@ function overlay(t, sub) {
   ctx.fillText(t, vw / 2, vh / 2);
   ctx.font = `10px ${PF}`; ctx.fillStyle = '#ddd'; ctx.fillText(sub, vw / 2, vh / 2 + 40);
 }
+// the ending, drawn as a little pixel scene: the baby wakes up in the crib, Mommy is there...
+function drawWinScene() {
+  const LW = lo.width, LH = lo.height, cx = LW >> 1, fy = Math.round(LH * .72);
+  const dim = clamp((endT - 9) / 2, 0, .85);
+  ctx.fillStyle = '#5a4870'; ctx.fillRect(0, 0, LW, fy);            // wall
+  ctx.fillStyle = '#6e5038'; ctx.fillRect(0, fy, LW, LH - fy);      // floor
+  ctx.fillStyle = '#5a402a'; for (let x = 0; x < LW; x += 16) ctx.fillRect(x, fy, 1, LH - fy);
+  // window with the morning sun
+  ctx.fillStyle = '#3a2a1a'; ctx.fillRect(cx - 90, fy - 90, 44, 40);
+  ctx.fillStyle = dim > .3 ? '#1a1430' : '#ffe8a8'; ctx.fillRect(cx - 87, fy - 87, 38, 34);
+  ctx.fillStyle = '#3a2a1a'; ctx.fillRect(cx - 69, fy - 87, 2, 34); ctx.fillRect(cx - 87, fy - 71, 38, 2);
+  ctx.fillStyle = `rgba(255,232,168,${(.18 * (1 - dim)).toFixed(2)})`; ctx.beginPath(); ctx.moveTo(cx - 87, fy - 53); ctx.lineTo(cx - 49, fy - 53); ctx.lineTo(cx + 10, fy + 30); ctx.lineTo(cx - 60, fy + 30); ctx.fill();
+  // the crib, with the baby inside
+  ctx.fillStyle = '#c8a070'; ctx.fillRect(cx - 26, fy - 40, 52, 4); ctx.fillRect(cx - 26, fy - 6, 52, 4);
+  const baby = endT < 4 ? SPR.babyBlink : SPR.baby.down[0];
+  ctx.drawImage(baby, cx - 8, fy - 26 - (endT > 4 && endT < 6 ? Math.floor(endT * 6) & 1 : 0));
+  ctx.fillStyle = '#c8a070'; for (let x = cx - 26; x <= cx + 24; x += 5) ctx.fillRect(x, fy - 40, 2, 38);
+  ctx.fillRect(cx - 28, fy - 44, 4, 46); ctx.fillRect(cx + 24, fy - 44, 4, 46);
+  // Mommy
+  if (endT < 9.5) ctx.drawImage(SPR.mommy, cx + 34, fy - SPR.mommy.height + 2);
+  // the music box under the crib, and eyes in the dark
+  if (dim > 0) {
+    ctx.fillStyle = `rgba(6,0,12,${dim.toFixed(2)})`; ctx.fillRect(0, 0, LW, LH);
+    ctx.drawImage(SPR.musicbox, cx - 6, fy - 2);
+    if (Math.floor(endT * 3) % 2) { ctx.fillStyle = '#d8a0ff'; ctx.fillRect(cx + 6, fy - 8 - Math.floor(endT * 10) % 6, 2, 2); }
+    if (endT > 11) [[.15, .3], [.82, .25], [.1, .62], [.88, .6], [.5, .15]].forEach(([ex, ey], k) => {
+      if (endT > 11 + k * .6) ctx.drawImage(Math.sin(endT * 1.3 + k) > .9 ? SPR.eyeShut : SPR.eye, Math.round(LW * ex), Math.round(LH * ey));
+    });
+  }
+}
 function drawWin() {
   const a = clamp(endT / 2, 0, 1);
-  ctx.fillStyle = `rgba(255,244,214,${a})`; ctx.fillRect(0, 0, vw, vh);
-  if (a < 1) return;
-  // the happy ending...
-  ctx.textAlign = 'center'; ctx.fillStyle = '#5a3a6a'; ctx.font = `${Math.min(30, vw / 20)}px ${PF}`;
-  ctx.fillText('YOU WOKE UP!', vw / 2, vh / 2 - 30);
-  ctx.drawImage(SPR.baby.down[0], vw / 2 - 24, vh / 2 - 120, 48, 57);
-  ctx.font = `10px ${PF}`; ctx.fillStyle = '#6a4a5a';
-  ctx.fillText('Mommy: "Good morning, sweetie. It was only a dream."', vw / 2, vh / 2 + 14);
-  // ...and the creepy hint
-  if (endT > 6) {
-    const k = clamp((endT - 6) / 2, 0, 1);
-    ctx.fillStyle = `rgba(10,0,10,${k * .85})`; ctx.fillRect(0, 0, vw, vh);
-    ctx.fillStyle = `rgba(220,20,40,${k})`; ctx.font = `${Math.min(13, vw / 40)}px ${PF}`;
-    ctx.fillText('...but the music box under the crib is still playing.', vw / 2, vh / 2 + 60);
-    ctx.fillText("Hush, little baby. Don't say a word.", vw / 2, vh / 2 + 92);
-    ctx.globalAlpha = k;
-    const shut = Math.sin(endT * 1.3) > .9;
-    for (const ex of [-40, 8]) ctx.drawImage(shut ? SPR.eyeShut : SPR.eye, vw / 2 + ex, vh * .8, 36, 20);
-    ctx.globalAlpha = 1;
+  if (endT < 2) { ctx.fillStyle = `rgba(255,244,214,${a})`; ctx.fillRect(0, 0, vw, vh); return; }
+  const type = (txt, start) => txt.slice(0, Math.max(0, Math.floor((endT - start) * 22)));
+  ctx.textAlign = 'center';
+  if (endT < 9) {
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(vw * .1, vh * .06, vw * .8, 64);
+    ctx.font = `${Math.min(22, vw / 26)}px ${PF}`; ctx.fillStyle = '#ffe8a8'; ctx.fillText('YOU WOKE UP!', vw / 2, vh * .06 + 26);
+    ctx.font = `10px ${PF}`; ctx.fillStyle = '#fff'; ctx.fillText(type('Mommy: "Good morning, sweetie. It was only a dream."', 3), vw / 2, vh * .06 + 50);
   }
-  if (endT > 9) { ctx.fillStyle = '#8a6a8a'; ctx.font = `9px ${PF}`; ctx.fillText('Press Space or tap to play again', vw / 2, vh - 40); }
+  if (endT > 11) {
+    ctx.font = `${Math.min(13, vw / 40)}px ${PF}`; ctx.fillStyle = '#e02040';
+    ctx.fillText(type('...but the music box under the crib is still playing.', 11), vw / 2, vh * .1);
+    if (endT > 14) ctx.fillText(type("Hush, little baby. Don't say a word.", 14), vw / 2, vh * .1 + 30);
+  }
+  if (endT > 17) { ctx.font = `${Math.min(26, vw / 22)}px ${PF}`; ctx.fillStyle = '#c0283a'; ctx.fillText('THE END?', vw / 2, vh * .9 - 30); }
+  if (endT > 18) { ctx.fillStyle = '#8a6a8a'; ctx.font = `9px ${PF}`; ctx.fillText('Press Space or tap to play again', vw / 2, vh - 20); }
 }
 function drawTitle() {
   ctx.textAlign = 'center';
@@ -1610,7 +1662,7 @@ function drawTitle() {
 let last = performance.now();
 function frame(now) {
   const dt = clamp((now - last) / 1000, 0, .05); last = now;
-  if (state === 'title' || (state === 'over' && endT > 1) || (state === 'win' && endT > 9)) {
+  if (state === 'title' || (state === 'over' && endT > 1) || (state === 'win' && endT > 18)) {
     if (pressed.jump || (pressed.start && state !== 'title')) { initAudio(); newGame(); }
     else if (pressed.start) initAudio();
     time += dt;
