@@ -34,7 +34,8 @@ const cv = document.getElementById('c'), mainCtx = cv.getContext('2d');
 const lo = document.createElement('canvas'), loCtx = lo.getContext('2d');
 let ctx = mainCtx;
 const PF = '"Press Start 2P", monospace';
-let cw = 0, ch = 0, zoom = 1, vw = 0, vh = 0, dpr = 1, PIX = 3;
+let cw = 0, ch = 0, zoom = 1, vw = 0, vh = 0, dpr = 1, PIX = 4, GW = 0, GH = 0;
+const RES = 2; // the world canvas has RES pixels per game pixel, so double-size sprites keep their detail
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
   cw = window.innerWidth; ch = window.innerHeight;
@@ -43,8 +44,9 @@ function resize() {
   zoom = Math.max(0.7, Math.min(1.4, Math.min(cw, ch) / 620));
   vw = cw / zoom; vh = ch / zoom;
   // about 10 tiles tall on wide screens, about 8 tiles across on tall phone screens
-  PIX = Math.max(2, Math.round(Math.min(ch / (16 * 10), cw / (16 * 8)) * dpr));
-  lo.width = Math.ceil(cw * dpr / PIX); lo.height = Math.ceil(ch * dpr / PIX);
+  PIX = Math.max(2, Math.round(Math.min(ch / (16 * 10), cw / (16 * 8)) * dpr / RES) * RES); // a multiple of RES keeps pixels square
+  GW = Math.ceil(cw * dpr / PIX); GH = Math.ceil(ch * dpr / PIX);
+  lo.width = GW * RES; lo.height = GH * RES;
 }
 // shrink any text that would run off the screen (the pixel font is wide)
 {
@@ -965,35 +967,129 @@ function spriteFromRows(rows) {
   rows.forEach((row, j) => { for (let i = 0; i < row.length; i++) { const col = PALC[row[i]]; if (col) { x.fillStyle = col; x.fillRect(i, j, 1, 1); } } });
   return c;
 }
-// a tiny pixel painter for the bigger sprites
-function grid(w, h) {
-  const a = Array.from({ length: h }, () => Array(w).fill('.'));
+// A tiny pixel painter for the bigger sprites. With k = 2 everything is painted at double size,
+// so there is room for fine details; the game then draws it back at normal size (see sw / sh).
+function grid(w, h, k = 1) {
+  const GW2 = w * k, GH2 = h * k, a = Array.from({ length: GH2 }, () => Array(GW2).fill('.'));
+  const put = (x, y, c) => { if (x >= 0 && y >= 0 && x < GW2 && y < GH2) a[y][x] = c; };
   const g = {
-    px(x, y, c) { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < w && y < h) a[y][x] = c; return g; },
-    rect(x, y, rw, rh, c) { for (let j = y; j < y + rh; j++) for (let i = x; i < x + rw; i++) g.px(i, j, c); return g; },
-    ell(cx, cy, rx, ry, c) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (((i + .5 - cx) / rx) ** 2 + ((j + .5 - cy) / ry) ** 2 <= 1) a[j][i] = c; return g; },
+    px(x, y, c) { x = Math.round(x) * k; y = Math.round(y) * k; for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) put(x + i, y + j, c); return g; },
+    rect(x, y, rw, rh, c) { for (let j = Math.round(y * k); j < Math.round((y + rh) * k); j++) for (let i = Math.round(x * k); i < Math.round((x + rw) * k); i++) put(i, j, c); return g; },
+    ell(cx, cy, rx, ry, c) { for (let j = 0; j < GH2; j++) for (let i = 0; i < GW2; i++) if ((((i + .5) / k - cx) / rx) ** 2 + (((j + .5) / k - cy) / ry) ** 2 <= 1) a[j][i] = c; return g; },
     poly(pts, c) {
-      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-        let ins = false; const X = i + .5, Y = j + .5;
-        for (let k = 0, l = pts.length - 1; k < pts.length; l = k++) { const [xi, yi] = pts[k], [xl, yl] = pts[l]; if ((yi > Y) !== (yl > Y) && X < (xl - xi) * (Y - yi) / (yl - yi) + xi) ins = !ins; }
+      for (let j = 0; j < GH2; j++) for (let i = 0; i < GW2; i++) {
+        let ins = false; const X = (i + .5) / k, Y = (j + .5) / k;
+        for (let q = 0, l = pts.length - 1; q < pts.length; l = q++) { const [xi, yi] = pts[q], [xl, yl] = pts[l]; if ((yi > Y) !== (yl > Y) && X < (xl - xi) * (Y - yi) / (yl - yi) + xi) ins = !ins; }
         if (ins) a[j][i] = c;
       }
       return g;
     },
-    line(x0, y0, x1, y1, c) { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1; for (let k = 0; k <= n; k++) g.px(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, c); return g; },
-    swap(from, to, test) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (a[j][i] === from && test(i, j)) a[j][i] = to; return g; },
+    line(x0, y0, x1, y1, c) { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1; for (let q = 0; q <= n; q++) g.px(x0 + (x1 - x0) * q / n, y0 + (y1 - y0) * q / n, c); return g; },
+    swap(from, to, test) { for (let j = 0; j < GH2; j++) for (let i = 0; i < GW2; i++) if (a[j][i] === from && test(Math.floor(i / k), Math.floor(j / k))) a[j][i] = to; return g; },
     outline(c) {
       const b = a.map(r => r.slice());
-      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (b[j][i] === '.') {
+      for (let j = 0; j < GH2; j++) for (let i = 0; i < GW2; i++) if (b[j][i] === '.') {
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const q = b[j + dy] && b[j + dy][i + dx]; if (q && q !== '.' && q !== c) { a[j][i] = c; break; } }
       }
       return g;
     },
-    done() { return spriteFromRows(a.map(r => r.join(''))); }
+    done() { const c = spriteFromRows(a.map(r => r.join(''))); c.s = k; return c; }
   };
   return g;
 }
+// size of a sprite in game pixels (double-size sprites count as half)
+const sw = img => img.width / (img.s || 1), sh = img => img.height / (img.s || 1);
+// paint fine details (in the sprite's own pixels) on top of a finished sprite
+function detail(img, fn) {
+  const x = img.getContext('2d');
+  const d = (px, py, c) => { x.fillStyle = PALC[c]; x.fillRect(px, py, 1, 1); };
+  d.el = (cx, cy, rx, ry, c) => { for (let j = Math.floor(cy - ry); j <= cy + ry; j++) for (let i = Math.floor(cx - rx); i <= cx + rx; i++) if (((i - cx) / rx) ** 2 + ((j - cy) / ry) ** 2 <= 1) d(i, j, c); };
+  // a wide stitched grin full of little teeth, curving up at the corners
+  d.grin = (x0, x1, y, curve) => {
+    const mid = (x0 + x1) / 2, half = (x1 - x0) / 2;
+    for (let i = x0; i <= x1; i++) {
+      const yy = y - Math.round(curve * ((i - mid) / half) ** 2);
+      d(i, yy, 'k'); d(i, yy + 1, 'k'); d(i, yy + 2, 'k');
+      d(i, (i & 1) ? yy : yy + 2, 'w');
+      if ((i - x0) % 3 === 0) { d(i, yy - 1, 'N'); d(i, yy + 3, 'N'); }
+    }
+  };
+  const ln = (x0, y0, x1, y1, c) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1; for (let q = 0; q <= n; q++) d(Math.round(x0 + (x1 - x0) * q / n), Math.round(y0 + (y1 - y0) * q / n), c); };
+  fn(d, ln);
+  return img;
+}
 const SPR = {};
+function addScaryDetails() {
+  const each = (set, dirs, fn) => dirs.forEach(dir => set[dir].forEach((img, f) => detail(img, (d, ln) => fn(d, ln, f))));
+  // new faces: hollow eye sockets with a red glint, and stitched grins full of teeth
+  each(SPR.toy, ['down'], (d) => { d.el(12, 13, 3.5, 4.5, 'k'); d(12, 14, 'e'); d(13, 14, 'e'); d.grin(8, 28, 25, 3); });
+  each(SPR.pig, ['down'], (d) => { d.el(13, 13, 3, 3.5, 'k'); d(13, 13, 'e'); d.el(30, 13, 3, 3.5, 'k'); d(30, 13, 'e'); d.grin(12, 32, 29, 2); });
+  each(SPR.littlebun, ['down'], (d, ln, f) => { d.el(9, 6 + f * 2, 2.5, 2, 'k'); d(9, 6 + f * 2, 'e'); d.el(23, 6 + f * 2, 2.5, 2, 'k'); d(23, 6 + f * 2, 'e'); });
+  each(SPR.duckling, ['down'], (d) => { d.el(10, 8, 2, 2.5, 'k'); d(10, 8, 'e'); d.el(19, 8, 2, 2.5, 'k'); d(19, 8, 'e'); });
+  each(SPR.monkey, ['down'], (d) => { d.el(16, 10, 3.5, 3, 'w'); d(16, 10, 'k'); d.el(25, 10, 3.5, 3, 'w'); d(25, 10, 'k'); d.grin(11, 30, 18, 2); });
+  detail(SPR.mac, (d) => { d.el(21, 20, 4.5, 5.5, 'k'); d.el(31, 20, 4.5, 5.5, 'k'); d(21, 21, 'e'); d(31, 21, 'e'); d.grin(14, 38, 30, 3); });
+  detail(SPR.starBoss, (d) => { d.el(24, 32, 6, 8, 'k'); d.el(44, 32, 6, 8, 'k'); d(24, 34, 'e'); d(44, 34, 'e'); });
+  detail(SPR.duck, (d) => { d.el(48, 16, 4, 4, 'e'); d.el(48, 16, 1.5, 2.5, 'k'); });
+  each(SPR.toy, ['down'], (d, ln) => {
+    ln(18, 4, 18, 21, 'N'); for (let y = 5; y < 21; y += 3) { d(17, y, 'N'); d(19, y, 'N'); }   // a stitched seam down its face
+    d(23, 11, 'c'); d(26, 11, 'c'); d(23, 14, 'c'); d(26, 14, 'c'); ln(22, 16, 21, 20, 'g');     // button holes, a loose thread
+    for (let x = 14; x <= 22; x += 2) d(x, 24, 'w');                                             // little teeth
+    d(18, 25, 'R'); d(18, 26, 'R'); d(18, 27, 'r'); d(15, 31, 'l'); d(21, 33, 'l');
+  });
+  each(SPR.pig, ['down'], (d, ln) => {
+    d(11, 11, 'R'); d(10, 12, 'R'); d(32, 11, 'R'); d(33, 12, 'R');                              // bloodshot eyes
+    for (let x = 17; x <= 27; x += 2) d(x, 25, 'w'); ln(22, 26, 22, 31, 'l');                      // teeth and drool
+    ln(15, 4, 29, 6, 'R'); for (let x = 16; x < 29; x += 3) d(x, 4, 'k');                          // a stitched scar
+  });
+  each(SPR.littlebun, ['down'], (d, ln, f) => {
+    const y = 16 + f * 2;
+    for (let x = 6; x < 27; x++) d(x, y + 1, 'k'); for (let x = 6; x < 27; x += 2) { d(x, y, 'w'); d(x + 1, y + 2, 'w'); } // a mouth full of teeth
+    d(9, 6 + f * 2, 'k'); d(23, 6 + f * 2, 'k');
+  });
+  each(SPR.duckling, ['down'], (d, ln) => { d(10, 8, 'e'); d(19, 8, 'e'); ln(12, 14, 17, 14, 'k'); d(13, 15, 'w'); d(16, 15, 'w'); d(7, 4, 'Y'); d(22, 5, 'Y'); });
+  each(SPR.tinyspider, ['down', 'side'], (d) => { d(14, 16, 'w'); d(18, 16, 'w'); d(15, 21, 'w'); d(17, 21, 'w'); d(16, 22, 'l'); });
+  each(SPR.monkey, ['down'], (d, ln) => {
+    for (let x = 16; x <= 24; x += 2) { d(x, 16, 'w'); d(x + 1, 17, 'w'); }                       // pointy grin
+    ln(24, 3, 27, 10, 'k'); d(15, 9, 'R'); d(26, 9, 'R'); d(16, 10, 'w');                         // cracked face
+  });
+  each(SPR.dollhead, ['down'], (d, ln) => {
+    ln(17, 12, 12, 16, 'k'); ln(22, 16, 25, 22, 'k'); ln(11, 20, 11, 27, 'R');                    // more cracks, a red tear
+    d(8, 11, 'k'); d(10, 10, 'k'); d(13, 10, 'k'); for (let x = 12; x <= 19; x += 2) { d(x, 23, 'k'); d(x, 26, 'k'); } // lashes, stitched mouth
+  });
+  detail(SPR.mac, (d, ln) => {
+    d(25, 24, 'k'); d(27, 24, 'k'); d(26, 25, 'k');                                               // skull nose
+    ln(16, 17, 19, 20, 'R'); ln(36, 17, 33, 20, 'R'); d(22, 28, 'k'); d(30, 29, 'k');              // red veins, chipped teeth
+    d(6, 10, 'k'); d(9, 6, 'k'); d(47, 12, 'k'); d(44, 4, 'k'); d(8, 14, 'k');                     // flies
+    d(21, 46, 'R'); d(22, 47, 'R'); d(21, 48, 'R'); d(32, 52, 'R'); d(33, 53, 'R'); ln(40, 6, 40, 11, 'R'); ln(52, 6, 52, 9, 'R');
+  });
+  detail(SPR.starBoss, (d, ln) => {
+    d(24, 33, 'w'); d(44, 33, 'w');                                                              // pin-prick pupils
+    ln(34, 6, 30, 20, 'k'); ln(30, 20, 36, 26, 'k'); ln(56, 30, 48, 34, 'k'); ln(12, 30, 20, 34, 'k');
+    for (let x = 22; x <= 46; x += 4) { ln(x, 42, x + 1, 46, 'w'); ln(x + 2, 49, x + 3, 45, 'w'); } // fangs
+    ln(36, 50, 36, 58, 'l'); ln(24, 40, 24, 47, 'R'); ln(44, 40, 44, 49, 'R');                    // drool, bleeding eyes
+  });
+  detail(SPR.bun, (d, ln) => {
+    for (let x = 12; x < 58; x += 4) { ln(x, 34, x + 2, 38, 'w'); ln(x + 2, 38, x + 4, 34, 'w'); ln(x, 41, x + 2, 37, 'w'); ln(x + 2, 37, x + 4, 41, 'w'); } // rows of sharp teeth
+    ln(12, 15, 14, 17, 'R'); ln(25, 15, 23, 17, 'R'); ln(46, 15, 48, 17, 'R'); ln(59, 15, 57, 17, 'R');
+    ln(36, 46, 36, 53, 'c'); ln(38, 46, 38, 50, 'c'); ln(30, 46, 30, 49, 'c');                    // glaze dripping
+  });
+  for (const img of SPR.spider) detail(img, (d, ln) => {
+    for (const [ex, ey] of [[-2, 19], [2, 19], [-4, 21], [4, 21], [-1, 22], [1, 22], [-3, 18], [3, 18]]) d((21 + ex) * 2, ey * 2, 'w'); // glinting eyes
+    ln(42, 57, 42, 63, 'l'); d(35, 18, 'w'); d(48, 18, 'w'); d(36, 20, 'k'); d(47, 20, 'k');       // drool, skull mark
+  });
+  detail(SPR.duck, (d, ln) => {
+    ln(44, 14, 46, 16, 'R'); ln(52, 13, 50, 15, 'R'); ln(43, 10, 52, 12, 'k');                     // veins, angry brow
+    for (let x = 58; x <= 68; x += 2) d(x, 21, 'w'); ln(66, 24, 66, 31, 'v');                      // more teeth, grape juice
+    ln(10, 40, 16, 44, 'x'); ln(14, 52, 20, 55, 'x'); ln(30, 48, 36, 50, 'x');                     // ruffled feathers
+  });
+  detail(SPR.final[0], (d, ln) => {
+    ln(38, 22, 30, 26, 'k'); ln(12, 14, 18, 22, 'k'); ln(18, 22, 14, 28, 'k');                    // cracks everywhere
+    d(16, 24, 'k'); d(19, 23, 'k'); d(25, 23, 'k'); d(28, 24, 'k'); ln(22, 44, 22, 53, 'R'); ln(42, 44, 42, 50, 'R');
+  });
+  detail(SPR.final[1], (d, ln) => { for (let y = 26; y <= 44; y += 5) { ln(20, y, 28, y + 1, 'V'); ln(44, y + 1, 52, y, 'V'); } ln(36, 46, 36, 52, 'l'); });
+  detail(SPR.final[2], (d, ln) => { ln(10, 30, 14, 36, 'R'); ln(52, 28, 48, 34, 'R'); d(14, 17, 'w'); d(40, 17, 'w'); });
+  detail(SPR.final[3], (d, ln) => { d(10, 6, 'N'); d(14, 4, 'N'); d(20, 8, 'N'); d(16, 10, 'N'); ln(50, 18, 52, 22, 'k'); });
+}
 function buildSprites() {
   const R = spriteFromRows;
   // --- the baby: front, back and side, two walking frames each ---
@@ -1037,7 +1133,7 @@ function buildSprites() {
   // --- small enemies: front (down), back (up) and side views, two frames each ---
   const four = make => ({ down: [make('down', 0), make('down', 1)], up: [make('up', 0), make('up', 1)], side: [make('side', 0), make('side', 1)] });
   SPR.toy = four((dir, f) => {
-    const g = grid(19, 20);
+    const g = grid(19, 20, 2);
     if (dir === 'side') {
       g.ell(8, 3, 3, 3, 'n').ell(8, 3, 1.5, 1.5, 'd').ell(8, 13.5, 5, 5, 'n').ell(10, 14, 2.5, 3, 'd').ell(9, 7, 5.5, 5.5, 'n').swap('n', 'U', (i, j) => j > 10 && i < 6)
         .ell(14, 8.5, 2.5, 1.8, 'd').px(16, 8, 'k').rect(11, 5, 2, 2, 'k').px(11, 5, 'e').line(12, 10, 15, 10, 'N').px(13, 11, 'N')
@@ -1054,7 +1150,7 @@ function buildSprites() {
     return g.outline('k').done();
   });
   SPR.pig = four((dir, f) => {
-    const g = grid(22, 17);
+    const g = grid(22, 17, 2);
     if (dir === 'side') {
       g.ell(10, 9, 8.5, 5, 'p').swap('p', 'P', (i, j) => j > 11).poly([[13, 5], [15, 1], [17, 6]], 'p').ell(18.5, 9, 2, 2.5, 'f').px(19, 8, 'R').px(19, 10, 'R')
         .rect(14, 6, 2, 2, 'k').px(15, 6, 'e').line(2, 6, 1, 4, 'P').px(2, 3, 'P')
@@ -1068,7 +1164,7 @@ function buildSprites() {
     return g.outline('k').done();
   });
   SPR.littlebun = four((dir, f) => {
-    const g = grid(16, 14);
+    const g = grid(16, 14, 2);
     g.ell(8, 6.5 + f, 6.5, 5.5 - f * .5, 'u').rect(2, 6 + f, 13, 4, 'u').swap('u', 'U', (i, j) => j > 8 + f).ell(5, 3 + f, 2, 1, 'o');
     if (dir === 'side') g.rect(2, 5 + f, 13, 2, 'c').rect(5, 1 + f, 2, 9, 'c').px(11, 3 + f, 'e').px(12, 3 + f, 'e').px(11, 8 + f, 'R').px(12, 8 + f, 'R').px(13, 8 + f, 'R');
     else {
@@ -1078,7 +1174,7 @@ function buildSprites() {
     return g.outline('k').done();
   });
   SPR.duckling = four((dir, f) => {
-    const g = grid(15, 15);
+    const g = grid(15, 15, 2);
     if (dir === 'side') g.ell(6, 9, 5, 3.5, 'y').ell(8.5, 4.5, 3.5, 3.5, 'y').swap('y', 'Y', (i, j) => j > 10).poly([[11, 4], [14, 5], [11, 6.5]], 'o')
       .px(9, 3, 'k').px(9, 4, 'e').ell(4.5, 9, 2.5, 1.5, 'Y').px(4 + f, 13, 'o').px(7 - f, 13, 'o');
     else {
@@ -1089,7 +1185,7 @@ function buildSprites() {
     return g.outline('k').done();
   });
   SPR.dollhead = (() => {
-    const make = f => grid(16, 16).ell(8, 8, 6.5, 6.5, 'c').swap('c', 'x', i => i > 11).ell(8, 3, 6, 2.5, 'N').px(2, 5, 'N').px(14, 5, 'N')
+    const make = f => grid(16, 16, 2).ell(8, 8, 6.5, 6.5, 'c').swap('c', 'x', i => i > 11).ell(8, 3, 6, 2.5, 'N').px(2, 5, 'N').px(14, 5, 'N')
       .ell(5.5, 8, 1.6, 2, 'k').px(5, 7, 'e').px(11, 7, 'k').px(10, 8, 'k').px(11, 9, 'k').px(12, 8, 'k')  // one eye, one X
       .line(10, 2, 9, 6, 'k').line(9, 6, 11, 8, 'k').rect(6, 12, 4, 1, 'R').px(4, 11, 'p').px(12, 11, 'p')
       .px(8, 15 - f, 'R').outline('k').done();                                                          // it's dripping
@@ -1098,7 +1194,7 @@ function buildSprites() {
   })();
   SPR.monkey = (() => {
     const make = clap => {
-      const g = grid(20, 20);
+      const g = grid(20, 20, 2);
       g.ell(10, 13, 5, 5, 'n').ell(10, 13.5, 3, 3.5, 'd').ell(10, 6, 5, 4.5, 'n').ell(4.5, 5, 2, 2, 'd').ell(15.5, 5, 2, 2, 'd')
         .ell(10, 7.5, 3, 2.5, 'd').px(8, 5, 'k').px(12, 5, 'k').px(8, 4, 'e').px(12, 4, 'e').rect(8, 8, 5, 1, 'R').px(9, 8, 'w').px(11, 8, 'w')
         .rect(7, 18, 2, 2, 'U').rect(11, 18, 2, 2, 'U').rect(9, 10, 2, 1, 'g'); // grin, and the wind-up key
@@ -1110,7 +1206,7 @@ function buildSprites() {
     return { down: [s0, s1], up: [s0, s1], side: [s0, s1] };
   })();
   SPR.tinyspider = four((dir, f) => {
-    const g = grid(17, 13);
+    const g = grid(17, 13, 2);
     for (let k = 0; k < 4; k++) for (const s of [-1, 1]) { const w = (f + k) & 1; g.line(8, 5 + k * .7, 8 + s * 4, 2 + k * 2 + w, 'k').line(8 + s * 4, 2 + k * 2 + w, 8 + s * 7, 4 + k * 2.2, 'k'); }
     if (dir === 'up') g.ell(8, 4, 2.5, 2, 'k').ell(8, 8, 3.5, 3, 'k').px(8, 8, 'R').px(8, 9, 'R');
     else g.ell(8, 4.5, 3.5, 3, 'k').ell(8, 8.5, 2.5, 2, 'k').px(8, 4, 'R').px(8, 5, 'R').px(7, 8, 'e').px(9, 8, 'e').px(6, 9, 'e').px(10, 9, 'e');
@@ -1118,7 +1214,7 @@ function buildSprites() {
   });
   // --- bosses ---
   {
-    const g = grid(28, 38);
+    const g = grid(28, 38, 2);
     g.rect(23, 6, 1, 30, 'z').rect(20, 2, 7, 1, 'g').rect(20, 0, 1, 3, 'g').rect(23, 0, 1, 3, 'g').rect(26, 0, 1, 3, 'g'); // pitchfork
     g.rect(8, 27, 4, 7, 'B').rect(14, 27, 4, 7, 'B').rect(7, 34, 5, 3, 'N').rect(14, 34, 5, 3, 'N');                     // legs and boots
     g.rect(5, 16, 16, 12, 'r'); for (let k = 5; k < 21; k += 3) g.rect(k, 16, 1, 12, 'i'); for (let k = 18; k < 28; k += 3) g.rect(5, k, 16, 1, 'i'); // plaid shirt
@@ -1135,7 +1231,7 @@ function buildSprites() {
   }
   {
     const pts = []; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? 6.5 : 15.5; pts.push([17 + Math.cos(a) * rr, 18 + Math.sin(a) * rr]); }
-    const g = grid(34, 35).poly(pts, 'y').swap('y', 'Y', (i, j) => (i - 17) + (j - 18) > 7).swap('y', 'j', (i, j) => (i - 17) + (j - 18) < -12);
+    const g = grid(34, 35, 2).poly(pts, 'y').swap('y', 'Y', (i, j) => (i - 17) + (j - 18) > 7).swap('y', 'j', (i, j) => (i - 17) + (j - 18) < -12);
     g.ell(12, 16, 2.5, 3.5, 'k').ell(22, 16, 2.5, 3.5, 'k').px(12, 15, 'w').px(22, 15, 'e').px(11, 17, 'e').px(21, 17, 'e');
     // a wide mouth full of teeth, cracks, and bleeding eyes
     g.rect(10, 21, 15, 4, 'k').px(16, 23, 'R').px(17, 23, 'R').px(18, 23, 'R');
@@ -1145,7 +1241,7 @@ function buildSprites() {
     SPR.starBoss = g.outline('k').done();
   }
   {
-    const g = grid(36, 30);
+    const g = grid(36, 30, 2);
     g.ell(18, 15, 16, 11, 'u').rect(2, 15, 32, 8, 'u').swap('u', 'U', (i, j) => j > 20 || i > 30).ell(11, 8, 5, 2.5, 'o').px(9, 7, 'j').px(10, 7, 'j')
       .rect(3, 13, 30, 3, 'c').rect(16, 4, 4, 19, 'c').swap('c', 'x', (i, j) => j === 15 || i === 19)
       .rect(7, 8, 5, 3, 'k').rect(8, 9, 2, 1, 'e').rect(24, 8, 5, 3, 'k').rect(26, 9, 2, 1, 'e')
@@ -1158,7 +1254,7 @@ function buildSprites() {
     SPR.bun = g.outline('k').done();
   }
   SPR.spider = [0, 1].map(f => {
-    const g = grid(42, 32), cx = 21;
+    const g = grid(42, 32, 2), cx = 21;
     for (let k = 0; k < 4; k++) for (const s of [-1, 1]) {
       const w = (f + k) % 2 ? 1 : -1, kx = cx + s * (11 + k * 2), ky = 3 + k * 6 + w;
       g.line(cx, 10 + k * 2, kx, ky, 'G').line(kx, ky, cx + s * (18 + k), 12 + k * 5, 'G').px(kx, ky, 'g');
@@ -1169,7 +1265,7 @@ function buildSprites() {
     g.px(cx - 3, 18, 'e').px(cx + 3, 18, 'e').px(cx, 17, 'e').rect(cx - 3, 4, 2, 1, 'w').rect(cx + 2, 4, 2, 1, 'w').px(cx - 1, 5, 'w').px(cx + 1, 5, 'w');
     return g.rect(cx - 2, 26, 1, 2, 'w').rect(cx + 2, 26, 1, 2, 'w').px(cx - 2, 28, 'r').px(cx + 2, 28, 'r').px(cx, 27, 'l').px(cx, 28, 'l').px(cx, 29, 'l').outline('G').done();
   });
-  SPR.duck = grid(37, 37).ell(14, 25, 13, 8.5, 'c').poly([[1, 20], [7, 15], [9, 23]], 'c').rect(18, 11, 7, 12, 'c').ell(22, 10, 7, 6.5, 'c')
+  SPR.duck = grid(37, 37, 2).ell(14, 25, 13, 8.5, 'c').poly([[1, 20], [7, 15], [9, 23]], 'c').rect(18, 11, 7, 12, 'c').ell(22, 10, 7, 6.5, 'c')
     .swap('c', 'x', (i, j) => j > 29 || (j > 16 && i < 4)).poly([[28, 8], [35, 10], [28, 13]], 'o').line(28, 10, 34, 10, 'z').px(30, 9, 'z')
     .rect(23, 7, 3, 3, 'k').px(24, 8, 'e').line(22, 5, 26, 6, 'k').ell(12, 24, 8, 4.5, 'g').line(5, 24, 18, 24, 'G')
     .ell(8, 27, 2, 2, 'v').ell(12, 28, 2, 2, 'v').ell(10, 30, 2, 2, 'v').px(7, 26, 'V').px(11, 27, 'V')
@@ -1178,7 +1274,7 @@ function buildSprites() {
     .line(29, 11, 34, 11, 'k').px(30, 10, 'w').px(32, 10, 'w').px(31, 12, 'w').px(33, 12, 'w').px(34, 9, 'R').px(35, 12, 'R')
     .rect(23, 7, 3, 3, 'e').px(24, 8, 'k').px(16, 22, 'R').px(17, 23, 'R').px(21, 27, 'x').px(22, 28, 'x').outline('k').done();
   {
-    const head = grid(32, 32).ell(16, 16, 14, 14, 's').swap('s', 'a', i => i > 22).swap('s', 'N', (i, j) => j < 10).swap('a', 'N', (i, j) => j < 10)
+    const head = grid(32, 32, 2).ell(16, 16, 14, 14, 's').swap('s', 'a', i => i > 22).swap('s', 'N', (i, j) => j < 10).swap('a', 'N', (i, j) => j < 10)
       .rect(7, 9, 18, 2, 'N').px(6, 11, 'N').px(25, 11, 'N').ell(11, 17, 3.5, 4.5, 'k').ell(21, 17, 3.5, 4.5, 'k').px(11, 16, 'w').px(21, 16, 'w')
       .line(23, 4, 19, 11, 'k').line(19, 11, 22, 14, 'k').line(11, 25, 21, 25, 'R').px(10, 24, 'R').px(22, 24, 'R')
       .rect(5, 21, 2, 1, 'p').rect(25, 21, 2, 1, 'p')
@@ -1186,15 +1282,15 @@ function buildSprites() {
       .px(21, 16, 'k').px(21, 17, 'e').px(11, 22, 'R').px(11, 23, 'R').px(11, 24, 'R').px(21, 22, 'R').px(21, 23, 'R').rect(26, 12, 2, 3, 'k');
     for (let k = 11; k <= 21; k += 2) head.px(k, 24, 'k').px(k, 26, 'k');
     head.px(16, 15, 'k');
-    const shoulders = grid(36, 28).rect(8, 7, 20, 19, 'v').swap('v', 'V', (i, j) => i < 11 && j < 18).ell(8, 8, 6.5, 4.5, 's').ell(28, 8, 6.5, 4.5, 's')
+    const shoulders = grid(36, 28, 2).rect(8, 7, 20, 19, 'v').swap('v', 'V', (i, j) => i < 11 && j < 18).ell(8, 8, 6.5, 4.5, 's').ell(28, 8, 6.5, 4.5, 's')
       .rect(1, 10, 5, 16, 's').rect(30, 10, 5, 16, 'a').rect(1, 24, 5, 3, 'S').rect(30, 24, 5, 3, 'S').ell(18, 6.5, 4.5, 2, 'k').ell(18, 17, 5, 6, 'R').ell(18, 17, 3, 4, 'k');
     for (let k = 14; k <= 22; k += 2) shoulders.px(k, 12, 'w');
     for (let k = 15; k <= 21; k += 2) shoulders.px(k, 22, 'w');
-    const knees = grid(32, 28).rect(6, 14, 7, 13, 'a').rect(19, 14, 7, 13, 'a').ell(9.5, 11, 7.5, 7.5, 's').ell(22.5, 11, 7.5, 7.5, 's')
+    const knees = grid(32, 28, 2).rect(6, 14, 7, 13, 'a').rect(19, 14, 7, 13, 'a').ell(9.5, 11, 7.5, 7.5, 's').ell(22.5, 11, 7.5, 7.5, 's')
       .swap('s', 'a', (i, j) => j > 15).ell(7, 9, 1.5, 2, 'k').ell(12, 9, 1.5, 2, 'k').ell(20, 9, 1.5, 2, 'k').ell(25, 9, 1.5, 2, 'k')
       .px(7, 8, 'e').px(12, 8, 'e').px(20, 8, 'e').px(25, 8, 'e').line(7, 14, 12, 14, 'R').line(20, 14, 25, 14, 'R').px(9, 14, 'w').px(22, 14, 'w')
       .rect(6, 25, 7, 2, 'S').rect(19, 25, 7, 2, 'S');
-    const toes = grid(38, 24).rect(4, 1, 11, 13, 's').swap('s', 'a', i => i > 11).ell(17, 16, 15, 6.5, 's').swap('s', 'a', (i, j) => j > 19);
+    const toes = grid(38, 24, 2).rect(4, 1, 11, 13, 's').swap('s', 'a', i => i > 11).ell(17, 16, 15, 6.5, 's').swap('s', 'a', (i, j) => j > 19);
     [[25, 11, 3.2], [29, 12, 2.8], [32, 14, 2.4], [34, 16, 2.1], [35, 18.5, 1.8]].forEach(([x, y, r]) => { toes.ell(x, y, r, r, 's'); toes.px(x, y - 1, 'k'); toes.px(x - 1, y, 'R'); });
     // scabs on the knees, black toenails and stitches on the foot
     knees.rect(4, 5, 2, 1, 'R').px(5, 6, 'R').rect(25, 13, 2, 1, 'R').px(26, 14, 'R').line(15, 18, 17, 20, 'k').line(16, 18, 16, 21, 'k');
@@ -1203,6 +1299,7 @@ function buildSprites() {
     toes.line(5, 7, 13, 7, 'R');
     SPR.final = [head, shoulders, knees, toes].map(g => g.outline('k').done());
   }
+  addScaryDetails();
   SPR.mommy = (() => {
     const g = grid(22, 40);
     g.ell(11, 6, 5, 5.5, 'N').rect(6, 6, 10, 12, 'N')                       // long hair
@@ -1348,7 +1445,7 @@ function shadow(x, y, z, w) {
 }
 // draw a sprite standing at world (x, y, z); feet at the bottom middle
 function spr(img, x, y, z, flip, w, h) {
-  w = w || img.width; h = h || img.height;
+  w = w || sw(img); h = h || sh(img);
   const sx = SX(x) - Math.round(w / 2), sy = SY(y, z) - h + 2;
   if (flip) { ctx.save(); ctx.translate(sx + w, sy); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, h); ctx.restore(); }
   else ctx.drawImage(img, sx, sy, w, h);
@@ -1390,7 +1487,8 @@ function drawEnemy(e) {
   shadow(e.x, e.y, e.z + hop, 10);
   const f = e.kind === 'monkey' ? (e.clapT > 0 ? 1 : 0) : Math.floor(e.t * 6) & 1;
   const img = SPR[e.kind][dir][f], [sx, sy] = spr(img, e.x, e.y, e.z + hop, dir === 'side' && mx < 0);
-  if (e.alertT > 0) { const cx = sx + (img.width >> 1) - 1; ctx.fillStyle = '#ff3040'; ctx.fillRect(cx, sy - 10, 2, 5); ctx.fillRect(cx, sy - 4, 2, 2); } // "!" when it spots you
+  if (dir !== 'up') glowEyes.push([e.kind, sx, sy, sw(img), dir === 'side' && mx < 0, Math.hypot(e.x - P.x, e.y - P.y)]);
+  if (e.alertT > 0) { const cx = sx + Math.round(sw(img) / 2) - 1; ctx.fillStyle = '#ff3040'; ctx.fillRect(cx, sy - 10, 2, 5); ctx.fillRect(cx, sy - 4, 2, 2); } // "!" when it spots you
 }
 function drawShot(s) {
   shadow(s.x, s.y, s.z, 8);
@@ -1414,7 +1512,27 @@ function bossImg(b) {
   }
 }
 // red warnings drawn on the floor just before a boss attacks, so you can get out of the way
-let floorMarks = [];
+let floorMarks = [], glowEyes = [];
+// where the eyes are on each sprite (in game pixels, facing the screen)
+const EYES = {
+  toy: [[6, 6.5]], pig: [[6.5, 6.5], [15, 6.5]], littlebun: [[4.5, 3], [11.5, 3]], duckling: [[5, 4], [9.5, 4]], tinyspider: [[7, 8], [9, 8]],
+  monkey: [[8, 5], [12.5, 5]], dollhead: [[5.5, 8]], mac: [[10.5, 10.5], [15.5, 10.5]], starBoss: [[12, 17], [22, 17]], bun: [[9, 9], [25.5, 9]],
+  spider: [[19, 19.5], [23, 19.5]], duck: [[24, 8]], final: [[11, 17], [21, 17]]
+};
+// out in the dark you see their red eyes before you see them
+function drawGlowEyes() {
+  const pulse = .55 + Math.sin(time * 3) * .25;
+  for (const [kind, sx, sy, w, flip, dist] of glowEyes) {
+    const eyes = EYES[kind]; if (!eyes || dist < 2.5) continue;
+    const a = clamp((dist - 2.5) / 3, 0, 1) * pulse;
+    for (const [ex, ey] of eyes) {
+      const x = Math.round(sx + (flip ? w - ex : ex)), y = Math.round(sy + ey);
+      ctx.fillStyle = `rgba(255,30,40,${(a * .35).toFixed(2)})`; ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+      ctx.fillStyle = `rgba(255,60,60,${a.toFixed(2)})`; ctx.fillRect(x - .5, y - .5, 1, 1);
+    }
+  }
+  glowEyes = [];
+}
 function telegraph(b) {
   const m = b.mv.m, s = spd(b), blink = Math.floor(time * 12) & 1;
   ctx.fillStyle = blink ? '#ff2030' : '#a01020';
@@ -1426,7 +1544,7 @@ function telegraph(b) {
     const cx = SX(b.x), cy = SY(b.y, b.z);
     pixelRing(cx, cy, 14, ctx.fillStyle); ctx.fillRect(cx - 4, cy, 9, 1); ctx.fillRect(cx, cy - 4, 1, 9);
   } else if (m === 'throw' && b.t < .3 / s) { // a quick "!" before throwing
-    ctx.fillRect(SX(b.x) - 1, SY(b.y, b.z + b.air) - bossImg(b).height - 12, 3, 7); ctx.fillRect(SX(b.x) - 1, SY(b.y, b.z + b.air) - bossImg(b).height - 3, 3, 3);
+    ctx.fillRect(SX(b.x) - 1, SY(b.y, b.z + b.air) - sh(bossImg(b)) - 12, 3, 7); ctx.fillRect(SX(b.x) - 1, SY(b.y, b.z + b.air) - sh(bossImg(b)) - 3, 3, 3);
   }
 }
 const whiteCache = new Map();
@@ -1434,7 +1552,7 @@ function whiteOf(img) {
   let c = whiteCache.get(img);
   if (!c) {
     c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-    const x = c.getContext('2d'); x.drawImage(img, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    c.s = img.s; const x = c.getContext('2d'); x.drawImage(img, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
     whiteCache.set(img, c);
   }
   return c;
@@ -1442,17 +1560,18 @@ function whiteOf(img) {
 function drawBoss(b) {
   if (b.state === 'locked' || (b.state === 'dead' && b.t > 2)) return;
   const img = bossImg(b), z = b.z + b.air;
-  shadow(b.x, b.y, z, img.width * .7);
-  if (b.id === 'spider' && b.air > .1) { ctx.fillStyle = 'rgba(230,230,240,.6)'; ctx.fillRect(SX(b.x), SY(b.y, z) - img.height - 90, 1, 92); }
+  shadow(b.x, b.y, z, sw(img) * .7);
+  if (b.id === 'spider' && b.air > .1) { ctx.fillStyle = 'rgba(230,230,240,.6)'; ctx.fillRect(SX(b.x), SY(b.y, z) - sh(img) - 90, 1, 92); }
   const vuln = b.state === 'fight' && b.mv && b.mv.m === 'vuln';
   if (b.state === 'fight' && b.mv) floorMarks.push(() => telegraph(b)); // drawn after the floor so nothing covers it
   const white = b.hurtT > .9; // flash white for a moment right after a hit, then blink
   const blink = !white && b.hurtT > 0 && Math.floor(time * 16) % 2;
   if (b.state === 'dead') ctx.globalAlpha *= Math.max(0, 1 - b.t / 2);
-  let w = img.width, h = img.height;
+  let w = sw(img), h = sh(img);
   if (b.sq > 0) { w = Math.round(w * (1 + b.sq * .25)); h = Math.round(h * (1 - b.sq * .25)); }
   const shakeX = b.mv && b.mv.m === 'charge' && b.t < .8 / spd(b) ? (Math.floor(time * 30) & 1 ? .06 : -.06) : 0;
   let sx = 0, sy = 0;
+  if (b.state === 'fight' || b.state === 'wait' || b.state === 'ghost') glowEyes.push([b.id === 'star' ? 'starBoss' : b.id, sx || SX(b.x) - (w >> 1), sy || SY(b.y, z) - h + 2, w, b.face < 0, Math.hypot(b.x - P.x, b.y - P.y)]);
   if (!blink) [sx, sy] = spr(white ? whiteOf(img) : img, b.x + shakeX, b.y, z + (b.state === 'dead' ? -b.t : 0), b.face < 0, w, h);
   else { sx = SX(b.x) - (w >> 1); sy = SY(b.y, z) - h + 2; }
   if (b.state === 'dead') ctx.globalAlpha = 1;
@@ -1523,25 +1642,25 @@ function drawDoor() {
 // floating eyes in the dark
 const eyes = []; { const r = rng(99); for (let i = 0; i < 40; i++) eyes.push({ x: r() * 900, y: r() * 700, ph: r() * 20, par: .2 + r() * .4 }); }
 function drawVoid(cx, cy) {
-  ctx.fillStyle = '#0a0414'; ctx.fillRect(0, 0, lo.width, lo.height);
+  ctx.fillStyle = '#0a0414'; ctx.fillRect(0, 0, GW, GH);
   for (const e of eyes) {
     const x = ((e.x - cx * e.par) % 900 + 900) % 900 - 100, y = ((e.y - cy * e.par) % 700 + 700) % 700 - 100;
-    if (x > lo.width || y > lo.height) continue;
+    if (x > GW || y > GH) continue;
     ctx.globalAlpha = .55; ctx.drawImage(Math.sin(time * .7 + e.ph) > .93 ? SPR.eyeShut : SPR.eye, Math.round(x), Math.round(y)); ctx.globalAlpha = 1;
   }
   // a big moon with a face hangs over the Night Sky
-  if (state === 'play' && lastZone === 11) ctx.drawImage(SPR.moon, Math.round(lo.width * .72 - cx * .05 % 40), Math.round(lo.height * .08 + Math.sin(time * .4) * 3), 92, 92);
+  if (state === 'play' && lastZone === 11) ctx.drawImage(SPR.moon, Math.round(GW * .72 - cx * .05 % 40), Math.round(GH * .08 + Math.sin(time * .4) * 3), 92, 92);
 }
 function crispPass() {
   mainCtx.setTransform(1, 0, 0, 1, 0, 0); mainCtx.imageSmoothingEnabled = false;
-  mainCtx.drawImage(lo, 0, 0, lo.width * PIX, lo.height * PIX);
+  mainCtx.drawImage(lo, 0, 0, GW * PIX, GH * PIX);
   ctx = mainCtx; ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0); ctx.imageSmoothingEnabled = false;
   for (const fn of labels) fn();
 }
 function render() {
   if (!SPR.baby) buildSprites();
-  ctx = loCtx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false; labels = [];
-  const LW = lo.width, LH = lo.height;
+  ctx = loCtx; ctx.setTransform(RES, 0, 0, RES, 0, 0); ctx.imageSmoothingEnabled = false; labels = [];
+  const LW = GW, LH = GH;
   if (state === 'win' && endT >= 2) { endT += 1 / 60; drawWinScene(); crispPass(); drawWin(); return; }
   if (state === 'story') { drawStoryScene(); crispPass(); drawStoryText(); return; }
   if (state === 'title') {
@@ -1551,8 +1670,8 @@ function render() {
     ctx.globalAlpha = .45;
     BOSS_ORDER.forEach((id, k) => {
       const img = id === 'final' ? SPR.final[Math.floor(Math.max(0, time) / 2) % 4] : bossImg({ id }), span = LW + 300;
-      const x = ((time * 14 + k * span / 6) % span) - 120, y = Math.round(LH * .95 - img.height + (Math.floor(time * 4 + k) & 1));
-      ctx.save(); ctx.translate(Math.round(x) + img.width, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0); ctx.restore();
+      const w = sw(img), h = sh(img), x = ((time * 14 + k * span / 6) % span) - 120, y = Math.round(LH * .95 - h + (Math.floor(time * 4 + k) & 1));
+      ctx.save(); ctx.translate(Math.round(x) + w, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, h); ctx.restore();
     });
     ctx.globalAlpha = 1;
     crispPass(); drawTitle(); return;
@@ -1616,6 +1735,7 @@ function render() {
     labels.push(() => { ctx.globalAlpha = clamp(1.5 - hw.t, 0, 1); ctx.font = `14px ${PF}`; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(hw.text, lx + 2, ly + 2); ctx.fillStyle = '#ffd23a'; ctx.fillText(hw.text, lx, ly); ctx.globalAlpha = 1; });
   }
   hitWords = hitWords.filter(hw => hw.t < 1.5);
+  drawGlowEyes();
   if (state === 'dying') { ctx.fillStyle = `rgba(30,0,10,${clamp(endT / 1.6, 0, .9).toFixed(2)})`; ctx.fillRect(0, 0, LW, LH); }
   if (P.inv > 1.5 && P.inv <= 2 && P.lives > 0) { ctx.fillStyle = `rgba(160,0,0,${((P.inv - 1.5) * .6).toFixed(2)})`; ctx.fillRect(0, 0, LW, LH); }
   crispPass();
@@ -1652,8 +1772,8 @@ function drawIntroCard() {
   const k = Math.min(1, c.t * 3, (2.8 - c.t) * 3), bar = Math.round(vh * .16 * k);
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, vw, bar); ctx.fillRect(0, vh - bar, vw, bar);
   ctx.globalAlpha = k; ctx.fillStyle = 'rgba(40,0,10,.55)'; ctx.fillRect(0, vh * .3, vw, vh * .4);
-  const img = bossImg(c.b), sc = Math.max(3, Math.floor(vh * .3 / img.height)), slide = (1 - Math.min(1, c.t * 2.5)) * vw * .5;
-  ctx.drawImage(img, Math.round(vw * .62 - img.width * sc / 2 + slide), Math.round(vh * .5 - img.height * sc / 2), img.width * sc, img.height * sc);
+  const img = bossImg(c.b), sc = Math.max(3, Math.floor(vh * .3 / sh(img))), iw = sw(img) * sc, ih = sh(img) * sc, slide = (1 - Math.min(1, c.t * 2.5)) * vw * .5;
+  ctx.drawImage(img, Math.round(vw * .62 - iw / 2 + slide), Math.round(vh * .5 - ih / 2), iw, ih);
   ctx.textAlign = 'left'; ctx.font = `${Math.min(22, vw / 26)}px ${PF}`; ctx.fillStyle = '#000'; ctx.fillText(c.b.def.name, vw * .08 + 3 - slide, vh * .5 + 3);
   ctx.fillStyle = '#ff3040'; ctx.fillText(c.b.def.name, vw * .08 - slide, vh * .5);
   ctx.font = `9px ${PF}`; ctx.fillStyle = '#e8d8ff'; ctx.fillText(c.b.def.tip, vw * .08 - slide, vh * .5 + 28);
@@ -1753,7 +1873,7 @@ function overlay(t, sub) {
 }
 // the ending, drawn as a little pixel scene: the baby wakes up in the crib, Mommy is there...
 function drawWinScene() {
-  const LW = lo.width, LH = lo.height, cx = LW >> 1, fy = Math.round(LH * .72);
+  const LW = GW, LH = GH, cx = LW >> 1, fy = Math.round(LH * .72);
   const dim = clamp((endT - 9) / 2, 0, .85);
   ctx.fillStyle = '#5a4870'; ctx.fillRect(0, 0, LW, fy);            // wall
   ctx.fillStyle = '#6e5038'; ctx.fillRect(0, fy, LW, LH - fy);      // floor
@@ -1815,7 +1935,7 @@ function drawWin() {
 }
 const STORY = ['Every night, Mommy sings the lullaby.', "Hush, little baby, don't say a word...", "But tonight, the song didn't stop.", 'And the nursery rhymes woke up.'];
 function drawStoryScene() {
-  const LW = lo.width, LH = lo.height, cx = LW >> 1, fy = Math.round(LH * .7);
+  const LW = GW, LH = GH, cx = LW >> 1, fy = Math.round(LH * .7);
   ctx.fillStyle = '#120a20'; ctx.fillRect(0, 0, LW, fy); ctx.fillStyle = '#1c1210'; ctx.fillRect(0, fy, LW, LH - fy);
   // moonlight through the window
   ctx.fillStyle = '#2a2050'; ctx.fillRect(cx + 50, fy - 90, 40, 36); ctx.fillStyle = '#120a20'; ctx.fillRect(cx + 69, fy - 90, 2, 36); ctx.fillRect(cx + 50, fy - 73, 40, 2);
