@@ -136,6 +136,7 @@ function buildWorld() {
   rect(59, 66, 60, 71, 1, T.BRIDGE);                                                     // south
   rect(59, 41, 60, 53, 1, T.BRIDGE); set(59, 47, VOID, 0); set(60, 47, VOID, 0);        // north
   rect(50, 59, 53, 60, 1, T.BRIDGE);                                                     // west (to the cove)
+  item('bottle', 52, 59); // a little help before the hardest fight
 
   // --- The Toy Graveyard (east) ---
   for (let y = 50; y <= 69; y++) for (let x = 70; x <= 86; x++) set(x, y, r() < .25 ? 1.5 : 1, T.GRAVE);
@@ -156,6 +157,7 @@ function buildWorld() {
   { const b = H(109, 70); set(110, 70, b + 1, T.BLOCK); set(111, 70, b + 2, T.BLOCK); set(112, 70, b + 3, T.BLOCK); pickups.push({ kind: 'bottle', x: 112.5, y: 70.5, z: 0 }); }
   item('pacifier', 96, 48);
   toy(95, 41, 'x', 4); toy(102, 47, 'y', 4); toy(108, 55, 'x', 4); toy(98, 66, 'y', 3); toy(105, 74, 'x', 3); toy(110, 44, 'y', 3); toy(100, 80, 'x', 4);
+  for (const [mx, my] of [[97, 55], [106, 44], [111, 68], [101, 77]]) foe('monkey', mx, my); // wind-up monkeys clapping cymbals
   for (const [bx, by] of [[95, 45], [108, 50], [99, 72], [110, 78], [104, 66]]) prop('balloon', bx, by);
   prop('carousel', 103, 60); prop('jack', 100, 52); prop('jack', 108, 62); prop('jack', 96, 76); prop('doll', 112, 82); prop('sign', 102, 39, 'The farm is up there. He is waiting.');
   prop('sign', 100, 37, 'Gap too big? DASH while you JUMP!');
@@ -415,9 +417,10 @@ function sfx(kind, v = 1) {
   else if (kind === 'oink') { tone('sawtooth', 200, 120, .22, .1); tone('sawtooth', 180, 110, .18, .08, .25); }
   else if (kind === 'peep') { tone('sine', 1900, 2500, .07, .07); tone('sine', 1900, 2600, .07, .07, .12); }
   else if (kind === 'sizzle') noise(.5, .1, 5000, 0, 'highpass');
+  else if (kind === 'clap') { noise(.08, .5, 7000, 0, 'highpass'); noise(.3, .2, 4000, .02, 'bandpass'); }
   else if (kind === 'skitter') for (let k = 0; k < 6; k++) noise(.025, .2, 3500, k * .05 + Math.random() * .02, 'highpass');
 }
-const ENEMY_SOUND = { toy: 'wind', pig: 'oink', duckling: 'peep', littlebun: 'sizzle', tinyspider: 'skitter' };
+const ENEMY_SOUND = { monkey: 'wind', toy: 'wind', pig: 'oink', duckling: 'peep', littlebun: 'sizzle', tinyspider: 'skitter' };
 const WHISPERS = ['Hush, little baby.', "Don't say a word.", 'Mommy is not coming.', 'Go back to sleep.', 'We can see you.'];
 // V cycles the sound: loud, quiet, off. Remembered for next time if the browser allows it.
 const VOLUMES = [.5, .2, 0], VOL_NAMES = ['LOUD', 'QUIET', 'OFF'];
@@ -661,6 +664,13 @@ function updateEnemies(dt) {
       const far = Math.abs(e.axis === 'x' ? nx - e.ox : ny - e.oy) > e.range;
       e.mx = ax; e.my = ay;
       if (ah === VOID || Math.abs(ah - e.z) > STEP || far) e.dir = -e.dir; else { e.x = nx; e.y = ny; e.z = groundAt(e.x, e.y, e.z, .2); }
+    } else if (e.kind === 'monkey') {
+      // it stays put and claps its cymbals, sending out a small shockwave you have to jump
+      e.ct = (e.ct === undefined ? Math.random() * 2 : e.ct) - dt; e.clapT = (e.clapT || 0) - dt;
+      if (e.ct <= 0) {
+        e.ct = 2.4; e.clapT = .25;
+        if (d < 9) { sfx('clap', 1 - d / 9); waves.push({ x: e.x, y: e.y, z: e.z, rad: .4, sp: 3, life: .6 }); }
+      }
     } else if (e.kind === 'tinyspider' && e.hang) {
       if (d < 2.6) { e.z -= 9 * dt; if (e.z <= e.base) { e.z = e.base; e.hang = false; e.alert = true; } }
     } else {
@@ -684,7 +694,7 @@ function updateEnemies(dt) {
     if (d < 7 && e.snd <= 0 && !(e.kind === 'tinyspider' && e.hang)) { e.snd = 1.5 + Math.random() * 2.5; sfx(ENEMY_SOUND[e.kind], (1 - d / 7) * .9); }
     const box = e.kind === 'littlebun' ? { x: e.x, y: e.y, z: e.z + Math.abs(Math.sin(e.t * 6)) * .5, r: e.r, h: e.h } : e;
     if (overlap(P, box)) {
-      if (stompCheck(box)) { e.dead = true; P.vz = 7.5; P.airDash = true; sfx('stomp'); freezeT = .04; burst(e.x, e.y, e.z + .5, { pig: '#e89ab0', littlebun: '#c08040', duckling: '#ffe060', tinyspider: '#222' }[e.kind] || '#d8c8a8', 14); poof(e.x, e.y, e.z);
+      if (stompCheck(box)) { e.dead = true; P.vz = 7.5; P.airDash = true; sfx('stomp'); freezeT = .04; burst(e.x, e.y, e.z + .5, { pig: '#e89ab0', littlebun: '#c08040', duckling: '#ffe060', tinyspider: '#222', monkey: '#7a5030' }[e.kind] || '#d8c8a8', 14); poof(e.x, e.y, e.z);
         if (P.lives === 1 && Math.random() < .25) { pickups.push({ kind: 'bottle', x: e.x, y: e.y, z: e.z }); showBanner('A bottle fell out!', '', 1.5); } }
       else hurt(e.x, e.y);
     }
@@ -1060,6 +1070,19 @@ function buildSprites() {
     }
     return g.outline('k').done();
   });
+  SPR.monkey = (() => {
+    const make = clap => {
+      const g = grid(20, 20);
+      g.ell(10, 13, 5, 5, 'n').ell(10, 13.5, 3, 3.5, 'd').ell(10, 6, 5, 4.5, 'n').ell(4.5, 5, 2, 2, 'd').ell(15.5, 5, 2, 2, 'd')
+        .ell(10, 7.5, 3, 2.5, 'd').px(8, 5, 'k').px(12, 5, 'k').px(8, 4, 'e').px(12, 4, 'e').rect(8, 8, 5, 1, 'R').px(9, 8, 'w').px(11, 8, 'w')
+        .rect(7, 18, 2, 2, 'U').rect(11, 18, 2, 2, 'U').rect(9, 10, 2, 1, 'g'); // grin, and the wind-up key
+      if (clap) g.ell(8.5, 13, 2, 3, 'y').ell(11.5, 13, 2, 3, 'Y');            // cymbals smashed together
+      else g.ell(2.5, 13, 2, 3.5, 'y').ell(17.5, 13, 2, 3.5, 'y');               // cymbals wide apart
+      return g.outline('k').done();
+    };
+    const s0 = make(false), s1 = make(true);
+    return { down: [s0, s1], up: [s0, s1], side: [s0, s1] };
+  })();
   SPR.tinyspider = four((dir, f) => {
     const g = grid(17, 13);
     for (let k = 0; k < 4; k++) for (const s of [-1, 1]) { const w = (f + k) & 1; g.line(8, 5 + k * .7, 8 + s * 4, 2 + k * 2 + w, 'k').line(8 + s * 4, 2 + k * 2 + w, 8 + s * 7, 4 + k * 2.2, 'k'); }
@@ -1339,7 +1362,7 @@ function drawEnemy(e) {
   const dir = Math.abs(my) > Math.abs(mx) ? (my < 0 ? 'up' : 'down') : 'side';
   const hop = e.kind === 'littlebun' ? Math.abs(Math.sin(e.t * 6)) * .5 : 0;
   shadow(e.x, e.y, e.z + hop, 10);
-  const f = Math.floor(e.t * 6) & 1;
+  const f = e.kind === 'monkey' ? (e.clapT > 0 ? 1 : 0) : Math.floor(e.t * 6) & 1;
   const img = SPR[e.kind][dir][f], [sx, sy] = spr(img, e.x, e.y, e.z + hop, dir === 'side' && mx < 0);
   if (e.alertT > 0) { const cx = sx + (img.width >> 1) - 1; ctx.fillStyle = '#ff3040'; ctx.fillRect(cx, sy - 10, 2, 5); ctx.fillRect(cx, sy - 4, 2, 2); } // "!" when it spots you
 }
