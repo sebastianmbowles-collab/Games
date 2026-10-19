@@ -1089,6 +1089,28 @@ function addScaryDetails() {
   detail(SPR.final[1], (d, ln) => { for (let y = 26; y <= 44; y += 5) { ln(20, y, 28, y + 1, 'V'); ln(44, y + 1, 52, y, 'V'); } ln(36, 46, 36, 52, 'l'); });
   detail(SPR.final[2], (d, ln) => { ln(10, 30, 14, 36, 'R'); ln(52, 28, 48, 34, 'R'); d(14, 17, 'w'); d(40, 17, 'w'); });
   detail(SPR.final[3], (d, ln) => { d(10, 6, 'N'); d(14, 4, 'N'); d(20, 8, 'N'); d(16, 10, 'N'); ln(50, 18, 52, 22, 'k'); });
+  // everyone gets the same scary face as Old MacDonald and the star: hollow sockets, a red glint, a grin full of teeth
+  const sockets = (d, pts, rx, ry) => pts.forEach(([x, y]) => { d.el(x, y, rx, ry, 'k'); d(x, y + 1, 'e'); d(x + 1, y + 1, 'e'); });
+  detail(SPR.bun, (d, ln) => { sockets(d, [[19, 19], [53, 19]], 6, 5); ln(17, 25, 17, 32, 'R'); ln(55, 25, 55, 30, 'R'); ln(10, 11, 24, 14, 'U'); ln(62, 11, 48, 14, 'U'); });
+  for (const img of SPR.spider) detail(img, (d, ln) => {
+    sockets(d, [[37, 40], [47, 40]], 4, 5); for (const [x, y] of [[32, 37], [52, 37], [34, 34], [50, 34]]) d(x, y, 'e'); d.grin(34, 50, 49, 2);
+    d.el(42, 18, 8, 7, 'G'); d.el(39, 18, 2, 2.5, 'k'); d.el(45, 18, 2, 2.5, 'k'); d(42, 21, 'k'); for (let x = 38; x <= 46; x += 2) { d(x, 24, 'G'); d(x + 1, 24, 'k'); } // a skull on its back
+  });
+  detail(SPR.duck, (d, ln) => {
+    sockets(d, [[48, 16]], 4.5, 5);
+    for (let x = 57; x <= 69; x++) { d(x, 20, 'k'); d(x, 21, 'k'); d(x, 22, 'k'); d(x, (x & 1) ? 20 : 22, 'w'); } // its beak is a mouth full of teeth
+    d(70, 22, 'R'); d(69, 24, 'R'); d(69, 25, 'R');
+  });
+  detail(SPR.final[0], (d) => { d(22, 33, 'k'); d(22, 35, 'e'); d(23, 35, 'e'); d(42, 35, 'e'); d(43, 35, 'e'); d.grin(18, 46, 52, 3); });
+  detail(SPR.final[1], (d) => { sockets(d, [[28, 20], [44, 20]], 3, 4); });
+  detail(SPR.final[2], (d) => { sockets(d, [[12, 16], [22, 16], [40, 16], [50, 16]], 3, 4); d.grin(10, 26, 29, 2); d.grin(38, 54, 29, 2); });
+  detail(SPR.final[3], (d) => { sockets(d, [[14, 10], [23, 10]], 3, 4); d.grin(11, 27, 20, 2); });
+  each(SPR.duckling, ['down'], (d, ln) => { ln(12, 14, 17, 14, 'k'); for (let x = 12; x <= 17; x += 2) d(x, 15, 'w'); d(15, 16, 'R'); d(15, 17, 'R'); });
+  each(SPR.monkey, ['down'], (d) => sockets(d, [[16, 10], [25, 10]], 3.5, 3.5));
+  each(SPR.dollhead, ['down'], (d) => d.grin(9, 23, 25, 2));
+  each(SPR.littlebun, ['down'], (d, ln, f) => sockets(d, [[9, 5 + f * 2], [23, 5 + f * 2]], 3, 2.5));
+  each(SPR.toy, ['side'], (d) => { sockets(d, [[23, 12]], 3, 3.5); d.grin(23, 31, 22, 1); });
+  each(SPR.pig, ['side'], (d) => { sockets(d, [[29, 13]], 3, 3.5); d.grin(26, 36, 26, 1); });
 }
 function buildSprites() {
   const R = spriteFromRows;
