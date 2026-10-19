@@ -13,7 +13,8 @@ canvas{display:block;position:absolute;left:0;top:0}
 #nub{position:absolute;left:40px;top:40px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.3)}
 .tb{position:absolute;width:78px;height:78px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.45);color:#fff;font:bold 13px monospace;display:flex;align-items:center;justify-content:center;pointer-events:auto}
 .tb.on{background:rgba(190,120,255,.45)}
-.tb.sm{width:64px;height:32px;border-radius:16px;font-size:10px}
+.tb.sm{width:64px;height:32px;border-radius:16px;font-size:10px;display:none}
+#touch.playing .tb.sm{display:flex}
 </style>
 </head>
 <body>
@@ -23,8 +24,8 @@ canvas{display:block;position:absolute;left:0;top:0}
   <div class="tb" data-k="jump" style="right:20px;bottom:30px">JUMP</div>
   <div class="tb" data-k="dash" style="right:104px;bottom:20px">DASH</div>
   <div class="tb" data-k="mom" style="right:30px;bottom:116px">MOMMY</div>
-  <div class="tb sm" data-k="pause" style="left:12px;top:64px">PAUSE</div>
-  <div class="tb sm" data-k="vol" style="left:84px;top:64px">SOUND</div>
+  <div class="tb sm" data-k="pause" style="left:24px;bottom:170px">PAUSE</div>
+  <div class="tb sm" data-k="vol" style="left:96px;bottom:170px">SOUND</div>
 </div>
 <script>
 'use strict';
@@ -41,7 +42,8 @@ function resize() {
   cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
   zoom = Math.max(0.7, Math.min(1.4, Math.min(cw, ch) / 620));
   vw = cw / zoom; vh = ch / zoom;
-  PIX = Math.max(2, Math.round(ch * dpr / (16 * 10))); // about 10 tiles tall on screen
+  // about 10 tiles tall on wide screens, about 8 tiles across on tall phone screens
+  PIX = Math.max(2, Math.round(Math.min(ch / (16 * 10), cw / (16 * 8)) * dpr));
   lo.width = Math.ceil(cw * dpr / PIX); lo.height = Math.ceil(ch * dpr / PIX);
 }
 // shrink any text that would run off the screen (the pixel font is wide)
@@ -1794,6 +1796,16 @@ function drawWin() {
     ctx.font = `9px ${PF}`; ctx.fillStyle = '#c8b8d8'; ctx.fillText('Time: ' + m + ':' + sec + '     Secret music boxes: ' + P.secrets + ' / 3', vw / 2, vh * .9 - 66);
   }
   if (endT > 17) { ctx.font = `${Math.min(26, vw / 22)}px ${PF}`; ctx.fillStyle = '#c0283a'; ctx.fillText('THE END?', vw / 2, vh * .9 - 30); }
+  if (endT > 19) { // the credits roll up
+    const lines = ['HUSH LITTLE BABY', '', 'Bosses, story and big ideas:', 'a very brave kid', '', 'Pixels, code and the music box:', 'Claude', '', 'Thanks for playing.', 'Sleep tight...'];
+    ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(0, vh * .22, vw, vh * .5);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, vh * .22, vw, vh * .5); ctx.clip();
+    lines.forEach((l, i) => {
+      const y = vh * .72 + i * 22 - (endT - 19) * 28;
+      ctx.font = `${i === 0 ? 14 : 9}px ${PF}`; ctx.fillStyle = i === 0 ? '#c0283a' : i % 3 === 2 ? '#c8b8d8' : '#ffd0f0'; ctx.fillText(l, vw / 2, y);
+    });
+    ctx.restore();
+  }
   if (endT > 18) { ctx.fillStyle = '#8a6a8a'; ctx.font = `9px ${PF}`; ctx.fillText('Press Space or tap to play again', vw / 2, vh - 20); }
 }
 const STORY = ['Every night, Mommy sings the lullaby.', "Hush, little baby, don't say a word...", "But tonight, the song didn't stop.", 'And the nursery rhymes woke up.'];
@@ -1848,6 +1860,7 @@ let last = performance.now();
 function frame(now) {
   const dt = clamp((now - last) / 1000, 0, .05); last = now;
   if (pressed.vol) { initAudio(); cycleVolume(); }
+  if (isTouch) document.getElementById('touch').classList.toggle('playing', state === 'play' || state === 'pause'); // PAUSE and SOUND only while playing
   if (state === 'story') { // any key or tap skips the story
     time += dt;
     if (time > 17 || Object.keys(pressed).some(k => pressed[k])) { state = 'title'; time = 0; }
