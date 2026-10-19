@@ -318,7 +318,7 @@ export function makeRiftstalker() {
 // ===== GENERAL VRAX: giant warlord, black and purple armour, four eyes, energy blade =====
 export function makeVrax() {
   const g = new THREE.Group(), P = {};
-  const blk = phong(0x17131f, { shininess: 90, specular: 0x554466 }), pur = phong(0x7a24e0, { shininess: 80 }), purD = phong(0x3d0f75);
+  const blk = phong(0x2a2238, { shininess: 90, specular: 0x8866aa }), pur = phong(0x8a2cf0, { shininess: 80 }), purD = phong(0x4d1490);
   const eye = glow(0xff2a44);
   P.legs = [];
   for (const s of [-1, 1]) {

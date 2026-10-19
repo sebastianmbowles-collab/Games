@@ -806,16 +806,16 @@ function spawnRing(x, z, speed, dmg, color, max = 30) {
   const wall = new THREE.Mesh(ringWallGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   const flat = new THREE.Mesh(ringFlatGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   flat.rotation.x = -Math.PI / 2;
-  wall.position.set(x, 0.35, z); flat.position.set(x, 0.04, z);
+  wall.position.set(x, 0.5, z); flat.position.set(x, 0.04, z);
   scene.add(wall); scene.add(flat);
   rings.push({ x, z, r: 0.5, speed, dmg, max, wall, flat, hit: false });
 }
 function updateRings(dt) {
   for (const r of rings) {
     r.r += r.speed * dt;
-    r.wall.scale.set(r.r, 0.7, r.r); r.flat.scale.set(r.r, r.r, 1);
+    r.wall.scale.set(r.r, 1.0, r.r); r.flat.scale.set(r.r, r.r, 1);
     const o = Math.max(0, 1 - r.r / r.max);
-    r.wall.material.opacity = 0.8 * o; r.flat.material.opacity = 0.9 * o;
+    r.wall.material.opacity = Math.min(1, 1.3 * o); r.flat.material.opacity = o;
     const d = Math.hypot(P.x - r.x, PZ - r.z);
     if (!r.hit && Math.abs(r.r - d) < 0.6 && P.y < 0.7) { r.hit = true; hurt(r.dmg); }
     if (Math.random() < 0.5) { const a = rnd(0, Math.PI * 2); fx.spawn(r.x + Math.cos(a) * r.r, 0.2, r.z + Math.sin(a) * r.r, 0, 2, 0, r.wall.material.color.getHex(), 0.4); }
@@ -851,6 +851,7 @@ function updateHazards(dt) {
 // ===== GENERAL VRAX =====
 function spawnVrax() {
   const g = MD.makeVrax();
+  g.scale.setScalar(1.3);
   g.position.set(0, 0, -30);
   scene.add(g);
   const mats = [];
@@ -894,7 +895,7 @@ function upVrax(dt) {
   const walk = () => { Pt.legs[0].rotation.x = s * 0.35; Pt.legs[1].rotation.x = -s * 0.35; if (Math.abs(s) > 0.98) { sfx.step(); G.shake = Math.max(G.shake, 0.15); } };
   Pt.bladeGlow.material.opacity = v.st === 'exhausted' ? 0.12 : 0.4 + Math.sin(v.t * 8) * 0.12;
   for (const e of Pt.eyes) e.material.color.setHex(v.st === 'exhausted' ? 0x551018 : 0xff2a44);
-  L.boss.position.set(v.x, 5, v.z + 2); L.boss.intensity = v.st === 'dying' ? 0 : 3;
+  L.boss.position.set(v.x, 6, v.z + 5); L.boss.intensity = v.st === 'dying' ? 0 : 7;
   if (v.st !== 'storm' && v.st !== 'stormWind' && v.st !== 'dying') v.g.rotation.y = damp(v.g.rotation.y, Math.atan2(P.x - v.x, PZ - v.z), 4, dt);
   if (v.st !== 'exhausted' && v.st !== 'dying') { Pt.body.position.y = damp(Pt.body.position.y, 2.6, 4, dt); Pt.torso.rotation.x = damp(Pt.torso.rotation.x, 0, 4, dt); }
   switch (v.st) {
@@ -1432,6 +1433,7 @@ export const debug = {
   skipIntro() { H.clearDialog(); },
   speaking: () => H.speaking(),
   get upgrades() { return upgrades; },
+  get scanned() { return [...scanned]; },
   clearMission() { spawnList = []; for (const e of enemies) killEnemy(e, true); },
   fillOD() { P.od = 100; },
 };
