@@ -162,7 +162,8 @@ function buildWorld() {
   rect(86, 4, 116, 25, 5, T.FARM);
   rect(108, 8, 112, 18, 8, T.BARN);
   prop('sign', 99, 22, 'Old MacDonald had a baby...');
-  for (const [sx, sy] of [[88, 7], [89, 12], [87, 18], [113, 6], [115, 12], [114, 18]]) prop('scarecrow', sx, sy); // they watch you prop('doll', 88, 23); prop('jack', 114, 22); item('pacifier', 90, 6);
+  for (const [sx, sy] of [[88, 7], [89, 12], [87, 18], [113, 6], [115, 12], [114, 18]]) prop('scarecrow', sx, sy); // they watch you
+  prop('doll', 88, 23); prop('jack', 114, 22); item('pacifier', 90, 6);
 
   // --- The Crib Maze (south) ---
   rect(48, 72, 72, 94, 3, T.MAZEWALL);
