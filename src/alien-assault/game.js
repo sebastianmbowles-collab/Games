@@ -18,7 +18,7 @@ let P, enemies = [], balls = [], shots = [], rings = [], hazards = [], boss = nu
 let mi = 0, M = null, spawnList = [], spawnT = 0, phase = 'card', phaseT = 0, upgrades = [], scanned = new Set();
 let scanBeam, scanTarget = null, scanT = 0, paused = false, pauseSel = 0, overSel = 0, upChoices = [], upSel = 0;
 let menuRects = [], creditY = 0, wallBroken = false, kills = 0, chatT = 8, patchMsgT = 0, cam = { yaw: 0, pitch: 0 };
-let aimNX = 0, aimNY = 0, flashT = 0, lightningT = 8;
+let aimNX = 0, aimNY = 0, flashT = 0, lightningT = 8, hitMarkT = 0;
 const has = id => upgrades.includes(id);
 
 // ===== Building the abandoned UFO =====
@@ -736,7 +736,7 @@ function upStalker(e, dt) {
 }
 function damageEnemy(e, dmg, at) {
   const mult = e.type === 'riftstalker' && e.near ? 3 : 1;
-  e.hp -= dmg * mult; e.flash = 0.1;
+  e.hp -= dmg * mult; e.flash = 0.1; hitMarkT = 0.15;
   sfx.hit();
   fx.burst(at, e.type === 'riftstalker' ? 0xff3030 : 0x7dff6a, mult > 1 ? 14 : 6, 5, 0.5, -6);
   P.od = Math.min(100, P.od + 1.5);
@@ -870,7 +870,7 @@ function vraxHit(b) {
     if (w.c.distanceTo(b.pos) > w.r + b.r) continue;
     if (v.st === 'enter' || v.st === 'dying') { fx.burst(b.pos, 0xffffff, 6, 4, 0.3, 0); sfx.clink(); return true; }
     const mult = v.st === 'exhausted' ? 3 : 1;
-    v.hp -= b.dmg * mult; v.flash = 0.08;
+    v.hp -= b.dmg * mult; v.flash = 0.08; hitMarkT = 0.15;
     fx.burst(b.pos, mult > 1 ? 0xffe14a : 0xc070ff, mult > 1 ? 16 : 7, 6, 0.5, -6);
     sfx.hit();
     P.od = Math.min(100, P.od + 0.8);
@@ -1046,7 +1046,7 @@ function emperorHit(b) {
   for (const w of e.ws) {
     if (w.c.distanceTo(b.pos) > w.r + b.r) continue;
     if (w.tag === 'core' && e.coreOpen > 0 && e.st !== 'dying') {
-      e.hp -= b.dmg; e.flash = 0.06;
+      e.hp -= b.dmg; e.flash = 0.06; hitMarkT = 0.15;
       fx.burst(b.pos, 0xff4af0, 12, 7, 0.5, -3); sfx.hit();
       P.od = Math.min(100, P.od + 0.8);
       if (e.hp <= e.max * 0.5 && !e.said.half) { e.said.half = 1; H.say('emperor', 'You DARE wound me? I will unmake you!', 1.4); }
@@ -1321,6 +1321,11 @@ function drawHUD(dt) {
     c.beginPath(); c.arc(mx, my, r, 0, Math.PI * 2); c.stroke();
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { c.beginPath(); c.moveTo(mx + dx * (r - 5), my + dy * (r - 5)); c.lineTo(mx + dx * (r + 7), my + dy * (r + 7)); c.stroke(); }
     c.fillStyle = col; c.fillRect(mx - 1.5, my - 1.5, 3, 3);
+    if (hitMarkT > 0) {
+      hitMarkT -= dt;
+      c.strokeStyle = '#ffffff'; c.lineWidth = 3;
+      for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { c.beginPath(); c.moveTo(mx + dx * 7, my + dy * 7); c.lineTo(mx + dx * 15, my + dy * 15); c.stroke(); }
+    }
   }
 
   // mission name and enemies left
