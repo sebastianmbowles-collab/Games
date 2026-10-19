@@ -24,6 +24,7 @@ canvas{display:block;position:absolute;left:0;top:0}
   <div class="tb" data-k="dash" style="right:104px;bottom:20px">DASH</div>
   <div class="tb" data-k="mom" style="right:30px;bottom:116px">MOMMY</div>
   <div class="tb sm" data-k="pause" style="left:12px;top:64px">PAUSE</div>
+  <div class="tb sm" data-k="vol" style="left:84px;top:64px">SOUND</div>
 </div>
 <script>
 'use strict';
@@ -126,6 +127,7 @@ function buildWorld() {
   // --- The Nursery (start, in the middle of everything) ---
   rect(54, 54, 65, 65, 1, T.NURSERY);
   set(56, 56, 2, T.BLOCK); set(57, 56, 2, T.BLOCK); set(56, 57, 3, T.BLOCK); set(63, 63, 2, T.BLOCK); set(63, 62, 2.5, T.BLOCK); set(62, 63, 3, T.BLOCK);
+  prop('trunk', 63, 56); prop('bunny', 56, 62);
   prop('doll', 55, 64); prop('doll', 64, 55); prop('sign', 59, 61, 'Beat them all. Then you can wake up.');
   prop('sign', 64, 60, 'JUMP over the gaps. Jump ON the toys.');
   item('pacifier', 62, 63);
@@ -154,6 +156,7 @@ function buildWorld() {
   { const b = H(109, 70); set(110, 70, b + 1, T.BLOCK); set(111, 70, b + 2, T.BLOCK); set(112, 70, b + 3, T.BLOCK); pickups.push({ kind: 'bottle', x: 112.5, y: 70.5, z: 0 }); }
   item('pacifier', 96, 48);
   toy(95, 41, 'x', 4); toy(102, 47, 'y', 4); toy(108, 55, 'x', 4); toy(98, 66, 'y', 3); toy(105, 74, 'x', 3); toy(110, 44, 'y', 3); toy(100, 80, 'x', 4);
+  for (const [bx, by] of [[95, 45], [108, 50], [99, 72], [110, 78], [104, 66]]) prop('balloon', bx, by);
   prop('carousel', 103, 60); prop('jack', 100, 52); prop('jack', 108, 62); prop('jack', 96, 76); prop('doll', 112, 82); prop('sign', 102, 39, 'The farm is up there. He is waiting.');
   prop('sign', 100, 37, 'Gap too big? DASH while you JUMP!');
   // stairs up to the farm (the last gap needs a dash-jump)
@@ -202,7 +205,7 @@ function buildWorld() {
 
   // --- The Night Sky (Twinkle Twinkle) ---
   rect(64, 102, 80, 118, 6, T.SKY);
-  for (const [hx, hy] of [[68, 106], [69, 106], [75, 110], [76, 110], [70, 114], [71, 114], [76, 105], [67, 111]]) set(hx, hy, VOID, 0);
+  for (const [hx, hy] of [[68, 106], [69, 106], [77, 112], [78, 112], [70, 114], [71, 114], [76, 105], [67, 111]]) set(hx, hy, VOID, 0);
 
   // --- The Creepy Bakery (north, Hot Cross Bun) ---
   rect(48, 16, 72, 40, 1, T.BAKERY);
@@ -287,7 +290,7 @@ function initAudio() {
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
-    master = AC.createGain(); master.gain.value = .5; master.connect(AC.destination);
+    master = AC.createGain(); master.gain.value = VOLUMES[volLevel]; master.connect(AC.destination);
     musicGain = AC.createGain(); musicGain.gain.value = .5; musicGain.connect(master);
     // low creepy drone under everything
     const o = AC.createOscillator(), o2 = AC.createOscillator(), g = AC.createGain(), lfo = AC.createOscillator(), lg = AC.createGain();
@@ -416,9 +419,20 @@ function sfx(kind, v = 1) {
 }
 const ENEMY_SOUND = { toy: 'wind', pig: 'oink', duckling: 'peep', littlebun: 'sizzle', tinyspider: 'skitter' };
 const WHISPERS = ['Hush, little baby.', "Don't say a word.", 'Mommy is not coming.', 'Go back to sleep.', 'We can see you.'];
+// V cycles the sound: loud, quiet, off. Remembered for next time if the browser allows it.
+const VOLUMES = [.5, .2, 0], VOL_NAMES = ['LOUD', 'QUIET', 'OFF'];
+let volLevel = 0;
+try { volLevel = +(localStorage.getItem('hlb-volume') || 0) % 3; } catch (e) { /* no storage */ }
+function cycleVolume() {
+  volLevel = (volLevel + 1) % 3;
+  if (master) master.gain.value = VOLUMES[volLevel];
+  if (volLevel === 2 && window.speechSynthesis) speechSynthesis.cancel();
+  try { localStorage.setItem('hlb-volume', volLevel); } catch (e) { /* no storage */ }
+  showBanner('Sound: ' + VOL_NAMES[volLevel], '', 1.5);
+}
 function say(text, pitch, rate, vol = .9) {
   try {
-    if (!window.speechSynthesis) return;
+    if (!window.speechSynthesis || volLevel === 2) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text); u.pitch = pitch; u.rate = rate; u.volume = vol;
     speechSynthesis.speak(u);
@@ -430,7 +444,7 @@ const keys = {}, pressed = {};
 const KEYMAP = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   Space: 'jump', KeyZ: 'jump', KeyJ: 'jump', ShiftLeft: 'dash', ShiftRight: 'dash', KeyX: 'dash', KeyK: 'dash',
-  KeyM: 'mom', KeyC: 'mom', KeyP: 'pause', Escape: 'pause', Enter: 'start'
+  KeyM: 'mom', KeyC: 'mom', KeyP: 'pause', Escape: 'pause', Enter: 'start', KeyV: 'vol'
 };
 window.addEventListener('keydown', e => {
   initAudio();
@@ -693,7 +707,7 @@ function updateAttacks(dt) {
   for (const w of waves) {
     w.rad += w.sp * dt; w.life -= dt;
     const d = Math.hypot(P.x - w.x, P.y - w.y);
-    if (Math.abs(d - w.rad) < .35 && P.z - w.z < .35) hurt(w.x, w.y);
+    if (Math.abs(d - w.rad) < .3 && P.z - w.z < .3) hurt(w.x, w.y);
   }
   waves = waves.filter(w => w.life > 0);
   for (const f of falls) {
@@ -720,7 +734,7 @@ function script(b) {
   const hurtHalf = b.hp <= Math.ceil(b.def.hp / 2);
   switch (b.id) {
     case 'mac': return [{ m: 'throw', kind: 'hay', n: 3 }, ...(hurtHalf ? [{ m: 'summon' }] : []), { m: 'charge' }, { m: 'vuln', dur: 2.6 }];
-    case 'star': return [{ m: 'ring', kind: 'star', n: 8 + (b.def.hp - b.hp) * 2 }, { m: 'throw', kind: 'star', n: 4 }, { m: 'ring', kind: 'star', n: 10 }, { m: 'vuln', dur: 2.6 }, { m: 'rise' }];
+    case 'star': return [{ m: 'ring', kind: 'star', n: 6 + (b.def.hp - b.hp) * 2 }, { m: 'throw', kind: 'star', n: 4 }, { m: 'ring', kind: 'star', n: 8 }, { m: 'vuln', dur: 3.2 }, { m: 'rise' }];
     case 'bun': return [{ m: 'slam' }, { m: 'slam' }, ...(hurtHalf ? [{ m: 'summon' }] : []), { m: 'charge' }, { m: 'vuln', dur: 2.4 }];
     case 'spider': return [{ m: 'throw', kind: 'web', n: 3 }, ...(hurtHalf ? [{ m: 'summon' }] : []), { m: 'drop' }, { m: 'vuln', dur: 2.4 }, { m: 'rise' }];
     case 'duck': return [{ m: 'say' }, { m: 'rain', kind: 'grape', n: 5 }, { m: 'throw', kind: 'grape', n: 3 }, ...(hurtHalf ? [{ m: 'summon' }] : []), { m: 'charge' }, { m: 'vuln', dur: 2.4 }];
@@ -795,14 +809,14 @@ function updateBoss(b, dt) {
     }
     case 'slam': {
       if (mv.vz === undefined) { mv.vz = 0; mv.up = false; }
-      if (!mv.up && b.t > .3 / s) { mv.up = true; mv.vz = 9; }
+      if (!mv.up && mv.landed === undefined && b.t > .3 / s) { mv.up = true; mv.vz = 9; } // jump only once per slam
       if (mv.up) {
         b.air += mv.vz * dt; mv.vz -= 18 * dt;
         const sp = 5 * s, nx = b.x + dx / d * Math.min(sp * dt, d), ny = b.y + dy / d * Math.min(sp * dt, d);
         if (!blocked(nx, ny, b.z, b.def.r) && groundAt(nx, ny, b.z, b.def.r) !== VOID) { b.x = nx; b.y = ny; }
         if (b.air <= 0 && mv.vz < 0) {
           b.air = 0; mv.up = false; mv.landed = b.t; b.sq = 1; shake = .5; sfx('slam');
-          waves.push({ x: b.x, y: b.y, z: b.z, rad: b.def.r, sp: 5 * s, life: 2.2 });
+          waves.push({ x: b.x, y: b.y, z: b.z, rad: b.def.r, sp: 4 * s, life: 2.6 });
         }
       }
       done = mv.landed !== undefined && b.t > mv.landed + .4 / s; break;
@@ -865,7 +879,7 @@ function updateCameo(b, dt) {
   g.air = g.id === 'star' ? 2 : g.id === 'spider' ? 2.5 : 0;
   g.face = P.x > g.x ? 1 : -1;
   if (g.atk <= 0 && g.life > 1) {
-    g.atk = 1.8;
+    g.atk = 2.2;
     const a = Math.atan2(P.y - g.y, P.x - g.x);
     if (g.id === 'mac') { fire(g, 'hay', a, 5.5); sfx('shoot'); }
     else if (g.id === 'star') { const off = Math.random() * 6; for (let i = 0; i < 8; i++) fire(g, 'star', off + i * Math.PI / 4, 3.5); sfx('shoot'); }
@@ -1152,6 +1166,7 @@ function buildSprites() {
   SPR.musicbox = grid(12, 13).rect(1, 4, 10, 8, 'v').rect(1, 4, 10, 2, 'V').rect(3, 7, 6, 3, 'p').px(5, 8, 'y').px(6, 8, 'y').rect(10, 1, 1, 4, 'g').rect(10, 1, 2, 1, 'g').outline('k').done();
   SPR.bottle = R(['...t...', '..ttt..', '.bbbbb.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '..www..']);
   SPR.pacifier = R(['...ppp...', '..p...p..', '..p...p..', '...ppp...', '.bbbbbbb.', 'bbbbbbbbb', '.bbpppbb.', '...ppp...', '...ppp...']);
+  SPR.balloon = grid(10, 12).ell(5, 5, 4, 5, 'r').swap('r', 'R', (i, j) => i > 6 || j > 8).px(3, 2, 'w').px(3, 3, 'w').rect(4, 10, 2, 1, 'R').outline('k').done();
   SPR.coffin = grid(12, 18).poly([[3, 1], [9, 1], [11, 5], [9, 17], [3, 17], [1, 5]], 'z').rect(5, 4, 2, 7, 'n').rect(3, 6, 6, 2, 'n').outline('k').done();
   SPR.soldier = grid(18, 10).rect(2, 3, 9, 4, 'r').rect(11, 3, 4, 4, 's').rect(14, 2, 3, 6, 'B').rect(0, 4, 2, 2, 'k').px(12, 4, 'k').px(13, 6, 'R').rect(5, 7, 2, 2, 'y').outline('k').done();
   SPR.wreath = grid(14, 14).ell(7, 7, 6, 6, 'G').ell(7, 7, 3, 3, '.').px(3, 3, 'v').px(10, 4, 'P').px(11, 9, 'v').px(4, 11, 'P').px(7, 1, 'Y').outline('k').done();
@@ -1414,6 +1429,11 @@ function drawPickup(p) {
 function drawProp(p) {
   if (p.kind === 'doll') spr(SPR.doll, p.x, p.y, p.z, P.x < p.x);
   else if (['flour', 'pin', 'trunk', 'lemontree', 'coffin', 'soldier', 'wreath', 'bunny', 'shoe'].includes(p.kind)) spr(SPR[p.kind], p.x, p.y, p.z, (p.x * 7 + p.y) % 2 < 1);
+  else if (p.kind === 'balloon') { // floats on a string, bobbing
+    const cx = SX(p.x), cy = SY(p.y, p.z), bob = Math.round(Math.sin(time * 1.5 + p.x) * 3), sway = Math.round(Math.sin(time + p.y) * 2);
+    ctx.fillStyle = '#ddd'; for (let k = 0; k < 26; k += 2) ctx.fillRect(cx + Math.round(sway * k / 26), cy - k, 1, 2);
+    ctx.drawImage(SPR.balloon, cx + sway - 5, cy - 36 + bob);
+  }
   else if (p.kind === 'rocker') { // rocks all by itself
     const cx = SX(p.x), cy = SY(p.y, p.z); ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.sin(time * 2.2) * .18); ctx.drawImage(SPR.rocker, -7, -15); ctx.restore();
   }
@@ -1667,8 +1687,8 @@ function drawPause() {
   ctx.textAlign = 'center'; ctx.fillStyle = '#c0283a'; ctx.font = `${Math.min(28, vw / 22)}px ${PF}`; ctx.fillText('PAUSED', vw / 2, vh * .18);
   ctx.font = `9px ${PF}`; ctx.fillStyle = '#c8b8d8';
   const lines = isTouch
-    ? ['Stick: move', 'JUMP: jump (jump ON enemies to beat them)', 'DASH: dash (dash + jump for big gaps)', 'MOMMY: show the map for 5 seconds']
-    : ['Arrow keys / WASD: move', 'Space / Z: jump (jump ON enemies to beat them)', 'Shift / X: dash (dash + jump for big gaps)', 'M: ask Mommy for the map', 'P: pause'];
+    ? ['Stick: move', 'JUMP: jump (jump ON enemies to beat them)', 'DASH: dash (dash + jump for big gaps)', 'MOMMY: show the map for 5 seconds', 'SOUND: loud / quiet / off']
+    : ['Arrow keys / WASD: move', 'Space / Z: jump (jump ON enemies to beat them)', 'Shift / X: dash (dash + jump for big gaps)', 'M: ask Mommy for the map', 'P: pause      V: sound loud / quiet / off'];
   lines.forEach((l, i) => ctx.fillText(l, vw / 2, vh * .3 + i * 22));
   const y = vh * .3 + lines.length * 22 + 26;
   ctx.fillStyle = '#ffd0f0';
@@ -1785,6 +1805,7 @@ function drawTitle() {
 let last = performance.now();
 function frame(now) {
   const dt = clamp((now - last) / 1000, 0, .05); last = now;
+  if (pressed.vol) { initAudio(); cycleVolume(); }
   if (state === 'story') { // any key or tap skips the story
     time += dt;
     if (time > 17 || Object.keys(pressed).some(k => pressed[k])) { state = 'title'; time = 0; }
