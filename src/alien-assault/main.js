@@ -18,7 +18,7 @@ G.goTitle();
 
 let last = performance.now();
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const dt = Math.min(0.05, (now - last) / 1000) * (G.timeScale ?? 1);
   last = now;
   G.time += dt;
   const c = G.hctx;

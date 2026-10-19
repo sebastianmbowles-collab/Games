@@ -100,12 +100,6 @@ export function makeTextures() {
       g.addColorStop(0, i % 2 ? 'rgba(60,255,140,0.18)' : 'rgba(200,60,255,0.22)'); g.addColorStop(1, 'rgba(0,0,0,0)');
       x.fillStyle = g; x.fillRect(0, 0, w, 128);
     }
-    for (let i = 0; i < 380; i++) {
-      x.fillStyle = Math.random() < 0.2 ? '#9ff' : '#fff';
-      x.globalAlpha = rnd(0.3, 1);
-      x.fillRect(rnd(0, w) | 0, rnd(0, h * 0.44) | 0, 1, 1);
-    }
-    x.globalAlpha = 1;
   }, { smooth: true });
   TEX.ground = make(64, 64, x => {
     x.fillStyle = '#4a1a66'; x.fillRect(0, 0, 64, 64);

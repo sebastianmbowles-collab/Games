@@ -27,6 +27,22 @@ export function glowSprite(color, scale, opacity = 1) {
   s.scale.setScalar(scale);
   return s;
 }
+// tiny sharp stars on a big dome (painting them into the sky texture made blurry blobs)
+export function makeStars(parent, n = 700, r = 380) {
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), c = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, y = 0.08 + Math.random() * 0.92, s = Math.sqrt(1 - y * y);
+    pos.set([Math.cos(a) * s * r, y * r - 30, Math.sin(a) * s * r], i * 3);
+    c.set([0xffffff, 0xffffff, 0x9ff6ff, 0xffb0f0, 0xfff2a0][(Math.random() * 5) | 0]).multiplyScalar(0.5 + Math.random() * 0.5);
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 1.5, sizeAttenuation: false, vertexColors: true, fog: false }));
+  parent.add(pts);
+  return pts;
+}
 const alongZ = m => { m.rotation.x = Math.PI / 2; return m; };
 const alongX = m => { m.rotation.z = Math.PI / 2; return m; };
 
@@ -109,8 +125,8 @@ export function makeFPArms() {
   P.tip = alongZ(cyl(0.16, 0.16, 0.12, blue.clone(), 0, 0, -1.38, B, 10));
   P.muzzle = new THREE.Object3D(); P.muzzle.position.set(0, 0, -1.5); B.add(P.muzzle);
 
-  const L = group(-1.35, -1.25, -0.1, root); P.L = L;
-  L.rotation.set(0.08, -0.1, 0);
+  const L = group(-1.3, -1.08, -0.1, root); P.L = L;
+  L.rotation.set(0.16, -0.16, 0);
   box(0.85, 0.6, 0.85, lite, -0.1, 0.15, 0.35, L);
   box(0.5, 0.5, 1.4, scr, 0, 0, -0.3, L);
   alongX(cyl(0.3, 0.3, 0.62, dark, 0, 0, -1.05, L, 8));
@@ -118,7 +134,7 @@ export function makeFPArms() {
   box(0.66, 0.12, 0.9, dark, 0, 0.36, -1.7, L);
   P.wrist = box(0.66, 0.1, 0.12, blue.clone(), 0, 0.2, -2.35, L);
   const Hn = group(0, 0, -2.6, L); P.hand = Hn;
-  box(0.55, 0.3, 0.55, dark, 0, 0, 0, Hn);
+  box(0.55, 0.3, 0.55, lite, 0, 0, 0, Hn);
   P.fingers = [];
   for (const k of [-0.18, 0, 0.18]) {
     const f = group(k, 0, -0.25, Hn); P.fingers.push(f);

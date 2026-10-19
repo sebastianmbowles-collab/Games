@@ -124,6 +124,7 @@ function buildRoom() {
 function buildOutside() {
   outside = MD.group(0, 0, 0, scene);
   MD.mesh(new THREE.SphereGeometry(450, 24, 16), new THREE.MeshBasicMaterial({ map: TEX.sky, side: THREE.BackSide, fog: false }), 0, -30, 0, outside);
+  MD.makeStars(outside);
   const gg = new THREE.PlaneGeometry(500, 500, 30, 30), pa = gg.attributes.position;
   for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i); if (Math.hypot(x, y) > R + 4) pa.setZ(i, Math.random() * 1.5 + Math.max(0, Math.hypot(x, y) - 90) * 0.12); }
   gg.computeVertexNormals();
@@ -272,7 +273,7 @@ function stepWorld(dt) {
   fx.update(dt); fxBig.update(dt); debris.update(dt);
   if (phase === 'fight' && !P.dead) {
     chatT -= dt;
-    if (chatT <= 0 && !H.dialogBusy() && kills > 2) { chatT = rnd(14, 24); const [who, s] = pick(CHATTER); H.say(who, s, 1.4); }
+    if (chatT <= 0 && !H.dialogBusy() && kills > 2) { chatT = rnd(14, 24); const [who, s] = pick(CHATTER); H.bark(who, s, 1.4); }
   }
   if (phase === 'clear' && phaseT > 3 && !H.dialogBusy()) {
     if (mi >= MISSIONS.length - 1) startEnding();
@@ -314,9 +315,9 @@ function updatePlayer(dt) {
   }
   if ((pr.shift || pr.e || pr.od) && P.od >= 100 && P.odT <= 0) {
     P.odT = 8 + (has('capacitor') ? 4 : 0); P.od = 0; P.odSaid = false;
-    sfx.overdrive(); H.warn('OVERDRIVE!', '#7fd4ff', 1.2, true); H.say('patch', pick(PATCH_OD), 1.2);
+    sfx.overdrive(); H.warn('OVERDRIVE!', '#7fd4ff', 1.2, true); H.bark('patch', pick(PATCH_OD), 1.2);
   }
-  if (P.od >= 100 && !P.odSaid && P.odT <= 0) { P.odSaid = true; H.say('patch', 'Overdrive is charged! Press {OD}!', 1.6); }
+  if (P.od >= 100 && !P.odSaid && P.odT <= 0) { P.odSaid = true; H.bark('patch', 'Overdrive is charged! Press {OD}!', 1.6); }
   if (P.odT > 0) P.odT -= dt;
   if (pr.q || pr.r || pr.repair) tryRepair();
   P.repairCD -= dt; P.hurtT -= dt; P.invT -= dt; patchMsgT -= dt; P.repairAnim -= dt;
@@ -405,22 +406,22 @@ function hurt(dmg) {
     sfx.boom(); H.clearDialog(); H.clearWarn();
   } else if (P.armor < P.max * 0.35 && !P.lowWarned) {
     P.lowWarned = true;
-    H.say('patch', pick(PATCH_LOW), 1.6);
+    H.bark('patch', pick(PATCH_LOW), 1.6);
   }
 }
 function tryRepair() {
   if (P.repairCD > 0) {
-    if (patchMsgT <= 0) { H.say('patch', `Still recharging! ${Math.ceil(P.repairCD)} more seconds!`, 1); patchMsgT = 4; }
+    if (patchMsgT <= 0) { H.bark('patch', `Still recharging! ${Math.ceil(P.repairCD)} more seconds!`, 1); patchMsgT = 4; }
     return;
   }
   if (P.armor >= P.max) {
-    if (patchMsgT <= 0) { H.say('patch', 'You are fine! Not a scratch! Well, a few scratches.', 1.2); patchMsgT = 4; }
+    if (patchMsgT <= 0) { H.bark('patch', 'You are fine! Not a scratch! Well, a few scratches.', 1.2); patchMsgT = 4; }
     return;
   }
   P.armor = Math.min(P.max, P.armor + 40);
   P.cracks.splice(0, Math.ceil(P.cracks.length * 0.6));
-  P.repairCD = has('turbo') ? 20 : 40; P.repairAnim = 1.4; P.lowWarned = false;
-  sfx.repair(); H.say('patch', pick(PATCH_REPAIR), 1.4);
+  P.repairCD = has('turbo') ? 20 : 40; P.repairAnim = 1.8; P.lowWarned = false;
+  sfx.repair(); H.bark('patch', pick(PATCH_REPAIR), 1.4);
 }
 
 function updateCamera(dt) {
@@ -438,7 +439,7 @@ function updateCamera(dt) {
   P.recoil = Math.max(0, P.recoil - dt * 8);
   AP.R.position.set(1.25 + Math.sin(G.time * 2) * 0.02, -1.15 + Math.sin(G.time * 1.6) * 0.025 - P.vy * 0.008, -0.1 + P.recoil * 0.4);
   AP.R.rotation.x = 0.1 + P.recoil * 0.06;
-  AP.L.position.set(-1.35, -1.25 + Math.sin(G.time * 1.6 + 1) * 0.025 - P.vy * 0.008, -0.1);
+  AP.L.position.set(-1.3, -1.08 + Math.sin(G.time * 1.6 + 1) * 0.025 - P.vy * 0.008, -0.1);
   const odOn = P.odT > 0, ringCol = odOn ? (Math.floor(G.time * 12) % 2 ? 0xffffff : 0x9a8cff) : 0x33aaff;
   for (const r of AP.rings) r.material.color.setHex(ringCol);
   AP.tip.material.color.setHex(P.cool > 0.05 ? 0xbfe8ff : ringCol);
@@ -451,7 +452,7 @@ function updateCamera(dt) {
 function updatePatch(dt) {
   const t = G.time;
   let tx = -1.7, ty = 0.9 + Math.sin(t * 2.3) * 0.06, tz = -3.2;
-  if (P.repairAnim > 0) { const k = Math.sin((1 - P.repairAnim / 1.4) * Math.PI); tx = lerp(-1.7, 0, k); ty = lerp(0.9, 0.05, k); tz = lerp(-3.2, -1.2, k); }
+  if (P.repairAnim > 0) { const k = Math.sin((1 - P.repairAnim / 1.8) * Math.PI); tx = lerp(-1.7, 0, k); ty = lerp(0.9, 0.05, k); tz = lerp(-3.2, -1.2, k); }
   patch.position.set(damp(patch.position.x, tx, 8, dt), damp(patch.position.y, ty, 8, dt), damp(patch.position.z, tz, 8, dt));
   const talking = H.speaking() === 'patch';
   const ry = talking || P.repairAnim > 0 ? 0.35 : scanTarget ? Math.PI - 0.3 : Math.PI - 0.7 + Math.sin(t * 0.7) * 0.3;
@@ -475,7 +476,7 @@ function updateScan(dt) {
       scanned.add(e.type); scanTarget = e; scanT = 1.6;
       sfx.scan();
       const s = SCANS[e.type];
-      H.showScan(s); H.say('patch', s.line, 1.4);
+      H.showScan(s); H.bark('patch', s.line, 1.4);
     }
     return;
   }
@@ -586,7 +587,9 @@ function updateEnemy(e, dt) {
   for (const m of e.mats) m.emissive.setHex(f ?? m.userData.e0);
 }
 function upZippit(e, dt) {
-  const tx = clamp(P.x + e.slot, -4.5, 4.5), tz = PZ - 2.3, dist = Math.hypot(P.x - e.x, PZ - e.z);
+  const close = enemies.filter(o => o !== e && o.type === 'zippit' && !o.dead && o.z > PZ - 4.2).length;
+  const wait = close >= 3 && e.z <= PZ - 4.2;
+  const tx = clamp(P.x + e.slot * (wait ? 1.8 : 1), -6, 6), tz = wait ? PZ - 6.8 : PZ - 2.8, dist = Math.hypot(P.x - e.x, PZ - e.z);
   const A = e.P.arms;
   if (e.st === 'enter' || e.st === 'run') {
     e.st = 'run';
@@ -600,7 +603,7 @@ function upZippit(e, dt) {
     e.P.legs[0].rotation.x = s * 0.8; e.P.legs[1].rotation.x = -s * 0.8;
     e.P.body.position.y = 0.95 + Math.abs(s) * 0.08;
     A[0].rotation.x = -0.9 - s * 0.4; A[1].rotation.x = -0.9 + s * 0.4;
-    if (d < 0.4 || dist < 2.7) { e.st = 'wind'; e.stT = 0.5; }
+    if (!wait && (d < 0.4 || dist < 3.1)) { e.st = 'wind'; e.stT = 0.5; }
   } else if (e.st === 'wind') {
     e.stT -= dt;
     face(e, P.x, PZ, 10, dt);
@@ -617,7 +620,7 @@ function upZippit(e, dt) {
   } else if (e.st === 'recover') {
     e.stT -= dt;
     for (const a of A) a.rotation.x = damp(a.rotation.x, -0.9, 6, dt);
-    if (e.stT <= 0) e.st = Math.hypot(P.x - e.x, PZ - e.z) < 2.9 && Math.abs(P.x - e.x) < 2 ? 'wind' : 'run';
+    if (e.stT <= 0) e.st = Math.hypot(P.x - e.x, PZ - e.z) < 3.3 && Math.abs(P.x - e.x) < 2 ? 'wind' : 'run';
     if (e.st === 'wind') e.stT = 0.5;
   }
 }
@@ -911,7 +914,7 @@ function upVrax(dt) {
         v.tx = clamp(rnd(-4, 4), -5, 5);
         if (p === 'wave') { v.st = 'waveWind'; v.stT = 1.0; v.low = Math.random() < 0.5; H.warn(v.low ? 'JUMP!' : 'DASH!', v.low ? '#ffb02e' : '#5ad8ff', 1.3); sfx.charge(); }
         if (p === 'slam') { v.st = 'slamWind'; v.stT = 0.7; v.count = 3; H.warn('JUMP!', '#ffb02e', 1.2); }
-        if (p === 'summon') { v.st = 'summon'; v.stT = 1.6; v.count = 3; sfx.roar(); H.say('vrax', pick(['ZIPPITS! ATTACK!', 'Minions! Tear it apart!', 'Get it, my little monsters!']), 1); }
+        if (p === 'summon') { v.st = 'summon'; v.stT = 1.6; v.count = 3; sfx.roar(); H.bark('vrax', pick(['ZIPPITS! ATTACK!', 'Minions! Tear it apart!', 'Get it, my little monsters!']), 1); }
         if (p === 'storm') { v.st = 'stormWind'; v.stT = 1.3; sfx.spin(); H.warn('BLADE STORM!', '#d070ff', 1.5); }
       }
       break;
@@ -1004,7 +1007,7 @@ function upVrax(dt) {
 function exhaust(v, time) {
   v.st = 'exhausted'; v.stT = time;
   H.warn('EXHAUSTED! HIT HIM!', '#ffe14a', 1.6, true);
-  if (!v.said.ex) { v.said.ex = 1; H.say('nova', 'He is exhausted! Hit him now, triple damage!', 1.2); }
+  if (!v.said.ex) { v.said.ex = 1; H.bark('nova', 'He is exhausted! Hit him now, triple damage!', 1.2); }
 }
 
 // ===== THE NULL EMPEROR =====
@@ -1054,7 +1057,7 @@ function emperorHit(b) {
       }
     } else {
       fx.burst(b.pos, 0xc8b0ff, 6, 4, 0.3, 0); sfx.clink();
-      if (!e.said.armor && e.ready) { e.said.armor = 1; H.say('patch', 'It bounced off! Wait for the core to open!', 1.2); }
+      if (!e.said.armor && e.ready) { e.said.armor = 1; H.bark('patch', 'It bounced off! Wait for the core to open!', 1.2); }
     }
     return true;
   }
@@ -1170,7 +1173,7 @@ function upEmperor(dt) {
       break;
     case 'open':
       e.stT -= dt;
-      if (e.stT <= 0) { e.st = 'idle'; e.stT = 1.2 * fast; H.say('patch', 'Core is closing! Hang in there!', 0.8); }
+      if (e.stT <= 0) { e.st = 'idle'; e.stT = 1.2 * fast; H.bark('patch', 'Core is closing! Hang in there!', 0.8); }
       break;
     case 'dying':
       e.stT -= dt;
@@ -1198,7 +1201,7 @@ function openCore(e, time) {
   e.st = 'open'; e.stT = time; e.coreOpen = time;
   H.warn('CORE EXPOSED!', '#ff4af0', 1.8, true);
   sfx.portal();
-  if (!e.said.core) { e.said.core = 1; H.say('nova', 'The core is open! Fire everything at it!', 1.2); }
+  if (!e.said.core) { e.said.core = 1; H.bark('nova', 'The core is open! Fire everything at it!', 1.2); }
 }
 function startStrike(e, fast) {
   e.stT = 0.9 * fast; e.lockX = P.x;
@@ -1422,6 +1425,8 @@ export const debug = {
   get mission() { return mi; }, set aim(v) { aimNX = v[0]; aimNY = v[1]; G.mouse.nx = v[0]; G.mouse.ny = v[1]; },
   spawn: spawnEnemy, hurt, openUpgrades, startMission, camera: () => camera,
   skipIntro() { H.clearDialog(); },
+  speaking: () => H.speaking(),
+  get upgrades() { return upgrades; },
   clearMission() { spawnList = []; for (const e of enemies) killEnemy(e, true); },
   fillOD() { P.od = 100; },
 };

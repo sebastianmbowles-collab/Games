@@ -55,6 +55,7 @@ export function buildTitle() {
 
   const sky = MD.mesh(new THREE.SphereGeometry(450, 24, 16), new THREE.MeshBasicMaterial({ map: TEX.sky, side: THREE.BackSide, fog: false }), 0, -40, 0, scene);
   sky.rotation.y = 1.2;
+  MD.makeStars(scene);
   const gg = new THREE.PlaneGeometry(700, 700, 40, 40);
   const pa = gg.attributes.position;
   for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i); if (Math.hypot(x, y + 20) > 30) pa.setZ(i, Math.random() * 2.5 + Math.max(0, -y - 150) * 0.08); }
@@ -356,7 +357,7 @@ function draw(dt) {
   const c = G.hctx, W = G.w, Hh = G.h, small = W < 700;
   if (menu === 'start') {
     if (startT < 0.9) H.drawLogo(W / 2, 4, Math.min(W * 0.92, 760), flick);
-    const f = Math.max(0, 1 - (startT - 0.9) * 2.2);
+    const f = Math.max(0, 1 - (startT - 0.9) * 1.1);
     if (startT > 0.9) H.fade(f, '120,200,255');
     if (startT > 3.3) H.fade((startT - 3.3) / 0.7);
     if (startT > 4.0) {
@@ -381,7 +382,7 @@ function draw(dt) {
   const g = c.createLinearGradient(0, 0, 0, Hh);
   g.addColorStop(0, 'rgba(0,0,0,0.35)'); g.addColorStop(0.35, 'rgba(0,0,0,0)'); g.addColorStop(0.75, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
   c.fillStyle = g; c.fillRect(0, 0, W, Hh);
-  const lh = H.drawLogo(W / 2, 4, Math.min(W * 0.92, 760), flick);
+  if (menu === 'main') H.drawLogo(W / 2, 4, Math.min(W * 0.92, 760), flick);
 
   if (menu === 'main') {
     const save = loadSave();
@@ -392,7 +393,8 @@ function draw(dt) {
     if (save && sel === 1) H.text(`MISSION ${save.mission + 1}`, small ? W / 2 : Math.max(150, W * 0.16), small ? Hh - 14 : Hh * 0.52 + gap * 5, 9, '#9fdcff', small ? 'center' : 'left');
     if (!small) H.text('ARROWS + ENTER, OR CLICK', W - 20, Hh - 18, 9, '#8a96b0', 'right');
   } else if (menu === 'settings') {
-    const pw = Math.min(560, W - 24), ph = 360, px = (W - pw) / 2, py = Math.max(lh * 0.8, (Hh - ph) / 2 + 30);
+    H.fade(0.35);
+    const pw = Math.min(560, W - 24), ph = 360, px = (W - pw) / 2, py = (Hh - ph) / 2;
     H.panel(px, py, pw, ph);
     H.text('SETTINGS', W / 2, py + 30, small ? 14 : 18, '#7fe3ff');
     if (showControls) {
@@ -421,5 +423,7 @@ export const titleDebug = {
   lightning() { lightningT = 0; },
   set credit(v) { creditY = v; },
   set quit(v) { quitT = v; },
+  get startT() { return startT; },
+  scene: () => scene,
 };
 export function screenOf(v) { return toScreen(v, camera); }

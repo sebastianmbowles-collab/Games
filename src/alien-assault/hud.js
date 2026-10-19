@@ -142,6 +142,11 @@ const NAMES = {
 };
 const D = { queue: [], cur: null, chars: 0, t: 0 };
 export function say(who, s, hold = 2.2) { D.queue.push({ who, text: fill(s), hold }); }
+// quick one-liners that never wait in line and never hold up the story
+export function bark(who, s, hold = 1.3) {
+  if ((D.cur && !D.cur.bark) || D.queue.length) return;
+  D.cur = { who, text: fill(s), hold, bark: true }; D.chars = 0; D.t = 0;
+}
 export function sayNow(who, s, hold) { D.queue.length = 0; D.cur = null; say(who, s, hold); }
 export const dialogBusy = () => !!D.cur || D.queue.length > 0;
 export const speaking = () => (D.cur ? D.cur.who : null);
@@ -151,6 +156,7 @@ export function skipLine() {
   if (D.chars < D.cur.text.length) D.chars = D.cur.text.length; else D.cur = null;
 }
 export function updateDialog(dt) {
+  if (D.cur && D.cur.bark && D.queue.length) D.cur = null;
   if (!D.cur && D.queue.length) { D.cur = D.queue.shift(); D.chars = 0; D.t = 0; }
   if (!D.cur) return;
   const before = Math.floor(D.chars);
