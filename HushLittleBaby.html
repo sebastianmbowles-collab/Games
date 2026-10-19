@@ -11,8 +11,9 @@ canvas{display:block;position:absolute;left:0;top:0}
 #touch{display:none;position:absolute;inset:0;pointer-events:none}
 #stick{position:absolute;left:24px;bottom:24px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.35);pointer-events:auto}
 #nub{position:absolute;left:40px;top:40px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.3)}
-.tb{position:absolute;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.45);color:#fff;font:bold 13px monospace;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+.tb{position:absolute;width:78px;height:78px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.45);color:#fff;font:bold 13px monospace;display:flex;align-items:center;justify-content:center;pointer-events:auto}
 .tb.on{background:rgba(190,120,255,.45)}
+.tb.sm{width:64px;height:32px;border-radius:16px;font-size:10px}
 </style>
 </head>
 <body>
@@ -22,6 +23,7 @@ canvas{display:block;position:absolute;left:0;top:0}
   <div class="tb" data-k="jump" style="right:20px;bottom:30px">JUMP</div>
   <div class="tb" data-k="dash" style="right:104px;bottom:20px">DASH</div>
   <div class="tb" data-k="mom" style="right:30px;bottom:116px">MOMMY</div>
+  <div class="tb sm" data-k="pause" style="left:12px;top:64px">PAUSE</div>
 </div>
 <script>
 'use strict';
@@ -476,11 +478,12 @@ const SPEED = 4.2, G = 21, JUMP = 7.2, DASH = 11, DASH_T = .22;
 function hurt(fromX, fromY) {
   if (P.inv > 0 || state !== 'play') return;
   if (P.shield) { P.shield = false; P.inv = 1.2; sfx('shield'); burst(P.x, P.y, P.z + .5, '#ff9ad8', 14); return; }
-  P.lives--; P.inv = 2; sfx('hurt'); shake = .35;
+  P.lives--; P.inv = 2; sfx('hurt'); shake = .35; buzz(150);
   const dx = P.x - fromX, dy = P.y - fromY, d = Math.hypot(dx, dy) || 1;
   P.kx = dx / d * 6; P.ky = dy / d * 6; P.kT = .2; P.vz = 5;
   if (P.lives <= 0) gameOver();
 }
+function buzz(ms) { try { if (isTouch && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* no vibration */ } }
 function gameOver() { state = 'over'; endT = 0; say('Nobody is coming, baby.', .4, .7); }
 function poof(x, y, z) { particles.push({ kind: 'poof', x, y, z, vx: 0, vy: 0, vz: 0, life: .5, max: .5 }); }
 function burst(x, y, z, color, n) {
@@ -870,7 +873,7 @@ function updateCameo(b, dt) {
 function hitBoss(b) {
   const oldPhase = b.id === 'final' ? finalPhase(b) : 0;
   b.hp--; b.hurtT = 1.1; P.vz = 9; P.airDash = true; sfx('stomp'); sfx('slam', .6); shake = .5; burst(b.x, b.y, b.z + 1.5, '#ffd23a', 18);
-  freezeT = .14; flashT = .12; hitWords.push({ x: b.x, y: b.y, z: b.z + 2, t: 0, text: HIT_WORD[b.id] });
+  freezeT = .14; flashT = .12; buzz(50); hitWords.push({ x: b.x, y: b.y, z: b.z + 2, t: 0, text: HIT_WORD[b.id] });
   if (b.hp <= 0) {
     b.state = 'dead'; b.t = 0; sfx('beat'); poof(b.x - .5, b.y, b.z); poof(b.x + .5, b.y, b.z); poof(b.x, b.y + .3, b.z + 1); setGates(b, false); shots = []; waves = []; falls = [];
     enemies = enemies.filter(e => e.kind !== b.def.minion || !inArena(b, e.x, e.y));
@@ -1306,6 +1309,22 @@ function bossImg(b) {
     default: return SPR.final[finalPhase(b)];
   }
 }
+// red warnings drawn on the floor just before a boss attacks, so you can get out of the way
+let floorMarks = [];
+function telegraph(b) {
+  const m = b.mv.m, s = spd(b), blink = Math.floor(time * 12) & 1;
+  ctx.fillStyle = blink ? '#ff2030' : '#a01020';
+  if (m === 'charge' && b.t < .8 / s) {      // where it will charge
+    for (let k = 2; k < 18; k += 2) ctx.fillRect(SX(b.x + b.dir[0] * k * .5) - 1, SY(b.y + b.dir[1] * k * .5, b.z) - 1, 3, 3);
+  } else if (m === 'ring' && !b.mv.k) {      // about to shoot in every direction
+    pixelRing(SX(b.x), SY(b.y, b.z), 8 + b.t * 40, blink ? '#ff2030' : '#a01020');
+  } else if ((m === 'slam' || m === 'drop') && b.air > .2) { // where it will land
+    const cx = SX(b.x), cy = SY(b.y, b.z);
+    pixelRing(cx, cy, 14, ctx.fillStyle); ctx.fillRect(cx - 4, cy, 9, 1); ctx.fillRect(cx, cy - 4, 1, 9);
+  } else if (m === 'throw' && b.t < .3 / s) { // a quick "!" before throwing
+    ctx.fillRect(SX(b.x) - 1, SY(b.y, b.z + b.air) - bossImg(b).height - 12, 3, 7); ctx.fillRect(SX(b.x) - 1, SY(b.y, b.z + b.air) - bossImg(b).height - 3, 3, 3);
+  }
+}
 const whiteCache = new Map();
 function whiteOf(img) {
   let c = whiteCache.get(img);
@@ -1322,6 +1341,7 @@ function drawBoss(b) {
   shadow(b.x, b.y, z, img.width * .7);
   if (b.id === 'spider' && b.air > .1) { ctx.fillStyle = 'rgba(230,230,240,.6)'; ctx.fillRect(SX(b.x), SY(b.y, z) - img.height - 90, 1, 92); }
   const vuln = b.state === 'fight' && b.mv && b.mv.m === 'vuln';
+  if (b.state === 'fight' && b.mv) floorMarks.push(() => telegraph(b)); // drawn after the floor so nothing covers it
   const white = b.hurtT > .9; // flash white for a moment right after a hit, then blink
   const blink = !white && b.hurtT > 0 && Math.floor(time * 16) % 2;
   if (b.state === 'dead') ctx.globalAlpha *= Math.max(0, 1 - b.t / 2);
@@ -1434,6 +1454,8 @@ function render() {
     const list = rows.get(j);
     if (list) { list.sort((a, b) => a[0] - b[0]); for (const [, fn] of list) fn(); }
   }
+  for (const fn of floorMarks) fn();
+  floorMarks = [];
   for (const w of waves) pixelRing(SX(w.x), SY(w.y, w.z), w.rad * TS, `rgba(255,170,90,${clamp(w.life, 0, 1).toFixed(2)})`);
   for (const q of particles) {
     ctx.globalAlpha = clamp(q.life * 2, 0, 1);
