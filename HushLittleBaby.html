@@ -221,6 +221,11 @@ function buildWorld() {
   item('pacifier', 33, 99); item('bottle', 8, 100);
   prop('sign', 33, 85, 'Got any grapes?'); prop('doll', 30, 76); prop('jack', 33, 93);
 
+  // --- Secret islands out in the dark: each has a music box ---
+  rect(54, 44, 56, 46, 1, T.NURSERY); item('musicbox', 55, 45); item('bottle', 54, 46);
+  rect(117, 58, 118, 60, 2, T.CLOWN); item('musicbox', 117, 59);
+  rect(18, 105, 20, 107, 1, T.PARK); item('musicbox', 19, 106); item('pacifier', 20, 107);
+
   // --- The Nursery Cove (west, flooded, final boss) ---
   rect(34, 51, 49, 68, 1, T.WATER);
   for (const [bx, by, bh] of [[37, 54, 2], [46, 55, 1.5], [38, 65, 1.5], [45, 64, 2]]) set(bx, by, bh, T.BLOCK);
@@ -448,6 +453,7 @@ if (isTouch) {
   });
 }
 cv.addEventListener('pointerdown', () => { initAudio(); pressed.start = true; });
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') state = 'pause'; }); // pause when you switch away
 
 // ===== Game state =====
 const MOM_ASKS = 10;
@@ -456,9 +462,9 @@ const cam = { x: 0, y: 0 };
 function newGame() {
   buildWorld();
   P = { x: 59.5, y: 59.5, z: 1, vz: 0, r: .28, h: .9, onGround: true, coyote: 0, jumpBuf: 0, dashT: 0, dashCd: 0, airDash: true, dashDir: [1, 0],
-    face: 1, dir: 'down', lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
+    face: 1, dir: 'down', secrets: 0, lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
   cam.x = P.x * 16; cam.y = P.y * 16 - P.z * 6;
-  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; introCard = null;
+  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; introCard = null; freezeT = 0; flashT = 0; hitWords = [];
   state = 'play';
   showBanner("Baby can't wake up.", 'Find and beat all the nursery rhyme bosses.', 5);
 }
@@ -485,9 +491,12 @@ function overlap(a, b) {
 }
 function stompCheck(e) { return P.vz < 0 && P.z > e.z + e.h * .45; }
 
+let freezeT = 0, flashT = 0, hitWords = [];
+const HIT_WORD = { mac: 'E-I-E-I-OW!', star: 'TWINK!', bun: 'SQUISH!', spider: 'SPLAT!', duck: 'QUACK!', final: 'OUCH!' };
 function update(dt) {
+  if (freezeT > 0) { freezeT -= dt; return; } // a tiny pause makes big hits feel strong
   time += dt;
-  if (pressed.pause) { state = state === 'pause' ? 'play' : 'pause'; }
+  if (pressed.pause || (state === 'pause' && pressed.start)) { state = state === 'pause' ? 'play' : 'pause'; }
   if (state !== 'play') return;
   if (mapT > 0) { mapT -= dt; return; } // the world waits while Mommy shows the map
   if (pressed.mom) {
@@ -519,6 +528,10 @@ function update(dt) {
     if (Math.hypot(P.x - p.x, P.y - p.y) < .6 && Math.abs(P.z - p.z) < 1) {
       p.got = true; sfx('pickup');
       if (p.kind === 'bottle') { P.lives = Math.min(P.lives + 1, 6); showBanner('Warm milk!', '+1 life', 1.8); burst(p.x, p.y, p.z + .5, '#ffffff', 12); }
+      else if (p.kind === 'musicbox') {
+        P.mom = Math.min(MOM_ASKS, P.mom + 3); P.secrets++;
+        showBanner('Secret music box! (' + P.secrets + '/3)', 'Mommy can show you 3 more maps.', 3); burst(p.x, p.y, p.z + .5, '#d8a0ff', 18); sfx('win');
+      }
       else { P.shield = true; showBanner('Pacifier!', 'It will block one hit.', 1.8); burst(p.x, p.y, p.z + .5, '#ff9ad8', 12); }
     }
   }
@@ -627,7 +640,7 @@ function updateEnemies(dt) {
     if (d < 7 && e.snd <= 0 && !(e.kind === 'tinyspider' && e.hang)) { e.snd = 1.5 + Math.random() * 2.5; sfx(ENEMY_SOUND[e.kind], (1 - d / 7) * .9); }
     const box = e.kind === 'littlebun' ? { x: e.x, y: e.y, z: e.z + Math.abs(Math.sin(e.t * 6)) * .5, r: e.r, h: e.h } : e;
     if (overlap(P, box)) {
-      if (stompCheck(box)) { e.dead = true; P.vz = 7.5; P.airDash = true; sfx('stomp'); burst(e.x, e.y, e.z + .5, { pig: '#e89ab0', littlebun: '#c08040', duckling: '#ffe060', tinyspider: '#222' }[e.kind] || '#d8c8a8', 14); poof(e.x, e.y, e.z); }
+      if (stompCheck(box)) { e.dead = true; P.vz = 7.5; P.airDash = true; sfx('stomp'); freezeT = .04; burst(e.x, e.y, e.z + .5, { pig: '#e89ab0', littlebun: '#c08040', duckling: '#ffe060', tinyspider: '#222' }[e.kind] || '#d8c8a8', 14); poof(e.x, e.y, e.z); }
       else hurt(e.x, e.y);
     }
   }
@@ -839,7 +852,8 @@ function updateCameo(b, dt) {
 }
 function hitBoss(b) {
   const oldPhase = b.id === 'final' ? finalPhase(b) : 0;
-  b.hp--; b.hurtT = 1.1; P.vz = 9; P.airDash = true; sfx('stomp'); shake = .4; burst(b.x, b.y, b.z + 1.5, '#ffd23a', 18);
+  b.hp--; b.hurtT = 1.1; P.vz = 9; P.airDash = true; sfx('stomp'); sfx('slam', .6); shake = .5; burst(b.x, b.y, b.z + 1.5, '#ffd23a', 18);
+  freezeT = .14; flashT = .12; hitWords.push({ x: b.x, y: b.y, z: b.z + 2, t: 0, text: HIT_WORD[b.id] });
   if (b.hp <= 0) {
     b.state = 'dead'; b.t = 0; sfx('beat'); poof(b.x - .5, b.y, b.z); poof(b.x + .5, b.y, b.z); poof(b.x, b.y + .3, b.z + 1); setGates(b, false); shots = []; waves = []; falls = [];
     enemies = enemies.filter(e => e.kind !== b.def.minion || !inArena(b, e.x, e.y));
@@ -1095,6 +1109,7 @@ function buildSprites() {
     toes.line(5, 7, 13, 7, 'R');
     SPR.final = [head, shoulders, knees, toes].map(g => g.outline('k').done());
   }
+  SPR.musicbox = grid(12, 13).rect(1, 4, 10, 8, 'v').rect(1, 4, 10, 2, 'V').rect(3, 7, 6, 3, 'p').px(5, 8, 'y').px(6, 8, 'y').rect(10, 1, 1, 4, 'g').rect(10, 1, 2, 1, 'g').outline('k').done();
   SPR.bottle = R(['...t...', '..ttt..', '.bbbbb.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '..www..']);
   SPR.pacifier = R(['...ppp...', '..p...p..', '..p...p..', '...ppp...', '.bbbbbbb.', 'bbbbbbbbb', '.bbpppbb.', '...ppp...', '...ppp...']);
   SPR.doll = R(['..NNNN..', '.NccccN.', '.ckcccc.', '.cccGcc.', '.ccRRcc.', '..cccc..', '.RRRRRR.', 'RRRRRRRR', 'cRRRRRRc', '.RRRRRR.', '.RRRRRR.', '..c..c..']);
@@ -1264,19 +1279,30 @@ function bossImg(b) {
     default: return SPR.final[finalPhase(b)];
   }
 }
+const whiteCache = new Map();
+function whiteOf(img) {
+  let c = whiteCache.get(img);
+  if (!c) {
+    c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d'); x.drawImage(img, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    whiteCache.set(img, c);
+  }
+  return c;
+}
 function drawBoss(b) {
   if (b.state === 'locked' || (b.state === 'dead' && b.t > 2)) return;
   const img = bossImg(b), z = b.z + b.air;
   shadow(b.x, b.y, z, img.width * .7);
   if (b.id === 'spider' && b.air > .1) { ctx.fillStyle = 'rgba(230,230,240,.6)'; ctx.fillRect(SX(b.x), SY(b.y, z) - img.height - 90, 1, 92); }
   const vuln = b.state === 'fight' && b.mv && b.mv.m === 'vuln';
-  const blink = b.hurtT > 0 && Math.floor(time * 16) % 2;
+  const white = b.hurtT > .9; // flash white for a moment right after a hit, then blink
+  const blink = !white && b.hurtT > 0 && Math.floor(time * 16) % 2;
   if (b.state === 'dead') ctx.globalAlpha *= Math.max(0, 1 - b.t / 2);
   let w = img.width, h = img.height;
   if (b.sq > 0) { w = Math.round(w * (1 + b.sq * .25)); h = Math.round(h * (1 - b.sq * .25)); }
   const shakeX = b.mv && b.mv.m === 'charge' && b.t < .8 / spd(b) ? (Math.floor(time * 30) & 1 ? .06 : -.06) : 0;
   let sx = 0, sy = 0;
-  if (!blink) [sx, sy] = spr(img, b.x + shakeX, b.y, z + (b.state === 'dead' ? -b.t : 0), b.face < 0, w, h);
+  if (!blink) [sx, sy] = spr(white ? whiteOf(img) : img, b.x + shakeX, b.y, z + (b.state === 'dead' ? -b.t : 0), b.face < 0, w, h);
   else { sx = SX(b.x) - (w >> 1); sy = SY(b.y, z) - h + 2; }
   if (b.state === 'dead') ctx.globalAlpha = 1;
   if (b.id === 'star' && !blink && !vuln) { ctx.fillStyle = 'rgba(255,240,150,.12)'; ctx.fillRect(sx - 4, sy - 4, w + 8, h + 8); }
@@ -1294,7 +1320,8 @@ function drawBoss(b) {
 function drawPickup(p) {
   const bob = Math.floor(time * 3 + p.x) & 1;
   shadow(p.x, p.y, p.z, 8);
-  const [sx, sy] = spr(p.kind === 'bottle' ? SPR.bottle : SPR.pacifier, p.x, p.y, p.z + (2 + bob) / ELEV, false);
+  const [sx, sy] = spr(p.kind === 'bottle' ? SPR.bottle : p.kind === 'musicbox' ? SPR.musicbox : SPR.pacifier, p.x, p.y, p.z + (2 + bob) / ELEV, false);
+  if (p.kind === 'musicbox' && Math.floor(time * 2) % 2) { ctx.fillStyle = '#d8a0ff'; ctx.fillRect(sx + 13, sy - 2 - Math.floor(time * 8) % 4, 2, 2); } // floating music note
   if (Math.floor(time * 4 + p.y) % 4 === 0) { ctx.fillStyle = '#fff'; ctx.fillRect(sx - 2, sy + 1, 1, 1); ctx.fillRect(sx + 8, sy + 6, 1, 1); }
 }
 function drawProp(p) {
@@ -1399,12 +1426,18 @@ function render() {
   const dk = ctx.createRadialGradient(px, py, 0, px, py, R * flick);
   [[0, 0], [.5, 0], [.5, .3], [.68, .3], [.68, .6], [.85, .6], [.85, .88], [1, .88]].forEach(([s, a]) => dk.addColorStop(s, `rgba(6,0,12,${a})`));
   ctx.fillStyle = dk; ctx.fillRect(0, 0, LW, LH);
+  if (flashT > 0) { flashT -= 1 / 60; ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(0, 0, LW, LH); }
+  for (const hw of hitWords) {
+    hw.t += 1 / 60; const lx = toL(SX(hw.x)), ly = toL(SY(hw.y, hw.z)) - hw.t * 40;
+    labels.push(() => { ctx.globalAlpha = clamp(1.5 - hw.t, 0, 1); ctx.font = `14px ${PF}`; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(hw.text, lx + 2, ly + 2); ctx.fillStyle = '#ffd23a'; ctx.fillText(hw.text, lx, ly); ctx.globalAlpha = 1; });
+  }
+  hitWords = hitWords.filter(hw => hw.t < 1.5);
   if (P.inv > 1.5 && P.inv <= 2 && P.lives > 0) { ctx.fillStyle = `rgba(160,0,0,${((P.inv - 1.5) * .6).toFixed(2)})`; ctx.fillRect(0, 0, LW, LH); }
   crispPass();
   drawHUD();
   drawIntroCard();
   if (mapT > 0) drawMap();
-  if (state === 'pause') overlay('PAUSED', 'Press P to keep going');
+  if (state === 'pause') drawPause();
   if (state === 'over') {
     endT += 1 / 60; overlay('THE NIGHTMARE GOT YOU', endT > 1 ? 'You have to start all over. Press Space or tap.' : '');
     const bs = 4, bx = vw / 2 - 8 * bs, by = vh / 2 - 60 - 19 * bs; // the baby cries
@@ -1512,6 +1545,20 @@ function drawMap() {
   ctx.font = `${Math.min(20, vw / 28)}px ${PF}`; ctx.fillStyle = '#ffd0f0';
   ctx.fillText("Mommy's Map", vw / 2, 44);
   ctx.fillRect(vw / 2 - 100, 56, Math.round(200 * mapT / 5), 6);
+}
+function drawPause() {
+  ctx.fillStyle = 'rgba(8,2,16,.95)'; ctx.fillRect(0, 0, vw, vh);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#c0283a'; ctx.font = `${Math.min(28, vw / 22)}px ${PF}`; ctx.fillText('PAUSED', vw / 2, vh * .18);
+  ctx.font = `9px ${PF}`; ctx.fillStyle = '#c8b8d8';
+  const lines = isTouch
+    ? ['Stick: move', 'JUMP: jump (jump ON enemies to beat them)', 'DASH: dash (dash + jump for big gaps)', 'MOMMY: show the map for 5 seconds']
+    : ['Arrow keys / WASD: move', 'Space / Z: jump (jump ON enemies to beat them)', 'Shift / X: dash (dash + jump for big gaps)', 'M: ask Mommy for the map', 'P: pause'];
+  lines.forEach((l, i) => ctx.fillText(l, vw / 2, vh * .3 + i * 22));
+  const y = vh * .3 + lines.length * 22 + 26;
+  ctx.fillStyle = '#ffd0f0';
+  ctx.fillText('Bosses beaten: ' + BOSS_ORDER.filter(id => bosses[id].state === 'dead').length + ' / 6', vw / 2, y);
+  ctx.fillText('Mommy maps left: ' + P.mom + '     Secret music boxes: ' + P.secrets + ' / 3', vw / 2, y + 22);
+  if (Math.floor(time * 2) % 2) { ctx.fillStyle = '#fff'; ctx.fillText(isTouch ? 'Tap to keep going' : 'Press P to keep going', vw / 2, vh * .86); }
 }
 function overlay(t, sub) {
   ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(0, 0, vw, vh);
