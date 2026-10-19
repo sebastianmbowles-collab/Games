@@ -9,12 +9,14 @@
     "build:standalone": "vite build --config vite.config.standalone.js",
     "lint": "oxlint",
     "preview": "vite preview",
-    "build:avd": "vite build --config vite.config.avd.js && cp standalone-avd/avd.html aliens-vs-dinos.html"
+    "build:avd": "vite build --config vite.config.avd.js && cp standalone-avd/avd.html aliens-vs-dinos.html",
+    "build:aa": "vite build --config vite.config.aa.js && cp standalone-aa/aa.html AlienAssault.html"
   },
   "dependencies": {
     "peerjs": "^1.5.5",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",
