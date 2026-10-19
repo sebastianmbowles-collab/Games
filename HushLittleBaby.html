@@ -125,6 +125,7 @@ function buildWorld() {
   rect(54, 54, 65, 65, 1, T.NURSERY);
   set(56, 56, 2, T.BLOCK); set(57, 56, 2, T.BLOCK); set(56, 57, 3, T.BLOCK); set(63, 63, 2, T.BLOCK); set(63, 62, 2.5, T.BLOCK); set(62, 63, 3, T.BLOCK);
   prop('doll', 55, 64); prop('doll', 64, 55); prop('sign', 59, 61, 'Beat them all. Then you can wake up.');
+  prop('sign', 64, 60, 'JUMP over the gaps. Jump ON the toys.');
   item('pacifier', 62, 63);
   // bridges out of the nursery
   rect(66, 59, 69, 60, 1, T.BRIDGE); set(67, 59, VOID, 0); set(67, 60, VOID, 0);        // east
@@ -151,6 +152,7 @@ function buildWorld() {
   item('pacifier', 96, 48);
   toy(95, 41, 'x', 4); toy(102, 47, 'y', 4); toy(108, 55, 'x', 4); toy(98, 66, 'y', 3); toy(105, 74, 'x', 3); toy(110, 44, 'y', 3); toy(100, 80, 'x', 4);
   prop('jack', 100, 52); prop('jack', 108, 62); prop('jack', 96, 76); prop('doll', 112, 82); prop('sign', 102, 39, 'The farm is up there. He is waiting.');
+  prop('sign', 100, 37, 'Gap too big? DASH while you JUMP!');
   // stairs up to the farm (the last gap needs a dash-jump)
   rect(102, 33, 103, 35, 3.5, T.BLOCK); rect(102, 31, 103, 32, 4, T.BLOCK); rect(102, 29, 103, 30, 4.5, T.BLOCK);
 
@@ -306,16 +308,19 @@ function activeBoss() { if (!bosses) return null; for (const id of BOSS_ORDER) {
 function musicTick() {
   if (!AC) return;
   const b = state === 'play' || state === 'pause' ? activeBoss() : null;
-  const song = b ? b.def.song : 'hush';
+  // outside fights, each boss area hums its boss's song slowly, so you know what is waiting
+  const ZONE_SONG = { 1: ['hush', -12, .7], 4: ['hush', 0, .34], 5: ['mac', 0, .75], 11: ['star', 12, .8], 12: ['bun', 0, .7], 14: ['spider', 0, .7], 16: ['duck', 0, .6], 18: ['heads', -12, .8] };
+  const zs = !b && state === 'play' && ZONE_SONG[lastZone], oct = zs ? zs[1] : 0;
+  const song = b ? b.def.song : zs ? zs[0] : 'hush';
   if (song !== curSong) { curSong = song; noteIdx = 0; nextNote = Math.max(nextNote, AC.currentTime + .05); }
   // boss songs start slow and speed up every time you hit the boss
   const hits = b ? b.def.hp - b.hp : 0;
-  const beat = b ? .5 / (1 + hits * .22) : .55;
+  const beat = b ? .5 / (1 + hits * .22) : zs ? zs[2] : .55;
   const mel = SONGS[song];
   while (nextNote < AC.currentTime + .2) {
     const [m, len] = mel[noteIdx % mel.length];
     if (m && state !== 'win' && state !== 'over') {
-      musicBox(m + 12, nextNote, (Math.random() - .5) * (b ? 50 : 30), !!b);
+      musicBox(m + 12 + oct, nextNote, (Math.random() - .5) * (b ? 50 : 30), !!b || lastZone === 4);
       if (b) { bassHit(m - 24, nextNote); if (hits > 0) kick(nextNote); }
     }
     nextNote += len * beat; noteIdx = (noteIdx + 1) % mel.length;
@@ -934,6 +939,12 @@ function buildSprites() {
       .px(5, 6, 'a').px(5, 7, 'a').rect(10, 5, 2, 2, 'k').px(10, 5, 'w').px(11, 9, 'p').px(13, 9, 'P');
     return g.outline('k').done();
   };
+  SPR.babyCry = (() => {
+    const g = grid(16, 19); babyBody(g); legs(g, 0);
+    g.ell(8, 6, 6, 5.5, 's').swap('s', 'a', (i, j) => i > 11 && j < 11).px(8, 0, 'N').px(7, 1, 'N').px(9, 1, 'N').px(8, 2, 'N')
+      .rect(5, 7, 2, 1, 'k').rect(10, 7, 2, 1, 'k').px(5, 8, 'b').px(5, 9, 'b').px(11, 8, 'b').px(11, 9, 'b').ell(8, 9.5, 1.5, 1, 'R');
+    return g.outline('k').done();
+  })();
   SPR.babyBlink = babyFront(0, 'blink'); SPR.babyHurt = babyFront(0, 'hurt');
   SPR.baby = { down: [babyFront(0), babyFront(1)], up: [babyBack(0), babyBack(1)], side: [babySide(0), babySide(1)] };
   // --- small enemies: front (down), back (up) and side views, two frames each ---
@@ -1333,7 +1344,15 @@ function render() {
   const LW = lo.width, LH = lo.height;
   if (state === 'title') {
     drawVoid(time * 8, time * 4);
-    const b = SPR.baby.down[Math.floor(time * 3) & 1]; ctx.drawImage(b, (LW >> 1) - 8, Math.round(LH * .66));
+    const b = SPR.baby.down[Math.floor(time * 3) & 1]; ctx.drawImage(b, (LW >> 1) - 8, Math.round(LH * .6));
+    // the bosses creep past in the dark
+    ctx.globalAlpha = .45;
+    BOSS_ORDER.forEach((id, k) => {
+      const img = id === 'final' ? SPR.final[Math.floor(Math.max(0, time) / 2) % 4] : bossImg({ id }), span = LW + 300;
+      const x = ((time * 14 + k * span / 6) % span) - 120, y = Math.round(LH * .95 - img.height + (Math.floor(time * 4 + k) & 1));
+      ctx.save(); ctx.translate(Math.round(x) + img.width, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0); ctx.restore();
+    });
+    ctx.globalAlpha = 1;
     crispPass(); drawTitle(); return;
   }
   cam.x += (P.x * TS - cam.x) * .15; cam.y += (P.y * TS - P.z * ELEV - cam.y) * .15;
@@ -1386,7 +1405,12 @@ function render() {
   drawIntroCard();
   if (mapT > 0) drawMap();
   if (state === 'pause') overlay('PAUSED', 'Press P to keep going');
-  if (state === 'over') { endT += 1 / 60; overlay('THE NIGHTMARE GOT YOU', endT > 1 ? 'You have to start all over. Press Space or tap.' : ''); }
+  if (state === 'over') {
+    endT += 1 / 60; overlay('THE NIGHTMARE GOT YOU', endT > 1 ? 'You have to start all over. Press Space or tap.' : '');
+    const bs = 4, bx = vw / 2 - 8 * bs, by = vh / 2 - 60 - 19 * bs; // the baby cries
+    ctx.drawImage(SPR.babyCry, bx, by + (Math.floor(time * 4) & 1) * 2, 16 * bs, 19 * bs);
+    ctx.fillStyle = '#9ad0ff'; for (let k = 0; k < 2; k++) ctx.fillRect(bx + 5 * bs + k * 6 * bs, by + 10 * bs + (time * 60 + k * 20) % 40, bs, bs);
+  }
   if (state === 'win') { endT += 1 / 60; drawWin(); }
 }
 function bossIcon(id, x, y, on) {
@@ -1454,8 +1478,17 @@ function buildMap() {
     const h = H(i, j); if (h === VOID) continue;
     m.fillStyle = shade(PAL[TY(i, j)][0], clamp(.75 + h * .08, .6, 1.5)); m.fillRect(i * MS, j * MS, MS, MS);
   }
+  // remember the middle of each area so the map can label it
+  const sum = {};
+  for (let j = 0; j < W; j++) for (let i = 0; i < W; i++) {
+    if (H(i, j) === VOID) continue;
+    const z = ZONE_OF[TY(i, j)]; if (z === undefined || z === 3) continue;
+    const a = sum[z] || (sum[z] = [0, 0, 0]); a[0] += i; a[1] += j; a[2]++;
+  }
+  zoneCenters = Object.entries(sum).filter(([, a]) => a[2] > 30).map(([z, a]) => [ZONES[z][0], a[0] / a[2], a[1] / a[2]]);
   mapDirty = false;
 }
+let zoneCenters = [];
 function drawMap() {
   if (mapDirty) buildMap();
   ctx.fillStyle = 'rgba(10,4,20,.96)'; ctx.fillRect(0, 0, vw, vh);
@@ -1463,7 +1496,9 @@ function drawMap() {
   const x0 = vw / 2 - mapCv.width * sc / 2, y0 = 74;
   ctx.drawImage(mapCv, x0, y0, mapCv.width * sc, mapCv.height * sc);
   const M = (x, y) => [x0 + x * MS * sc, y0 + y * MS * sc];
-  ctx.font = `8px ${PF}`; ctx.textAlign = 'center';
+  ctx.font = `7px ${PF}`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(230,220,255,.75)';
+  for (const [name, zx, zy] of zoneCenters) { const [lx, ly] = M(zx, zy); ctx.fillText(name.replace('The ', ''), lx, ly + 16); }
+  ctx.font = `8px ${PF}`;
   for (const id of BOSS_ORDER) {
     const b = bosses[id], [bx, by] = M(b.x, b.y);
     if (b.state === 'dead') { ctx.fillStyle = '#888'; for (let k = -6; k <= 6; k += 2) { ctx.fillRect(bx + k - 1, by + k - 1, 2, 2); ctx.fillRect(bx - k - 1, by + k - 1, 2, 2); } continue; }
@@ -1521,13 +1556,13 @@ function drawTitle() {
     : ['Move: Arrow keys or WASD', 'Jump: Space or Z      Dash: Shift or X', 'Ask Mommy for the map: M (10 times)', 'Jump on enemies to beat them. Beat all 6 bosses to wake up.  Pause: P'];
   lines.forEach((l, i) => ctx.fillText(l, vw / 2, vh * .38 + i * 22));
   ctx.fillStyle = '#7a6a8a'; ctx.fillText(AC ? '' : '(press any key to hear the lullaby)', vw / 2, vh * .38 + lines.length * 22 + 10);
-  if (Math.floor(time * 2) % 2) { ctx.font = `${Math.min(16, vw / 32)}px ${PF}`; ctx.fillStyle = '#ffd0f0'; ctx.fillText(isTouch ? 'Tap JUMP to begin' : 'Press Space to begin', vw / 2, vh * .9); }
+  if (Math.floor(time * 2) % 2) { ctx.font = `${Math.min(16, vw / 32)}px ${PF}`; ctx.fillStyle = '#ffd0f0'; ctx.fillText(isTouch ? 'Tap JUMP to begin' : 'Press Space to begin', vw / 2, vh * .76); }
 }
 
 // ===== Loop =====
 let last = performance.now();
 function frame(now) {
-  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  const dt = clamp((now - last) / 1000, 0, .05); last = now;
   if (state === 'title' || (state === 'over' && endT > 1) || (state === 'win' && endT > 9)) {
     if (pressed.jump || (pressed.start && state !== 'title')) { initAudio(); newGame(); }
     else if (pressed.start) initAudio();
