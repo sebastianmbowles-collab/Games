@@ -520,7 +520,7 @@ function newGame() {
   P = { x: 59.5, y: 59.5, z: 1, vz: 0, r: .28, h: .9, onGround: true, coyote: 0, jumpBuf: 0, dashT: 0, dashCd: 0, airDash: true, dashDir: [1, 0],
     face: 1, dir: 'down', secrets: 0, playT: 0, seen: {}, lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
   cam.x = P.x * 16; cam.y = P.y * 16 - P.z * 6;
-  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; blackT = 0; blackNext = 20; stalker = null; stalkNext = 25; scareT = 0; laughAt = -9; stalkSeen = false; followT = 0; followNext = 40; echoSteps = []; extraStep = true; winScared = 0; introCard = null; freezeT = 0; flashT = 0; hitWords = [];
+  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; arrowT = 0; blackT = 0; blackNext = 20; stalker = null; stalkNext = 25; scareT = 0; laughAt = -9; stalkSeen = false; followT = 0; followNext = 40; echoSteps = []; extraStep = true; winScared = 0; introCard = null; freezeT = 0; flashT = 0; hitWords = [];
   state = 'play';
   showBanner("Baby can't wake up.", 'Find and beat all the nursery rhyme bosses.', 5);
 }
@@ -628,7 +628,7 @@ function update(dt) {
   if (mapT > 0) { mapT -= dt; return; } // the world waits while Mommy shows the map
   P.playT += dt;
   if (pressed.mom) {
-    if (P.mom > 0) { P.mom--; mapT = 5; sfx('mom'); say(P.mom === 0 ? 'This is the last time, sweetie.' : 'Here, sweetie. This is where you are.', 1.15, .9); }
+    if (P.mom > 0) { P.mom--; mapT = 5; arrowT = 6; sfx('mom'); say(P.mom === 0 ? 'This is the last time, sweetie.' : 'Here, sweetie. This is where you are.', 1.15, .9); }
     else { momMsgT = 2.5; say('Mommy is asleep.', .5, .7); }
   }
   updatePlayer(dt);
@@ -1901,7 +1901,22 @@ function drawIntroCard() {
   ctx.font = `9px ${PF}`; ctx.fillStyle = '#e8d8ff'; ctx.fillText(c.b.def.tip, vw * .08 - slide, vh * .5 + 28);
   ctx.globalAlpha = 1;
 }
+// after a Mommy map, an arrow at the edge of the screen points to the nearest boss still waiting
+let arrowT = 0;
+function drawBossArrow() {
+  if (arrowT <= 0 || mapT > 0 || activeBoss()) return;
+  arrowT -= 1 / 60;
+  let best = null, bd = 1e9;
+  for (const id of BOSS_ORDER) { const b = bosses[id], d = Math.hypot(b.x - P.x, b.y - P.y); if (b.state !== 'dead' && b.state !== 'locked' && d < bd) { bd = d; best = b; } }
+  if (!best || bd < 4) return;
+  const a = Math.atan2(best.y - P.y, best.x - P.x), r = Math.min(vw, vh) * .38, cx = vw / 2 + Math.cos(a) * r, cy = vh / 2 + Math.sin(a) * r;
+  ctx.save(); ctx.globalAlpha = clamp(arrowT, 0, 1) * (.65 + .35 * Math.sin(time * 8)); ctx.translate(Math.round(cx), Math.round(cy)); ctx.rotate(a); ctx.scale(1.5, 1.5);
+  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-10, -12); ctx.lineTo(-4, 0); ctx.lineTo(-10, 12); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ff3040'; ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-7, -9); ctx.lineTo(-2, 0); ctx.lineTo(-7, 9); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
 function drawHUD() {
+  drawBossArrow();
   for (let i = 0; i < P.lives; i++) ctx.drawImage(SPR.heart, 12 + i * 26, 12, 21, 18);
   if (P.shield) { ctx.drawImage(SPR.pacifier, 12, 38, 18, 18); ctx.fillStyle = '#ff6fb8'; ctx.font = `8px ${PF}`; ctx.textAlign = 'left'; ctx.fillText('SHIELD', 34, 52); }
   ctx.textAlign = 'right'; ctx.font = `9px ${PF}`; ctx.fillStyle = '#e8d8ff';
@@ -1964,6 +1979,9 @@ function drawMap() {
     if (b.state === 'dead') { ctx.fillStyle = '#888'; for (let k = -6; k <= 6; k += 2) { ctx.fillRect(bx + k - 1, by + k - 1, 2, 2); ctx.fillRect(bx - k - 1, by + k - 1, 2, 2); } continue; }
     ctx.fillStyle = '#ff3030'; ctx.fillRect(bx - 5, by - 5, 10, 10);
     ctx.fillText(b.state === 'locked' ? '???' : b.def.name, bx, by - 10);
+  }
+  for (const p of pickups) if (p.kind === 'musicbox' && p.got) { // secrets you already found
+    const [sx, sy] = M(p.x, p.y); ctx.fillStyle = '#d8a0ff'; ctx.fillRect(sx - 4, sy - 3, 8, 6); ctx.fillStyle = '#5a2a80'; ctx.fillRect(sx - 1, sy - 1, 2, 2);
   }
   if (door) { const [bx, by] = M(door.x, door.y); ctx.fillStyle = '#fff4c0'; ctx.fillRect(bx - 6, by - 6, 12, 12); ctx.fillText('WAKE UP', bx, by - 12); }
   const [mx, my] = M(P.x, P.y), pr = Math.floor(time * 8) & 1 ? 6 : 4;
