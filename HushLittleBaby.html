@@ -417,6 +417,22 @@ function sfx(kind, v = 1) {
     f.frequency.setValueAtTime(900, t); f.frequency.linearRampToValueAtTime(2600, t + .7); f.frequency.linearRampToValueAtTime(1100, t + 1.6);
   }
   else if (kind === 'creak') { tone('sawtooth', 75, 52, 1.1, .05); tone('sawtooth', 110, 90, .6, .03, .4); }
+  else if (kind === 'laugh') { // slow "ha... ha... ha..." that gets deeper
+    for (let k = 0; k < 7; k++) {
+      const at = t + k * .46, o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain(), lfo = AC.createOscillator(), lg = AC.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(150 - k * 11, at); o.frequency.exponentialRampToValueAtTime(95 - k * 7, at + .38);
+      lfo.frequency.value = 28; lg.gain.value = 6; lfo.connect(lg); lg.connect(o.frequency);
+      f.type = 'bandpass'; f.frequency.value = 750 - k * 40; f.Q.value = 3;
+      g.gain.setValueAtTime(.0001, at); g.gain.exponentialRampToValueAtTime(.32 * v, at + .05); g.gain.exponentialRampToValueAtTime(.0001, at + .42);
+      o.connect(f); f.connect(g); g.connect(master); o.start(at); o.stop(at + .45); lfo.start(at); lfo.stop(at + .45);
+      noise(.3, .12, 900, k * .46 + .02, 'bandpass');
+    }
+  }
+  else if (kind === 'scare') { // a loud horror-movie sting
+    [233, 247, 262, 277, 466].forEach(f0 => tone('sawtooth', f0, f0 * .97, 1.2, .09));
+    tone('square', 90, 40, .8, .2); noise(.7, .8, 2500);
+  }
+  else if (kind === 'flicker') for (let k = 0; k < 4; k++) noise(.03, .25, 5000, k * .09 + Math.random() * .03, 'highpass');
   else if (kind === 'heart') { tone('sine', 70, 40, .14, .45); tone('sine', 65, 38, .14, .35, .2); }
   else if (kind === 'wind') for (let k = 0; k < 5; k++) tone('square', 2200, 1900, .02, .05, k * .07); // wind-up toy clicks
   else if (kind === 'oink') { tone('sawtooth', 200, 120, .22, .1); tone('sawtooth', 180, 110, .18, .08, .25); }
@@ -503,7 +519,7 @@ function newGame() {
   P = { x: 59.5, y: 59.5, z: 1, vz: 0, r: .28, h: .9, onGround: true, coyote: 0, jumpBuf: 0, dashT: 0, dashCd: 0, airDash: true, dashDir: [1, 0],
     face: 1, dir: 'down', secrets: 0, playT: 0, seen: {}, lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
   cam.x = P.x * 16; cam.y = P.y * 16 - P.z * 6;
-  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; introCard = null; freezeT = 0; flashT = 0; hitWords = [];
+  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; blackT = 0; blackNext = 30; stalker = null; stalkNext = 25; scareT = 0; laughAt = -9; introCard = null; freezeT = 0; flashT = 0; hitWords = [];
   state = 'play';
   showBanner("Baby can't wake up.", 'Find and beat all the nursery rhyme bosses.', 5);
 }
@@ -516,6 +532,7 @@ function hurt(fromX, fromY) {
   if (P.inv > 0 || state !== 'play') return;
   if (P.shield) { P.shield = false; P.inv = 1.2; sfx('shield'); burst(P.x, P.y, P.z + .5, '#ff9ad8', 14); return; }
   P.lives--; P.inv = 2; sfx('hurt'); shake = .35; buzz(150);
+  if (activeBoss() && P.lives > 0 && time - laughAt > 6) { laughAt = time; sfx('laugh'); say('heh. heh. heh. heh. heh.', .1, .4, .8); }
   const dx = P.x - fromX, dy = P.y - fromY, d = Math.hypot(dx, dy) || 1;
   P.kx = dx / d * 6; P.ky = dy / d * 6; P.kT = .2; P.vz = 5;
   if (P.lives <= 0) gameOver();
@@ -531,7 +548,46 @@ function overlap(a, b) {
 }
 function stompCheck(e) { return P.vz < 0 && P.z > e.z + e.h * .45; }
 
-let freezeT = 0, flashT = 0, hitWords = [];
+let freezeT = 0, flashT = 0, hitWords = [], laughAt = -9;
+// horror-movie tricks: the lights go out, something tall watches from the dark, and sometimes a face jumps out
+let blackT = 0, blackNext = 30, stalker = null, stalkNext = 25, scareT = 0, scareImg = null;
+function updateHorror(dt) {
+  if (scareT > 0) scareT -= dt;
+  if (activeBoss() || door) { blackT = 0; stalker = null; return; }
+  if (blackT > 0 && (blackT -= dt) <= 0 && Math.random() < .3) { // when the lights come back... a face
+    scareT = .45; scareImg = [SPR.dollhead.down[0], SPR.mac, SPR.final[0], SPR.toy.down[0]][Math.random() * 4 | 0]; sfx('scare'); shake = .4; buzz(300);
+  }
+  if ((blackNext -= dt) <= 0) { blackNext = 28 + Math.random() * 30; blackT = .9 + Math.random() * .9; sfx('flicker'); }
+  if (stalker) {
+    stalker.t += dt;
+    const d = Math.hypot(stalker.x - P.x, stalker.y - P.y);
+    if (!stalker.gone && (d < 3.2 || stalker.t > 7)) { stalker.gone = true; stalker.t = 0; if (d < 3.2) sfx('whisper', .8); }
+    if (stalker.gone && stalker.t > .25) stalker = null;
+  } else if ((stalkNext -= dt) <= 0) {
+    stalkNext = 35 + Math.random() * 40;
+    for (let k = 0; k < 12; k++) { // somewhere just past the edge of the light, on solid ground
+      const a = Math.random() * Math.PI * 2, x = P.x + Math.cos(a) * 5.5, y = P.y + Math.sin(a) * 4;
+      const z = H(Math.floor(x), Math.floor(y));
+      if (z !== VOID && Math.abs(z - P.z) < 2.5) { stalker = { x, y, z, t: 0 }; break; }
+    }
+  }
+}
+function drawStalker() {
+  if (!stalker) return;
+  const a = stalker.gone ? 1 - stalker.t / .25 : clamp(stalker.t, 0, 1), sx = SX(stalker.x), sy = SY(stalker.y, stalker.z);
+  if (stalker.gone && (Math.floor(stalker.t * 30) & 1)) return; // it flickers away
+  ctx.fillStyle = `rgba(0,0,0,${(.9 * a).toFixed(2)})`;
+  ctx.fillRect(sx - 3, sy - 40, 6, 6); ctx.fillRect(sx - 4, sy - 34, 8, 20); ctx.fillRect(sx - 6, sy - 33, 2, 18); ctx.fillRect(sx + 4, sy - 33, 2, 18); // head, body, long arms
+  ctx.fillRect(sx - 6, sy - 15, 1, 3); ctx.fillRect(sx + 5, sy - 15, 1, 3); ctx.fillRect(sx - 3, sy - 14, 2, 14); ctx.fillRect(sx + 1, sy - 14, 2, 14);
+  ctx.fillStyle = `rgba(255,245,235,${a.toFixed(2)})`; ctx.fillRect(sx - 2, sy - 38, 1, 1); ctx.fillRect(sx + 1, sy - 38, 1, 1);
+}
+function drawScare() {
+  if (scareT <= 0 || !scareImg) return;
+  const k = scareT / .45, h = vh * (1.05 + (1 - k) * .3), w = h * sw(scareImg) / sh(scareImg);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, vw, vh);
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(scareImg, vw / 2 - w / 2 + (Math.random() - .5) * 14, vh / 2 - h / 2 + (Math.random() - .5) * 14, w, h);
+  ctx.fillStyle = 'rgba(160,0,0,.3)'; ctx.fillRect(0, 0, vw, vh);
+}
 const HIT_WORD = { mac: 'E-I-E-I-OW!', star: 'TWINK!', bun: 'SQUISH!', spider: 'SPLAT!', duck: 'QUACK!', final: 'OUCH!' };
 function update(dt) {
   if (freezeT > 0) { freezeT -= dt; return; } // a tiny pause makes big hits feel strong
@@ -556,6 +612,7 @@ function update(dt) {
   }
 
   updateEnemies(dt);
+  updateHorror(dt);
   ambT -= dt;
   if (ambT <= 0) {
     ambT = 10 + Math.random() * 16;
@@ -1111,6 +1168,12 @@ function addScaryDetails() {
   each(SPR.littlebun, ['down'], (d, ln, f) => sockets(d, [[9, 5 + f * 2], [23, 5 + f * 2]], 3, 2.5));
   each(SPR.toy, ['side'], (d) => { sockets(d, [[23, 12]], 3, 3.5); d.grin(23, 31, 22, 1); });
   each(SPR.pig, ['side'], (d) => { sockets(d, [[29, 13]], 3, 3.5); d.grin(26, 36, 26, 1); });
+  // a second face on their backs, so they are watching you even when they walk away
+  each(SPR.toy, ['up'], (d) => { sockets(d, [[13, 12], [23, 12]], 2.5, 3); d.grin(11, 25, 19, 2); });
+  each(SPR.pig, ['up'], (d) => { sockets(d, [[15, 14], [29, 14]], 3, 3.5); d.grin(13, 31, 21, 2); });
+  each(SPR.littlebun, ['up'], (d, ln, f) => { sockets(d, [[10, 10 + f * 2], [22, 10 + f * 2]], 2.5, 2); d.grin(9, 23, 17 + f * 2, 2); });
+  each(SPR.duckling, ['up'], (d) => { sockets(d, [[10, 9], [18, 9]], 2, 2.5); d.grin(9, 19, 14, 1); });
+  each(SPR.tinyspider, ['up'], (d) => { d(13, 15, 'e'); d(19, 15, 'e'); d.grin(12, 20, 19, 1); });
 }
 function buildSprites() {
   const R = spriteFromRows;
@@ -1509,7 +1572,7 @@ function drawEnemy(e) {
   shadow(e.x, e.y, e.z + hop, 10);
   const f = e.kind === 'monkey' ? (e.clapT > 0 ? 1 : 0) : Math.floor(e.t * 6) & 1;
   const img = SPR[e.kind][dir][f], [sx, sy] = spr(img, e.x, e.y, e.z + hop, dir === 'side' && mx < 0);
-  if (dir !== 'up') glowEyes.push([e.kind, sx, sy, sw(img), dir === 'side' && mx < 0, Math.hypot(e.x - P.x, e.y - P.y)]);
+  glowEyes.push([dir === 'up' ? e.kind + '_up' : e.kind, sx, sy, sw(img), dir === 'side' && mx < 0, Math.hypot(e.x - P.x, e.y - P.y)]);
   if (e.alertT > 0) { const cx = sx + Math.round(sw(img) / 2) - 1; ctx.fillStyle = '#ff3040'; ctx.fillRect(cx, sy - 10, 2, 5); ctx.fillRect(cx, sy - 4, 2, 2); } // "!" when it spots you
 }
 function drawShot(s) {
@@ -1539,18 +1602,20 @@ let floorMarks = [], glowEyes = [];
 const EYES = {
   toy: [[6, 6.5]], pig: [[6.5, 6.5], [15, 6.5]], littlebun: [[4.5, 3], [11.5, 3]], duckling: [[5, 4], [9.5, 4]], tinyspider: [[7, 8], [9, 8]],
   monkey: [[8, 5], [12.5, 5]], dollhead: [[5.5, 8]], mac: [[10.5, 10.5], [15.5, 10.5]], starBoss: [[12, 17], [22, 17]], bun: [[9, 9], [25.5, 9]],
-  spider: [[19, 19.5], [23, 19.5]], duck: [[24, 8]], final: [[11, 17], [21, 17]]
+  spider: [[19, 19.5], [23, 19.5]], duck: [[24, 8]], final: [[11, 17], [21, 17]],
+  toy_up: [[6.5, 6]], pig_up: [[7.5, 7], [14.5, 7]], littlebun_up: [[5, 5], [11, 5]], duckling_up: [[5, 4.5], [9, 4.5]], tinyspider_up: [[6.5, 7.5], [9.5, 7.5]]
 };
 // out in the dark you see their red eyes before you see them
 function drawGlowEyes() {
-  const pulse = .55 + Math.sin(time * 3) * .25;
+  const pulse = .75 + Math.sin(time * 3) * .25;
   for (const [kind, sx, sy, w, flip, dist] of glowEyes) {
-    const eyes = EYES[kind]; if (!eyes || dist < 2.5) continue;
-    const a = clamp((dist - 2.5) / 3, 0, 1) * pulse;
+    const eyes = EYES[kind]; if (!eyes || dist < 1.5) continue;
+    const a = clamp((dist - 1.5) / 2, 0, 1) * pulse;
     for (const [ex, ey] of eyes) {
       const x = Math.round(sx + (flip ? w - ex : ex)), y = Math.round(sy + ey);
-      ctx.fillStyle = `rgba(255,30,40,${(a * .35).toFixed(2)})`; ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
-      ctx.fillStyle = `rgba(255,60,60,${a.toFixed(2)})`; ctx.fillRect(x - .5, y - .5, 1, 1);
+      ctx.fillStyle = `rgba(255,20,30,${(a * .18).toFixed(2)})`; ctx.fillRect(x - 3, y - 2, 6, 4);
+      ctx.fillStyle = `rgba(255,30,40,${(a * .45).toFixed(2)})`; ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+      ctx.fillStyle = `rgba(255,${(120 + a * 100) | 0},${(120 + a * 80) | 0},${a.toFixed(2)})`; ctx.fillRect(x - .5, y - .5, 1.5, 1);
     }
   }
   glowEyes = [];
@@ -1757,11 +1822,15 @@ function render() {
     labels.push(() => { ctx.globalAlpha = clamp(1.5 - hw.t, 0, 1); ctx.font = `14px ${PF}`; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(hw.text, lx + 2, ly + 2); ctx.fillStyle = '#ffd23a'; ctx.fillText(hw.text, lx, ly); ctx.globalAlpha = 1; });
   }
   hitWords = hitWords.filter(hw => hw.t < 1.5);
+  drawStalker();
+  if (blackT > 0 && (blackT > .3 || Math.random() < .6)) { ctx.fillStyle = 'rgba(0,0,0,.94)'; ctx.fillRect(0, 0, LW, LH); }
   drawGlowEyes();
+  for (let k = 0; k < 90; k++) { ctx.fillStyle = k & 1 ? 'rgba(0,0,0,.35)' : 'rgba(200,190,220,.07)'; ctx.fillRect(Math.random() * LW | 0, Math.random() * LH | 0, 1, 1); } // old-film grain
   if (state === 'dying') { ctx.fillStyle = `rgba(30,0,10,${clamp(endT / 1.6, 0, .9).toFixed(2)})`; ctx.fillRect(0, 0, LW, LH); }
   if (P.inv > 1.5 && P.inv <= 2 && P.lives > 0) { ctx.fillStyle = `rgba(160,0,0,${((P.inv - 1.5) * .6).toFixed(2)})`; ctx.fillRect(0, 0, LW, LH); }
   crispPass();
   drawHUD();
+  drawScare();
   drawIntroCard();
   if (mapT > 0) drawMap();
   if (state === 'pause') drawPause();
