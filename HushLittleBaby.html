@@ -208,6 +208,7 @@ function buildWorld() {
   set(49, 38, 2, T.OVEN); item('bottle', 49, 37);
   foe('littlebun', 53, 38); foe('littlebun', 66, 36); foe('littlebun', 62, 39);
   prop('sign', 59, 39, 'One a penny, two a penny...'); prop('doll', 71, 39);
+  for (const [kx, ky, kind] of [[52, 35, 'flour'], [68, 39, 'flour'], [55, 39, 'flour'], [64, 35, 'pin'], [57, 36, 'pin']]) prop(kind, kx, ky);
 
   // --- The Attic (north-west, high up, Itsy Bitsy Spider) ---
   const attic = [[45, 28, 2], [42, 27, 3], [39, 28, 4], [36, 27, 5]];
@@ -217,6 +218,7 @@ function buildWorld() {
   set(31, 15, 8, T.RAFTER); set(31, 33, 8, T.RAFTER); set(33, 24, 7, T.RAFTER); item('bottle', 33, 24);
   foe('tinyspider', 31, 20); foe('tinyspider', 32, 28); foe('tinyspider', 30, 25); foe('tinyspider', 33, 17);
   prop('sign', 33, 27, 'Down came the rain and washed the baby out.'); prop('doll', 30, 35);
+  prop('trunk', 30, 13); prop('trunk', 32, 30); prop('rocker', 30, 19);
 
   // --- The Lemonade Stand (south-west, the Duck) ---
   rect(6, 74, 35, 102, 1, T.PARK);
@@ -224,6 +226,7 @@ function buildWorld() {
   foe('duckling', 31, 80); foe('duckling', 32, 90); foe('duckling', 30, 96);
   item('pacifier', 33, 99); item('bottle', 8, 100);
   prop('sign', 33, 85, 'Got any grapes?'); prop('doll', 30, 76); prop('jack', 33, 93);
+  prop('lemontree', 30, 79); prop('lemontree', 34, 96); prop('lemontree', 29, 101);
 
   // --- Secret islands out in the dark: each has a music box ---
   rect(54, 44, 56, 46, 1, T.NURSERY); item('musicbox', 55, 45); item('bottle', 54, 46);
@@ -543,6 +546,7 @@ function update(dt) {
     }
   }
   for (const p of props) {
+    if (p.kind === 'rocker') { p.t += dt; if (p.t > 1.4) { p.t = 0; const d = Math.hypot(P.x - p.x, P.y - p.y); if (d < 6) sfx('creak', (1 - d / 6) * .8); } continue; }
     if (p.kind !== 'jack') continue;
     const near = Math.hypot(P.x - p.x, P.y - p.y) < 2.6;
     if (near && !p.open) { p.open = true; p.t = 0; sfx('jack'); }
@@ -1146,6 +1150,16 @@ function buildSprites() {
   SPR.musicbox = grid(12, 13).rect(1, 4, 10, 8, 'v').rect(1, 4, 10, 2, 'V').rect(3, 7, 6, 3, 'p').px(5, 8, 'y').px(6, 8, 'y').rect(10, 1, 1, 4, 'g').rect(10, 1, 2, 1, 'g').outline('k').done();
   SPR.bottle = R(['...t...', '..ttt..', '.bbbbb.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '.wgwww.', '.wwwww.', '.wwwww.', '..www..']);
   SPR.pacifier = R(['...ppp...', '..p...p..', '..p...p..', '...ppp...', '.bbbbbbb.', 'bbbbbbbbb', '.bbpppbb.', '...ppp...', '...ppp...']);
+ SPR.flour = grid(12, 13).ell(6, 7.5, 5, 5, 'c').rect(4, 1, 4, 3, 'c').rect(4, 3, 4, 1, 'z').rect(2, 7, 8, 2, 'x').px(3, 11, 'l').px(9, 10, 'l').outline('k').done();
+  SPR.pin = grid(16, 6).rect(3, 1, 10, 4, 't').rect(3, 1, 10, 1, 'j').rect(0, 2, 3, 2, 'z').rect(13, 2, 3, 2, 'z').outline('k').done();
+  SPR.trunk = grid(16, 12).rect(1, 2, 14, 9, 'z').rect(1, 2, 14, 3, 'n').rect(4, 2, 2, 9, 'Y').rect(10, 2, 2, 9, 'Y').rect(7, 5, 2, 2, 'y').outline('k').done();
+  SPR.rocker = grid(14, 16).rect(3, 1, 2, 10, 'n').rect(9, 1, 2, 10, 'n').rect(3, 1, 8, 2, 'n').rect(3, 5, 8, 1, 'z').rect(2, 9, 10, 2, 'n')
+    .rect(3, 11, 1, 3, 'z').rect(10, 11, 1, 3, 'z').line(0, 13, 13, 14, 'z').outline('k').done();
+  SPR.lemontree = grid(22, 26).rect(9, 14, 4, 12, 'z').ell(11, 9, 10, 8, 'm').swap('m', 'G', (i, j) => j > 12)
+    .px(5, 6, 'y').px(14, 4, 'y').px(17, 10, 'Y').px(8, 12, 'y').px(12, 8, 'Y').px(4, 11, 'G').px(15, 13, 'y').px(6, 24, 'Y').px(15, 25, 'Y').outline('k').done();
+  SPR.moon = grid(46, 46).ell(23, 23, 21, 21, 'j').swap('j', 'y', (i, j) => i + j > 52).ell(14, 13, 3, 2, 'Y').ell(31, 33, 4, 3, 'Y').ell(33, 12, 2, 2, 'Y')
+    .ell(16, 21, 3, 4, 'k').ell(30, 21, 3, 4, 'k').px(16, 20, 'e').px(30, 20, 'e').line(14, 31, 32, 31, 'k').px(13, 30, 'k').px(33, 30, 'k')
+    .px(16, 32, 'w').px(20, 32, 'w').px(24, 32, 'w').px(28, 32, 'w').outline('k').done();
   SPR.scarecrow = [-1, 0, 1].map(look => grid(18, 28)
     .rect(8, 8, 2, 20, 'z').rect(1, 11, 16, 2, 'z')                               // the wooden cross
     .rect(5, 10, 8, 10, 'r').rect(5, 13, 8, 1, 'i').rect(5, 16, 8, 1, 'i').rect(1, 10, 4, 3, 'r').rect(13, 10, 4, 3, 'r') // shirt
@@ -1392,6 +1406,10 @@ function drawPickup(p) {
 }
 function drawProp(p) {
   if (p.kind === 'doll') spr(SPR.doll, p.x, p.y, p.z, P.x < p.x);
+  else if (p.kind === 'flour' || p.kind === 'pin' || p.kind === 'trunk' || p.kind === 'lemontree') spr(SPR[p.kind], p.x, p.y, p.z, (p.x * 7 + p.y) % 2 < 1);
+  else if (p.kind === 'rocker') { // rocks all by itself
+    const cx = SX(p.x), cy = SY(p.y, p.z); ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.sin(time * 2.2) * .18); ctx.drawImage(SPR.rocker, -7, -15); ctx.restore();
+  }
   else if (p.kind === 'scarecrow') spr(SPR.scarecrow[clamp(Math.round(P.x - p.x), -1, 1) + 1], p.x, p.y, p.z, false);
   else if (p.kind === 'carousel') { // a broken carousel: horses on poles going slowly round
     const cx = SX(p.x), cy = SY(p.y, p.z);
@@ -1435,6 +1453,8 @@ function drawVoid(cx, cy) {
     if (x > lo.width || y > lo.height) continue;
     ctx.globalAlpha = .55; ctx.drawImage(Math.sin(time * .7 + e.ph) > .93 ? SPR.eyeShut : SPR.eye, Math.round(x), Math.round(y)); ctx.globalAlpha = 1;
   }
+  // a big moon with a face hangs over the Night Sky
+  if (state === 'play' && lastZone === 11) ctx.drawImage(SPR.moon, Math.round(lo.width * .72 - cx * .05 % 40), Math.round(lo.height * .08 + Math.sin(time * .4) * 3), 92, 92);
 }
 function crispPass() {
   mainCtx.setTransform(1, 0, 0, 1, 0, 0); mainCtx.imageSmoothingEnabled = false;
