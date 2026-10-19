@@ -1792,6 +1792,16 @@ function render() {
       ctx.save(); ctx.translate(Math.round(x) + w, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, h); ctx.restore();
     });
     ctx.globalAlpha = 1;
+    // something tall stands behind the baby for a few seconds, then is gone
+    const ph = time % 11, sa = ph > 5 && ph < 9 ? clamp(Math.min(ph - 5, 9 - ph), 0, 1) * .9 : 0;
+    if (sa > 0) {
+      const sx = (LW >> 1) + 22, sy = Math.round(LH * .6) + 18;
+      ctx.fillStyle = `rgba(0,0,0,${sa.toFixed(2)})`;
+      ctx.fillRect(sx - 3, sy - 40, 6, 6); ctx.fillRect(sx - 4, sy - 34, 8, 20); ctx.fillRect(sx - 6, sy - 33, 2, 18); ctx.fillRect(sx + 4, sy - 33, 2, 18);
+      ctx.fillRect(sx - 3, sy - 14, 2, 14); ctx.fillRect(sx + 1, sy - 14, 2, 14);
+      ctx.fillStyle = `rgba(255,245,235,${sa.toFixed(2)})`; ctx.fillRect(sx - 2, sy - 38, 1, 1); ctx.fillRect(sx + 1, sy - 38, 1, 1);
+    }
+    for (let k = 0; k < 90; k++) { ctx.fillStyle = k & 1 ? 'rgba(0,0,0,.35)' : 'rgba(200,190,220,.07)'; ctx.fillRect(Math.random() * LW | 0, Math.random() * LH | 0, 1, 1); } // old-film grain
     crispPass(); drawTitle(); return;
   }
   cam.x += (P.x * TS - cam.x) * .15; cam.y += (P.y * TS - P.z * ELEV - cam.y) * .15;
@@ -2119,8 +2129,17 @@ function drawStoryText() {
 function drawTitle() {
   ctx.textAlign = 'center';
   ctx.font = `${Math.min(44, vw / 14)}px ${PF}`;
-  ctx.fillStyle = '#5a0a16'; ctx.fillText('HUSH LITTLE BABY', vw / 2 + 4, vh * .22 + 4);
-  ctx.fillStyle = '#c0283a'; ctx.fillText('HUSH LITTLE BABY', vw / 2, vh * .22);
+  // every few seconds the title glitches and says something else
+  const glitch = time % 7 > 6.75, title = glitch ? "HE'S WATCHING" : 'HUSH LITTLE BABY', jx = glitch ? (Math.random() - .5) * 12 : 0;
+  ctx.fillStyle = '#5a0a16'; ctx.fillText(title, vw / 2 + 4 + jx, vh * .22 + 4);
+  ctx.fillStyle = glitch ? '#ff1030' : '#c0283a'; ctx.fillText(title, vw / 2 + jx, vh * .22);
+  // blood dripping off the letters
+  const tw = ctx.measureText('HUSH LITTLE BABY').width, fs = Math.min(44, vw / 14);
+  for (let k = 0; k < 16; k++) {
+    const x = Math.round(vw / 2 - tw / 2 + ((k * 37) % 100) / 100 * tw), len = (time * (5 + k % 4) + k * 13) % 46;
+    ctx.fillStyle = '#8a0a1c'; ctx.fillRect(x, vh * .22, 4, len); ctx.fillRect(x - 1, vh * .22 + len - 2, 6, 5);
+    if (k % 3 === 0) ctx.fillRect(x + 1, vh * .22 + ((time * 40 + k * 50) % (vh * .2)) + fs * .3, 3, 4); // a drop falling
+  }
   ctx.font = `${Math.min(12, vw / 36)}px ${PF}`; ctx.fillStyle = '#a890c0';
   ctx.fillText("Don't say a word. The nursery rhymes are awake.", vw / 2, vh * .22 + 40);
   ctx.font = `9px ${PF}`; ctx.fillStyle = '#c8b8d8';
