@@ -410,6 +410,7 @@ function sfx(kind, v = 1) {
   else if (kind === 'beat') arp([392, 330, 262, 196], .12, .15);
   // --- footsteps, creepy noises and enemy sounds ---
   else if (kind === 'step') noise(.05, .1, 700 + Math.random() * 300);
+  else if (kind === 'step2') { noise(.09, .2, 380); tone('sine', 90, 45, .1, .12); } // heavier steps... behind you
   else if (kind === 'splash') noise(.12, .14, 2600);
   else if (kind === 'land') { noise(.12, .3, 350); tone('sine', 120, 50, .12, .15); }
   else if (kind === 'whisper') { // a breathy "shhhh" that moves around
@@ -519,7 +520,7 @@ function newGame() {
   P = { x: 59.5, y: 59.5, z: 1, vz: 0, r: .28, h: .9, onGround: true, coyote: 0, jumpBuf: 0, dashT: 0, dashCd: 0, airDash: true, dashDir: [1, 0],
     face: 1, dir: 'down', secrets: 0, playT: 0, seen: {}, lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
   cam.x = P.x * 16; cam.y = P.y * 16 - P.z * 6;
-  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; blackT = 0; blackNext = 30; stalker = null; stalkNext = 25; scareT = 0; laughAt = -9; introCard = null; freezeT = 0; flashT = 0; hitWords = [];
+  lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; blackT = 0; blackNext = 20; stalker = null; stalkNext = 25; scareT = 0; laughAt = -9; stalkSeen = false; followT = 0; followNext = 40; echoSteps = []; extraStep = true; winScared = 0; introCard = null; freezeT = 0; flashT = 0; hitWords = [];
   state = 'play';
   showBanner("Baby can't wake up.", 'Find and beat all the nursery rhyme bosses.', 5);
 }
@@ -550,25 +551,53 @@ function stompCheck(e) { return P.vz < 0 && P.z > e.z + e.h * .45; }
 
 let freezeT = 0, flashT = 0, hitWords = [], laughAt = -9;
 // horror-movie tricks: the lights go out, something tall watches from the dark, and sometimes a face jumps out
-let blackT = 0, blackNext = 30, stalker = null, stalkNext = 25, scareT = 0, scareImg = null;
+let blackT = 0, blackNext = 20, stalker = null, stalkNext = 25, scareT = 0, scareImg = null, stalkSeen = false;
+let followT = 0, followNext = 40, echoSteps = [], lastStepAt = 0, extraStep = true;
+const scareFace = () => Math.random() < .6 ? SPR.mac : [SPR.dollhead.down[0], SPR.final[0], SPR.toy.down[0]][Math.random() * 3 | 0];
+// the tall shadow leads you to something it wants you to find: a hidden pickup, or a boss
+function stalkTarget(x, y) {
+  const near = (list, maxD) => { let best = null, bd = maxD; for (const [px, py] of list) { const d = Math.hypot(px - x, py - y); if (d < bd) { bd = d; best = [px, py]; } } return best; };
+  return near(pickups.filter(p => !p.got).map(p => [p.x, p.y]), 30) || near(BOSS_ORDER.filter(id => bosses[id].state !== 'dead').map(id => bosses[id].def.at), 999);
+}
 function updateHorror(dt) {
-  if (scareT > 0) scareT -= dt;
-  if (activeBoss() || door) { blackT = 0; stalker = null; return; }
-  if (blackT > 0 && (blackT -= dt) <= 0 && Math.random() < .3) { // when the lights come back... a face
-    scareT = .45; scareImg = [SPR.dollhead.down[0], SPR.mac, SPR.final[0], SPR.toy.down[0]][Math.random() * 4 | 0]; sfx('scare'); shake = .4; buzz(300);
+  if (activeBoss() || door) { blackT = 0; stalker = null; followT = 0; echoSteps = []; return; }
+  if (blackT > 0 && (blackT -= dt) <= 0 && Math.random() < .55) { // when the lights come back... a face
+    scareT = .45; scareImg = scareFace(); sfx('scare'); shake = .4; buzz(300);
   }
-  if ((blackNext -= dt) <= 0) { blackNext = 28 + Math.random() * 30; blackT = .9 + Math.random() * .9; sfx('flicker'); }
+  if ((blackNext -= dt) <= 0) { blackNext = 18 + Math.random() * 22; blackT = .9 + Math.random() * .9; sfx('flicker'); }
+  // footsteps behind you that stop when you stop... almost
+  if ((followNext -= dt) <= 0) { followNext = 35 + Math.random() * 35; followT = 12 + Math.random() * 6; }
+  if (followT > 0) {
+    followT -= dt;
+    if (!extraStep && time - lastStepAt > .65) { extraStep = true; sfx('step2', .8); }
+  }
+  echoSteps = echoSteps.filter(at => { if (time >= at) { sfx('step2', .7); return false; } return true; });
   if (stalker) {
     stalker.t += dt;
     const d = Math.hypot(stalker.x - P.x, stalker.y - P.y);
-    if (!stalker.gone && (d < 3.2 || stalker.t > 7)) { stalker.gone = true; stalker.t = 0; if (d < 3.2) sfx('whisper', .8); }
-    if (stalker.gone && stalker.t > .25) stalker = null;
+    if (stalker.gone) { if (stalker.t > .25) { if (stalker.next) { Object.assign(stalker, stalker.next); stalker.next = null; stalker.gone = false; stalker.t = 0; } else stalker = null; } }
+    else if (stalker.t > 10) { stalker.gone = true; stalker.t = 0; }
+    else if (d < 3.2) { // you came close: it flickers away and appears further on, toward what it wants you to find
+      stalker.gone = true; stalker.t = 0; sfx('whisper', .8);
+      const tg = stalkTarget(stalker.x, stalker.y);
+      if (tg && Math.hypot(tg[0] - stalker.x, tg[1] - stalker.y) > 2.5 && stalker.hops < 8) {
+        const dx = tg[0] - stalker.x, dy = tg[1] - stalker.y, len = Math.hypot(dx, dy);
+        for (const k of [4.5, 3.5, 6, 2.5, 7.5]) {
+          const m = Math.min(k, len), x = stalker.x + dx / len * m, y = stalker.y + dy / len * m, z = H(Math.floor(x), Math.floor(y));
+          if (z !== VOID) { stalker.next = { x, y, z, hops: stalker.hops + 1 }; break; }
+        }
+      }
+    }
   } else if ((stalkNext -= dt) <= 0) {
-    stalkNext = 35 + Math.random() * 40;
+    stalkNext = 30 + Math.random() * 30;
     for (let k = 0; k < 12; k++) { // somewhere just past the edge of the light, on solid ground
       const a = Math.random() * Math.PI * 2, x = P.x + Math.cos(a) * 5.5, y = P.y + Math.sin(a) * 4;
       const z = H(Math.floor(x), Math.floor(y));
-      if (z !== VOID && Math.abs(z - P.z) < 2.5) { stalker = { x, y, z, t: 0 }; break; }
+      if (z !== VOID && Math.abs(z - P.z) < 2.5) {
+        stalker = { x, y, z, t: 0, hops: 0 };
+        if (!stalkSeen) { stalkSeen = true; showBanner('Something is watching you...', 'Follow it?', 3); }
+        break;
+      }
     }
   }
 }
@@ -583,6 +612,7 @@ function drawStalker() {
 }
 function drawScare() {
   if (scareT <= 0 || !scareImg) return;
+  scareT -= 1 / 60;
   const k = scareT / .45, h = vh * (1.05 + (1 - k) * .3), w = h * sw(scareImg) / sh(scareImg);
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, vw, vh);
   ctx.imageSmoothingEnabled = false; ctx.drawImage(scareImg, vw / 2 - w / 2 + (Math.random() - .5) * 14, vh / 2 - h / 2 + (Math.random() - .5) * 14, w, h);
@@ -694,7 +724,8 @@ function updatePlayer(dt) {
     P.walkT += dt * 10 * slow;
     if (Math.floor(P.walkT / 2) !== step) {
       const wet = TY(Math.floor(P.x), Math.floor(P.y)) === T.WATER;
-      sfx(wet ? 'splash' : 'step');
+      sfx(wet ? 'splash' : 'step'); lastStepAt = time; extraStep = false;
+      if (followT > 0) echoSteps.push(time + .3 + Math.random() * .06);
       if (wet) particles.push({ kind: 'ripple', x: P.x, y: P.y, z: P.z, vx: 0, vy: 0, vz: 0, life: .6, max: .6 });
       else particles.push({ x: P.x + (Math.random() - .5) * .3, y: P.y + .1, z: P.z, vx: (Math.random() - .5), vy: 0, vz: 1.5, life: .35, color: 'rgba(160,150,170,.7)' });
     }
@@ -1748,7 +1779,7 @@ function render() {
   if (!SPR.baby) buildSprites();
   ctx = loCtx; ctx.setTransform(RES, 0, 0, RES, 0, 0); ctx.imageSmoothingEnabled = false; labels = [];
   const LW = GW, LH = GH;
-  if (state === 'win' && endT >= 2) { endT += 1 / 60; drawWinScene(); crispPass(); drawWin(); return; }
+  if (state === 'win' && endT >= 2) { endT += 1 / 60; drawWinScene(); crispPass(); drawWin(); drawScare(); return; }
   if (state === 'story') { drawStoryScene(); crispPass(); drawStoryText(); return; }
   if (state === 'title') {
     drawVoid(time * 8, time * 4);
@@ -1963,6 +1994,7 @@ function overlay(t, sub) {
   ctx.font = `10px ${PF}`; ctx.fillStyle = '#ddd'; ctx.fillText(sub, vw / 2, vh / 2 + 40);
 }
 // the ending, drawn as a little pixel scene: the baby wakes up in the crib, Mommy is there...
+let winScared = 0;
 function drawWinScene() {
   const LW = GW, LH = GH, cx = LW >> 1, fy = Math.round(LH * .72);
   const dim = clamp((endT - 9) / 2, 0, .85);
@@ -1982,6 +2014,17 @@ function drawWinScene() {
   ctx.fillRect(cx - 28, fy - 44, 4, 46); ctx.fillRect(cx + 24, fy - 44, 4, 46);
   // Mommy
   if (endT < 9.5) ctx.drawImage(SPR.mommy, cx + 34, fy - SPR.mommy.height + 2);
+  // twist: someone is looking in the window, the baby's eyes turn red, and then...
+  if (endT > 12.5) {
+    ctx.save(); ctx.beginPath(); ctx.rect(cx - 87, fy - 87, 38, 34); ctx.clip();
+    ctx.globalAlpha = clamp((endT - 12.5) / 1.5, 0, 1); ctx.drawImage(SPR.mac, cx - 82, fy - 86 + Math.max(0, Math.round((14 - endT) * 8)), sw(SPR.mac), sh(SPR.mac));
+    ctx.globalAlpha = 1; ctx.restore();
+    if (endT > 14) { ctx.fillStyle = '#ff3040'; ctx.fillRect(cx - 72, fy - 75, 1, 1); ctx.fillRect(cx - 67, fy - 75, 1, 1); }
+  }
+  if (endT > 14.5) { ctx.fillStyle = Math.floor(endT * 4) & 1 ? '#ff2030' : '#c01020'; ctx.fillRect(cx - 3, fy - 20, 2, 2); ctx.fillRect(cx + 2, fy - 20, 2, 2); ctx.fillStyle = '#000'; ctx.fillRect(cx - 3, fy - 17, 7, 1); ctx.fillRect(cx - 4, fy - 18, 1, 1); ctx.fillRect(cx + 4, fy - 18, 1, 1); }
+  if (endT < 3) winScared = 0;
+  if (endT > 15.7 && winScared === 0) { winScared = 1; scareT = .7; scareImg = SPR.mac; sfx('scare'); }
+  if (endT > 16.4 && winScared === 1) { winScared = 2; sfx('laugh'); say('E. I. E. I. O.', .1, .35, .9); }
   // the music box under the crib, and eyes in the dark
   if (dim > 0) {
     ctx.fillStyle = `rgba(6,0,12,${dim.toFixed(2)})`; ctx.fillRect(0, 0, LW, LH);
