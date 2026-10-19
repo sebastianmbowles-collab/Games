@@ -203,6 +203,7 @@ function buildWorld() {
   const steps = [[76, 94, 1.5], [79, 96, 2], [82, 98, 2.5], [84, 101, 3], [86, 104, 3.5], [87, 107, 4], [86, 110, 4.5], [84, 112, 5], [81, 113, 5.5]];
   for (const [sx, sy, sh] of steps) rect(sx, sy, sx + 1, sy + 1, sh, T.BLOCK);
   item('pacifier', 87, 107); item('bottle', 86, 110);
+  foe('dollhead', 80, 97); foe('dollhead', 85, 102); foe('dollhead', 87, 111);
   prop('sign', 76, 94, "Up, up, up. Don't look down.");
 
   // --- The Night Sky (Twinkle Twinkle) ---
@@ -420,7 +421,12 @@ function sfx(kind, v = 1) {
   else if (kind === 'clap') { noise(.08, .5, 7000, 0, 'highpass'); noise(.3, .2, 4000, .02, 'bandpass'); }
   else if (kind === 'skitter') for (let k = 0; k < 6; k++) noise(.025, .2, 3500, k * .05 + Math.random() * .02, 'highpass');
 }
-const ENEMY_SOUND = { monkey: 'wind', toy: 'wind', pig: 'oink', duckling: 'peep', littlebun: 'sizzle', tinyspider: 'skitter' };
+const ENEMY_HINT = {
+  toy: ['Wind-up teddy!', 'Jump ON it to beat it.'], pig: ['A creepy pig!', 'It chases you. Stomp it!'], littlebun: ['Little buns!', 'They hop after you. Stomp them!'],
+  duckling: ['Ducklings!', 'They follow you. Jump on them!'], tinyspider: ['Tiny spiders!', 'They drop from the ceiling. Look up!'],
+  monkey: ['Cymbal monkey!', 'Jump over its shockwave, then stomp it.'], dollhead: ['Floating doll head!', 'It flies over gaps. Stomp it from above!']
+};
+const ENEMY_SOUND = { dollhead: 'whisper', monkey: 'wind', toy: 'wind', pig: 'oink', duckling: 'peep', littlebun: 'sizzle', tinyspider: 'skitter' };
 const WHISPERS = ['Hush, little baby.', "Don't say a word.", 'Mommy is not coming.', 'Go back to sleep.', 'We can see you.'];
 // V cycles the sound: loud, quiet, off. Remembered for next time if the browser allows it.
 const VOLUMES = [.5, .2, 0], VOL_NAMES = ['LOUD', 'QUIET', 'OFF'];
@@ -488,7 +494,7 @@ const cam = { x: 0, y: 0 };
 function newGame() {
   buildWorld();
   P = { x: 59.5, y: 59.5, z: 1, vz: 0, r: .28, h: .9, onGround: true, coyote: 0, jumpBuf: 0, dashT: 0, dashCd: 0, airDash: true, dashDir: [1, 0],
-    face: 1, dir: 'down', secrets: 0, playT: 0, lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
+    face: 1, dir: 'down', secrets: 0, playT: 0, seen: {}, lives: 3, shield: false, inv: 0, safe: [59.5, 59.5, 1], safeT: 0, walkT: 0, mom: MOM_ASKS, slowT: 0, held: false, kT: 0 };
   cam.x = P.x * 16; cam.y = P.y * 16 - P.z * 6;
   lastZone = -1; mapT = 0; momMsgT = 0; time = 0; coveOpen = false; ambT = 8; heartT = 0; introCard = null; freezeT = 0; flashT = 0; hitWords = [];
   state = 'play';
@@ -657,6 +663,7 @@ function updateEnemies(dt) {
     if (e.dead) continue;
     e.t += dt;
     const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 1;
+    if (d < 5 && !P.seen[e.kind] && !activeBoss()) { P.seen[e.kind] = true; showBanner(...ENEMY_HINT[e.kind], 3); }
     if (e.kind === 'toy') {
       const ax = e.axis === 'x' ? e.dir : 0, ay = e.axis === 'y' ? e.dir : 0;
       const nx = e.x + ax * e.sp * dt, ny = e.y + ay * e.sp * dt;
@@ -664,6 +671,10 @@ function updateEnemies(dt) {
       const far = Math.abs(e.axis === 'x' ? nx - e.ox : ny - e.oy) > e.range;
       e.mx = ax; e.my = ay;
       if (ah === VOID || Math.abs(ah - e.z) > STEP || far) e.dir = -e.dir; else { e.x = nx; e.y = ny; e.z = groundAt(e.x, e.y, e.z, .2); }
+    } else if (e.kind === 'dollhead') {
+      // floats toward you, right over gaps, and drifts to your height so you can stomp it
+      if (d < 8) { e.mx = dx / d; e.my = dy / d; e.x += e.mx * 1.4 * dt; e.y += e.my * 1.4 * dt; }
+      e.z += (P.z + .2 + Math.sin(e.t * 3) * .15 - e.z) * Math.min(1, dt * 1.5);
     } else if (e.kind === 'monkey') {
       // it stays put and claps its cymbals, sending out a small shockwave you have to jump
       e.ct = (e.ct === undefined ? Math.random() * 2 : e.ct) - dt; e.clapT = (e.clapT || 0) - dt;
@@ -694,7 +705,7 @@ function updateEnemies(dt) {
     if (d < 7 && e.snd <= 0 && !(e.kind === 'tinyspider' && e.hang)) { e.snd = 1.5 + Math.random() * 2.5; sfx(ENEMY_SOUND[e.kind], (1 - d / 7) * .9); }
     const box = e.kind === 'littlebun' ? { x: e.x, y: e.y, z: e.z + Math.abs(Math.sin(e.t * 6)) * .5, r: e.r, h: e.h } : e;
     if (overlap(P, box)) {
-      if (stompCheck(box)) { e.dead = true; P.vz = 7.5; P.airDash = true; sfx('stomp'); freezeT = .04; burst(e.x, e.y, e.z + .5, { pig: '#e89ab0', littlebun: '#c08040', duckling: '#ffe060', tinyspider: '#222', monkey: '#7a5030' }[e.kind] || '#d8c8a8', 14); poof(e.x, e.y, e.z);
+      if (stompCheck(box)) { e.dead = true; P.vz = 7.5; P.airDash = true; sfx('stomp'); freezeT = .04; burst(e.x, e.y, e.z + .5, { pig: '#e89ab0', littlebun: '#c08040', duckling: '#ffe060', tinyspider: '#222', monkey: '#7a5030', dollhead: '#e8dcd0' }[e.kind] || '#d8c8a8', 14); poof(e.x, e.y, e.z);
         if (P.lives === 1 && Math.random() < .25) { pickups.push({ kind: 'bottle', x: e.x, y: e.y, z: e.z }); showBanner('A bottle fell out!', '', 1.5); } }
       else hurt(e.x, e.y);
     }
@@ -1070,6 +1081,14 @@ function buildSprites() {
     }
     return g.outline('k').done();
   });
+  SPR.dollhead = (() => {
+    const make = f => grid(16, 16).ell(8, 8, 6.5, 6.5, 'c').swap('c', 'x', i => i > 11).ell(8, 3, 6, 2.5, 'N').px(2, 5, 'N').px(14, 5, 'N')
+      .ell(5.5, 8, 1.6, 2, 'k').px(5, 7, 'e').px(11, 7, 'k').px(10, 8, 'k').px(11, 9, 'k').px(12, 8, 'k')  // one eye, one X
+      .line(10, 2, 9, 6, 'k').line(9, 6, 11, 8, 'k').rect(6, 12, 4, 1, 'R').px(4, 11, 'p').px(12, 11, 'p')
+      .px(8, 15 - f, 'R').outline('k').done();                                                          // it's dripping
+    const s0 = make(0), s1 = make(1);
+    return { down: [s0, s1], up: [s0, s1], side: [s0, s1] };
+  })();
   SPR.monkey = (() => {
     const make = clap => {
       const g = grid(20, 20);
