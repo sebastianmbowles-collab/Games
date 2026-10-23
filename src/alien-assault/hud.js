@@ -58,6 +58,15 @@ function holo(x) {
   for (let y = 0; y < 48; y += 2) { x.fillStyle = 'rgba(0,0,0,0.2)'; x.fillRect(0, y, 48, 1); }
 }
 const DRAW = {
+  scientist(x) {
+    x.fillStyle = '#04080a'; x.fillRect(0, 0, 48, 48);
+    x.fillStyle = '#c8ccd4'; x.beginPath(); x.moveTo(6, 48); x.lineTo(12, 36); x.lineTo(36, 36); x.lineTo(42, 48); x.fill();
+    x.fillStyle = '#15141a'; x.beginPath(); x.ellipse(24, 22, 12, 15, 0, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#000'; x.beginPath(); x.ellipse(24, 25, 8, 9, 0, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#7affd8'; x.fillRect(18, 22, 4, 3); x.fillRect(26, 22, 4, 3);
+    x.fillStyle = 'rgba(122,255,216,0.25)'; x.fillRect(15, 20, 18, 7);
+    x.fillStyle = '#7affd8'; x.font = 'bold 10px monospace'; x.fillText('?', 38, 12);
+  },
   patch(x) {
     x.fillStyle = '#0a1a3a'; x.fillRect(0, 0, 48, 48);
     x.fillStyle = '#ff7a14'; circ(x, 24, 27, 15);
@@ -138,7 +147,7 @@ export function portrait(who) {
 // ===== Dialogue =====
 const NAMES = {
   patch: ['PATCH', '#ff9a3c'], nova: ['COMMANDER NOVA', '#5ab8ff'], unit: ['UNIT-07', '#9fe8ff'],
-  vrax: ['GENERAL VRAX', '#c45bff'], emperor: ['THE NULL EMPEROR', '#ff4af0'],
+  vrax: ['GENERAL VRAX', '#c45bff'], emperor: ['THE NULL EMPEROR', '#ff4af0'], scientist: ['???', '#7affd8'],
 };
 const D = { queue: [], cur: null, chars: 0, t: 0 };
 export function say(who, s, hold = 2.2) { D.queue.push({ who, text: fill(s), hold }); }

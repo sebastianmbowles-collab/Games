@@ -6,8 +6,9 @@ import * as MD from './models.js';
 import { Particles, Debris } from './fx.js';
 import { buildJungle, updateJungle } from './jungle.js';
 import * as J from './models2.js';
-import { MISSIONS, SCANS, UPGRADES, ENDING, CREDITS, PATCH_REPAIR, PATCH_LOW, PATCH_OD, CHATTER, ENDING2 } from './data.js';
+import { MISSIONS, SCANS, UPGRADES, ENDING, CREDITS, PATCH_REPAIR, PATCH_LOW, PATCH_OD, CHATTER, CHATTER2, ENDING2, DIFFS } from './data.js';
 import * as H from './hud.js';
+import { PROG, saveProg, unlockBadge, unlockSkin, addScore, drawToast, tagSkin, applySkin, skinIsRainbow } from './progress.js';
 
 const R = 15, ROOM_H = 9, DOOR_H = 7.5, DOOR_ANG = 0.36, PZ = 9, EYE = 2.6;
 const UPV = new THREE.Vector3(0, 1, 0);
@@ -21,7 +22,10 @@ let mi = 0, M = null, spawnList = [], spawnT = 0, phase = 'card', phaseT = 0, up
 let scanBeam, scanTarget = null, scanT = 0, paused = false, pauseSel = 0, overSel = 0, upChoices = [], upSel = 0;
 let menuRects = [], creditY = 0, wallBroken = false, kills = 0, chatT = 8, patchMsgT = 0, cam = { yaw: 0, pitch: 0 };
 let aimNX = 0, aimNY = 0, flashT = 0, lightningT = 8, hitMarkT = 0;
-let jungle, inJungle = false, rail = 0, props = [], scareT = 0;
+let jungle, inJungle = false, rail = 0, props = [], scareT = 0, score = 0, nova = null;
+const POINTS = { zippit: 100, voidfly: 120, bruteclaw: 400, riftstalker: 300, soldier: 120, bug: 150, plant: 120, swamp: 250, mutant: 200 };
+const MISSION_SKIN = ['bronze', 'silver', 'camo', 'redblack', 'gold', 'rainbow', 'diamond'];
+const MOON_COLORS = [0x5af0ff, 0x6aff7a, 0xffd84a, 0xff9a3a, 0xff6ad8, 0xb07aff, 0xffffff, 0xffffff];
 const has = id => upgrades.includes(id);
 
 // ===== Building the abandoned UFO =====
@@ -45,6 +49,7 @@ export function buildGame() {
   jungle.cart.position.z = PZ;
 
   arms = MD.makeFPArms(); AP = arms.userData.parts; camera.add(arms);
+  tagSkin(arms);
   patch = MD.makePatch(); PP = patch.userData.parts; camera.add(patch);
   patch.position.set(-1.7, 0.9, -3.2); patch.scale.setScalar(0.5);
   scanBeam = MD.mesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), MD.addGlow(0x33bbff, 0.55), 0, 0, 0, scene);
@@ -185,7 +190,9 @@ export const Game = {
   start(i, o = {}) {
     if (o.fresh) { upgrades = []; scanned = new Set(); }
     if (o.upgrades) upgrades = o.upgrades.slice();
+    score = o.fresh ? 0 : o.score || score;
     scanned = new Set();
+    applySkin(G.time);
     G.hud.style.cursor = 'none';
     paused = false;
     startMission(i, o.skipCard);
@@ -198,6 +205,7 @@ function resetPlayer() {
     armor: 0, max: 100 + (has('plating') ? 30 : 0), x: 0, y: 0, vy: 0, air: false,
     dashT: 0, dashDur: 1, dashDir: 0, dashCD: 0, cool: 0, od: 0, odT: 0, repairCD: 0, repairAnim: 0,
     recoil: 0, hurtT: 0, invT: 0, cracks: [], dead: false, lowWarned: false, odSaid: false,
+    block: false, arm: 100, weapon: 1, heat: 0, overheat: 0,
   };
   P.armor = P.max;
 }
@@ -209,6 +217,7 @@ function clearAll() {
   for (const h of hazards) if (h.mesh) scene.remove(h.mesh);
   if (boss) { scene.remove(boss.g); boss.extra?.forEach(m => scene.remove(m)); }
   for (const p of props) scene.remove(p);
+  if (nova) { scene.remove(nova); nova = null; }
   for (const e of enemies) if (e.pool) scene.remove(e.pool);
   enemies = []; balls = []; shots = []; rings = []; hazards = []; boss = null; props = [];
   for (const c of covers) c.used = false;
@@ -254,7 +263,7 @@ function startMission(i, skipCard) {
   if (firstZ > 0) { spawnList.splice(firstZ, 1); spawnList.unshift('zippit'); }
   spawnT = 1.2; kills = 0; chatT = rnd(10, 16);
   phase = skipCard ? 'introStart' : 'card'; phaseT = 0;
-  writeSave({ mission: i, upgrades });
+  writeSave({ mission: i, upgrades, score });
   playMusic(skipCard ? M.music : null);
   cam.yaw = 0; cam.pitch = 0;
 }
@@ -268,6 +277,9 @@ function beginIntro() {
 }
 function missionClear() {
   phase = 'clear'; phaseT = 0;
+  if (MISSION_SKIN[mi]) unlockSkin(MISSION_SKIN[mi]);
+  if (!P.tookHit) unlockBadge('nohit');
+  score = addScore(1000 * (mi + 1), score);
   for (const [who, s] of M.outro) H.say(who, s);
   H.warn('MISSION COMPLETE', '#39ff6a', 2.5, true);
   sfx.select();
@@ -288,6 +300,7 @@ function update(dt) {
     H.updateDialog(dt);
   }
   updateCamera(dt);
+  if (skinIsRainbow()) applySkin(G.time);
   composer.render();
   drawHUD(paused ? 0 : dt);
 }
@@ -321,7 +334,7 @@ function stepWorld(dt) {
   fx.update(dt); fxBig.update(dt); debris.update(dt);
   if (phase === 'fight' && !P.dead) {
     chatT -= dt;
-    if (chatT <= 0 && !H.dialogBusy() && kills > 2) { chatT = rnd(14, 24); const [who, s] = pick(CHATTER); H.bark(who, s, 1.4); }
+    if (chatT <= 0 && !H.dialogBusy() && kills > 2) { chatT = rnd(9, 16); const [who, s] = pick(inJungle && Math.random() < 0.6 ? CHATTER2 : CHATTER); H.bark(who, s, 1.4); }
   }
   if (phase === 'clear' && phaseT > 3 && !H.dialogBusy()) {
     if (mi === 6 || mi >= MISSIONS.length - 1) startEnding();
@@ -363,6 +376,7 @@ function updatePlayer(dt) {
   }
   if ((pr.shift || pr.e || pr.od) && P.od >= 100 && P.odT <= 0) {
     P.odT = 8 + (has('capacitor') ? 4 : 0); P.od = 0; P.odSaid = false;
+    unlockBadge('overdrive');
     sfx.overdrive(); H.warn('OVERDRIVE!', '#7fd4ff', 1.2, true); H.bark('patch', pick(PATCH_OD), 1.2);
   }
   if (P.od >= 100 && !P.odSaid && P.odT <= 0) { P.odSaid = true; H.bark('patch', 'Overdrive is charged! Press {OD}!', 1.6); }
@@ -370,8 +384,16 @@ function updatePlayer(dt) {
   if (pr.q || pr.r || pr.repair) tryRepair();
   P.repairCD -= dt; P.hurtT -= dt; P.invT -= dt; patchMsgT -= dt; P.repairAnim -= dt;
   P.cool -= dt;
+  P.block = (G.keys.s || G.keys.block) && P.arm > 0;
+  if (has('laser')) {
+    if (G.pressed['1']) { P.weapon = 1; sfx.ui(); }
+    if (G.pressed['2']) { P.weapon = 2; sfx.ui(); }
+    if (G.pressed.wpn) { P.weapon = 3 - P.weapon; sfx.ui(); }
+  } else P.weapon = 1;
   const firing = G.mouse.down || G.keys.f || G.keys.j;
-  if (firing && P.cool <= 0 && !paused && phase !== 'clear') fire();
+  P.overheat -= dt;
+  if (P.weapon === 2) laser(dt, firing && !paused && phase !== 'clear' && P.overheat <= 0);
+  else { laser(dt, false); if (firing && P.cool <= 0 && !paused && phase !== 'clear') fire(); }
 }
 function fire() {
   const od = P.odT > 0;
@@ -392,17 +414,60 @@ function fire() {
     const side = tmp.subVectors(target, tmp2).cross(UPV).normalize().multiplyScalar(0.45);
     spawnBall(tmp2.clone().add(side), target.clone().add(side), r, dmg, od);
   }
-  P.recoil = 1; L.muzzle.intensity = 5;
+  P.recoil = 1; L.muzzle.intensity = 5; L.muzzle.color.setHex(0x55b8ff);
   sfx.shoot(od);
   for (let k = 0; k < 5; k++) fx.spawn(tmp2.x, tmp2.y, tmp2.z, rnd(-2, 2), rnd(-2, 2), rnd(-2, 2), 0x8fd4ff, 0.15);
 }
+// ===== The plasma laser: a beam that melts whatever it touches =====
+let beamOuter = null, beamInner = null, laserHumT = 0;
+function laser(dt, on) {
+  if (!beamOuter) {
+    beamOuter = MD.mesh(new THREE.CylinderGeometry(1, 1, 1, 10, 1, true), MD.addGlow(0xff8a20, 0.7), 0, 0, 0, scene);
+    beamInner = MD.mesh(new THREE.CylinderGeometry(1, 1, 1, 8, 1, true), MD.glow(0xfff4d0), 0, 0, 0, scene);
+  }
+  if (!on) {
+    beamOuter.visible = beamInner.visible = false;
+    P.heat = Math.max(0, P.heat - dt * 0.45);
+    return;
+  }
+  const od = P.odT > 0, dps = (od ? 16 : 8) * (has('heavy') ? 1.5 : 1);
+  P.heat += dt * 0.32;
+  if (P.heat >= 1) { P.overheat = 1.6; P.heat = 0.65; sfx.hurt(); H.bark('patch', 'Laser overheated! Give it a second!', 1); }
+  camera.updateMatrixWorld();
+  ndc.set(aimNX, aimNY); raycaster.setFromCamera(ndc, camera);
+  const ray = raycaster.ray;
+  let best = 70, hit = null, what = null;
+  const test = (c, r, obj) => { sph.set(c, r); const q = ray.intersectSphere(sph, tmp); if (q) { const d = q.distanceTo(ray.origin); if (d < best) { best = d; hit = q.clone(); what = obj; } } };
+  for (const e of enemies) if (!e.dead && e.alpha > 0.5 && e.ws) for (const w of e.ws) test(w.c, w.r, e);
+  if (boss && boss.ws) for (const w of boss.ws) test(w.c, w.r, boss);
+  for (const sh of shots) if (sh.shootable) test(sh.pos, sh.r + 0.3, sh);
+  const end = hit || ray.origin.clone().addScaledVector(ray.direction, 70);
+  AP.muzzle.getWorldPosition(tmp2);
+  const wob = 1 + Math.sin(G.time * 60) * 0.25;
+  beamBetween(beamOuter, tmp2, end, (od ? 0.16 : 0.1) * wob);
+  beamBetween(beamInner, tmp2, end, (od ? 0.06 : 0.035) * wob);
+  beamOuter.visible = beamInner.visible = true;
+  L.muzzle.intensity = 4; L.muzzle.color.setHex(0xff9a40);
+  P.recoil = Math.max(P.recoil, 0.25);
+  laserHumT -= dt;
+  if (laserHumT <= 0) { laserHumT = 0.12; sfx.shoot(true); }
+  fx.spawn(end.x, end.y, end.z, rnd(-3, 3), rnd(0, 4), rnd(-3, 3), pick([0xffa040, 0xffffff]), 0.3, -8);
+  if (!what) return;
+  if (what === boss) boss.hitBall({ pos: end, r: 0.3, dmg: dps * dt });
+  else if (shots.includes(what)) { what.hp -= dps * dt; if (what.hp <= 0) popShot(what, true); }
+  else damageEnemy(what, dps * dt, end);
+}
 const ballGeo = new THREE.SphereGeometry(1, 24, 16);
 let ballMat = null, ballMatOD = null;
+const moonMats = [];
 function spawnBall(from, target, r, dmg, od) {
   if (!ballMat) { ballMat = new THREE.MeshBasicMaterial({ map: TEX.moon }); ballMatOD = new THREE.MeshBasicMaterial({ map: TEX.moonOD }); }
-  const mesh = new THREE.Mesh(ballGeo, od ? ballMatOD : ballMat);
+  // moon blasts change colour with every upgrade you pick
+  const n = upgrades.filter(u => u !== 'laser').length, col = n ? MOON_COLORS[Math.min(n, 8) - 1] : 0x4aa8ff;
+  if (n && !moonMats[n]) moonMats[n] = new THREE.MeshBasicMaterial({ map: TEX.moonW, color: col });
+  const mesh = new THREE.Mesh(ballGeo, od ? ballMatOD : n ? moonMats[n] : ballMat);
   mesh.scale.setScalar(r); mesh.position.copy(from); scene.add(mesh);
-  const glow = MD.glowSprite(od ? 0x9a8cff : 0x4aa8ff, r * 6, 0.9); glow.position.copy(from); scene.add(glow);
+  const glow = MD.glowSprite(od ? 0x9a8cff : col, r * 6, 0.9); glow.position.copy(from); scene.add(glow);
   const vel = new THREE.Vector3().subVectors(target, from).normalize().multiplyScalar(58);
   balls.push({ mesh, glow, pos: from.clone(), vel, r, dmg, life: 2.2 });
 }
@@ -441,9 +506,24 @@ function updateBalls(dt) {
   }
   balls = balls.filter(b => !b.dead);
 }
+function bossDown(id) {
+  score = addScore({ vrax: 5000, emperor: 10000, patient: 8000 }[id], score);
+  unlockBadge(id);
+  if (G.settings.diff === 2) unlockBadge('commander');
+}
 function hurt(dmg) {
   if (P.dead || P.invT > 0 || phase === 'clear' || phase === 'ending' || window.__AA?.god) return;
-  P.armor -= dmg; P.invT = 0.3; P.hurtT = 0.6;
+  dmg *= DIFFS[G.settings.diff].hurt;
+  if (P.block) {
+    // the left arm takes the hit
+    dmg *= 0.25; sfx.clink(); P.blockFlash = 0.25;
+    PROG.blocks++; if (PROG.blocks >= 10) unlockBadge('block10');
+    AP.hand.getWorldPosition(tmp); fx.burst(tmp, 0xffe0a0, 16, 6, 0.3, -4);
+  } else if (P.arm > 0) {
+    P.arm = Math.max(0, P.arm - dmg * 1.6);
+    if (P.arm <= 0) { sfx.crack(); H.bark('patch', 'Your left arm is broken! You cannot block until I fix it! Press {FIX}!', 1.8); }
+  }
+  P.armor -= dmg; P.invT = 0.3; P.hurtT = 0.6; P.tookHit = true;
   G.shake = Math.max(G.shake, 0.35);
   P.cracks.push(H.makeCrack(dmg / 10));
   if (P.cracks.length > 18) P.cracks.shift();
@@ -462,11 +542,11 @@ function tryRepair() {
     if (patchMsgT <= 0) { H.bark('patch', `Still recharging! ${Math.ceil(P.repairCD)} more seconds!`, 1); patchMsgT = 4; }
     return;
   }
-  if (P.armor >= P.max) {
+  if (P.armor >= P.max && P.arm >= 100) {
     if (patchMsgT <= 0) { H.bark('patch', 'You are fine! Not a scratch! Well, a few scratches.', 1.2); patchMsgT = 4; }
     return;
   }
-  P.armor = Math.min(P.max, P.armor + 40);
+  P.armor = Math.min(P.max, P.armor + 40); P.arm = 100;
   P.cracks.splice(0, Math.ceil(P.cracks.length * 0.6));
   P.repairCD = has('turbo') ? 20 : 40; P.repairAnim = 1.8; P.lowWarned = false;
   sfx.repair(); H.bark('patch', pick(PATCH_REPAIR), 1.4);
@@ -487,11 +567,17 @@ function updateCamera(dt) {
   P.recoil = Math.max(0, P.recoil - dt * 8);
   AP.R.position.set(1.25 + Math.sin(G.time * 2) * 0.02, -1.15 + Math.sin(G.time * 1.6) * 0.025 - P.vy * 0.008, -0.1 + P.recoil * 0.4);
   AP.R.rotation.x = 0.1 + P.recoil * 0.06;
-  AP.L.position.set(-1.3, -1.08 + Math.sin(G.time * 1.6 + 1) * 0.025 - P.vy * 0.008, -0.1);
+  // left arm: raised to block, drooping when broken
+  const blk = P.block ? 1 : 0;
+  P.blockK = damp(P.blockK || 0, blk, 14, dt);
+  const bk = P.blockK, broken = P.arm <= 0;
+  AP.L.position.set(-1.3 + bk * 0.75, -1.08 + bk * 0.7 + Math.sin(G.time * 1.6 + 1) * 0.025 - P.vy * 0.008 - (broken ? 0.25 : 0), -0.1 + bk * 0.3);
+  AP.L.rotation.set(0.16 + bk * 0.75 - (broken ? 0.5 : 0), -0.16 - bk * 0.75, bk * 0.5 + (broken ? 0.3 : 0));
+  if (broken && Math.random() < 0.3) { AP.hand.getWorldPosition(tmp); fx.spawn(tmp.x, tmp.y, tmp.z, rnd(-1, 1), rnd(0, 2), rnd(-1, 1), pick([0xffe080, 0x55c8ff]), 0.3, -8); }
   const odOn = P.odT > 0, ringCol = odOn ? (Math.floor(G.time * 12) % 2 ? 0xffffff : 0x9a8cff) : 0x33aaff;
   for (const r of AP.rings) r.material.color.setHex(ringCol);
   AP.tip.material.color.setHex(P.cool > 0.05 ? 0xbfe8ff : ringCol);
-  AP.wrist.material.color.setHex(P.repairCD <= 0 ? 0x39ff6a : 0xff7a00);
+  AP.wrist.material.color.setHex(P.arm <= 0 ? 0xff2020 : P.repairCD <= 0 ? 0x39ff6a : 0xff7a00);
   for (const f of AP.fingers) f.rotation.x = -0.25 - (P.hurtT > 0 ? 0.5 : 0) - Math.sin(G.time * 1.2) * 0.05;
   L.muzzle.intensity = Math.max(0, L.muzzle.intensity - dt * 30);
 }
@@ -600,7 +686,7 @@ function spawnEnemy(type, o = {}) {
   const g = make();
   scene.add(g);
   const e = { type, g, P: g.userData.parts, hit: g.userData.hit, t: rnd(0, 5), st: 'enter', stT: 0, flash: 0, dead: false, alpha: 1, ws: null };
-  e.hp = e.max = { zippit: 3, bruteclaw: 26, voidfly: 2, riftstalker: 6, soldier: 4, bug: 5, plant: 4, swamp: 6, mutant: 6 }[type];
+  e.hp = e.max = { zippit: 3, bruteclaw: 26, voidfly: 2, riftstalker: 6, soldier: 4, bug: 5, plant: 4, swamp: 6, mutant: 6 }[type] * DIFFS[G.settings.diff].hp;
   e.x = o.x ?? (inJungle ? rnd(-7, 7) : rnd(-3.5, 3.5)); e.z = o.z ?? (inJungle ? rnd(-62, -50) : rnd(-26, -22)); e.y = type === 'voidfly' ? rnd(3, 4.5) : 0;
   const side = Math.random() < 0.5 ? -1 : 1;
   if (type === 'soldier') { e.tx = rnd(-7, 7); e.tz = rnd(-24, -14); e.fireT = rnd(1, 2); }
@@ -837,6 +923,9 @@ function killEnemy(e, quiet) {
   debris.burst(c, ENEMY_COLORS[e.type], big ? 12 : 6, big ? 8 : 6, big ? 0.45 : 0.25);
   if (quiet) return;
   kills++;
+  score = addScore(POINTS[e.type] || 100, score);
+  PROG.kills++; if (PROG.kills % 10 === 0) saveProg();
+  unlockBadge('first'); if (PROG.kills >= 100) unlockBadge('goo100');
   P.od = Math.min(100, P.od + ({ zippit: 6, voidfly: 8, bruteclaw: 25, riftstalker: 18, soldier: 8, bug: 10, plant: 8, swamp: 15, mutant: 12 }[e.type] || 8));
   if (big) sfx.bigkill(); else sfx.kill();
   if (big) G.shake = Math.max(G.shake, 0.4);
@@ -1029,7 +1118,7 @@ function spawnPatient() {
   const mats = [];
   g.traverse(m => { if (m.material && m.material.emissive) { mats.push(m.material); m.material.userData.e0 = m.material.emissive.getHex(); } });
   boss = {
-    type: 'patient', name: 'PATIENT ZERO', g, Pt: g.userData.parts, hit: g.userData.hit, hp: 300, max: 300,
+    type: 'patient', name: 'PATIENT ZERO', g, Pt: g.userData.parts, hit: g.userData.hit, hp: 300 * DIFFS[G.settings.diff].hp, max: 300 * DIFFS[G.settings.diff].hp,
     x: 0, z: -70, y: 0, st: 'enter', stT: 0, seq: 0, tx: 0, flash: 0, mats, ready: false, said: {}, t: 0, podOpen: 0, extra: [], hitBall: patientHit,
   };
   sfx.roar();
@@ -1048,7 +1137,7 @@ function patientHit(b) {
     if (!core && !e.said.armor && e.ready) { e.said.armor = 1; H.bark('patch', 'It barely felt that! Wait for it to scream, then hit the parasite!', 1.4); }
     if (e.hp <= e.max * 0.5 && !e.said.half) { e.said.half = 1; H.say('nova', 'It is weakening! Keep hitting the parasite!', 1.2); }
     if (e.hp <= 0) {
-      e.hp = 0; e.st = 'dying'; e.stT = 4; sfx.roar(); sfx.scream(); playMusic(null);
+      e.hp = 0; e.st = 'dying'; e.stT = 4; sfx.roar(); sfx.scream(); playMusic(null); bossDown('patient');
       hazards.forEach(h => (h.t = 0)); for (const s of shots) removeShot(s); shots = [];
       for (const en of enemies) killEnemy(en, true);
     }
@@ -1286,7 +1375,7 @@ function spawnVrax() {
   const mats = [];
   g.traverse(m => { if (m.material && m.material.emissive) { mats.push(m.material); m.material.userData.e0 = m.material.emissive.getHex(); } });
   boss = {
-    type: 'vrax', name: 'GENERAL VRAX', g, Pt: g.userData.parts, hit: g.userData.hit, hp: 220, max: 220,
+    type: 'vrax', name: 'GENERAL VRAX', g, Pt: g.userData.parts, hit: g.userData.hit, hp: 220 * DIFFS[G.settings.diff].hp, max: 220 * DIFFS[G.settings.diff].hp,
     x: 0, z: -30, st: 'enter', stT: 0, seq: 0, tx: 0, flash: 0, mats, ready: false, said: {}, t: 0, count: 0,
     hitBall: vraxHit,
   };
@@ -1306,7 +1395,7 @@ function vraxHit(b) {
     P.od = Math.min(100, P.od + 0.8);
     if (v.hp <= v.max * 0.66 && !v.said.a) { v.said.a = 1; H.say('vrax', 'You scratched my armour! Unforgivable!', 1.4); }
     if (v.hp <= v.max * 0.33 && !v.said.b) { v.said.b = 1; H.say('vrax', 'Impossible! I am GENERAL VRAX!', 1.2); H.say('unit', 'And I am still here.', 1.2); }
-    if (v.hp <= 0) { v.hp = 0; v.st = 'dying'; v.stT = 3; sfx.roar(); hazards.forEach(h => (h.t = 0)); for (const e of enemies) killEnemy(e, true); playMusic(null); }
+    if (v.hp <= 0) { bossDown('vrax'); v.hp = 0; v.st = 'dying'; v.stT = 3; sfx.roar(); hazards.forEach(h => (h.t = 0)); for (const e of enemies) killEnemy(e, true); playMusic(null); }
     return true;
   }
   return false;
@@ -1451,7 +1540,7 @@ function spawnEmperor() {
   const mats = [];
   g.traverse(m => { if (m.material && m.material.emissive) { mats.push(m.material); m.material.userData.e0 = m.material.emissive.getHex(); } });
   boss = {
-    type: 'emperor', name: 'THE NULL EMPEROR', g, Pt: g.userData.parts, hit: g.userData.hit, hp: 260, max: 260,
+    type: 'emperor', name: 'THE NULL EMPEROR', g, Pt: g.userData.parts, hit: g.userData.hit, hp: 260 * DIFFS[G.settings.diff].hp, max: 260 * DIFFS[G.settings.diff].hp,
     st: 'rise', stT: 6, seq: 0, flash: 0, mats, ready: false, said: {}, t: 0, coreOpen: 0, count: 0, extra: [], hitBall: emperorHit,
   };
   sfx.alarm();
@@ -1482,7 +1571,7 @@ function emperorHit(b) {
       P.od = Math.min(100, P.od + 0.8);
       if (e.hp <= e.max * 0.5 && !e.said.half) { e.said.half = 1; H.say('emperor', 'You DARE wound me? I will unmake you!', 1.4); }
       if (e.hp <= 0) {
-        e.hp = 0; e.st = 'dying'; e.stT = 4.5; e.coreOpen = 99; sfx.roar(); playMusic(null);
+        e.hp = 0; e.st = 'dying'; e.stT = 4.5; e.coreOpen = 99; sfx.roar(); playMusic(null); bossDown('emperor');
         hazards.forEach(h => (h.t = 0)); for (const s of shots) removeShot(s); shots = [];
         for (const en of enemies) killEnemy(en, true);
       }
@@ -1687,6 +1776,7 @@ function openUpgrades() {
 }
 function chooseUpgrade(i) {
   upgrades.push(upChoices[i].id);
+  if (upChoices[i].id === 'laser') unlockBadge('laser');
   sfx.overdrive();
   G.hud.style.cursor = 'none';
   startMission(mi + 1);
@@ -1697,8 +1787,22 @@ function startEnding() {
   if (M.chapter === 2) clearSave(); else writeSave({ mission: 7, upgrades });
   playMusic('calm');
   for (const [who, s] of M.chapter === 2 ? ENDING2 : ENDING) H.say(who, s, 2);
+  // Commander Nova comes to the rescue in person
+  if (M.chapter !== 2) {
+    nova = shadows(J.makeNova()); nova.scale.setScalar(1.45);
+    nova.position.set(0, 0, -16); scene.add(nova);
+  }
 }
-function updateEnding() {
+function updateEnding(dt) {
+  if (nova) {
+    const N = nova.userData.parts, walk = nova.position.z < 3;
+    if (walk) nova.position.z += dt * 3;
+    nova.rotation.y = 0;
+    N.legs[0].rotation.x = walk ? Math.sin(G.time * 8) * 0.5 : 0; N.legs[1].rotation.x = walk ? -Math.sin(G.time * 8) * 0.5 : 0;
+    N.arms[1].rotation.set(walk ? Math.sin(G.time * 8) * 0.4 : -2.6 + Math.sin(G.time * 6) * 0.2, 0, walk ? 0 : 0.5);
+    N.arms[0].rotation.x = walk ? -Math.sin(G.time * 8) * 0.4 : -1.2;
+    N.holo.material.opacity = 0.4 + Math.sin(G.time * 9) * 0.15;
+  }
   if (!H.dialogBusy() && phaseT > 3) { phase = 'credits'; phaseT = 0; creditY = 0; }
 }
 
@@ -1783,6 +1887,15 @@ function drawHUD(dt) {
   H.bar(rx, by, bw, 16, P.odT > 0 ? P.odT / (8 + (has('capacitor') ? 4 : 0)) : P.od / 100, P.odT > 0 ? '#ffffff' : '#9a6cff');
   const rr = P.repairCD <= 0;
   H.text(rr ? (isTouch ? 'PATCH REPAIR READY' : 'PATCH REPAIR READY [Q]') : `PATCH REPAIR ${Math.ceil(P.repairCD)}`, isTouch ? ax : ax, by + 30, fs - 1, rr ? '#39ff6a' : '#ff9a3c', 'left');
+  // left arm health (for blocking)
+  if (P.arm <= 0) H.text(Math.floor(t * 3) % 2 ? 'LEFT ARM BROKEN - NEED REPAIR' : '', ax, by + 48, fs - 1, '#ff4040', 'left');
+  else { H.text(P.block ? 'BLOCKING!' : isTouch ? 'ARM' : 'ARM [S]', ax, by + 48, fs - 1, P.block ? '#ffe14a' : '#9fdcff', 'left'); H.bar(ax + (small ? 52 : 80), by + 42, small ? 60 : 90, 10, P.arm / 100, P.arm > 40 ? '#9fdcff' : '#ff9a3c'); }
+  // weapon and laser heat
+  if (has('laser')) {
+    H.text(P.weapon === 2 ? (isTouch ? 'LASER' : 'LASER [2]') : (isTouch ? 'MOON BLASTER' : 'MOON BLASTER [1]'), rx, by + 30, fs - 1, P.weapon === 2 ? '#ffa040' : '#7fe3ff', 'left');
+    if (P.weapon === 2) H.bar(rx, by + 42, bw, 10, P.overheat > 0 ? 1 : P.heat, P.overheat > 0 ? '#ff3030' : '#ffa040');
+  }
+  if (P.blockFlash > 0) { P.blockFlash -= dt; c.strokeStyle = `rgba(255,230,140,${P.blockFlash * 3})`; c.lineWidth = 8; c.strokeRect(4, 4, W - 8, Hh - 8); }
   // boss bar
   if (boss && boss.ready) {
     const w = Math.min(520, W - (isTouch ? 160 : 40)), x0 = (W - w) / 2, y0 = isTouch ? 140 : 62;
@@ -1793,6 +1906,8 @@ function drawHUD(dt) {
     if (boss.type === 'emperor') tag = boss.coreOpen > 0 ? 'CORE EXPOSED!' : 'CORE ARMOURED';
     if (tag) H.text(tag, W / 2, y0 + 28, small ? 8 : 10, boss.coreOpen > 0 || boss.st === 'exhausted' ? '#ffe14a' : '#9a9ab0');
   }
+  H.text(`SCORE ${score}`, W - 18, 22, fs + 1, '#ffe14a', 'right');
+  drawToast(dt);
   H.drawScan(dt, isTouch ? 196 : 84);
   H.drawWarn(dt);
   H.drawDialog(isTouch ? Hh - 182 : Hh - 84);

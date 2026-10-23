@@ -9,7 +9,7 @@ export const GFX = [
 
 export const G = {
   w: 1, h: 1, dpr: 1, time: 0, mode: 'title',
-  settings: { music: 6, sfx: 8, gfx: isTouch ? 1 : 0, hints: true },
+  settings: { music: 6, sfx: 8, gfx: isTouch ? 1 : 0, hints: true, diff: 1 },
   keys: {}, pressed: {},
   mouse: { x: 0, y: 0, nx: 0, ny: 0, down: false, pid: null, moved: false },
   cameras: [], shake: 0,

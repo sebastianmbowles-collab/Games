@@ -4,18 +4,20 @@ import { sfx, playMusic, applyVolumes } from './audio.js';
 import { TEX } from './textures.js';
 import * as MD from './models.js';
 import { Particles } from './fx.js';
-import { CREDITS } from './data.js';
+import { CREDITS, DIFFS } from './data.js';
 import * as H from './hud.js';
+import { PROG, SKINS, BADGES, saveProg, tagSkin, applySkin, drawToast } from './progress.js';
 
 let scene, camera, composer, unit, UP, patch, PP, fx, smoke, embers, hemi, flashLight, scanBeam, spot;
-let beams = [], fogs = [], logoT = 0;
+let beams = [], fogs = [], logoT = 0, pow = 1, powT = 0;
 let brute, vrax, voidfly, zippits = [], asteroids = [], ships = [], bolts = [], booms = [], fires = [], bigShip;
 let t = 0, menu = 'main', sel = 0, setSel = 0, rects = [], lastMX = -1, lastMY = -1;
 let lightningT = 3, flick = 0, boltMesh = null, boltT = 0, startT = 0, creditY = 0, quitT = 0, showControls = false;
 const CAM0 = new THREE.Vector3(0, 3.4, 12.5), LOOK0 = new THREE.Vector3(0, 6.4, 0);
 const UPV = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3();
 
-const MAIN = ['PLAY', 'CONTINUE', 'SETTINGS', 'CREDITS', 'QUIT'];
+const MAIN = ['PLAY', 'CONTINUE', 'LOCKER', 'SETTINGS', 'CREDITS', 'QUIT'];
+let lockSel = 0;
 
 function makeShip(scale, lights = 0x39ff6a) {
   const g = new THREE.Group();
@@ -130,6 +132,7 @@ export function buildTitle() {
 
   // UNIT-07, center stage
   unit = shadows(MD.makeUnit07()); UP = unit.userData.parts; scene.add(unit);
+  tagSkin(unit);
   // Patch floating beside it
   patch = shadows(MD.makePatch()); PP = patch.userData.parts; patch.scale.setScalar(1.7); patch.position.set(-3.4, 6.2, 2.2); scene.add(patch);
   scanBeam = MD.mesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), MD.addGlow(0x33bbff, 0.5), 0, 0, 0, scene);
@@ -179,7 +182,10 @@ function resetBolt(b, anywhere) {
 
 export const Title = {
   enter() {
-    menu = 'main'; sel = 0; t = 0; startT = 0; logoT = 0;
+    applySkin(0);
+    // the very first time, UNIT-07 is switched off until you press COMMENCE MISSION
+    menu = G.commenced ? 'main' : 'press'; pow = G.commenced ? 1 : 0;
+    sel = 0; t = 0; startT = 0; logoT = 0;
     camera.position.copy(CAM0); camera.fov = 55; camera.userData.baseFov = 55; resize();
     bigShip.visible = false;
     UP.armR.rotation.set(-0.55, 0, 0.12); UP.foreR.rotation.x = -0.9;
@@ -187,12 +193,16 @@ export const Title = {
     G.hud.style.cursor = 'default';
     if (!loadSave() && sel === 1) sel = 0;
   },
+  // after the lab cutscene: straight into the launch (raise blaster, zoom to the ship)
+  launch() { menu = 'start'; startT = 0; pow = 1; G.commenced = true; },
   update(dt) {
     t += dt;
     animate(dt);
+    if (PROG.skin === 'rainbow') applySkin(t);
     input();
     composer.render();
     draw(dt);
+    drawToast(dt);
   },
 };
 
@@ -214,8 +224,17 @@ function animate(dt) {
   // UNIT-07 idle: breathing, visor pulse, sparks
   UP.torso.rotation.y = Math.sin(t * 0.7) * 0.04;
   UP.head.rotation.y = Math.sin(t * 0.5) * 0.12;
-  UP.visor.material.color.setHSL(0.55, 1, 0.55 + Math.sin(t * 3) * 0.1);
-  UP.tip.visible = Math.sin(t * 5) > -0.3;
+  if (menu === 'powerup') {
+    powT += dt;
+    pow = powT < 1.3 ? (Math.random() < 0.55 ? 1 : 0.08) * smooth(powT / 1.3) : 1;
+    if (powT > 1.3 && powT - dt <= 1.3) { sfx.overdrive(); for (let i = 0; i < 80; i++) fx.spawn(0, 4.8, 0.6, rnd(-6, 6), rnd(-2, 6), rnd(-1, 6), pick([0x55c8ff, 0xffffff, 0x2a7cff]), rnd(0.5, 1.1), -5); }
+    if (powT > 1.9) { menu = 'main'; logoT = 1.1; G.commenced = true; }
+  }
+  UP.visor.material.color.setHSL(0.55, 1, 0.03 + pow * (0.52 + Math.sin(t * 3) * 0.1));
+  UP.core.material.color.setHSL(0.6, 1, 0.04 + pow * 0.5);
+  UP.tip.visible = pow > 0.5 && Math.sin(t * 5) > -0.3;
+  UP.head.rotation.x = damp(UP.head.rotation.x, (1 - pow) * 0.45, 6, dt);
+  UP.torso.rotation.x = damp(UP.torso.rotation.x, (1 - pow) * 0.12, 6, dt);
   if (Math.random() < 0.5) {
     const s = pick([[-1.4, 3.9, 0.2], [1.4, 3.9, 0.2], [0, 4.8, 0.5], [-1.4, 2.6, 0.2], [0.6, 1.5, 0.4], [1.6, 2.2, 0.6]]);
     tmp.set(s[0] + rnd(-0.3, 0.3), s[1] + rnd(-0.3, 0.3), s[2]);
@@ -332,13 +351,13 @@ function startAnim(dt) {
 }
 
 // ===== Menus =====
-const INFO = ['Start a new game.', 'Continue your previous adventure.', 'Adjust sound, graphics, and controls.', 'See who created the game.', 'Leave the game.'];
+const INFO = ['Start a new game.', 'Continue your previous adventure.', 'Pick a skin and see your badges.', 'Adjust sound, graphics, and controls.', 'See who created the game.', 'Leave the game.'];
 let barY = -1;
 function drawMainMenu(c, W, Hh, small, k) {
   const save = loadSave();
   const size = small ? 14 : 18, gap = small ? 38 : 46;
   const pw = small ? Math.min(W - 40, 300) : 300, px = small ? (W - pw) / 2 : Math.max(40, W * 0.07);
-  const py = small ? Hh - gap * 5 - 70 : Hh * 0.45, ph = gap * 5 + 58;
+  const py = small ? Hh - gap * 6 - 70 : Hh * 0.42, ph = gap * 6 + 58;
   const slide = (1 - k) * -340;
   c.save(); c.translate(slide, 0);
   // glass panel
@@ -364,6 +383,39 @@ function drawMainMenu(c, W, Hh, small, k) {
   H.text(info, px + 16, py + ph - 16, small ? 8 : 9, '#9fdcff', 'left', { stroke: false, max: pw - 24 });
   c.restore();
   if (!small) H.text('ARROWS + ENTER, OR CLICK', W - 20, Hh - 18, 9, '#8a96b0', 'right');
+  if (PROG.high) H.text(`HIGH SCORE ${PROG.high}`, small ? W / 2 : W - 20, small ? 16 : Hh - 38, 9, '#ffe14a', small ? 'center' : 'right');
+}
+function drawLocker(c, W, Hh, small) {
+  H.fade(0.45);
+  const pw = Math.min(980, W - 20), ph = Math.min(Hh - 30, 560), px = (W - pw) / 2, py = (Hh - ph) / 2;
+  H.panel(px, py, pw, ph);
+  H.text('LOCKER', W / 2, py + 26, small ? 14 : 18, '#7fe3ff');
+  H.text(`HIGH SCORE ${PROG.high}`, W / 2, py + 50, small ? 8 : 10, '#ffe14a', 'center', { stroke: false });
+  const colW = small ? pw - 30 : pw * 0.42, sx = px + 16, size = small ? 9 : 11, gap = small ? 26 : 34;
+  H.text('SKINS', sx, py + 80, size, '#9fdcff', 'left', { stroke: false });
+  rects = [];
+  SKINS.forEach((s, i) => {
+    const y = py + 104 + i * gap, own = PROG.skins.includes(s.id), on = i === lockSel, eq = PROG.skin === s.id;
+    if (on) { c.fillStyle = 'rgba(80,190,255,0.3)'; c.fillRect(sx - 6, y - gap / 2 + 2, colW, gap - 4); }
+    c.fillStyle = own ? '#' + s.metal.toString(16).padStart(6, '0') : '#333a48'; c.fillRect(sx, y - 7, 14, 14);
+    H.text(own ? s.name : 'LOCKED', sx + 24, y, size, own ? (eq ? '#ffe14a' : '#ffffff') : '#5a6278', 'left', { stroke: false });
+    H.text(eq ? 'EQUIPPED' : own ? '' : s.how, sx + colW - 16, y, small ? 7 : 8, eq ? '#ffe14a' : '#7a86a0', 'right', { stroke: false, max: colW * 0.5 });
+    rects.push({ x: sx - 6, y: y - gap / 2, w: colW, h: gap, i });
+  });
+  if (!small) {
+    const bx = px + pw * 0.48;
+    H.text(`BADGES  ${PROG.badges.length} / ${BADGES.length}`, bx, py + 80, size, '#9fdcff', 'left', { stroke: false });
+    BADGES.forEach((b, i) => {
+      const y = py + 104 + i * 36, got = PROG.badges.includes(b.id);
+      c.fillStyle = got ? '#ffe14a' : '#2a3040';
+      c.beginPath(); for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2 - Math.PI / 2, r = k % 2 ? 4 : 9; c.lineTo(bx + 9 + Math.cos(a) * r, y + Math.sin(a) * r); } c.fill();
+      H.text(b.name, bx + 26, y - 6, 10, got ? '#ffffff' : '#5a6278', 'left', { stroke: false });
+      H.text(b.how, bx + 26, y + 8, 8, got ? '#9fdcff' : '#4a5468', 'left', { stroke: false, max: pw * 0.48 });
+    });
+  }
+  const by = py + ph - 30;
+  H.text('BACK', W / 2, by, size, lockSel === SKINS.length ? '#7fe3ff' : '#ffffff');
+  rects.push({ x: W / 2 - 60, y: by - 16, w: 120, h: 32, i: SKINS.length });
 }
 function settingsItems() {
   const s = G.settings;
@@ -372,6 +424,7 @@ function settingsItems() {
     { label: `SOUND FX  < ${s.sfx} >` },
     { label: `GRAPHICS  < ${GFX[s.gfx].name} >` },
     { label: `HINTS  < ${s.hints ? 'ON' : 'OFF'} >` },
+    { label: `DIFFICULTY  < ${DIFFS[s.diff].name} >` },
     { label: 'CONTROLS' },
     { label: 'BACK' },
   ];
@@ -382,17 +435,19 @@ function adjust(i, d) {
   if (i === 1) s.sfx = clamp(s.sfx + d, 0, 10);
   if (i === 2) { s.gfx = (s.gfx + d + GFX.length) % GFX.length; applyQuality(G.scenes); }
   if (i === 3) s.hints = !s.hints;
+  if (i === 4) s.diff = (s.diff + d + DIFFS.length) % DIFFS.length;
   applyVolumes(); saveSettings(); sfx.ui();
 }
 function activate(i) {
   const save = loadSave();
   if (i === 1 && !save) return;
   sfx.select();
-  if (i === 0) { menu = 'start'; startT = 0; }
-  if (i === 1) G.goGame(save.mission, { upgrades: save.upgrades || [] });
-  if (i === 2) { menu = 'settings'; setSel = 0; showControls = false; }
-  if (i === 3) { menu = 'credits'; creditY = 0; playMusic('calm'); }
-  if (i === 4) { menu = 'quit'; quitT = 0; playMusic(null); try { window.close(); } catch (e) { /* browsers may refuse */ } }
+  if (i === 0) { G.goCut(); return; }
+  if (i === 1) G.goGame(save.mission, { upgrades: save.upgrades || [], score: save.score || 0 });
+  if (i === 2) { menu = 'locker'; lockSel = Math.max(0, SKINS.findIndex(s => s.id === PROG.skin)); }
+  if (i === 3) { menu = 'settings'; setSel = 0; showControls = false; }
+  if (i === 4) { menu = 'credits'; creditY = 0; playMusic('calm'); }
+  if (i === 5) { menu = 'quit'; quitT = 0; playMusic(null); try { window.close(); } catch (e) { /* browsers may refuse */ } }
 }
 function input() {
   const pr = G.pressed, m = G.mouse;
@@ -401,6 +456,10 @@ function input() {
   const up = pr.arrowup || pr.w, down = pr.arrowdown || pr.s, ok = pr.enter || pr.space;
   const left = pr.arrowleft || pr.a, right = pr.arrowright || pr.d;
   const hit = H.hitRect(rects, m.x, m.y);
+  if (menu === 'press') {
+    if (ok || pr.click || pr.tap) { menu = 'powerup'; powT = 0; sfx.power(); sfx.robot(); }
+    return;
+  }
   if (menu === 'main') {
     const can = i => i !== 1 || !!loadSave();
     if (down) { do sel = (sel + 1) % MAIN.length; while (!can(sel)); sfx.ui(); }
@@ -410,17 +469,30 @@ function input() {
     if (pr.click && hit && !hit.off) activate(hit.i);
   } else if (menu === 'settings') {
     if (showControls) { if (ok || pr.click || pr.escape) { showControls = false; sfx.ui(); } return; }
-    const n = 6;
+    const n = 7;
     if (down) { setSel = (setSel + 1) % n; sfx.ui(); }
     if (up) { setSel = (setSel + n - 1) % n; sfx.ui(); }
     if (hit && moved && hit.i !== setSel) { setSel = hit.i; sfx.ui(); }
-    if (left && setSel < 4) adjust(setSel, -1);
-    if (right && setSel < 4) adjust(setSel, 1);
+    if (left && setSel < 5) adjust(setSel, -1);
+    if (right && setSel < 5) adjust(setSel, 1);
     const pickIt = i => {
-      if (i === 4) { showControls = true; sfx.select(); } else if (i === 5) { menu = 'main'; sfx.select(); } else adjust(i, m.x < G.w / 2 ? -1 : 1);
+      if (i === 5) { showControls = true; sfx.select(); } else if (i === 6) { menu = 'main'; sfx.select(); } else adjust(i, m.x < G.w / 2 ? -1 : 1);
     };
     if (ok) pickIt(setSel);
     if (pr.click && hit) { setSel = hit.i; pickIt(hit.i); }
+    if (pr.escape) menu = 'main';
+  } else if (menu === 'locker') {
+    const n = SKINS.length;
+    if (down) { lockSel = (lockSel + 1) % n; sfx.ui(); }
+    if (up) { lockSel = (lockSel + n - 1) % n; sfx.ui(); }
+    if (hit && moved && hit.i < n && hit.i !== lockSel) { lockSel = hit.i; sfx.ui(); }
+    const equip = i => {
+      if (i === n) { menu = 'main'; sfx.select(); return; }
+      if (!PROG.skins.includes(SKINS[i].id)) { sfx.hurt(); return; }
+      PROG.skin = SKINS[i].id; saveProg(); applySkin(t); sfx.select();
+    };
+    if (ok) equip(lockSel);
+    if (pr.click && hit) equip(hit.i);
     if (pr.escape) menu = 'main';
   } else if (menu === 'credits') {
     if (ok || pr.click || pr.escape) { menu = 'main'; playMusic('title'); }
@@ -458,7 +530,18 @@ function draw(dt) {
   const g = c.createLinearGradient(0, 0, 0, Hh);
   g.addColorStop(0, 'rgba(0,0,0,0.35)'); g.addColorStop(0.35, 'rgba(0,0,0,0)'); g.addColorStop(0.75, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
   c.fillStyle = g; c.fillRect(0, 0, W, Hh);
-  if (menu === 'main') {
+  if (menu === 'press' || menu === 'powerup') {
+    H.drawLogo(W / 2, 4 + Math.sin(t * 1.3) * 3, Math.min(W * 0.92, 760), menu === 'powerup' ? Math.random() : flick, { shine: ((t - 0.5) % 4.5) / 1.2 });
+    rects = [];
+    if (menu === 'press') {
+      // the COMMENCE MISSION button
+      const bw = Math.min(W - 40, 440), bh = small ? 54 : 64, bx = (W - bw) / 2, by = Hh * 0.8 - bh / 2, a = 0.55 + Math.sin(t * 4) * 0.35;
+      c.fillStyle = `rgba(20,60,120,${0.35 + a * 0.3})`; c.fillRect(bx, by, bw, bh);
+      c.strokeStyle = `rgba(127,227,255,${a})`; c.lineWidth = 3; c.strokeRect(bx + 1.5, by + 1.5, bw - 3, bh - 3);
+      H.text('COMMENCE MISSION', W / 2, by + bh / 2, small ? 16 : 24, '#ffffff', 'center', { glow: '#2a9dff', max: bw - 20 });
+      H.text(isTouch ? 'TAP TO POWER UP UNIT-07' : 'PRESS ENTER OR CLICK TO POWER UP UNIT-07', W / 2, by + bh + 22, small ? 8 : 10, '#9fdcff', 'center', { stroke: false });
+    } else if (powT > 1.3) H.fade((1.9 - powT) * 1.5, '120,200,255');
+  } else if (menu === 'main') {
     // logo drops in, then floats, with a shine sweep every few seconds
     logoT += dt;
     const k = smooth(logoT / 1.1), lw = Math.min(W * 0.92, 760) * (1.25 - 0.25 * k);
@@ -466,20 +549,22 @@ function draw(dt) {
     drawMainMenu(c, W, Hh, small, k);
   } else if (menu === 'settings') {
     H.fade(0.35);
-    const pw = Math.min(560, W - 24), ph = 360, px = (W - pw) / 2, py = (Hh - ph) / 2;
+    const pw = Math.min(560, W - 24), ph = 420, px = (W - pw) / 2, py = (Hh - ph) / 2;
     H.panel(px, py, pw, ph);
     H.text('SETTINGS', W / 2, py + 30, small ? 14 : 18, '#7fe3ff');
     if (showControls) {
       rects = [];
       const L = isTouch
-        ? ['TOUCH + HOLD: AIM AND FIRE', 'DASH BUTTONS: DODGE SIDEWAYS', 'JUMP: JUMP OVER SHOCKWAVES', 'OVERDRIVE: POWER UP (WHEN FULL)', 'FIX: PATCH REPAIRS YOU', 'II: PAUSE']
-        : ['MOUSE: AIM     HOLD CLICK: FIRE', 'A / D: DASH LEFT / RIGHT', 'SPACE or W: JUMP', 'SHIFT or E: OVERDRIVE', 'Q: PATCH EMERGENCY REPAIR', 'P or ESC: PAUSE     ENTER: SKIP TALKING'];
-      L.forEach((s, i) => H.text(s, W / 2, py + 80 + i * 36, small ? 8 : 11, '#fff', 'center', { max: pw - 30 }));
+        ? ['TOUCH + HOLD: AIM AND FIRE', 'DASH BUTTONS: DODGE SIDEWAYS', 'JUMP: JUMP OVER SHOCKWAVES', 'BLOCK: RAISE YOUR LEFT ARM', 'OVERDRIVE: POWER UP (WHEN FULL)', 'FIX: PATCH REPAIRS YOU', 'WPN: SWITCH WEAPON   II: PAUSE']
+        : ['MOUSE: AIM     HOLD CLICK: FIRE', 'A / D: DASH LEFT / RIGHT', 'SPACE or W: JUMP', 'HOLD S: BLOCK WITH LEFT ARM', '1 / 2: MOON BLASTER / LASER', 'SHIFT or E: OVERDRIVE     Q: REPAIR', 'P or ESC: PAUSE     ENTER: SKIP TALKING'];
+      L.forEach((s, i) => H.text(s, W / 2, py + 76 + i * 40, small ? 8 : 11, '#fff', 'center', { max: pw - 30 }));
       H.text('PRESS ENTER OR CLICK', W / 2, py + ph - 28, 9, '#7fe3ff');
     } else {
       rects = H.menu(settingsItems(), setSel, W / 2, py + 86, small ? 11 : 14, 44);
       H.text(isTouch ? 'TAP LEFT OR RIGHT SIDE TO CHANGE' : 'LEFT / RIGHT TO CHANGE', W / 2, py + ph - 24, 8, '#8a96b0');
     }
+  } else if (menu === 'locker') {
+    drawLocker(c, W, Hh, small);
   } else if (menu === 'credits') {
     H.fade(0.55);
     rects = [];

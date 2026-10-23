@@ -168,6 +168,12 @@ export const SCANS = {
   emperor: { name: 'THE NULL EMPEROR', role: 'FINAL BOSS', info: 'Energy beams, explosive bombs, shockwaves. Special: RIFT COLLAPSE.', weak: 'CHEST CORE OPENS AFTER BIG ATTACKS', line: 'Scanning... Scanner says: RUN. I am ignoring the scanner.' },
 };
 
+// difficulty: how much damage you take, and how tough the aliens are
+export const DIFFS = [
+  { name: 'RECRUIT', hurt: 0.6, hp: 0.8 },
+  { name: 'SOLDIER', hurt: 1, hp: 1 },
+  { name: 'COMMANDER', hurt: 1.4, hp: 1.25 },
+];
 export const UPGRADES = [
   { id: 'rapid', name: 'RAPID CORE', desc: 'Fire 30% faster' },
   { id: 'heavy', name: 'HEAVY MOON', desc: 'Moon blasts do 50% more damage' },
@@ -176,6 +182,7 @@ export const UPGRADES = [
   { id: 'turbo', name: 'PATCH TURBO', desc: 'Emergency Repair recharges twice as fast' },
   { id: 'twin', name: 'TWIN MOONS', desc: 'Fire two moon blasts at once' },
   { id: 'big', name: 'FULL MOON', desc: 'Bigger moon blasts that are easier to hit with' },
+  { id: 'laser', name: 'PLASMA LASER', desc: 'A melting beam weapon. Press 2 for laser, 1 for moons' },
 ];
 
 export const PATCH_REPAIR = [
@@ -199,6 +206,26 @@ export const CHATTER = [
   ['unit', 'I would step aside, but my legs are busy being stuck.'],
   ['unit', 'Please form an orderly line. Thank you.'],
   ['patch', 'Keep going! You are doing great! I think!'],
+  ['patch', 'Fun fact: I am ninety percent screws and ten percent worry.'],
+  ['patch', 'Left! No, right! No, the other left!'],
+  ['patch', 'That one exploded into goo. I am naming it Gooey.'],
+  ['patch', 'Is it snack time? Robots do not eat. I just like asking.'],
+  ['patch', 'I scanned your aim. It is very good. I scanned my aim. It is very bad.'],
+  ['patch', 'If we survive this, I want a medal. A small one. Shiny.'],
+  ['patch', 'Your blaster is getting hot! That is normal! Probably!'],
+  ['patch', 'Commander Nova, are you watching? We are doing SO good.'],
+  ['unit', 'Patch. Less talking. More repairing.'],
+  ['unit', 'Target neutralised. Next.'],
+];
+// extra things Patch says only on the jungle planet
+export const CHATTER2 = [
+  ['patch', 'This jungle smells like old socks and bananas.'],
+  ['patch', 'Are we going too fast? I think we are going too fast!'],
+  ['patch', 'A bug landed on me. A HUGE bug. Get it off. GET IT OFF.'],
+  ['patch', 'Those mushrooms glow. Do not eat the glowing mushrooms.'],
+  ['patch', 'I can see the rails ahead. And teeth. Lots of teeth.'],
+  ['unit', 'Note to self: never ride a jungle roller coaster again.'],
+  ['patch', 'Wheee! I mean, oh no. I mean, wheee!'],
 ];
 
 export const ENDING2 = [
@@ -241,6 +268,10 @@ export const CREDITS = [
   ['', ''],
   ['NO ROBOTS WERE HARMED IN THE MAKING OF THIS GAME', ''],
   ['EXCEPT UNIT-07. A LOT.', ''],
+  ['', ''],
+  ['CHAPTER 2: THE JUNGLE PLANET', 'head'],
+  ['PATIENT ZERO .... VERY ANGRY FORMER COLONIST', ''],
+  ['THE UNKNOWN SCIENTIST .... ???', ''],
   ['', ''],
   ['THANKS FOR PLAYING!', 'head'],
 ];

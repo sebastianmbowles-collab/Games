@@ -285,3 +285,40 @@ export function makeLog() {
   return g;
 }
 export { addGlow };
+
+// ===== COMMANDER NOVA, in person (arrives at the end of chapter 1) =====
+export function makeNova() {
+  const g = new THREE.Group(), P = {};
+  const blue = lam(0x1f5fd6, { roughness: 0.5 }), white = lam(0xf0f6ff, { roughness: 0.4 }), skin = lam(0xc98d64, { roughness: 0.6 });
+  const hair = lam(0x2a1a12, { roughness: 0.8 }), boot = phong(0x1a1e2a);
+  P.legs = [];
+  for (const s of [-1, 1]) {
+    const L = group(s * 0.16, 0.95, 0, g); P.legs.push(L);
+    cyl(0.1, 0.09, 0.9, blue, 0, -0.45, 0, L, 10);
+    box(0.16, 0.12, 0.3, boot, 0, -0.9, 0.05, L);
+  }
+  const body = group(0, 0.95, 0, g); P.body = body;
+  box(0.48, 0.65, 0.28, blue, 0, 0.4, 0, body);
+  box(0.12, 0.6, 0.29, white, 0, 0.42, 0.005, body);
+  for (const s of [-1, 1]) box(0.14, 0.1, 0.3, white, s * 0.22, 0.72, 0, body);
+  ball(0.04, glow(0xffd24a), 0.14, 0.6, 0.15, body, 0);
+  cyl(0.06, 0.07, 0.12, skin, 0, 0.79, 0, body, 8);
+  const head = group(0, 1.0, 0, body); P.head = head;
+  ball(0.15, skin, 0, 0, 0, head).scale.set(0.9, 1.1, 0.95);
+  mesh(new THREE.SphereGeometry(0.16, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hair, 0, 0.02, -0.01, head);
+  for (const s of [-1, 1]) ball(0.02, glow(0x101010), s * 0.05, 0.02, 0.13, head, 0);
+  box(0.02, 0.12, 0.02, glow(0x33e0ff), 0.15, -0.02, 0.05, head);
+  P.arms = [];
+  for (const s of [-1, 1]) {
+    const a = group(s * 0.29, 0.68, 0, body); P.arms.push(a);
+    cyl(0.06, 0.05, 0.62, blue, 0, -0.31, 0, a, 8);
+    ball(0.05, skin, 0, -0.65, 0, a);
+    if (s < 0) {
+      box(0.1, 0.06, 0.14, white, 0, -0.5, 0.03, a);
+      const holo = mesh(new THREE.PlaneGeometry(0.3, 0.2), new THREE.MeshBasicMaterial({ color: 0x33e0ff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }), 0, -0.48, 0.2, a);
+      holo.rotation.x = -0.6; P.holo = holo;
+    }
+  }
+  g.userData.parts = P;
+  return g;
+}

@@ -43,6 +43,13 @@ export function makeTextures() {
       x.beginPath(); x.arc(cx + 0.5, cy + 0.5, r, Math.PI * 0.9, Math.PI * 1.9); x.stroke();
     }
   });
+  // a white moon that can be tinted any colour (moon blasts change colour with upgrades)
+  TEX.moonW = make(64, 32, (x, w, h) => {
+    x.drawImage(TEX.moon.image, 0, 0);
+    const d = x.getImageData(0, 0, w, h), p = d.data;
+    for (let i = 0; i < p.length; i += 4) { const l = Math.min(255, (p[i] * 0.3 + p[i + 1] * 0.59 + p[i + 2] * 0.11) * 1.25); p[i] = p[i + 1] = p[i + 2] = l; }
+    x.putImageData(d, 0, 0);
+  });
   TEX.moonOD = make(64, 32, (x, w, h) => {
     x.drawImage(TEX.moon.image, 0, 0);
     x.globalCompositeOperation = 'lighter'; x.fillStyle = 'rgba(120,90,255,0.35)'; x.fillRect(0, 0, w, h);
