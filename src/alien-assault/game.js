@@ -386,9 +386,11 @@ function updatePlayer(dt) {
   P.cool -= dt;
   P.block = (G.keys.s || G.keys.block) && P.arm > 0;
   if (has('laser')) {
-    if (G.pressed['1']) { P.weapon = 1; sfx.ui(); }
-    if (G.pressed['2']) { P.weapon = 2; sfx.ui(); }
-    if (G.pressed.wpn) { P.weapon = 3 - P.weapon; sfx.ui(); }
+    const was = P.weapon;
+    if (G.pressed['1']) P.weapon = 1;
+    if (G.pressed['2']) P.weapon = 2;
+    if (G.pressed.wpn) P.weapon = 3 - P.weapon;
+    if (P.weapon !== was) { P.switchT = 0.45; sfx.ui(); sfx.power(); }
   } else P.weapon = 1;
   const firing = G.mouse.down || G.keys.f || G.keys.j;
   P.overheat -= dt;
@@ -566,7 +568,10 @@ function updateCamera(dt) {
   // arms: recoil, sway, overdrive glow
   P.recoil = Math.max(0, P.recoil - dt * 8);
   AP.R.position.set(1.25 + Math.sin(G.time * 2) * 0.02, -1.15 + Math.sin(G.time * 1.6) * 0.025 - P.vy * 0.008, -0.1 + P.recoil * 0.4);
-  AP.R.rotation.x = 0.1 + P.recoil * 0.06;
+  P.switchT = Math.max(0, (P.switchT || 0) - dt);
+  const sw = Math.sin((P.switchT / 0.45) * Math.PI);
+  AP.R.position.y -= sw * 0.9; AP.R.rotation.x = 0.1 + P.recoil * 0.06 - sw * 0.6;
+  AP.R.rotation.z = sw * 0.5;
   // left arm: raised to block, drooping when broken
   const blk = P.block ? 1 : 0;
   P.blockK = damp(P.blockK || 0, blk, 14, dt);
@@ -750,6 +755,7 @@ function updateEnemy(e, dt) {
   }
   e.g.position.set(e.x, e.y + (e.crouch ? -e.crouch * 1.1 : 0), e.z);
   if (e.flash > 0) e.flash -= dt;
+  if (e.stagger > 0) e.stagger -= dt;
   const f = e.flash > 0 ? 0xffffff : null;
   for (const m of e.mats) m.emissive.setHex(f ?? m.userData.e0);
 }
@@ -769,6 +775,7 @@ function upZippit(e, dt) {
     const s = Math.sin(e.t * 16);
     e.P.legs[0].rotation.x = s * 0.8; e.P.legs[1].rotation.x = -s * 0.8;
     e.P.body.position.y = 0.95 + Math.abs(s) * 0.08;
+    e.P.body.rotation.x = 0.22 + (e.stagger > 0 ? -0.5 : 0); e.P.head.rotation.x = Math.sin(e.t * 16) * 0.12 - 0.15;
     A[0].rotation.x = -0.9 - s * 0.4; A[1].rotation.x = -0.9 + s * 0.4;
     if (!wait && (d < 0.4 || dist < 3.1)) { e.st = 'wind'; e.stT = 0.5; }
   } else if (e.st === 'wind') {
@@ -799,6 +806,7 @@ function upBrute(e, dt) {
     face(e, P.x, PZ, 3, dt);
     e.P.legs[0].rotation.x = s * 0.4; e.P.legs[1].rotation.x = -s * 0.4;
     e.P.body.position.y = 2.6 + Math.abs(s) * 0.1;
+    e.P.body.rotation.z = s * 0.06; e.P.head.rotation.y = Math.sin(e.t * 0.9) * 0.4;
     if (Math.abs(s) > 0.98 && e.z > -14) sfx.step();
     if (d < 0.3) { e.st = 'idle'; e.stT = rnd(0.8, 1.6); }
   } else if (e.st === 'idle') {
@@ -904,6 +912,7 @@ function upStalker(e, dt) {
 function damageEnemy(e, dmg, at) {
   const mult = e.type === 'riftstalker' && e.near ? 3 : 1;
   e.hp -= dmg * mult; e.flash = 0.1; hitMarkT = 0.15;
+  if (!e.anchored && e.type !== 'bruteclaw' && dmg >= 0.5) { e.z -= 0.22; e.stagger = 0.15; }
   sfx.hit();
   fx.burst(at, e.type === 'riftstalker' ? 0xff3030 : 0x7dff6a, mult > 1 ? 14 : 6, 5, 0.5, -6);
   P.od = Math.min(100, P.od + 1.5);
