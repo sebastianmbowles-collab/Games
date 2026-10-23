@@ -134,7 +134,7 @@ export function buildTitle() {
   patch = shadows(MD.makePatch()); PP = patch.userData.parts; patch.scale.setScalar(1.7); patch.position.set(-3.4, 6.2, 2.2); scene.add(patch);
   scanBeam = MD.mesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), MD.addGlow(0x33bbff, 0.5), 0, 0, 0, scene);
   // Bruteclaw towering over Zippits
-  brute = shadows(MD.makeBruteclaw()); brute.scale.setScalar(1.6); brute.position.set(-11, 0, -22); brute.rotation.y = 0.35; scene.add(brute);
+  brute = shadows(MD.makeBruteclaw()); brute.scale.setScalar(1.7); brute.position.set(-7.5, 0, -17); brute.rotation.y = 0.25; scene.add(brute);
   for (let i = 0; i < 7; i++) {
     const z = shadows(MD.makeZippit()); z.scale.setScalar(1.3); z.position.set(-40 + i * 11, 0, rnd(-15, -20)); z.rotation.y = Math.PI / 2;
     scene.add(z); zippits.push({ g: z, P: z.userData.parts, ph: rnd(0, 9), sp: rnd(2.5, 3.5) });
