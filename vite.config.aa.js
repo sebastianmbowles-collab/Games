@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 
-// Builds Alien Assault into one self-contained HTML file.
+// Builds PROJECT: STARFORGE into one self-contained HTML file.
 export default defineConfig({
   plugins: [viteSingleFile()],
   build: {

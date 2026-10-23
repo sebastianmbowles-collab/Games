@@ -10,7 +10,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "build:avd": "vite build --config vite.config.avd.js && cp standalone-avd/avd.html aliens-vs-dinos.html",
-    "build:aa": "vite build --config vite.config.aa.js && cp standalone-aa/aa.html AlienAssault.html"
+    "build:aa": "vite build --config vite.config.aa.js && cp standalone-aa/aa.html ProjectStarforge.html"
   },
   "dependencies": {
     "peerjs": "^1.5.5",

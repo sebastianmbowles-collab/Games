@@ -299,7 +299,7 @@ export function drawVisor(od, low, t) {
   }
 }
 
-// ===== The ALIEN ASSAULT logo: metal letters, green cracks, blue energy, ASSAULT battle-damaged =====
+// ===== The PROJECT: STARFORGE logo: metal letters, green cracks, blue energy, STARFORGE battle-damaged =====
 let logo = null;
 export function makeLogo() {
   const W = 1400, Hh = 560;
@@ -346,8 +346,8 @@ export function makeLogo() {
     o.drawImage(L, 0, 0);
     o.restore();
   };
-  word('ALIEN', 160, 150, false);
-  word('ASSAULT', 390, 124, true);
+  word('PROJECT:', 150, 112, false);
+  word('STARFORGE', 380, 132, true);
   logo = out;
 }
 let shineC = null;

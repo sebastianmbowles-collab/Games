@@ -248,7 +248,7 @@ export const ENDING = [
 ];
 
 export const CREDITS = [
-  ['ALIEN ASSAULT', 'big'],
+  ['PROJECT: STARFORGE', 'big'],
   ['', ''],
   ['STORY, CHARACTERS AND IDEAS', 'head'],
   [CREATOR, ''],
