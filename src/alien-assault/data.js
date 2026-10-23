@@ -6,7 +6,7 @@ const KEYS = isTouch
   : { FIX: 'Q', OD: 'SHIFT', JUMP: 'SPACE', DASH: 'A or D', AIM: 'Aim with the mouse and hold the mouse button', FIRE: '' };
 export const fill = s => s.replace(/\{(\w+)\}/g, (_, k) => KEYS[k] ?? k);
 
-export const CREATOR = 'THE GAME DESIGNER';
+export const CREATOR = 'SEBASTIAN BOWLES';
 
 export const MISSIONS = [
   {
@@ -82,9 +82,84 @@ export const MISSIONS = [
     ],
     outro: [],
   },
+  // ===== CHAPTER 2: THE JUNGLE PLANET =====
+  {
+    chapter: 2, title: 'JUNGLE DROP', sub: 'A jungle planet. A rail cart. No brakes.', music: 'jungle', rail: 7,
+    spawns: { soldier: 8, bug: 6 }, maxAlive: 5, gap: [1.0, 2.0],
+    intro: [
+      ['nova', 'UNIT-07, the missing colonists were taken to this jungle planet. We have to find them.'],
+      ['patch', 'Good news: I fixed your legs! Bad news: I bolted you to a rail cart. It was the only ride left.'],
+      ['unit', 'A robot on a roller coaster. My day keeps getting better.'],
+      ['nova', 'Alien jungle soldiers ahead. Stay on the cart and keep shooting.'],
+    ],
+    outro: [['nova', 'Good. Keep following the rails.'], ['patch', 'I think I left my stomach back there.']],
+  },
+  {
+    chapter: 2, title: 'THE GREEN TEETH', sub: 'Even the plants want to eat you.', music: 'jungle', rail: 7,
+    spawns: { plant: 10, bug: 6 }, maxAlive: 6, gap: [0.8, 1.6],
+    intro: [
+      ['patch', 'Scanning the plants... Oh no. The plants have TEETH.'],
+      ['nova', 'Shoot their heads before they spit acid. If one bites as you pass, DASH away.'],
+    ],
+    outro: [['unit', 'Gardening complete.'], ['patch', 'I am never complaining about weeds again.']],
+  },
+  {
+    chapter: 2, title: 'SWAMP RUN', sub: 'Something lives in the glowing water.', music: 'jungle', rail: 6,
+    spawns: { swamp: 7, soldier: 6, plant: 4 }, maxAlive: 6, gap: [0.9, 1.8],
+    intro: [
+      ['nova', 'The rails go straight through a swamp. Watch the glowing pools.'],
+      ['patch', 'Swamp monsters throw mud bombs! Shoot the bombs out of the air!'],
+    ],
+    outro: [['nova', 'Through the swamp. I am picking up human life signs ahead.'], ['patch', 'Humans? Survivors? Finally some good news!']],
+  },
+  {
+    chapter: 2, title: 'THE COLONISTS', sub: 'We found them. Something is wrong.', music: 'mutant', rail: 6,
+    spawns: { mutant: 10, bug: 4 }, maxAlive: 5, gap: [1.2, 2.2],
+    intro: [
+      ['patch', 'I see people! Hello! We are here to save you! ...Why are their eyes red?'],
+      ['nova', 'Those... are the colonists. The aliens changed them. They are not human anymore.'],
+      ['unit', 'They are coming at us. Fast.'],
+      ['nova', 'Human mutants. When one leaps at you, DASH. Do not let it reach your visor.'],
+    ],
+    outro: [['patch', 'I do not like this. I really, really do not like this.'], ['nova', 'Stay focused, UNIT-07. We need to find who did this.']],
+  },
+  {
+    chapter: 2, title: 'NIGHT IN THE JUNGLE', sub: 'Lights out. Headlamp on.', music: 'mutant', rail: 5, night: true,
+    spawns: { mutant: 10, plant: 5, bug: 5 }, maxAlive: 6, gap: [1.0, 2.0],
+    intro: [
+      ['nova', 'Night is falling. Your headlamp is on, but it will not show you everything.'],
+      ['patch', 'Why is it so quiet? I hate when it is quiet.'],
+      ['unit', 'Listen. Something is moving in the trees.'],
+    ],
+    outro: [['patch', 'Sunrise! I have never been so happy to see a sun. Either sun.'], ['nova', 'The signals are all coming from one place. The nest.']],
+  },
+  {
+    chapter: 2, title: 'THE NEST', sub: 'Everything the jungle has left.', music: 'jungle', rail: 7,
+    spawns: { mutant: 8, soldier: 6, bug: 6, swamp: 3, plant: 4 }, maxAlive: 8, gap: [0.6, 1.4],
+    intro: [
+      ['nova', 'This is where the aliens changed the colonists. Destroy everything.'],
+      ['patch', 'Overdrive, repairs, moon blasts. Use EVERYTHING!'],
+    ],
+    outro: [['nova', 'Wait. Something huge is tearing through the trees toward you.'], ['patch', 'I would like to get off the ride now please.']],
+  },
+  {
+    chapter: 2, title: 'PATIENT ZERO', sub: 'The first colonist they changed.', music: 'patient', boss: 'patient', rail: 8,
+    intro: [
+      ['nova', 'That is Patient Zero. The very first colonist the aliens mutated.'],
+      ['patch', 'There is an alien parasite in its chest! When it screams, its chest opens. Shoot the parasite!'],
+      ['unit', 'Then I will give it something to scream about.'],
+    ],
+    outro: [],
+  },
 ];
 
 export const SCANS = {
+  soldier: { name: 'JUNGLE SOLDIER', role: 'ALIEN TROOPER', info: 'A Zippit in camouflage with a blaster. Keeps its distance and shoots.', weak: 'LOW HEALTH', line: 'Scanning... It is wearing leaves as a hat. Very fashionable.' },
+  bug: { name: 'GIANT BUG', role: 'JUNGLE BEAST', info: 'Huge mantis-beetle. Skitters fast and LEAPS at the cart.', weak: 'SOFT HEAD', line: 'Scanning... That bug is bigger than me. Why is it bigger than me?' },
+  plant: { name: 'ALIEN PLANT', role: 'JUNGLE TRAP', info: 'Grows beside the rails. Spits ACID. Bites if you pass too close - DASH!', weak: 'ITS HEAD', line: 'Scanning... Plant. Teeth. Plant with teeth. Nope.' },
+  swamp: { name: 'SWAMP MONSTER', role: 'AMBUSH ENEMY', info: 'Rises from glowing pools and throws MUD BOMBS. Shoot the bombs!', weak: 'BIG YELLOW EYE', line: 'Scanning... Ew. It smells like a sock full of soup.' },
+  mutant: { name: 'HUMAN MUTANT', role: 'CHANGED COLONIST', info: 'A colonist the aliens changed. Very fast. LEAPS at your visor - DASH!', weak: 'STILL HUMAN SIZE', line: 'Scanning... It is human. It WAS human. I need a minute.' },
+  patient: { name: 'PATIENT ZERO', role: 'CHAPTER 2 BOSS', info: 'Throws trees, smashes the ground, screams for more mutants.', weak: 'CHEST PARASITE OPENS WHEN IT SCREAMS', line: 'Scanning... Scanner says it is ninety percent anger.' },
   zippit: { name: 'ZIPPIT', role: 'BASIC ENEMY', info: 'Runs fast and attacks with claws. Special: QUICK DASH.', weak: 'LOW HEALTH', line: 'Scanning... It is small, green, and very rude.' },
   bruteclaw: { name: 'BRUTECLAW', role: 'HEAVY ENEMY', info: 'Four arms. Absorbs damage. GROUND SLAM makes a shockwave - JUMP!', weak: 'SLOW MOVEMENT', line: 'Scanning... That is a lot of arms. Why so many arms?' },
   voidfly: { name: 'VOIDFLY', role: 'FLYING ENEMY', info: 'Hovers and fires a TRIPLE ENERGY BLAST. Shoot the bolts or DASH.', weak: 'FRAGILE ARMOUR', line: 'Scanning... Flying eyeball. My least favourite kind of eyeball.' },
@@ -126,6 +201,14 @@ export const CHATTER = [
   ['patch', 'Keep going! You are doing great! I think!'],
 ];
 
+export const ENDING2 = [
+  ['nova', 'Patient Zero is down. The parasite is destroyed.'],
+  ['patch', 'Look! The mutants are falling asleep. Maybe we can help them now.'],
+  ['nova', 'There is a lab under the nest. Someone was here before the aliens.'],
+  ['patch', 'There is a message on the screen... It says: UNIT-07, YOU WERE NOT THE LAST.'],
+  ['unit', 'Who wrote that? And how do they know my name?'],
+  ['nova', 'I do not know. But we are going to find out.'],
+];
 export const ENDING = [
   ['emperor', 'Impossible... a single... machine...'],
   ['nova', 'The Null Emperor is down! The alien army is retreating!'],
@@ -133,6 +216,8 @@ export const ENDING = [
   ['patch', 'We did it! Well, YOU did it. I mostly screamed.'],
   ['unit', 'Mission complete. Now can someone please get my legs out of this floor?'],
   ['nova', 'Rescue team is on the way. Rest now, UNIT-07.'],
+  ['nova', 'Wait. A distress signal. The missing colonists... they were taken to a jungle planet.'],
+  ['unit', 'Of course they were. CHAPTER 2 it is.'],
 ];
 
 export const CREDITS = [

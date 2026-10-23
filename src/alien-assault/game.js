@@ -4,7 +4,9 @@ import { sfx, playMusic } from './audio.js';
 import { TEX, updateCore } from './textures.js';
 import * as MD from './models.js';
 import { Particles, Debris } from './fx.js';
-import { MISSIONS, SCANS, UPGRADES, ENDING, CREDITS, PATCH_REPAIR, PATCH_LOW, PATCH_OD, CHATTER } from './data.js';
+import { buildJungle, updateJungle } from './jungle.js';
+import * as J from './models2.js';
+import { MISSIONS, SCANS, UPGRADES, ENDING, CREDITS, PATCH_REPAIR, PATCH_LOW, PATCH_OD, CHATTER, ENDING2 } from './data.js';
 import * as H from './hud.js';
 
 const R = 15, ROOM_H = 9, DOOR_H = 7.5, DOOR_ANG = 0.36, PZ = 9, EYE = 2.6;
@@ -13,12 +15,13 @@ const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Ve
 const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), sph = new THREE.Sphere();
 
 let scene, camera, composer, arms, AP, patch, PP, fx, fxBig, debris, L = {};
-let panels = [], covers = [], doorFrame, roof, outside;
+let panels = [], covers = [], doorFrame, roof, outside, roomG;
 let P, enemies = [], balls = [], shots = [], rings = [], hazards = [], boss = null;
 let mi = 0, M = null, spawnList = [], spawnT = 0, phase = 'card', phaseT = 0, upgrades = [], scanned = new Set();
 let scanBeam, scanTarget = null, scanT = 0, paused = false, pauseSel = 0, overSel = 0, upChoices = [], upSel = 0;
 let menuRects = [], creditY = 0, wallBroken = false, kills = 0, chatT = 8, patchMsgT = 0, cam = { yaw: 0, pitch: 0 };
 let aimNX = 0, aimNY = 0, flashT = 0, lightningT = 8, hitMarkT = 0;
+let jungle, inJungle = false, rail = 0, props = [], scareT = 0;
 const has = id => upgrades.includes(id);
 
 // ===== Building the abandoned UFO =====
@@ -38,6 +41,8 @@ export function buildGame() {
   buildRoom();
   buildOutside();
   buildLights();
+  jungle = buildJungle(scene);
+  jungle.cart.position.z = PZ;
 
   arms = MD.makeFPArms(); AP = arms.userData.parts; camera.add(arms);
   patch = MD.makePatch(); PP = patch.userData.parts; camera.add(patch);
@@ -51,13 +56,14 @@ export function buildGame() {
 }
 
 function buildRoom() {
+  roomG = MD.group(0, 0, 0, roomG);
   const wall1 = MD.phong(0x4a5474, { map: TEX.panel, shininess: 80 }), wall2 = MD.phong(0x3a4262, { map: TEX.panel, shininess: 80 });
   const glyph = new THREE.MeshBasicMaterial({ map: TEX.glyph }), rib = MD.phong(0x23293a, { shininess: 90 });
   const lamp = MD.glow(0x9fe8ff), lampDead = MD.glow(0x1a2030), lampRed = MD.glow(0xff3030);
   const N = 24, pw = 2 * R * Math.sin(Math.PI / N) + 0.06;
   for (let i = 0; i < N; i++) {
     const a = (i / N) * Math.PI * 2, d = angDiff(a, -Math.PI / 2);
-    const grp = MD.group(Math.cos(a) * R, 0, Math.sin(a) * R, scene);
+    const grp = MD.group(Math.cos(a) * R, 0, Math.sin(a) * R, roomG);
     grp.lookAt(0, 0, 0);
     const isDoor = Math.abs(d) < DOOR_ANG;
     if (isDoor) {
@@ -72,21 +78,21 @@ function buildRoom() {
     MD.box(0.35, ROOM_H, 0.45, rib, pw / 2, ROOM_H / 2, 0.15, grp);
     panels.push({ grp, a, near: Math.abs(d) < 1.3, isDoor, pos: grp.position.clone(), rot: grp.rotation.clone(), fly: null });
   }
-  const floor = MD.mesh(new THREE.CircleGeometry(R + 0.6, 24), MD.phong(0x8a93a8, { map: TEX.floor, shininess: 30 }), 0, 0, 0, scene);
+  const floor = MD.mesh(new THREE.CircleGeometry(R + 0.6, 24), MD.phong(0x8a93a8, { map: TEX.floor, shininess: 30 }), 0, 0, 0, roomG);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   for (const [r, c] of [[4.5, 0x2a9dff], [9, 0x39ff6a]]) {
-    const ring = MD.mesh(new THREE.RingGeometry(r, r + 0.12, 32), MD.glow(c), 0, 0.02, 0, scene);
+    const ring = MD.mesh(new THREE.RingGeometry(r, r + 0.12, 32), MD.glow(c), 0, 0.02, 0, roomG);
     ring.rotation.x = -Math.PI / 2;
   }
   // the crater UNIT-07's legs are jammed into
-  const crater = MD.mesh(new THREE.RingGeometry(0.6, 1.6, 10), MD.lam(0x2a2f3a, { side: THREE.DoubleSide }), 0, 0.03, PZ, scene);
+  const crater = MD.mesh(new THREE.RingGeometry(0.6, 1.6, 10), MD.lam(0x2a2f3a, { side: THREE.DoubleSide }), 0, 0.03, PZ, roomG);
   crater.rotation.x = -Math.PI / 2;
   for (let i = 0; i < 7; i++) {
-    const a = (i / 7) * Math.PI * 2, s = MD.box(rnd(0.6, 1.1), 0.18, rnd(0.4, 0.8), MD.phong(0x5a6478), Math.cos(a) * 1.3, 0.12, PZ + Math.sin(a) * 1.3, scene);
+    const a = (i / 7) * Math.PI * 2, s = MD.box(rnd(0.6, 1.1), 0.18, rnd(0.4, 0.8), MD.phong(0x5a6478), Math.cos(a) * 1.3, 0.12, PZ + Math.sin(a) * 1.3, roomG);
     s.rotation.set(rnd(-0.5, 0.5), a, rnd(-0.4, 0.4));
   }
-  roof = MD.group(0, 0, 0, scene);
+  roof = MD.group(0, 0, 0, roomG);
   const dome = MD.mesh(new THREE.SphereGeometry(R + 0.3, 24, 6, 0, Math.PI * 2, 0, Math.PI / 2), MD.phong(0x2e3448, { side: THREE.BackSide, map: TEX.panel }), 0, ROOM_H, 0, roof);
   dome.scale.y = 0.32;
   const light = MD.cyl(2.2, 2.2, 0.3, MD.glow(0xbff4ff), 0, ROOM_H + 4.3, 0, roof, 16);
@@ -97,7 +103,7 @@ function buildRoom() {
     c.position.y = ROOM_H + 2 - c.geometry.parameters.height / 2;
   }
   // door frame with hazard stripes
-  doorFrame = MD.group(0, 0, 0, scene);
+  doorFrame = MD.group(0, 0, 0, roomG);
   const hz = MD.phong(0xffffff, { map: TEX.hazard }), dz = -R * Math.cos(DOOR_ANG) + 0.2, dx = R * Math.sin(DOOR_ANG);
   for (const s of [-1, 1]) {
     MD.box(0.9, DOOR_H, 1.2, hz, s * dx, DOOR_H / 2, dz, doorFrame);
@@ -106,13 +112,13 @@ function buildRoom() {
   MD.box(dx * 2 + 0.9, 0.7, 1.2, hz, 0, DOOR_H, dz, doorFrame);
   L.doorStrip = MD.box(dx * 2 - 1, 0.12, 0.12, MD.glow(0xff3020), 0, DOOR_H - 0.45, dz + 0.62, doorFrame);
   // the broken hatch lying on the floor
-  const hatch = MD.box(5, 0.35, 6, MD.phong(0x48506a, { map: TEX.panel }), 6.5, 0.9, -9.5, scene);
+  const hatch = MD.box(5, 0.35, 6, MD.phong(0x48506a, { map: TEX.panel }), 6.5, 0.9, -9.5, roomG);
   hatch.rotation.set(0.15, 0.6, 0.25);
   shadows(hatch, true, true);
   // alien pods: cover for Riftstalkers
   const podM = MD.phong(0x3a2a6a, { shininess: 90 }), podG = MD.glow(0x39ff6a);
   for (const [x, z] of [[-7.5, -6.5], [7.8, -4.5], [-3.5, -10.5], [3.8, -0.5], [-6.2, 2.2], [0.5, -7]]) {
-    const g = MD.group(x, 0, z, scene);
+    const g = MD.group(x, 0, z, roomG);
     MD.cyl(0.95, 1.1, 1.9, podM, 0, 0.95, 0, g, 8);
     MD.cyl(0.7, 0.95, 0.4, podM, 0, 2.05, 0, g, 8);
     MD.box(0.5, 0.8, 0.1, podG, 0, 1.1, 1.0, g).lookAt(0, 1.1, PZ);
@@ -121,7 +127,7 @@ function buildRoom() {
   }
   // consoles off to each side of UNIT-07
   for (const s of [-1, 1]) {
-    const g = MD.group(s * 7.5, 0, 6.5, scene);
+    const g = MD.group(s * 7.5, 0, 6.5, roomG);
     MD.box(1.8, 1.4, 1.0, MD.phong(0x30384c), 0, 0.7, 0, g);
     const scr = MD.box(1.5, 0.7, 0.05, new THREE.MeshBasicMaterial({ map: TEX.glyph }), 0, 1.25, 0.45, g);
     scr.rotation.x = -0.5;
@@ -169,6 +175,9 @@ function buildLights() {
   L.boss = new THREE.PointLight(0xff4af0, 0, 40, 0); L.boss.position.set(0, 6, -10); scene.add(L.boss);
   L.muzzle = new THREE.PointLight(0x55b8ff, 0, 9, 0); L.muzzle.position.set(0.5, -0.3, -3.5); camera.add(L.muzzle);
   L.fill = new THREE.PointLight(0x8fb0ff, 1.4, 6, 0); L.fill.position.set(0, 1, -0.5); camera.add(L.fill);
+  // UNIT-07's headlamp for the night mission
+  L.head = new THREE.SpotLight(0xfff0d0, 0, 70, 0.45, 0.5, 1); L.head.position.set(0.4, 0.2, 0); L.head.target.position.set(0, -1.2, -10);
+  camera.add(L.head); camera.add(L.head.target);
 }
 
 // ===== Missions =====
@@ -199,7 +208,9 @@ function clearAll() {
   for (const r of rings) { scene.remove(r.wall); scene.remove(r.flat); }
   for (const h of hazards) if (h.mesh) scene.remove(h.mesh);
   if (boss) { scene.remove(boss.g); boss.extra?.forEach(m => scene.remove(m)); }
-  enemies = []; balls = []; shots = []; rings = []; hazards = []; boss = null;
+  for (const p of props) scene.remove(p);
+  for (const e of enemies) if (e.pool) scene.remove(e.pool);
+  enemies = []; balls = []; shots = []; rings = []; hazards = []; boss = null; props = [];
   for (const c of covers) c.used = false;
   fx.clear(); fxBig.clear(); debris.clear();
   H.clearDialog(); H.clearWarn(); H.clearScan();
@@ -210,9 +221,31 @@ function restoreWall() {
   doorFrame.visible = true; wallBroken = false;
   roof.position.set(0, 0, 0); roof.rotation.set(0, 0, 0); roof.visible = true; roof.userData.fly = 0;
 }
+function setWorld() {
+  const jg = M.chapter === 2, night = !!M.night;
+  inJungle = jg; rail = jg ? M.rail || 7 : 0;
+  roomG.visible = outside.visible = !jg; jungle.root.visible = jg;
+  for (const k of ['ceil', 'door', 'emer', 'green', 'cyan']) L[k].visible = !jg;
+  if (jg) {
+    scene.fog.color.setHex(night ? 0x020806 : 0x0e3a2a); scene.fog.near = night ? 6 : 25; scene.fog.far = night ? 60 : 150;
+    scene.background.setHex(night ? 0x010302 : 0x06241a);
+    L.hemi.color.setHex(night ? 0x203048 : 0x9affc0); L.hemi.groundColor.setHex(0x0a1a08); L.hemi.intensity = night ? 0.2 : 1.0;
+    L.key.color.setHex(night ? 0x6a7aff : 0xfff2d0); L.key.intensity = night ? 0.25 : 2.2;
+    L.sun.intensity = night ? 0 : 0.6;
+    L.head.intensity = night ? 140 : 0;
+    jungle.sky.material.color.setHex(night ? 0x1a2626 : 0xffffff);
+  } else {
+    scene.fog.color.setHex(0x1c0832); scene.fog.near = 26; scene.fog.far = 150;
+    scene.background.setHex(0x0a0214);
+    L.hemi.color.setHex(0x9a7aff); L.hemi.groundColor.setHex(0x140818); L.hemi.intensity = 0.7;
+    L.key.color.setHex(0xd8e4ff); L.key.intensity = 1.4; L.sun.intensity = 1.2; L.head.intensity = 0;
+  }
+}
+const missionName = () => (M.chapter === 2 ? `CHAPTER 2 - MISSION ${mi - 6}: ${M.title}` : `MISSION ${mi + 1}: ${M.title}`);
 function startMission(i, skipCard) {
   mi = i; M = MISSIONS[i];
   clearAll(); restoreWall(); resetPlayer();
+  setWorld();
   spawnList = [];
   for (const [t, n] of Object.entries(M.spawns || {})) for (let k = 0; k < n; k++) spawnList.push(t);
   shuffle(spawnList);
@@ -231,6 +264,7 @@ function beginIntro() {
   for (const [who, s] of M.intro) H.say(who, s);
   if (M.boss === 'vrax') spawnVrax();
   if (M.boss === 'emperor') spawnEmperor();
+  if (M.boss === 'patient') spawnPatient();
 }
 function missionClear() {
   phase = 'clear'; phaseT = 0;
@@ -290,7 +324,7 @@ function stepWorld(dt) {
     if (chatT <= 0 && !H.dialogBusy() && kills > 2) { chatT = rnd(14, 24); const [who, s] = pick(CHATTER); H.bark(who, s, 1.4); }
   }
   if (phase === 'clear' && phaseT > 3 && !H.dialogBusy()) {
-    if (mi >= MISSIONS.length - 1) startEnding();
+    if (mi === 6 || mi >= MISSIONS.length - 1) startEnding();
     else openUpgrades();
   }
   if (phase === 'dead' && phaseT > 2.6) { phase = 'over'; overSel = 0; G.hud.style.cursor = 'default'; playMusic(null); }
@@ -398,7 +432,7 @@ function updateBalls(dt) {
     if (!hit && boss && boss.ws) hit = boss.hitBall(b);
     if (!hit) {
       const rr = Math.hypot(b.pos.x, b.pos.z);
-      if (b.pos.y < 0 || (b.pos.y > ROOM_H && rr < R && !wallBroken) || (rr > R - 0.3 && rr < R + 0.6 && !doorOpenAt(b.pos))) {
+      if (b.pos.y < 0 || (!inJungle && ((b.pos.y > ROOM_H && rr < R && !wallBroken) || (rr > R - 0.3 && rr < R + 0.6 && !doorOpenAt(b.pos))))) {
         hit = true;
         fx.burst(b.pos, 0x7fd4ff, 10, 5, 0.4, -4);
       }
@@ -512,6 +546,13 @@ function beamBetween(m, a, b, r) {
 
 function updateRoom(dt) {
   const t = G.time;
+  if (inJungle) {
+    updateJungle(jungle, dt, rail, t);
+    for (const p of props) p.position.z += rail * dt;
+    props = props.filter(p => { if (p.position.z > PZ + 25) { scene.remove(p); return false; } return true; });
+    scareT -= dt;
+    return;
+  }
   L.emer.intensity = Math.sin(t * 4) > 0 ? 2.8 : 0.4;
   L.ceil.intensity = 2.2 * (Math.random() < 0.02 ? 0.3 : 1);
   L.doorStrip.material.color.setHex(Math.sin(t * 6) > 0 ? 0xff3020 : 0x601008);
@@ -555,12 +596,21 @@ function coverStand(c) {
   return { x: c.x + (dx / d) * 1.6, z: c.z + (dz / d) * 1.6 };
 }
 function spawnEnemy(type, o = {}) {
-  const make = { zippit: MD.makeZippit, bruteclaw: MD.makeBruteclaw, voidfly: MD.makeVoidfly, riftstalker: MD.makeRiftstalker }[type];
+  const make = { zippit: MD.makeZippit, bruteclaw: MD.makeBruteclaw, voidfly: MD.makeVoidfly, riftstalker: MD.makeRiftstalker, soldier: () => J.makeSoldier(MD.makeZippit), bug: J.makeBug, plant: J.makePlant, swamp: J.makeSwamp, mutant: J.makeMutant }[type];
   const g = make();
   scene.add(g);
   const e = { type, g, P: g.userData.parts, hit: g.userData.hit, t: rnd(0, 5), st: 'enter', stT: 0, flash: 0, dead: false, alpha: 1, ws: null };
-  e.hp = e.max = { zippit: 3, bruteclaw: 26, voidfly: 2, riftstalker: 6 }[type];
-  e.x = o.x ?? rnd(-3.5, 3.5); e.z = o.z ?? rnd(-26, -22); e.y = type === 'voidfly' ? rnd(3, 4.5) : 0;
+  e.hp = e.max = { zippit: 3, bruteclaw: 26, voidfly: 2, riftstalker: 6, soldier: 4, bug: 5, plant: 4, swamp: 6, mutant: 6 }[type];
+  e.x = o.x ?? (inJungle ? rnd(-7, 7) : rnd(-3.5, 3.5)); e.z = o.z ?? (inJungle ? rnd(-62, -50) : rnd(-26, -22)); e.y = type === 'voidfly' ? rnd(3, 4.5) : 0;
+  const side = Math.random() < 0.5 ? -1 : 1;
+  if (type === 'soldier') { e.tx = rnd(-7, 7); e.tz = rnd(-24, -14); e.fireT = rnd(1, 2); }
+  if (type === 'bug') { e.speed = rnd(7, 9); e.slot = rnd(-2, 2); e.leapCD = rnd(0, 1.5); }
+  if (type === 'plant') { e.anchored = true; e.x = o.x ?? side * rnd(3.8, 6.5); e.z = o.z ?? -85; e.fireT = rnd(0.3, 1.2); }
+  if (type === 'swamp') {
+    e.anchored = true; e.x = o.x ?? side * rnd(5, 8); e.z = o.z ?? -90; e.y = -4.2; e.fireT = 0.8;
+    e.pool = J.makePool(2.8); e.pool.position.set(e.x, 0, e.z); scene.add(e.pool);
+  }
+  if (type === 'mutant') { e.speed = rnd(7, 9.5); e.slot = rnd(-2.2, 2.2); e.twitchT = 0; if (o.x === undefined && Math.random() < 0.4) { e.x = side * rnd(10, 13); e.z = rnd(-40, -28); } }
   e.mats = [];
   g.traverse(m => { if (m.material && m.material.emissive) { e.mats.push(m.material); m.material.userData.e0 = m.material.emissive.getHex(); } });
   if (type === 'zippit') { e.speed = rnd(5, 6.5); e.slot = rnd(-2.2, 2.2); e.dashT = rnd(1, 3); }
@@ -578,10 +628,11 @@ function spawnEnemy(type, o = {}) {
   return e;
 }
 function steer(e, tx, tz, sp, dt) {
-  if (e.z < -13.2 && tz > -13) { tx = clamp(e.x, -3, 3); tz = -11.5; }
+  if (!inJungle && e.z < -13.2 && tz > -13) { tx = clamp(e.x, -3, 3); tz = -11.5; }
   const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz);
   if (d > 0.001) { const s = Math.min(d, sp * dt); e.x += (dx / d) * s; e.z += (dz / d) * s; }
-  if (e.z > -13) { const r = Math.hypot(e.x, e.z); if (r > R - 1) { e.x *= (R - 1) / r; e.z *= (R - 1) / r; } }
+  if (inJungle) e.x = clamp(e.x, -14, 14);
+  else if (e.z > -13) { const r = Math.hypot(e.x, e.z); if (r > R - 1) { e.x *= (R - 1) / r; e.z *= (R - 1) / r; } }
   return Math.hypot(tx - e.x, tz - e.z);
 }
 function face(e, tx, tz, k, dt) {
@@ -591,12 +642,22 @@ function face(e, tx, tz, k, dt) {
 function updateEnemy(e, dt) {
   e.t += dt;
   if (e.dead) return;
+  if (e.anchored) {
+    e.z += rail * dt;
+    if (e.pool) e.pool.position.z = e.z;
+    if (e.z > PZ + 8) { e.dead = e.removed = true; scene.remove(e.g); if (e.pool) props.push(e.pool); return; }
+  }
   if (e.type === 'zippit') upZippit(e, dt);
   else if (e.type === 'bruteclaw') upBrute(e, dt);
   else if (e.type === 'voidfly') upVoidfly(e, dt);
-  else upStalker(e, dt);
+  else if (e.type === 'riftstalker') upStalker(e, dt);
+  else if (e.type === 'soldier') upSoldier(e, dt);
+  else if (e.type === 'bug') upBug(e, dt);
+  else if (e.type === 'plant') upPlant(e, dt);
+  else if (e.type === 'swamp') upSwamp(e, dt);
+  else upMutant(e, dt);
   // keep Zippits from piling inside each other
-  if (e.type === 'zippit') for (const o of enemies) {
+  if (e.type === 'zippit' || e.type === 'mutant' || e.type === 'bug') for (const o of enemies) {
     if (o === e || o.dead || o.type === 'voidfly') continue;
     const dx = e.x - o.x, dz = e.z - o.z, d = Math.hypot(dx, dz), min = o.type === 'bruteclaw' ? 2 : 0.9;
     if (d < min && d > 0.001) { e.x += (dx / d) * (min - d) * 0.5; e.z += (dz / d) * (min - d) * 0.5; }
@@ -762,12 +823,13 @@ function damageEnemy(e, dmg, at) {
   P.od = Math.min(100, P.od + 1.5);
   if (e.hp <= 0) killEnemy(e);
 }
-const ENEMY_COLORS = { zippit: [0x2ef03c, 0x8a2be2], bruteclaw: [0x7d22d8, 0x2a0b4f, 0xff7a00], voidfly: [0x9b30ff, 0x66ff22], riftstalker: [0x1c2030, 0x3d3366] };
+const ENEMY_COLORS = { soldier: [0x6a9a2a, 0x3a4a22], bug: [0x1a8a7a, 0x6a2ab0], plant: [0xc0208a, 0x2a8a3a], swamp: [0x3a5a22, 0x2a3a14], mutant: [0x8a9a7a, 0x8a1a8a], zippit: [0x2ef03c, 0x8a2be2], bruteclaw: [0x7d22d8, 0x2a0b4f, 0xff7a00], voidfly: [0x9b30ff, 0x66ff22], riftstalker: [0x1c2030, 0x3d3366] };
 function killEnemy(e, quiet) {
   e.dead = true; e.removed = true;
   scene.remove(e.g);
   if (e.laser) scene.remove(e.laser);
   if (e.cover) e.cover.used = false;
+  if (e.pool) props.push(e.pool);
   const c = e.ws ? e.ws[0].c : tmp.set(e.x, 1, e.z);
   const big = e.type === 'bruteclaw';
   fxBig.burst(c, e.type === 'voidfly' ? 0x9b30ff : 0x39ff6a, big ? 40 : 18, big ? 10 : 7, 0.7, -8);
@@ -775,17 +837,363 @@ function killEnemy(e, quiet) {
   debris.burst(c, ENEMY_COLORS[e.type], big ? 12 : 6, big ? 8 : 6, big ? 0.45 : 0.25);
   if (quiet) return;
   kills++;
-  P.od = Math.min(100, P.od + { zippit: 6, voidfly: 8, bruteclaw: 25, riftstalker: 18 }[e.type]);
+  P.od = Math.min(100, P.od + ({ zippit: 6, voidfly: 8, bruteclaw: 25, riftstalker: 18, soldier: 8, bug: 10, plant: 8, swamp: 15, mutant: 12 }[e.type] || 8));
   if (big) sfx.bigkill(); else sfx.kill();
   if (big) G.shake = Math.max(G.shake, 0.4);
 }
 
+// ===== Chapter 2 creatures =====
+function legSwing(legs, t, amt) { legs.forEach((l, i) => { l.rotation.x = Math.sin(t + (i % 2) * Math.PI) * amt; }); }
+function upSoldier(e, dt) {
+  const A = e.P.arms;
+  if (e.st === 'enter' || e.st === 'move') {
+    e.st = 'move';
+    const d = steer(e, e.tx, e.tz, 7, dt);
+    face(e, P.x, PZ, 8, dt);
+    legSwing(e.P.legs, e.t * 14, 0.7);
+    if (d < 0.3) { e.st = 'aim'; e.stT = rnd(0.6, 1.2); }
+  } else {
+    face(e, P.x, PZ, 8, dt);
+    e.x = clamp(e.x + Math.sin(e.t * 1.4) * 1.5 * dt, -9, 9);
+    legSwing(e.P.legs, e.t * 6, 0.15);
+    e.stT -= dt;
+    for (const a of A) a.rotation.x = damp(a.rotation.x, e.stT < 0.3 ? -1.55 : -1.3, 10, dt);
+    if (e.stT <= 0) {
+      e.P.muzzle.getWorldPosition(tmp);
+      const dir = headPos(tmp2).sub(tmp).normalize();
+      dir.x += rnd(-0.03, 0.03);
+      makeShot('bolt', tmp, dir.multiplyScalar(16), { r: 0.22, dmg: 6 });
+      sfx.bolt();
+      fx.burst(tmp, 0xffa020, 5, 3, 0.2, 0);
+      e.shots = (e.shots || 0) + 1;
+      if (e.shots % 3 === 0) { e.tx = rnd(-7, 7); e.tz = clamp(e.tz + rnd(-2, 5), -24, -8); e.st = 'move'; } else e.stT = rnd(1.2, 2.2);
+    }
+  }
+}
+function upBug(e, dt) {
+  const B = e.P;
+  B.legs.forEach(l => { l.g.rotation.x = Math.sin(e.t * 22 + l.i * 1.6 + (l.s > 0 ? Math.PI : 0)) * 0.45; });
+  for (const w of B.wings) w.rotation.z = e.st === 'leap' ? Math.sin(e.t * 60) * 0.6 : w.rotation.z * 0.9;
+  e.leapCD -= dt;
+  const dist = Math.hypot(P.x - e.x, PZ - e.z);
+  if (e.st === 'enter' || e.st === 'run') {
+    e.st = 'run';
+    const tx = clamp(P.x + e.slot, -6, 6);
+    steer(e, tx, PZ - 7, e.speed, dt);
+    e.x += Math.sin(e.t * 5) * 4 * dt;
+    face(e, P.x, PZ, 8, dt);
+    B.body.position.y = 1.3 + Math.abs(Math.sin(e.t * 22)) * 0.06;
+    for (const s of B.scythes) s.rotation.x = 0.3 + Math.sin(e.t * 6) * 0.1;
+    if (dist < 9 && e.leapCD <= 0) { e.st = 'crouch'; e.stT = 0.45; H.warn('DASH!', '#5ad8ff', 0.9); }
+  } else if (e.st === 'crouch') {
+    e.stT -= dt; face(e, P.x, PZ, 10, dt);
+    B.body.position.y = damp(B.body.position.y, 0.8, 10, dt);
+    for (const s of B.scythes) s.rotation.x = damp(s.rotation.x, -1.0, 10, dt);
+    if (e.stT <= 0) { e.st = 'leap'; e.stT = 0.55; e.l0x = e.x; e.l0z = e.z; e.lx = P.x; sfx.dash(); }
+  } else if (e.st === 'leap') {
+    e.stT -= dt;
+    const k = 1 - Math.max(0, e.stT) / 0.55;
+    e.x = lerp(e.l0x, e.lx, k); e.z = lerp(e.l0z, PZ - 1.6, k); e.y = Math.sin(k * Math.PI) * 3;
+    B.body.position.y = 1.3;
+    if (e.stT <= 0) {
+      e.y = 0;
+      for (const s of B.scythes) s.rotation.x = 0.8;
+      sfx.blade();
+      if (Math.abs(P.x - e.lx) < 1.8 && P.y < 2) hurt(10);
+      e.st = 'recover'; e.stT = 0.9; e.leapCD = rnd(2.5, 3.5);
+    }
+  } else if (e.st === 'recover') {
+    e.stT -= dt;
+    e.z = damp(e.z, PZ - 6, 3, dt);
+    for (const s of B.scythes) s.rotation.x = damp(s.rotation.x, 0.3, 4, dt);
+    if (e.stT <= 0) e.st = 'run';
+  }
+}
+function upPlant(e, dt) {
+  const Pt = e.P;
+  face(e, P.x, PZ, 4, dt);
+  Pt.neck.rotation.x = Math.sin(e.t * 1.7) * 0.15;
+  Pt.stem.rotation.z = Math.sin(e.t * 1.1) * 0.06;
+  const near = e.z > PZ - 12 && Math.abs(e.x - P.x) < 4.6;
+  if (e.st === 'spit') {
+    e.stT -= dt;
+    Pt.top.rotation.x = damp(Pt.top.rotation.x, -1.0, 12, dt); Pt.bot.rotation.x = damp(Pt.bot.rotation.x, 0.8, 12, dt);
+    Pt.neck.rotation.x = -0.4;
+    if (e.stT <= 0) {
+      Pt.mouth.getWorldPosition(tmp);
+      makeShot('acid', tmp, headPos(tmp2).sub(tmp).normalize().multiplyScalar(14), { r: 0.3, dmg: 7 });
+      sfx.bolt();
+      e.st = 'idle'; e.fireT = rnd(1.8, 2.8);
+    }
+    return;
+  }
+  Pt.top.rotation.x = -0.25 - Math.abs(Math.sin(e.t * 3)) * 0.25;
+  Pt.bot.rotation.x = 0.2 + Math.abs(Math.sin(e.t * 3)) * 0.2;
+  if (!e.bit && near && e.z > PZ - 9 && !e.warned) { e.warned = true; H.warn('DASH!', '#5ad8ff', 0.9); }
+  if (!e.bit && e.z > PZ - 3.2) {
+    e.bit = true;
+    Pt.top.rotation.x = 0; Pt.bot.rotation.x = 0;
+    sfx.blade();
+    if (Math.abs(e.x - P.x) < 4.6) hurt(10);
+  }
+  if (e.z > -40 && e.z < PZ - 4) { e.fireT -= dt; if (e.fireT <= 0) { e.st = 'spit'; e.stT = 0.5; } }
+}
+function upSwamp(e, dt) {
+  const S = e.P;
+  if (!e.risen) {
+    if (e.z > -48) { e.risen = true; e.st = 'rise'; e.stT = 1; sfx.slam(); }
+    return;
+  }
+  for (const a of S.arms) a.rotation.x = damp(a.rotation.x, e.st === 'wind' ? -2.6 : Math.sin(e.t * 2) * 0.2, 8, dt);
+  S.eye.scale.setScalar(1 + Math.sin(e.t * 6) * 0.08);
+  face(e, P.x, PZ, 4, dt);
+  if (e.st === 'rise') {
+    e.stT -= dt;
+    e.y = lerp(-4.2, 0, smooth(1 - e.stT));
+    if (Math.random() < 0.8) fx.spawn(e.x + rnd(-2, 2), 0.3, e.z + rnd(-2, 2), rnd(-2, 2), rnd(3, 7), rnd(-2, 2), 0x6aff8a, 0.6, -12);
+    if (e.stT <= 0) { e.st = 'idle'; e.y = 0; }
+  } else if (e.st === 'idle') {
+    e.fireT -= dt;
+    if (e.fireT <= 0 && e.z < PZ - 6) { e.st = 'wind'; e.stT = 0.6; }
+    if (e.z > PZ - 5) { e.st = 'sink'; }
+  } else if (e.st === 'wind') {
+    e.stT -= dt;
+    if (e.stT <= 0) {
+      S.hand.getWorldPosition(tmp);
+      const T = 1.5, tx = clamp(P.x + rnd(-1.5, 1.5), -4, 4), tz = PZ - rnd(0, 1.5);
+      const vel = new THREE.Vector3((tx - tmp.x) / T, (0 - tmp.y) / T + 0.5 * 9 * T, (tz - tmp.z) / T);
+      makeShot('mud', tmp, vel, { r: 0.5, hp: 1, dmg: 10, grav: -9 });
+      sfx.bolt();
+      e.st = 'idle'; e.fireT = rnd(2.2, 3.2);
+    }
+  } else if (e.st === 'sink') {
+    e.y = Math.max(-4.2, e.y - dt * 3);
+  }
+}
+function upMutant(e, dt) {
+  const Mt = e.P;
+  // jerky, twitchy movement
+  e.twitchT -= dt;
+  if (e.twitchT <= 0) { e.twitchT = rnd(0.15, 0.6); e.tw = { hz: rnd(-0.6, 0.6), hx: rnd(-0.4, 0.3), lean: rnd(0.1, 0.5) }; }
+  const tw = e.tw || { hz: 0.3, hx: 0, lean: 0.3 };
+  Mt.head.rotation.z = damp(Mt.head.rotation.z, tw.hz, 20, dt); Mt.head.rotation.x = damp(Mt.head.rotation.x, tw.hx, 20, dt);
+  Mt.body.rotation.x = damp(Mt.body.rotation.x, tw.lean, 10, dt);
+  Mt.eyeGlow.material.opacity = 0.6 + Math.random() * 0.4;
+  const dist = Math.hypot(P.x - e.x, PZ - e.z);
+  if (e.st === 'enter' || e.st === 'run') {
+    e.st = 'run';
+    const sp = e.speed * (0.6 + Math.abs(Math.sin(e.t * 4.5)) * 0.7);
+    steer(e, clamp(P.x + e.slot, -5, 5), PZ - 3, sp, dt);
+    face(e, P.x, PZ, 10, dt);
+    legSwing(Mt.legs, e.t * 16, 0.8);
+    Mt.arms[0].rotation.x = Math.sin(e.t * 16) * 0.8 - 0.5; Mt.arms[1].rotation.x = -Math.sin(e.t * 16) * 0.5 - 0.3;
+    Mt.jaw.rotation.x = 0.2 + Math.abs(Math.sin(e.t * 9)) * 0.3;
+    if (!e.pounced && dist < 8 && dist > 4.5 && Math.random() < dt * 1.5) { e.st = 'crouch'; e.stT = 0.45; sfx.scream(); H.warn('DASH!', '#ff3030', 0.9); }
+    else if (dist < 3.4) { e.st = 'wind'; e.stT = 0.45; }
+  } else if (e.st === 'crouch') {
+    e.stT -= dt; face(e, P.x, PZ, 12, dt);
+    Mt.body.position.y = damp(Mt.body.position.y, 1.0, 12, dt);
+    Mt.jaw.rotation.x = 0.9;
+    if (e.stT <= 0) { e.st = 'pounce'; e.stT = 0.4; e.l0x = e.x; e.l0z = e.z; e.lx = P.x; }
+  } else if (e.st === 'pounce') {
+    // leaps straight at the visor
+    e.stT -= dt;
+    const k = 1 - Math.max(0, e.stT) / 0.4;
+    e.x = lerp(e.l0x, e.lx, k); e.z = lerp(e.l0z, PZ - 1.1, k); e.y = Math.sin(k * Math.PI * 0.8) * 1.4;
+    Mt.arms[0].rotation.x = Mt.arms[1].rotation.x = -2.6;
+    if (e.stT <= 0) {
+      e.pounced = true;
+      if (Math.abs(P.x - e.lx) < 1.6) { hurt(14); scareT = 0.7; G.shake = 1; sfx.scream(); }
+      e.st = 'recover'; e.stT = 0.8;
+    }
+  } else if (e.st === 'wind') {
+    e.stT -= dt; face(e, P.x, PZ, 12, dt);
+    Mt.arms[1].rotation.x = damp(Mt.arms[1].rotation.x, -2.4, 12, dt);
+    if (e.stT <= 0) { e.st = 'recover'; e.stT = 0.8; sfx.blade(); if (Math.abs(P.x - e.x) < 1.8 && P.y < 1.5) hurt(9); }
+  } else if (e.st === 'recover') {
+    e.stT -= dt;
+    e.y = Math.max(0, e.y - dt * 6);
+    e.z = damp(e.z, PZ - 5, 3, dt);
+    Mt.body.position.y = damp(Mt.body.position.y, 1.4, 6, dt);
+    if (e.stT <= 0) e.st = 'run';
+  }
+}
+
+// ===== PATIENT ZERO =====
+const PZ_SEQ = ['leap', 'throw', 'grab', 'throw', 'scream'];
+function spawnPatient() {
+  const g = shadows(J.makePatientZero());
+  g.scale.setScalar(4);
+  g.position.set(0, 0, -70);
+  scene.add(g);
+  const mats = [];
+  g.traverse(m => { if (m.material && m.material.emissive) { mats.push(m.material); m.material.userData.e0 = m.material.emissive.getHex(); } });
+  boss = {
+    type: 'patient', name: 'PATIENT ZERO', g, Pt: g.userData.parts, hit: g.userData.hit, hp: 300, max: 300,
+    x: 0, z: -70, y: 0, st: 'enter', stT: 0, seq: 0, tx: 0, flash: 0, mats, ready: false, said: {}, t: 0, podOpen: 0, extra: [], hitBall: patientHit,
+  };
+  sfx.roar();
+  L.boss.color.setHex(0xff2ad0);
+}
+function patientHit(b) {
+  const e = boss;
+  for (const w of e.ws) {
+    if (w.c.distanceTo(b.pos) > w.r + b.r) continue;
+    if (e.st === 'enter' || e.st === 'dying') { sfx.clink(); return true; }
+    const core = w.tag === 'core' && e.podOpen > 0;
+    e.hp -= b.dmg * (core ? 1.5 : 0.12); e.flash = 0.06; hitMarkT = 0.15;
+    fx.burst(b.pos, core ? 0xff4af0 : 0x9aff7a, core ? 14 : 5, 6, 0.5, -5);
+    if (core) sfx.hit(); else sfx.clink();
+    P.od = Math.min(100, P.od + (core ? 0.8 : 0.1));
+    if (!core && !e.said.armor && e.ready) { e.said.armor = 1; H.bark('patch', 'It barely felt that! Wait for it to scream, then hit the parasite!', 1.4); }
+    if (e.hp <= e.max * 0.5 && !e.said.half) { e.said.half = 1; H.say('nova', 'It is weakening! Keep hitting the parasite!', 1.2); }
+    if (e.hp <= 0) {
+      e.hp = 0; e.st = 'dying'; e.stT = 4; sfx.roar(); sfx.scream(); playMusic(null);
+      hazards.forEach(h => (h.t = 0)); for (const s of shots) removeShot(s); shots = [];
+      for (const en of enemies) killEnemy(en, true);
+    }
+    return true;
+  }
+  return false;
+}
+function upPatient(dt) {
+  const e = boss, Pt = e.Pt, fast = e.hp < e.max * 0.5 ? 0.8 : 1;
+  e.podOpen -= dt;
+  const open = e.podOpen > 0;
+  for (const r of Pt.ribs) r.children[0].rotation.x = damp(r.children[0].rotation.x, open ? 1.9 : 0.6, 6, dt);
+  Pt.coreGlow.material.opacity = damp(Pt.coreGlow.material.opacity, open ? 1 : 0.2, 6, dt);
+  Pt.core.scale.setScalar(open ? 1.2 + Math.sin(e.t * 12) * 0.15 : 0.8);
+  Pt.tentacle.rotation.x = Math.sin(e.t * 2.3) * 0.5 - 0.6; Pt.tentacle.rotation.z = Math.cos(e.t * 1.7) * 0.4;
+  Pt.eyeGlow.material.opacity = 0.7 + Math.random() * 0.3;
+  L.boss.position.set(e.x, 10, e.z + 10); L.boss.intensity = open ? 8 : 3;
+  const run = (k = 1) => { legSwing(Pt.legs, e.t * 9, 0.5 * k); Pt.body.position.y = 1.4 + Math.abs(Math.sin(e.t * 9)) * 0.08 * k; };
+  if (e.st !== 'dying') e.g.rotation.y = damp(e.g.rotation.y, Math.atan2(P.x - e.x, PZ - e.z), 5, dt);
+  switch (e.st) {
+    case 'enter':
+      e.z = Math.min(-26, e.z + 9 * dt); run();
+      if (e.z >= -26) { e.st = 'idle'; e.stT = 1.2; e.ready = true; sfx.roar(); sfx.scream(); G.shake = 0.6; }
+      break;
+    case 'idle':
+      e.stT -= dt; run(0.6);
+      e.x = damp(e.x, e.tx, 1.5, dt);
+      if (e.stT <= 0) {
+        const p = PZ_SEQ[e.seq++ % PZ_SEQ.length];
+        e.tx = rnd(-5, 5);
+        if (p === 'leap') { e.st = 'leapWind'; e.stT = 0.7 * fast; H.warn('JUMP!', '#ffb02e', 1.4); }
+        if (p === 'throw') { e.st = 'throwWind'; e.stT = 0.9 * fast; e.log = J.makeLog(); e.log.scale.setScalar(0.25); Pt.hand.add(e.log); H.warn('SHOOT IT OR DASH!', '#ff9a2a', 1.2); }
+        if (p === 'grab') { e.st = 'grabWind'; e.stT = 0.9 * fast; e.lockX = P.x; e.marker = MD.mesh(new THREE.RingGeometry(1.0, 1.5, 24), MD.addGlow(0xff2050, 0.9), e.lockX, 0.06, PZ - 0.3, scene); e.marker.rotation.x = -Math.PI / 2; e.extra.push(e.marker); H.warn('DASH!', '#5ad8ff', 1); sfx.charge(); }
+        if (p === 'scream') { e.st = 'scream'; e.stT = 1.4; sfx.roar(); sfx.scream(); H.warn('IT IS SCREAMING!', '#ff4af0', 1.4, true); }
+      }
+      break;
+    case 'leapWind':
+      e.stT -= dt;
+      Pt.body.position.y = damp(Pt.body.position.y, 0.9, 8, dt);
+      if (e.stT <= 0) { e.st = 'leapAir'; e.stT = 0.9; e.l0 = e.z; }
+      break;
+    case 'leapAir': {
+      e.stT -= dt;
+      const k = 1 - Math.max(0, e.stT) / 0.9;
+      e.z = lerp(e.l0, -12, k); e.y = Math.sin(k * Math.PI) * 9;
+      Pt.arms[0].rotation.x = Pt.arms[1].rotation.x = -2.8;
+      if (e.stT <= 0) {
+        e.y = 0;
+        spawnRing(e.x, e.z + 2, 13, 15, 0xff2ad0);
+        sfx.slam(); G.shake = 0.9;
+        fxBig.burst(tmp.set(e.x, 0.5, e.z + 2), 0x6a4a20, 40, 12, 0.8, -8);
+        e.st = 'leapBack'; e.stT = 1.3;
+      }
+      break;
+    }
+    case 'leapBack':
+      e.stT -= dt; run();
+      Pt.arms[0].rotation.x = damp(Pt.arms[0].rotation.x, -0.3, 4, dt); Pt.arms[1].rotation.x = damp(Pt.arms[1].rotation.x, -0.2, 4, dt);
+      e.z = damp(e.z, -26, 2, dt);
+      if (e.stT <= 0) { e.st = 'idle'; e.stT = 0.8 * fast; }
+      break;
+    case 'throwWind':
+      e.stT -= dt; run(0.4);
+      Pt.arms[1].rotation.x = damp(Pt.arms[1].rotation.x, -2.9, 6, dt);
+      if (e.stT <= 0) {
+        Pt.hand.getWorldPosition(tmp);
+        Pt.hand.remove(e.log); e.log = null;
+        const target = tmp2.set(P.x, 1.8, PZ);
+        const s = makeShot('log', tmp, target.clone().sub(tmp).normalize().multiplyScalar(17), { r: 1.2, hp: 4, dmg: 14, grav: 0 });
+        s.mesh.scale.setScalar(0.9);
+        sfx.whoosh();
+        Pt.arms[1].rotation.x = 0.6;
+        e.st = 'idle'; e.stT = 1.1 * fast;
+      }
+      break;
+    case 'grabWind':
+      e.stT -= dt;
+      e.marker.scale.setScalar(1 + Math.sin(e.t * 20) * 0.1);
+      Pt.tentacle.rotation.x = -2.2;
+      if (e.stT <= 0) {
+        e.st = 'grabHit'; e.stT = 0.35;
+        Pt.tentacle.getWorldPosition(tmp);
+        e.whip = MD.mesh(new THREE.CylinderGeometry(1, 1, 1, 10, 1, true), MD.addGlow(0xff2ad0, 0.9), 0, 0, 0, scene);
+        e.extra.push(e.whip);
+        beamBetween(e.whip, tmp, tmp2.set(e.lockX, 0.2, PZ - 0.4), 0.5);
+        sfx.slam(); G.shake = 0.5;
+        if (Math.abs(P.x - e.lockX) < 1.5) hurt(16);
+        fxBig.burst(tmp2, 0xff2ad0, 20, 8, 0.6, -6);
+      }
+      break;
+    case 'grabHit':
+      e.stT -= dt;
+      if (e.stT <= 0) { scene.remove(e.whip); scene.remove(e.marker); e.st = 'idle'; e.stT = 1.0 * fast; }
+      break;
+    case 'scream':
+      e.stT -= dt;
+      Pt.head.rotation.x = -0.6; Pt.jaw.rotation.x = 1.0;
+      G.shake = Math.max(G.shake, 0.3);
+      if (e.stT <= 0) {
+        const n = e.hp < e.max * 0.5 ? 3 : 2;
+        for (let i = 0; i < n; i++) spawnEnemy('mutant', { x: (i % 2 ? 1 : -1) * rnd(7, 11), z: e.z + rnd(-2, 4) });
+        e.podOpen = 5.5; e.st = 'open'; e.stT = 5.5;
+        H.warn('PARASITE EXPOSED!', '#ff4af0', 1.8, true);
+        if (!e.said.pod) { e.said.pod = 1; H.bark('nova', 'Its chest is open! Shoot the parasite now!', 1.2); }
+      }
+      break;
+    case 'open':
+      e.stT -= dt; run(0.3);
+      if (e.stT <= 0) { e.st = 'idle'; e.stT = 1.0 * fast; }
+      break;
+    case 'dying':
+      e.stT -= dt;
+      G.shake = Math.max(G.shake, 0.4);
+      e.g.rotation.x = damp(e.g.rotation.x, 0.5, 1.2, dt);
+      Pt.core.scale.setScalar(1 + Math.sin(e.t * 30) * 0.4 + (4 - e.stT) * 0.3);
+      if (Math.random() < 0.5) {
+        const w = pick(e.ws);
+        tmp.copy(w.c).add(tmp2.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(w.r));
+        fxBig.burst(tmp, pick([0xff4af0, 0x9aff7a, 0xffffff]), 12, 9, 0.6, -3);
+        if (Math.random() < 0.3) sfx.kill();
+      }
+      if (e.stT <= 0) {
+        tmp.set(e.x, 7, e.z);
+        fxBig.burst(tmp, 0xff4af0, 120, 26, 1.3, -3); fx.burst(tmp, 0xffffff, 60, 20, 0.6, 0);
+        debris.burst(tmp, [0x8a9a7a, 0x8a1a8a, 0x6a2aff], 24, 12, 0.7);
+        sfx.boom(); sfx.bigkill(); flashT = 0.6; G.shake = 1.4;
+        scene.remove(e.g); e.extra.forEach(m => scene.remove(m));
+        boss = null;
+        missionClear();
+        return;
+      }
+      break;
+  }
+  e.g.position.set(e.x, e.y, e.z);
+}
+
 // ===== Enemy shots, shockwaves and other hazards =====
-const SHOT_COL = { bolt: 0x6dff3a, blade: 0xd070ff, bomb: 0xff8a20, orb: 0xff4af0 };
+const SHOT_COL = { bolt: 0x6dff3a, blade: 0xd070ff, bomb: 0xff8a20, orb: 0xff4af0, acid: 0xc8ff20, mud: 0x8a6a30, log: 0x9a6a3a, laser: 0xffa020 };
+const LOBBED = { bomb: 1, mud: 1 };
 function makeShot(kind, pos, vel, o = {}) {
   const r = o.r || 0.25;
   let mesh;
   if (kind === 'blade') { mesh = MD.cyl(r, r, 0.08, MD.glow(0xe8b0ff), 0, 0, 0, null, 10); }
+  else if (kind === 'log') { mesh = J.makeLog(); }
+  else if (kind === 'mud') { mesh = MD.ball(r, MD.lam(0x4a3a1a, { emissive: 0x6a4a10, emissiveIntensity: 0.5 }), 0, 0, 0, null, 1); }
   else mesh = MD.ball(r, MD.glow(kind === 'bomb' ? 0xffb050 : SHOT_COL[kind]), 0, 0, 0, null, 1);
   mesh.position.copy(pos); scene.add(mesh);
   const glow = MD.glowSprite(SHOT_COL[kind], r * 5, 0.9); glow.position.copy(pos); scene.add(glow);
@@ -797,9 +1205,9 @@ function removeShot(s) { scene.remove(s.mesh); scene.remove(s.glow); s.dead = tr
 function popShot(s, byPlayer) {
   removeShot(s);
   fx.burst(s.pos, SHOT_COL[s.kind], 14, 6, 0.4, -4);
-  if (s.kind === 'bomb') {
-    fxBig.burst(s.pos, 0xff8a20, 24, 8, 0.6, -4); sfx.boom();
-    if (!byPlayer && Math.hypot(s.pos.x - P.x, s.pos.z - PZ) < 2.6 && P.y < 2) hurt(12);
+  if (LOBBED[s.kind]) {
+    fxBig.burst(s.pos, s.kind === 'mud' ? 0x8a6a30 : 0xff8a20, 24, 8, 0.6, -4); sfx.boom();
+    if (!byPlayer && Math.hypot(s.pos.x - P.x, s.pos.z - PZ) < 2.6 && P.y < 2) hurt(s.dmg);
   } else if (byPlayer) sfx.hit();
 }
 function updateShots(dt) {
@@ -810,8 +1218,9 @@ function updateShots(dt) {
     s.pos.addScaledVector(s.vel, dt); s.life -= dt;
     s.mesh.position.copy(s.pos); s.glow.position.copy(s.pos);
     if (s.kind === 'blade') { s.mesh.rotation.y += dt * 20; s.mesh.rotation.x = 0.3; }
+    else if (s.kind === 'log') { s.mesh.rotation.y += dt * 3; s.mesh.rotation.x += dt * 5; }
     else s.mesh.rotation.y += dt * 4;
-    if (s.kind === 'bomb') {
+    if (LOBBED[s.kind]) {
       s.glow.scale.setScalar(s.r * 5 * (1 + Math.sin(G.time * 20) * 0.2));
       if (s.pos.y < 0.3) { popShot(s, false); continue; }
     } else if (!P.dead && (s.pos.distanceTo(head) < s.r + 0.6 || s.pos.distanceTo(chest) < s.r + 0.6)) {
@@ -906,7 +1315,7 @@ function updateBoss(dt) {
   boss.t += dt;
   if (boss.flash > 0) boss.flash -= dt;
   for (const m of boss.mats) m.emissive.setHex(boss.flash > 0 ? 0x664477 : m.userData.e0);
-  if (boss.type === 'vrax') upVrax(dt); else upEmperor(dt);
+  if (boss.type === 'vrax') upVrax(dt); else if (boss.type === 'patient') upPatient(dt); else upEmperor(dt);
 }
 function upVrax(dt) {
   const v = boss, Pt = v.Pt, s = Math.sin(v.t * 3);
@@ -1284,9 +1693,10 @@ function chooseUpgrade(i) {
 }
 function startEnding() {
   phase = 'ending'; phaseT = 0;
-  clearSave();
+  // beating chapter 1 unlocks chapter 2 on CONTINUE
+  if (M.chapter === 2) clearSave(); else writeSave({ mission: 7, upgrades });
   playMusic('calm');
-  for (const [who, s] of ENDING) H.say(who, s, 2);
+  for (const [who, s] of M.chapter === 2 ? ENDING2 : ENDING) H.say(who, s, 2);
 }
 function updateEnding() {
   if (!H.dialogBusy() && phaseT > 3) { phase = 'credits'; phaseT = 0; creditY = 0; }
@@ -1297,7 +1707,7 @@ function drawHUD(dt) {
   const c = G.hctx, W = G.w, Hh = G.h, small = W < 700, t = G.time;
   if (phase === 'card') {
     H.fade(1);
-    const n = Math.floor(phaseT * 24), s = `MISSION ${mi + 1}: ${M.title}`;
+    const n = Math.floor(phaseT * 24), s = missionName();
     H.text(s.slice(0, n), W / 2, Hh / 2 - 10, Math.min(26, W / 22), '#fff', 'center', { glow: '#2a9dff' });
     if (phaseT > 1.4) H.text(M.sub, W / 2, Hh / 2 + 36, Math.min(12, W / 50), '#9fdcff');
     return;
@@ -1315,6 +1725,11 @@ function drawHUD(dt) {
     c.fillStyle = g; c.fillRect(0, 0, W, Hh);
   }
   if (flashT > 0) H.fade(flashT * 2, '255,255,255');
+  // a mutant reached the visor: red flash and static
+  if (scareT > 0) {
+    H.fade(scareT * 0.9, '160,0,0');
+    for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(255,255,255,${rnd(0, 0.25)})`; c.fillRect(0, rnd(0, Hh), W, rnd(1, 5)); }
+  }
   H.drawCracks(P.cracks);
   H.drawVisor(P.odT > 0, P.armor / P.max < 0.3 && !P.dead, t);
 
@@ -1353,7 +1768,7 @@ function drawHUD(dt) {
 
   // mission name and enemies left
   const tl = 18, fs = small ? 8 : 10;
-  H.text(`MISSION ${mi + 1}: ${M.title}`, tl, 22, fs, '#7fe3ff', 'left', { max: W * 0.5 });
+  H.text(missionName(), tl, 22, fs, '#7fe3ff', 'left', { max: W * 0.5 });
   if (!M.boss && phase === 'fight') H.text(`ALIENS LEFT: ${spawnList.length + enemies.length}`, tl, 40, fs, '#ffffff', 'left');
   // armour, overdrive, repair
   const bw = small ? Math.min(150, W * 0.36) : 240, by = isTouch ? 76 : Hh - 46;

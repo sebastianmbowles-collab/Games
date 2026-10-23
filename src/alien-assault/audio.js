@@ -110,6 +110,11 @@ const S = {
   robot(t) { for (let i = 0; i < 6; i++) osc('square', 300 + Math.random() * 900, t + i * 0.06, 0.05, 0.04); },
   power(t) { osc('sawtooth', 100, t, 0.8, 0.2, null, { to: 900, lp: 2500 }); },
   whoosh(t) { nz(t, 1.5, 0.4, null, { type: 'bandpass', f: 200, to: 2000, q: 1.2, attack: 0.6 }); },
+  scream(t) {
+    nz(t, 0.9, 0.45, null, { type: 'bandpass', f: 2200, to: 700, q: 3 });
+    osc('sawtooth', 900, t, 0.9, 0.18, null, { to: 300, vib: 30, vibAmt: 80, lp: 3000 });
+    osc('square', 1300, t, 0.6, 0.06, null, { to: 500, vib: 22, vibAmt: 120 });
+  },
   cloak(t) { osc('sine', 1200, t, 0.5, 0.06, null, { to: 200, vib: 20, vibAmt: 80 }); },
 };
 export const sfx = new Proxy({}, {
@@ -140,6 +145,21 @@ const SONGS = {
     bpm: 160, chords: [[36, [60, 63, 67]], [32, [56, 60, 63]], [39, [63, 67, 70]], [34, [58, 62, 65]]],
     kick: 'x.x.x..xx.x.x..x', snare: '....x.......x.x.', hat: 'x.xxx.xxx.xxx.xx',
     bass: [0, 0, 12, 0, 0, 12, 0, 0, 0, 0, 12, 0, 0, 12, 7, 10], lead: 'arp16', fill: true,
+  },
+  jungle: {
+    bpm: 126, chords: [[40, [64, 67, 71]], [36, [60, 64, 67]], [38, [62, 65, 69]], [35, [59, 62, 66]]],
+    kick: 'x..x..x...x..x..', snare: '....x.......x..x', hat: 'x.xxx.x.x.xxx.x.',
+    bass: [0, null, 7, 0, null, 12, 0, null, 0, null, 7, 0, 10, null, 12, null], lead: 'arp', fill: true,
+  },
+  mutant: {
+    bpm: 98, chords: [[37, [61, 64, 68]], [38, [62, 65, 68]], [37, [61, 64, 67]], [36, [60, 63, 66]]],
+    kick: 'x.......x..x....', snare: '....x.......x...', hat: '....x.x.....x.x.',
+    bass: [0, null, null, 1, null, null, 0, null, null, null, 6, null, 0, null, null, null], lead: 'slow',
+  },
+  patient: {
+    bpm: 164, chords: [[37, [61, 64, 68]], [36, [60, 63, 67]], [33, [57, 61, 64]], [34, [58, 61, 65]]],
+    kick: 'x.xxx.x.x.xxx.xx', snare: '....x..x....x.xx', hat: 'xxxxxxxxxxxxxxxx',
+    bass: [0, 0, 12, 0, 1, 0, 12, 0, 0, 0, 12, 0, 6, 0, 13, 12], lead: 'arp16', fill: true,
   },
   calm: {
     bpm: 84, chords: [[41, [65, 69, 72]], [38, [62, 65, 69]], [34, [58, 62, 65]], [36, [60, 64, 67]]],
