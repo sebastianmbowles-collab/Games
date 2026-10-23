@@ -61,7 +61,7 @@ export function buildGame() {
 }
 
 function buildRoom() {
-  roomG = MD.group(0, 0, 0, roomG);
+  roomG = MD.group(0, 0, 0, scene);
   const wall1 = MD.phong(0x4a5474, { map: TEX.panel, shininess: 80 }), wall2 = MD.phong(0x3a4262, { map: TEX.panel, shininess: 80 });
   const glyph = new THREE.MeshBasicMaterial({ map: TEX.glyph }), rib = MD.phong(0x23293a, { shininess: 90 });
   const lamp = MD.glow(0x9fe8ff), lampDead = MD.glow(0x1a2030), lampRed = MD.glow(0xff3030);
