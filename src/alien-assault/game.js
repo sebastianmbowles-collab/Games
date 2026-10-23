@@ -638,6 +638,7 @@ function beamBetween(m, a, b, r) {
 function updateRoom(dt) {
   const t = G.time;
   if (inJungle) {
+    flashT -= dt;
     updateJungle(jungle, dt, rail, t);
     for (const p of props) p.position.z += rail * dt;
     props = props.filter(p => { if (p.position.z > PZ + 25) { scene.remove(p); return false; } return true; });

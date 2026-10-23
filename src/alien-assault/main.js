@@ -5,6 +5,7 @@ import { makeLogo } from './hud.js';
 import { buildTitle, Title, titleDebug } from './title.js';
 import { buildGame, Game, debug } from './game.js';
 import { buildCutscene, Cut, cutTime } from './cutscene.js';
+import { PROG, applySkin } from './progress.js';
 
 initEngine();
 makeTextures();
@@ -38,4 +39,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // handy for testing and screenshots
-window.__AA = { G, Game, Title, debug, titleDebug, god: false, cutT: cutTime };
+window.__AA = { G, Game, Title, debug, titleDebug, god: false, cutT: cutTime, setSkin: id => { PROG.skin = id; applySkin(G.time); } };
