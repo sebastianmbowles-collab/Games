@@ -64,7 +64,7 @@ export class Debris {
     this.items = [];
     const geo = new THREE.BoxGeometry(1, 1, 1);
     for (let i = 0; i < n; i++) {
-      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }));
+      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.5, roughness: 0.4 }));
       m.visible = false; scene.add(m);
       this.items.push({ m, v: new THREE.Vector3(), spin: new THREE.Vector3(), life: 0, s: 1 });
     }

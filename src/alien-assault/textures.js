@@ -10,7 +10,7 @@ function make(w, h, draw, o = {}) {
   draw(x, w, h);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  if (!o.smooth) t.magFilter = THREE.NearestFilter;
+  t.anisotropy = 8;
   if (o.repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(o.repeat[0], o.repeat[1]); }
   t.userData.ctx = x;
   return t;
@@ -138,6 +138,21 @@ export function makeTextures() {
       x.beginPath();
       for (let a = 0; a < 9; a += 0.2) { const r = a * 3.2, ang = a + k * 2.1; x.lineTo(32 + Math.cos(ang) * r, 32 + Math.sin(ang) * r); }
       x.stroke();
+    }
+  }, { smooth: true });
+  // soft light beam: bright at the top, fading out at the bottom
+  TEX.beam = make(8, 128, (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+  }, { smooth: true });
+  // drifting fog: soft lumpy blobs
+  TEX.fog = make(128, 128, x => {
+    for (let i = 0; i < 26; i++) {
+      const cx = rnd(20, 108), cy = rnd(20, 108), r = rnd(14, 34);
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.fillRect(0, 0, 128, 128);
     }
   }, { smooth: true });
   TEX.core = make(128, 128, () => {}, { smooth: true });

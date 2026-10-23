@@ -1,22 +1,22 @@
 export const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-// How chunky the pixels are. "64-BIT" renders at about a third of screen size, like an old console.
+// Graphics quality. SMOOTH HD has glow, shadows and full resolution. 64-BIT RETRO is the old chunky look.
 export const GFX = [
-  { name: 'SHARP', scale: 1.5 },
-  { name: '64-BIT', scale: 3 },
-  { name: 'SUPER CHUNKY', scale: 4.5 },
+  { name: 'SMOOTH HD', pr: 2, bloom: true, shadows: true },
+  { name: 'SMOOTH', pr: 1, bloom: true, shadows: false },
+  { name: '64-BIT RETRO', pr: 0.34, bloom: false, shadows: false, retro: true },
 ];
 
 export const G = {
   w: 1, h: 1, dpr: 1, time: 0, mode: 'title',
-  settings: { music: 6, sfx: 8, gfx: 1, hints: true },
+  settings: { music: 6, sfx: 8, gfx: isTouch ? 1 : 0, hints: true },
   keys: {}, pressed: {},
   mouse: { x: 0, y: 0, nx: 0, ny: 0, down: false, pid: null, moved: false },
   cameras: [], shake: 0,
 };
-try { Object.assign(G.settings, JSON.parse(localStorage.getItem('aa-settings') || '{}')); } catch (e) { /* no storage */ }
+try { Object.assign(G.settings, JSON.parse(localStorage.getItem('aa-settings2') || '{}')); } catch (e) { /* no storage */ }
 export function saveSettings() {
-  try { localStorage.setItem('aa-settings', JSON.stringify(G.settings)); } catch (e) { /* no storage */ }
+  try { localStorage.setItem('aa-settings2', JSON.stringify(G.settings)); } catch (e) { /* no storage */ }
 }
 export function loadSave() {
   try { return JSON.parse(localStorage.getItem('aa-save') || 'null'); } catch (e) { return null; }

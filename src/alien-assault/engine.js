@@ -1,12 +1,22 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { G, GFX, isTouch } from './state.js';
 import { initAudio } from './audio.js';
 export { THREE };
 
 export function initEngine() {
   const canvas = document.getElementById('gl');
-  G.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-  G.renderer.setPixelRatio(1);
+  G.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  G.renderer.toneMapping = THREE.NeutralToneMapping;
+  G.renderer.toneMappingExposure = 1.1;
+  G.renderer.shadowMap.enabled = GFX[G.settings.gfx].shadows;
+  G.renderer.shadowMap.type = THREE.PCFShadowMap;
+  const pm = new THREE.PMREMGenerator(G.renderer);
+  G.envMap = pm.fromScene(new RoomEnvironment(), 0.04).texture;
   G.hud = document.getElementById('hud');
   G.hctx = G.hud.getContext('2d');
   window.addEventListener('resize', resize);
@@ -49,14 +59,44 @@ export function initEngine() {
 export function resize() {
   G.w = window.innerWidth; G.h = window.innerHeight;
   G.dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const s = GFX[G.settings.gfx].scale;
-  G.renderer.setSize(Math.max(120, Math.round(G.w / s)), Math.max(90, Math.round(G.h / s)), false);
+  const q = GFX[G.settings.gfx];
+  const pr = q.retro ? q.pr : Math.min(G.dpr, q.pr);
+  G.renderer.setPixelRatio(pr);
+  G.renderer.setSize(G.w, G.h, false);
+  G.renderer.domElement.style.imageRendering = q.retro ? 'pixelated' : 'auto';
+  for (const c of composers) { c.c.setPixelRatio(pr); c.c.setSize(G.w, G.h); }
   G.hud.width = Math.round(G.w * G.dpr); G.hud.height = Math.round(G.h * G.dpr);
   for (const c of G.cameras) {
     c.aspect = G.w / G.h;
     if (c.userData.baseFov) c.fov = c.userData.baseFov * (c.aspect < 1 ? 1.25 : 1);
     c.updateProjectionMatrix();
   }
+}
+
+// One renderer per scene that adds the glow (bloom) on top. Falls back to a plain render when glow is off.
+const composers = [];
+export function makeComposer(scene, camera, strength = 0.85) {
+  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+  const c = new EffectComposer(G.renderer, rt);
+  c.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), strength, 0.4, 0.93);
+  c.addPass(bloom);
+  c.addPass(new OutputPass());
+  const o = { c, bloom, render() { if (GFX[G.settings.gfx].bloom) c.render(); else G.renderer.render(scene, camera); } };
+  composers.push(o);
+  resize();
+  return o;
+}
+// shadows on/off needs every material rebuilt
+export function applyQuality(scenes) {
+  G.renderer.shadowMap.enabled = GFX[G.settings.gfx].shadows;
+  for (const sc of scenes) sc.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => (m.needsUpdate = true)); });
+  resize();
+}
+// make a whole model cast (and optionally catch) shadows
+export function shadows(obj, cast = true, receive = false) {
+  obj.traverse(o => { if (o.isMesh && !o.material.transparent && o.material.type !== 'MeshBasicMaterial') { o.castShadow = cast; o.receiveShadow = receive; } });
+  return obj;
 }
 
 export function showTouch(on) {

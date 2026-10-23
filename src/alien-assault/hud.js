@@ -341,11 +341,27 @@ export function makeLogo() {
   word('ASSAULT', 390, 124, true);
   logo = out;
 }
-export function drawLogo(cx, top, width, flick) {
+let shineC = null;
+export function drawLogo(cx, top, width, flick, o = {}) {
   if (!logo) return;
   const c = G.hctx, h = (width * logo.height) / logo.width;
-  c.globalAlpha = flick > 0 && Math.random() < 0.5 ? 0.35 : 1;
+  const a = o.alpha ?? 1;
+  c.globalAlpha = a * (flick > 0 && Math.random() < 0.5 ? 0.35 : 1);
   c.drawImage(logo, cx - width / 2, top, width, h);
+  // a bright shine sweeping across the metal letters
+  if (o.shine !== undefined && o.shine > -0.2 && o.shine < 1.2) {
+    if (!shineC) { shineC = document.createElement('canvas'); shineC.width = logo.width; shineC.height = logo.height; }
+    const s = shineC.getContext('2d'), W = logo.width, Hh = logo.height, x = o.shine * W * 1.3 - W * 0.15;
+    s.globalCompositeOperation = 'source-over'; s.clearRect(0, 0, W, Hh);
+    s.drawImage(logo, 0, 0);
+    s.globalCompositeOperation = 'source-in';
+    const g = s.createLinearGradient(x - 160, 0, x + 160, Hh * 0.4);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.85)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    s.fillStyle = g; s.fillRect(0, 0, W, Hh);
+    c.globalCompositeOperation = 'lighter';
+    c.drawImage(shineC, cx - width / 2, top, width, h);
+    c.globalCompositeOperation = 'source-over';
+  }
   if (flick > 0) {
     c.globalCompositeOperation = 'lighter'; c.globalAlpha = Math.min(1, flick);
     c.drawImage(logo, cx - width / 2, top, width, h);

@@ -1,4 +1,4 @@
-import { THREE, toScreen } from './engine.js';
+import { THREE, toScreen, makeComposer, shadows } from './engine.js';
 import { G, isTouch, rnd, clamp, lerp, pick, damp, smooth, angDiff, shuffle, writeSave, clearSave } from './state.js';
 import { sfx, playMusic } from './audio.js';
 import { TEX, updateCore } from './textures.js';
@@ -12,7 +12,7 @@ const UPV = new THREE.Vector3(0, 1, 0);
 const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Vector3();
 const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), sph = new THREE.Sphere();
 
-let scene, camera, arms, AP, patch, PP, fx, fxBig, debris, L = {};
+let scene, camera, composer, arms, AP, patch, PP, fx, fxBig, debris, L = {};
 let panels = [], covers = [], doorFrame, roof, outside;
 let P, enemies = [], balls = [], shots = [], rings = [], hazards = [], boss = null;
 let mi = 0, M = null, spawnList = [], spawnT = 0, phase = 'card', phaseT = 0, upgrades = [], scanned = new Set();
@@ -31,6 +31,10 @@ export function buildGame() {
   camera.rotation.order = 'YXZ';
   G.cameras.push(camera);
   scene.add(camera);
+  scene.environment = G.envMap;
+  scene.environmentIntensity = 0.3;
+  (G.scenes ||= []).push(scene);
+  composer = makeComposer(scene, camera, 0.6);
   buildRoom();
   buildOutside();
   buildLights();
@@ -70,6 +74,7 @@ function buildRoom() {
   }
   const floor = MD.mesh(new THREE.CircleGeometry(R + 0.6, 24), MD.phong(0x8a93a8, { map: TEX.floor, shininess: 30 }), 0, 0, 0, scene);
   floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
   for (const [r, c] of [[4.5, 0x2a9dff], [9, 0x39ff6a]]) {
     const ring = MD.mesh(new THREE.RingGeometry(r, r + 0.12, 32), MD.glow(c), 0, 0.02, 0, scene);
     ring.rotation.x = -Math.PI / 2;
@@ -103,6 +108,7 @@ function buildRoom() {
   // the broken hatch lying on the floor
   const hatch = MD.box(5, 0.35, 6, MD.phong(0x48506a, { map: TEX.panel }), 6.5, 0.9, -9.5, scene);
   hatch.rotation.set(0.15, 0.6, 0.25);
+  shadows(hatch, true, true);
   // alien pods: cover for Riftstalkers
   const podM = MD.phong(0x3a2a6a, { shininess: 90 }), podG = MD.glow(0x39ff6a);
   for (const [x, z] of [[-7.5, -6.5], [7.8, -4.5], [-3.5, -10.5], [3.8, -0.5], [-6.2, 2.2], [0.5, -7]]) {
@@ -110,6 +116,7 @@ function buildRoom() {
     MD.cyl(0.95, 1.1, 1.9, podM, 0, 0.95, 0, g, 8);
     MD.cyl(0.7, 0.95, 0.4, podM, 0, 2.05, 0, g, 8);
     MD.box(0.5, 0.8, 0.1, podG, 0, 1.1, 1.0, g).lookAt(0, 1.1, PZ);
+    shadows(g, true, true);
     covers.push({ x, z, used: false });
   }
   // consoles off to each side of UNIT-07
@@ -136,7 +143,7 @@ function buildOutside() {
   }
   for (let i = 0; i < 10; i++) {
     const r = rnd(2, 8);
-    MD.ball(r, new THREE.MeshLambertMaterial({ color: 0x3aff6a, emissive: 0x18a83a, flatShading: true }), rnd(-120, 120), rnd(30, 110), rnd(-120, -260), outside, 0);
+    MD.rock(r, MD.lam(0x3aff6a, { emissive: 0x22d84a, emissiveIntensity: 0.8 }), rnd(-120, 120), rnd(30, 110), rnd(-120, -260), outside);
   }
   for (let i = 0; i < 6; i++) MD.box(rnd(2, 4), rnd(3, 7), rnd(2, 4), MD.lam(0x4a2a5a), rnd(-25, 25), 1.5, rnd(-25, -45), outside).rotation.set(rnd(-0.3, 0.3), rnd(0, 3), rnd(-0.3, 0.3));
   for (let i = 0; i < 4; i++) {
@@ -149,6 +156,11 @@ function buildLights() {
   scene.add(new THREE.AmbientLight(0x5a4a90, 0.55));
   L.hemi = new THREE.HemisphereLight(0x9a7aff, 0x140818, 0.7); scene.add(L.hemi);
   L.sun = new THREE.DirectionalLight(0xffe6ff, 1.2); L.sun.position.set(-5, 20, -30); scene.add(L.sun);
+  // overhead light that casts the shadows inside the UFO
+  L.key = new THREE.DirectionalLight(0xd8e4ff, 1.4); L.key.position.set(5, 22, 10); L.key.target.position.set(0, 0, -4);
+  L.key.castShadow = true; L.key.shadow.mapSize.set(2048, 2048); L.key.shadow.bias = -0.0005; L.key.shadow.normalBias = 0.03;
+  Object.assign(L.key.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 60 });
+  scene.add(L.key); scene.add(L.key.target);
   L.ceil = new THREE.PointLight(0x8ad0ff, 2.2, 30, 0); L.ceil.position.set(0, 8, 0); scene.add(L.ceil);
   L.door = new THREE.PointLight(0xc040ff, 4, 30, 0); L.door.position.set(0, 4, -18); scene.add(L.door);
   L.emer = new THREE.PointLight(0xff2a2a, 2.5, 20, 0); L.emer.position.set(-10, 6, -1); scene.add(L.emer);
@@ -242,7 +254,7 @@ function update(dt) {
     H.updateDialog(dt);
   }
   updateCamera(dt);
-  G.renderer.render(scene, camera);
+  composer.render();
   drawHUD(paused ? 0 : dt);
 }
 
@@ -350,7 +362,7 @@ function fire() {
   sfx.shoot(od);
   for (let k = 0; k < 5; k++) fx.spawn(tmp2.x, tmp2.y, tmp2.z, rnd(-2, 2), rnd(-2, 2), rnd(-2, 2), 0x8fd4ff, 0.15);
 }
-const ballGeo = new THREE.IcosahedronGeometry(1, 2);
+const ballGeo = new THREE.SphereGeometry(1, 24, 16);
 let ballMat = null, ballMatOD = null;
 function spawnBall(from, target, r, dmg, od) {
   if (!ballMat) { ballMat = new THREE.MeshBasicMaterial({ map: TEX.moon }); ballMatOD = new THREE.MeshBasicMaterial({ map: TEX.moonOD }); }
@@ -561,6 +573,7 @@ function spawnEnemy(type, o = {}) {
     e.lock = new THREE.Vector3();
   }
   g.position.set(e.x, e.y, e.z);
+  shadows(g);
   enemies.push(e);
   return e;
 }
@@ -857,7 +870,7 @@ function updateHazards(dt) {
 
 // ===== GENERAL VRAX =====
 function spawnVrax() {
-  const g = MD.makeVrax();
+  const g = shadows(MD.makeVrax());
   g.scale.setScalar(1.3);
   g.position.set(0, 0, -30);
   scene.add(g);
@@ -1022,7 +1035,7 @@ function exhaust(v, time) {
 const PORTALS = [[-6, 3, -4], [6, 4, -3], [-3, 5.5, -8], [3.5, 2.5, 0], [0, 6.5, -6]];
 let portalGeo = null;
 function spawnEmperor() {
-  const g = MD.makeEmperor();
+  const g = shadows(MD.makeEmperor());
   g.scale.setScalar(4.5);
   g.position.set(0, -40, -30);
   scene.add(g);

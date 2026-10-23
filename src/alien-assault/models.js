@@ -1,9 +1,17 @@
 import { THREE } from './engine.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { TEX } from './textures.js';
 
 // ===== Building blocks =====
-export const phong = (color, o = {}) => new THREE.MeshPhongMaterial({ color, flatShading: true, shininess: 60, specular: 0x666677, ...o });
-export const lam = (color, o = {}) => new THREE.MeshLambertMaterial({ color, flatShading: true, ...o });
+// Shiny, smooth materials that react to light and reflections. "shininess" from the old look still works.
+function std(color, o, base) {
+  const { shininess, specular: _specular, flatShading: _flat, ...rest } = o;
+  const m = new THREE.MeshStandardMaterial({ color, ...base, ...rest });
+  if (shininess !== undefined) m.roughness = Math.max(0.15, 0.75 - shininess / 180);
+  return m;
+}
+export const phong = (color, o = {}) => std(color, o, { metalness: 0.7, roughness: 0.35 });
+export const lam = (color, o = {}) => std(color, o, { metalness: 0.05, roughness: 0.55 });
 export const glow = (color, o = {}) => new THREE.MeshBasicMaterial({ color, ...o });
 export const addGlow = (color, opacity = 0.5) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
 export function mesh(geo, mat, x = 0, y = 0, z = 0, p = null) {
@@ -12,10 +20,23 @@ export function mesh(geo, mat, x = 0, y = 0, z = 0, p = null) {
   if (p) p.add(m);
   return m;
 }
-export const box = (w, h, d, mat, x, y, z, p) => mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z, p);
-export const ball = (r, mat, x, y, z, p, det = 1) => mesh(new THREE.IcosahedronGeometry(r, det), mat, x, y, z, p);
-export const cyl = (rt, rb, h, mat, x, y, z, p, seg = 8) => mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y, z, p);
-export const cone = (r, h, mat, x, y, z, p, seg = 6) => mesh(new THREE.ConeGeometry(r, h, seg), mat, x, y, z, p);
+export const box = (w, h, d, mat, x, y, z, p) => mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(w, h, d) * 0.18), mat, x, y, z, p);
+export const ball = (r, mat, x, y, z, p, det = 1) => mesh(new THREE.SphereGeometry(r, det < 1 ? 12 : 24, det < 1 ? 8 : 16), mat, x, y, z, p);
+export const cyl = (rt, rb, h, mat, x, y, z, p, seg = 8) => mesh(new THREE.CylinderGeometry(rt, rb, h, Math.max(seg * 2, 16)), mat, x, y, z, p);
+export const cone = (r, h, mat, x, y, z, p, seg = 6) => mesh(new THREE.ConeGeometry(r, h, Math.max(seg * 2, 12)), mat, x, y, z, p);
+// a lumpy smooth space rock
+export function rock(r, mat, x, y, z, p) {
+  const g = new THREE.IcosahedronGeometry(r, 3), pa = g.attributes.position, v = new THREE.Vector3();
+  const seed = Math.random() * 10;
+  for (let i = 0; i < pa.count; i++) {
+    v.fromBufferAttribute(pa, i);
+    const n = Math.sin(v.x * 1.7 / r + seed) * Math.sin(v.y * 2.1 / r + seed * 2) * Math.sin(v.z * 1.3 / r - seed);
+    v.multiplyScalar(1 + n * 0.22 + (Math.random() - 0.5) * 0.04);
+    pa.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  return mesh(g, mat, x, y, z, p);
+}
 export function group(x = 0, y = 0, z = 0, p = null) {
   const g = new THREE.Group();
   g.position.set(x, y, z);
@@ -151,7 +172,7 @@ export function makeFPArms() {
 // ===== Patch, the repair drone =====
 export function makePatch() {
   const g = new THREE.Group(), P = {};
-  const white = phong(0xf4f6fa, { shininess: 100 }), orange = phong(0xff7a14, { shininess: 80 }), dark = phong(0x2a2f3a);
+  const white = lam(0xdfe4ec, { roughness: 0.4 }), orange = lam(0xff7a14, { roughness: 0.4 }), dark = phong(0x2a2f3a);
   const top = mesh(new THREE.SphereGeometry(0.4, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), white, 0, 0, 0, g);
   const bot = mesh(new THREE.SphereGeometry(0.4, 12, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), orange, 0, 0, 0, g);
   top.userData.k = bot.userData.k = 1;

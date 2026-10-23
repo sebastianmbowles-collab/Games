@@ -1,4 +1,4 @@
-import { THREE, resize, toScreen } from './engine.js';
+import { THREE, resize, toScreen, makeComposer, shadows, applyQuality } from './engine.js';
 import { G, GFX, isTouch, rnd, clamp, lerp, smooth, pick, damp, loadSave, saveSettings } from './state.js';
 import { sfx, playMusic, applyVolumes } from './audio.js';
 import { TEX } from './textures.js';
@@ -7,7 +7,8 @@ import { Particles } from './fx.js';
 import { CREDITS } from './data.js';
 import * as H from './hud.js';
 
-let scene, camera, unit, UP, patch, PP, fx, smoke, hemi, flashLight, scanBeam;
+let scene, camera, composer, unit, UP, patch, PP, fx, smoke, embers, hemi, flashLight, scanBeam, spot;
+let beams = [], fogs = [], logoT = 0;
 let brute, vrax, voidfly, zippits = [], asteroids = [], ships = [], bolts = [], booms = [], fires = [], bigShip;
 let t = 0, menu = 'main', sel = 0, setSel = 0, rects = [], lastMX = -1, lastMY = -1;
 let lightningT = 3, flick = 0, boltMesh = null, boltT = 0, startT = 0, creditY = 0, quitT = 0, showControls = false;
@@ -52,19 +53,40 @@ export function buildTitle() {
   camera = new THREE.PerspectiveCamera(55, 1, 0.1, 700);
   camera.userData.baseFov = 55;
   G.cameras.push(camera);
+  scene.environment = G.envMap;
+  scene.environmentIntensity = 0.32;
+  (G.scenes ||= []).push(scene);
+  composer = makeComposer(scene, camera, 0.7);
 
   const sky = MD.mesh(new THREE.SphereGeometry(450, 24, 16), new THREE.MeshBasicMaterial({ map: TEX.sky, side: THREE.BackSide, fog: false }), 0, -40, 0, scene);
   sky.rotation.y = 1.2;
   MD.makeStars(scene);
-  const gg = new THREE.PlaneGeometry(700, 700, 40, 40);
+  // smooth rolling alien ground with a few craters
+  const gg = new THREE.PlaneGeometry(700, 700, 160, 160);
   const pa = gg.attributes.position;
-  for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i); if (Math.hypot(x, y + 20) > 30) pa.setZ(i, Math.random() * 2.5 + Math.max(0, -y - 150) * 0.08); }
+  const craters = [[-18, 30, 6], [22, 45, 8], [-40, 70, 10], [8, 95, 7]];
+  for (let i = 0; i < pa.count; i++) {
+    const x = pa.getX(i), y = pa.getY(i);
+    let h = Math.sin(x * 0.05) * Math.cos(y * 0.04) * 1.6 + Math.sin(x * 0.13 + y * 0.09) * 0.5;
+    for (const [cx, cy, r] of craters) { const d = Math.hypot(x - cx, y - cy) / r; if (d < 1.4) h += d < 1 ? -(1 - d * d) * r * 0.25 : (1.4 - d) * r * 0.2; }
+    h *= Math.min(1, Math.max(0, (Math.hypot(x, y + 2) - 6) / 14));
+    h += Math.max(0, y - 160) * 0.12;
+    pa.setZ(i, h);
+  }
   gg.computeVertexNormals();
-  MD.mesh(gg, MD.lam(0xb070d8, { map: TEX.ground }), 0, 0, 0, scene).rotation.x = -Math.PI / 2;
+  const ground = MD.mesh(gg, MD.lam(0xb070d8, { map: TEX.ground, roughness: 0.85 }), 0, 0, 0, scene);
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
 
   scene.add(new THREE.AmbientLight(0x6a4a9a, 0.7));
   hemi = new THREE.HemisphereLight(0xc08aff, 0x200a28, 1.0); scene.add(hemi);
   const key = new THREE.DirectionalLight(0xd6ecff, 1.5); key.position.set(6, 12, 16); scene.add(key);
+  // spotlight on UNIT-07 that throws a real shadow, and a blue rim light behind it
+  spot = new THREE.SpotLight(0xe8f0ff, 60, 40, 0.42, 0.6, 1.2);
+  spot.position.set(5, 16, 9); spot.target.position.set(0, 2.5, 0);
+  spot.castShadow = true; spot.shadow.mapSize.set(2048, 2048); spot.shadow.bias = -0.0004; spot.shadow.normalBias = 0.02;
+  scene.add(spot); scene.add(spot.target);
+  const back = new THREE.SpotLight(0x33b8ff, 80, 30, 0.6, 0.8, 1.2); back.position.set(-2, 9, -7); back.target.position.set(0, 4, 0);
+  scene.add(back); scene.add(back.target);
   const rim = new THREE.DirectionalLight(0xff3dd0, 2.2); rim.position.set(-10, 8, -12); scene.add(rim);
   const rim2 = new THREE.DirectionalLight(0x39ff6a, 1.2); rim2.position.set(12, 4, -8); scene.add(rim2);
   const vis = new THREE.PointLight(0x33aaff, 2.5, 5, 0); vis.position.set(0, 5.6, 2.2); scene.add(vis);
@@ -74,9 +96,9 @@ export function buildTitle() {
   for (let i = 0; i < 34; i++) {
     const x = rnd(-90, 90), z = rnd(-30, -140);
     if (Math.abs(x) < 9 && z > -45) continue;
-    scene.add(makeRuin(x, z));
+    scene.add(shadows(makeRuin(x, z), true, true));
   }
-  const dome = MD.mesh(new THREE.SphereGeometry(12, 14, 8, 0, Math.PI * 1.4, 0, Math.PI / 2), MD.lam(0xa8c8ff, { side: THREE.DoubleSide }), -34, 0, -70, scene);
+  const dome = MD.mesh(new THREE.SphereGeometry(12, 14, 8, 0, Math.PI * 1.4, 0, Math.PI / 2), MD.lam(0x5a6a9a, { side: THREE.DoubleSide }), -34, 0, -70, scene);
   dome.rotation.y = 0.8;
   // fires among the ruins
   for (let i = 0; i < 12; i++) {
@@ -87,7 +109,7 @@ export function buildTitle() {
   // glowing green asteroids
   for (let i = 0; i < 16; i++) {
     const r = rnd(2, 11);
-    const a = MD.ball(r, new THREE.MeshLambertMaterial({ color: 0x3aff6a, emissive: 0x18a83a, flatShading: true }), rnd(-200, 200), rnd(50, 170), rnd(-160, -320), scene, 0);
+    const a = MD.rock(r, MD.lam(0x3aff6a, { emissive: 0x22d84a, emissiveIntensity: 0.8 }), rnd(-200, 200), rnd(50, 170), rnd(-160, -320), scene);
     a.scale.set(1, rnd(0.6, 1), rnd(0.7, 1.2));
     const gl = MD.glowSprite(0x39ff6a, r * 3.5, 0.45); gl.position.copy(a.position); scene.add(gl);
     asteroids.push({ m: a, spin: new THREE.Vector3(rnd(-0.3, 0.3), rnd(-0.3, 0.3), 0) });
@@ -95,25 +117,30 @@ export function buildTitle() {
   // enormous alien spaceships over the colony
   for (const [x, y, z, s, l] of [[-70, 75, -210, 1, 0x39ff6a], [100, 95, -270, 0.8, 0xff3df0], [15, 62, -160, 0.55, 0x39ff6a]]) {
     const sh = makeShip(s, l); sh.position.set(x, y, z); sh.rotation.z = rnd(-0.08, 0.08); scene.add(sh);
-    MD.mesh(new THREE.ConeGeometry(12, 70, 12, 1, true), MD.addGlow(l, 0.12), 0, -40, 0, sh);
     ships.push({ g: sh, base: sh.position.clone(), ph: rnd(0, 9) });
+    // searchlight sweeping down from the ship
+    const pivot = MD.group(x, y - 6 * s, z, scene);
+    const mat = new THREE.MeshBasicMaterial({ color: l, map: TEX.beam, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    const cone = MD.mesh(new THREE.ConeGeometry(14, 120, 24, 1, true), mat, 0, -60, 0, pivot);
+    cone.rotation.x = Math.PI;
+    beams.push({ pivot, ph: rnd(0, 9), sp: rnd(0.25, 0.45) });
   }
   // the ship the camera zooms toward when you press PLAY
   bigShip = makeShip(0.18, 0xff3df0); bigShip.visible = false; scene.add(bigShip);
 
   // UNIT-07, center stage
-  unit = MD.makeUnit07(); UP = unit.userData.parts; scene.add(unit);
+  unit = shadows(MD.makeUnit07()); UP = unit.userData.parts; scene.add(unit);
   // Patch floating beside it
-  patch = MD.makePatch(); PP = patch.userData.parts; patch.scale.setScalar(1.7); patch.position.set(-3.4, 6.2, 2.2); scene.add(patch);
+  patch = shadows(MD.makePatch()); PP = patch.userData.parts; patch.scale.setScalar(1.7); patch.position.set(-3.4, 6.2, 2.2); scene.add(patch);
   scanBeam = MD.mesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), MD.addGlow(0x33bbff, 0.5), 0, 0, 0, scene);
   // Bruteclaw towering over Zippits
-  brute = MD.makeBruteclaw(); brute.scale.setScalar(1.6); brute.position.set(-11, 0, -22); brute.rotation.y = 0.35; scene.add(brute);
+  brute = shadows(MD.makeBruteclaw()); brute.scale.setScalar(1.6); brute.position.set(-11, 0, -22); brute.rotation.y = 0.35; scene.add(brute);
   for (let i = 0; i < 7; i++) {
-    const z = MD.makeZippit(); z.scale.setScalar(1.3); z.position.set(-40 + i * 11, 0, rnd(-15, -20)); z.rotation.y = Math.PI / 2;
+    const z = shadows(MD.makeZippit()); z.scale.setScalar(1.3); z.position.set(-40 + i * 11, 0, rnd(-15, -20)); z.rotation.y = Math.PI / 2;
     scene.add(z); zippits.push({ g: z, P: z.userData.parts, ph: rnd(0, 9), sp: rnd(2.5, 3.5) });
   }
   // Voidfly hovering above the battlefield
-  voidfly = MD.makeVoidfly(); voidfly.scale.setScalar(1.8); voidfly.position.set(9, 8, -14); voidfly.rotation.y = -0.4; scene.add(voidfly);
+  voidfly = shadows(MD.makeVoidfly()); voidfly.scale.setScalar(1.8); voidfly.position.set(9, 8, -14); voidfly.rotation.y = -0.4; scene.add(voidfly);
   // General Vrax on a distant cliff
   const cliff = MD.cyl(6, 14, 16, MD.lam(0x2a0f3c), 50, 8, -66, scene, 7);
   cliff.rotation.y = 0.4;
@@ -133,8 +160,15 @@ export function buildTitle() {
     const s = MD.glowSprite(0xffa040, 1, 0.9); scene.add(s);
     booms.push({ m, s, t: rnd(-3, 0), x: rnd(-80, 80), y: rnd(0, 18), z: rnd(-40, -150) });
   }
+  // fog drifting low over the battlefield
+  for (let i = 0; i < 9; i++) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshBasicMaterial({ map: TEX.fog, color: pick([0x8a4aff, 0x4ad8ff, 0xff4ad8]), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.position.set(rnd(-90, 90), rnd(1, 4), rnd(-20, -120)); scene.add(m);
+    fogs.push({ m, v: rnd(1, 3) * (Math.random() < 0.5 ? 1 : -1) });
+  }
   fx = new Particles(scene, 500, 0.35);
   smoke = new Particles(scene, 200, 3.5);
+  embers = new Particles(scene, 400, 0.5);
 }
 function resetBolt(b, anywhere) {
   const dir = Math.random() < 0.5 ? 1 : -1;
@@ -145,7 +179,7 @@ function resetBolt(b, anywhere) {
 
 export const Title = {
   enter() {
-    menu = 'main'; sel = 0; t = 0; startT = 0;
+    menu = 'main'; sel = 0; t = 0; startT = 0; logoT = 0;
     camera.position.copy(CAM0); camera.fov = 55; camera.userData.baseFov = 55; resize();
     bigShip.visible = false;
     UP.armR.rotation.set(-0.55, 0, 0.12); UP.foreR.rotation.x = -0.9;
@@ -157,7 +191,7 @@ export const Title = {
     t += dt;
     animate(dt);
     input();
-    G.renderer.render(scene, camera);
+    composer.render();
     draw(dt);
   },
 };
@@ -165,9 +199,18 @@ export const Title = {
 function animate(dt) {
   // camera: slow drift, or the PLAY zoom
   if (menu !== 'start') {
-    camera.position.set(CAM0.x + Math.sin(t * 0.25) * 0.8, CAM0.y + Math.sin(t * 0.4) * 0.2, CAM0.z);
-    camera.lookAt(LOOK0);
+    // slow cinematic orbit around UNIT-07, nudged a little by the mouse
+    const a = Math.sin(t * 0.11) * 0.32 + G.mouse.nx * 0.06, r = CAM0.z + Math.sin(t * 0.07) * 0.8;
+    camera.position.set(Math.sin(a) * r, CAM0.y + Math.sin(t * 0.23) * 0.25 + G.mouse.ny * 0.25, Math.cos(a) * r);
+    camera.lookAt(LOOK0.x, LOOK0.y + Math.sin(t * 0.17) * 0.1, LOOK0.z);
   }
+  for (const b of beams) { b.pivot.rotation.z = Math.sin(t * b.sp + b.ph) * 0.35; b.pivot.rotation.x = Math.cos(t * b.sp * 0.8 + b.ph) * 0.25 - 0.1; }
+  for (const f of fogs) { f.m.position.x += f.v * dt; if (Math.abs(f.m.position.x) > 110) f.v = -f.v; }
+  if (Math.random() < 0.9) {
+    const f = pick(fires);
+    embers.spawn(f.s.position.x + rnd(-2, 2), f.s.position.y, f.s.position.z, rnd(-1, 1), rnd(2, 5), rnd(-1, 1), pick([0xff7a20, 0xffb040, 0xff4010]), rnd(2, 4), 0.4);
+  }
+  if (Math.random() < 0.4) embers.spawn(rnd(-14, 14), rnd(0, 2), rnd(-6, 6), rnd(-0.3, 0.3), rnd(0.6, 1.4), rnd(-0.3, 0.3), pick([0xff8a30, 0x55c8ff]), rnd(3, 5), 0.05);
   // UNIT-07 idle: breathing, visor pulse, sparks
   UP.torso.rotation.y = Math.sin(t * 0.7) * 0.04;
   UP.head.rotation.y = Math.sin(t * 0.5) * 0.12;
@@ -248,7 +291,7 @@ function animate(dt) {
   flick = Math.max(0, flick - dt * 3);
   flashLight.intensity = flick * 3;
   hemi.intensity = 1.0 + flick * 2;
-  fx.update(dt); smoke.update(dt);
+  fx.update(dt); smoke.update(dt); embers.update(dt);
   if (menu === 'start') startAnim(dt);
 }
 
@@ -289,6 +332,39 @@ function startAnim(dt) {
 }
 
 // ===== Menus =====
+const INFO = ['Start a new game.', 'Continue your previous adventure.', 'Adjust sound, graphics, and controls.', 'See who created the game.', 'Leave the game.'];
+let barY = -1;
+function drawMainMenu(c, W, Hh, small, k) {
+  const save = loadSave();
+  const size = small ? 14 : 18, gap = small ? 38 : 46;
+  const pw = small ? Math.min(W - 40, 300) : 300, px = small ? (W - pw) / 2 : Math.max(40, W * 0.07);
+  const py = small ? Hh - gap * 5 - 70 : Hh * 0.45, ph = gap * 5 + 58;
+  const slide = (1 - k) * -340;
+  c.save(); c.translate(slide, 0);
+  // glass panel
+  const g = c.createLinearGradient(px, py, px + pw, py + ph);
+  g.addColorStop(0, 'rgba(20,40,90,0.55)'); g.addColorStop(1, 'rgba(10,8,40,0.35)');
+  c.fillStyle = g; c.fillRect(px, py, pw, ph);
+  c.strokeStyle = 'rgba(120,200,255,0.5)'; c.lineWidth = 1.5; c.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+  c.fillStyle = '#2a9dff'; c.fillRect(px, py, 4, ph);
+  // glowing bar that glides to the selected button
+  const target = py + 22 + sel * gap;
+  barY = barY < 0 ? target : barY + (target - barY) * 0.25;
+  const bg = c.createLinearGradient(px, 0, px + pw, 0);
+  bg.addColorStop(0, 'rgba(80,190,255,0.75)'); bg.addColorStop(1, 'rgba(80,190,255,0)');
+  c.fillStyle = bg; c.fillRect(px + 4, barY, pw - 4, gap - 6);
+  rects = [];
+  MAIN.forEach((s, i) => {
+    const off = i === 1 && !save, on = i === sel, y = py + 22 + i * gap + (gap - 6) / 2;
+    H.text(s, px + 34 + (on ? 8 : 0), y, size, off ? '#5a6278' : on ? '#ffffff' : '#c9d8ee', 'left', on ? { glow: '#7fe3ff' } : {});
+    if (on) H.text('>', px + 16, y, size, '#7fe3ff', 'left');
+    rects.push({ x: px + slide, y: y - gap / 2, w: pw, h: gap, i, off });
+  });
+  const info = sel === 1 && save ? `Continue from MISSION ${save.mission + 1}.` : INFO[sel];
+  H.text(info, px + 16, py + ph - 16, small ? 8 : 9, '#9fdcff', 'left', { stroke: false, max: pw - 24 });
+  c.restore();
+  if (!small) H.text('ARROWS + ENTER, OR CLICK', W - 20, Hh - 18, 9, '#8a96b0', 'right');
+}
 function settingsItems() {
   const s = G.settings;
   return [
@@ -304,7 +380,7 @@ function adjust(i, d) {
   const s = G.settings;
   if (i === 0) s.music = clamp(s.music + d, 0, 10);
   if (i === 1) s.sfx = clamp(s.sfx + d, 0, 10);
-  if (i === 2) { s.gfx = (s.gfx + d + GFX.length) % GFX.length; resize(); }
+  if (i === 2) { s.gfx = (s.gfx + d + GFX.length) % GFX.length; applyQuality(G.scenes); }
   if (i === 3) s.hints = !s.hints;
   applyVolumes(); saveSettings(); sfx.ui();
 }
@@ -382,16 +458,12 @@ function draw(dt) {
   const g = c.createLinearGradient(0, 0, 0, Hh);
   g.addColorStop(0, 'rgba(0,0,0,0.35)'); g.addColorStop(0.35, 'rgba(0,0,0,0)'); g.addColorStop(0.75, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
   c.fillStyle = g; c.fillRect(0, 0, W, Hh);
-  if (menu === 'main') H.drawLogo(W / 2, 4, Math.min(W * 0.92, 760), flick);
-
   if (menu === 'main') {
-    const save = loadSave();
-    const items = MAIN.map((s, i) => ({ label: s, disabled: i === 1 && !save }));
-    const size = small ? 13 : 18, gap = small ? 34 : 44;
-    if (small) rects = H.menu(items, sel, W / 2, Hh - gap * 5 - 24, size, gap);
-    else rects = H.menu(items, sel, Math.max(150, W * 0.16), Hh * 0.52, size, gap, 'left');
-    if (save && sel === 1) H.text(`MISSION ${save.mission + 1}`, small ? W / 2 : Math.max(150, W * 0.16), small ? Hh - 14 : Hh * 0.52 + gap * 5, 9, '#9fdcff', small ? 'center' : 'left');
-    if (!small) H.text('ARROWS + ENTER, OR CLICK', W - 20, Hh - 18, 9, '#8a96b0', 'right');
+    // logo drops in, then floats, with a shine sweep every few seconds
+    logoT += dt;
+    const k = smooth(logoT / 1.1), lw = Math.min(W * 0.92, 760) * (1.25 - 0.25 * k);
+    H.drawLogo(W / 2, 4 + (1 - k) * -40 + Math.sin(t * 1.3) * 3, lw, flick, { alpha: k, shine: ((logoT - 0.8) % 4.5) / 1.2 });
+    drawMainMenu(c, W, Hh, small, k);
   } else if (menu === 'settings') {
     H.fade(0.35);
     const pw = Math.min(560, W - 24), ph = 360, px = (W - pw) / 2, py = (Hh - ph) / 2;
