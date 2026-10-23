@@ -3,7 +3,8 @@ import { G, isTouch, rnd, clamp, lerp, pick, damp, smooth, angDiff, shuffle, wri
 import { sfx, playMusic } from './audio.js';
 import { TEX, updateCore } from './textures.js';
 import * as MD from './models.js';
-import { Particles, Debris } from './fx.js';
+import { Particles, Debris, Blasts, Smoke } from './fx.js';
+import * as D from './detail.js';
 import { buildJungle, updateJungle } from './jungle.js';
 import * as J from './models2.js';
 import { MISSIONS, SCANS, UPGRADES, ENDING, CREDITS, PATCH_REPAIR, PATCH_LOW, PATCH_OD, CHATTER, CHATTER2, ENDING2, DIFFS } from './data.js';
@@ -16,7 +17,7 @@ const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Ve
 const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), sph = new THREE.Sphere();
 
 let scene, camera, composer, arms, AP, patch, PP, fx, fxBig, debris, L = {};
-let panels = [], covers = [], doorFrame, roof, outside, roomG;
+let panels = [], covers = [], doorFrame, roof, outside, roomG, sparkPts = [], beacons = [], blasts, smoke;
 let P, enemies = [], balls = [], shots = [], rings = [], hazards = [], boss = null;
 let mi = 0, M = null, spawnList = [], spawnT = 0, phase = 'card', phaseT = 0, upgrades = [], scanned = new Set();
 let scanBeam, scanTarget = null, scanT = 0, paused = false, pauseSel = 0, overSel = 0, upChoices = [], upSel = 0;
@@ -57,7 +58,9 @@ export function buildGame() {
 
   fx = new Particles(scene, 1400, 0.22);
   fxBig = new Particles(scene, 500, 0.9);
-  debris = new Debris(scene, 70);
+  debris = new Debris(scene, 90);
+  blasts = new Blasts(scene, 12);
+  smoke = new Smoke(scene, 300, 2.2);
 }
 
 function buildRoom() {
@@ -81,6 +84,9 @@ function buildRoom() {
       if (i % 4 === 1) { MD.box(1.8, 1.2, 0.5, MD.phong(0x30384c), 0, 1.2, 0.25, grp); MD.box(1.2, 0.5, 0.05, MD.glow(pick([0x39ff6a, 0x33bbff, 0xff9a2a])), 0, 1.4, 0.52, grp); }
     }
     MD.box(0.35, ROOM_H, 0.45, rib, pw / 2, ROOM_H / 2, 0.15, grp);
+    const wd = D.wallDetail(i, pw, ROOM_H, isDoor, DOOR_H);
+    grp.add(wd.g);
+    for (const sp of wd.sparks) sparkPts.push({ grp, p: sp });
     panels.push({ grp, a, near: Math.abs(d) < 1.3, isDoor, pos: grp.position.clone(), rot: grp.rotation.clone(), fly: null });
   }
   const floor = MD.mesh(new THREE.CircleGeometry(R + 0.6, 24), MD.phong(0x8a93a8, { map: TEX.floor, shininess: 30 }), 0, 0, 0, roomG);
@@ -90,6 +96,9 @@ function buildRoom() {
     const ring = MD.mesh(new THREE.RingGeometry(r, r + 0.12, 32), MD.glow(c), 0, 0.02, 0, roomG);
     ring.rotation.x = -Math.PI / 2;
   }
+  const PODS = [[-7.5, -6.5], [7.8, -4.5], [-3.5, -10.5], [3.8, -0.5], [-6.2, 2.2], [0.5, -7]];
+  const clear = (x, z) => Math.hypot(x, z - PZ) < 3.2 || (z < -9 && Math.abs(x) < 6) || Math.hypot(Math.abs(x) - 7.5, z - 6.5) < 2 || Math.hypot(x - 6.5, z + 9.5) < 3.5 || PODS.some(([px, pz]) => Math.hypot(x - px, z - pz) < 1.8);
+  roomG.add(D.floorDetail(R, clear));
   // the crater UNIT-07's legs are jammed into
   const crater = MD.mesh(new THREE.RingGeometry(0.6, 1.6, 10), MD.lam(0x2a2f3a, { side: THREE.DoubleSide }), 0, 0.03, PZ, roomG);
   crater.rotation.x = -Math.PI / 2;
@@ -103,6 +112,7 @@ function buildRoom() {
   const light = MD.cyl(2.2, 2.2, 0.3, MD.glow(0xbff4ff), 0, ROOM_H + 4.3, 0, roof, 16);
   light.userData.k = 1;
   MD.mesh(new THREE.TorusGeometry(5.5, 0.15, 4, 32), MD.glow(0x7f5aff), 0, ROOM_H + 3.2, 0, roof).rotation.x = Math.PI / 2;
+  roof.add(D.roofDetail(R, ROOM_H, (R + 0.3) * 0.32));
   for (let i = 0; i < 9; i++) {
     const c = MD.cyl(0.05, 0.05, rnd(2, 5), MD.phong(0x15181f), rnd(-10, 10), 0, rnd(-9, 6), roof, 4);
     c.position.y = ROOM_H + 2 - c.geometry.parameters.height / 2;
@@ -116,16 +126,23 @@ function buildRoom() {
   }
   MD.box(dx * 2 + 0.9, 0.7, 1.2, hz, 0, DOOR_H, dz, doorFrame);
   L.doorStrip = MD.box(dx * 2 - 1, 0.12, 0.12, MD.glow(0xff3020), 0, DOOR_H - 0.45, dz + 0.62, doorFrame);
+  const dd = D.doorDetail(dx, DOOR_H, dz); doorFrame.add(dd.g); beacons = dd.beacons;
   // the broken hatch lying on the floor
   const hatch = MD.box(5, 0.35, 6, MD.phong(0x48506a, { map: TEX.panel }), 6.5, 0.9, -9.5, roomG);
   hatch.rotation.set(0.15, 0.6, 0.25);
   shadows(hatch, true, true);
   // alien pods: cover for Riftstalkers
   const podM = MD.phong(0x3a2a6a, { shininess: 90 }), podG = MD.glow(0x39ff6a);
-  for (const [x, z] of [[-7.5, -6.5], [7.8, -4.5], [-3.5, -10.5], [3.8, -0.5], [-6.2, 2.2], [0.5, -7]]) {
+  const podD = MD.phong(0x1e1638, { roughness: 0.4 });
+  for (const [x, z] of PODS) {
     const g = MD.group(x, 0, z, roomG);
     MD.cyl(0.95, 1.1, 1.9, podM, 0, 0.95, 0, g, 8);
     MD.cyl(0.7, 0.95, 0.4, podM, 0, 2.05, 0, g, 8);
+    MD.dome(0.7, podM, 0, 2.25, 0, g).scale.y = 0.5;
+    MD.cyl(1.2, 1.25, 0.2, podD, 0, 0.1, 0, g);
+    for (const y of [0.5, 1.5]) MD.ring(1.02 - y * 0.05, 0.06, podD, 0, y, 0, g).rotation.x = Math.PI / 2;
+    for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.5; MD.tube([[Math.cos(a) * 1.08, 0.2, Math.sin(a) * 1.08], [Math.cos(a + 0.3) * 1.0, 1.0, Math.sin(a + 0.3) * 1.0], [Math.cos(a) * 0.85, 1.9, Math.sin(a) * 0.85]], 0.035, podG, g); }
+    MD.ball(0.12, podG, 0, 2.5, 0, g, 0);
     MD.box(0.5, 0.8, 0.1, podG, 0, 1.1, 1.0, g).lookAt(0, 1.1, PZ);
     shadows(g, true, true);
     covers.push({ x, z, used: false });
@@ -136,6 +153,14 @@ function buildRoom() {
     MD.box(1.8, 1.4, 1.0, MD.phong(0x30384c), 0, 0.7, 0, g);
     const scr = MD.box(1.5, 0.7, 0.05, new THREE.MeshBasicMaterial({ map: TEX.glyph }), 0, 1.25, 0.45, g);
     scr.rotation.x = -0.5;
+    // keyboard of glowing buttons, a joystick, and a second little screen
+    const kb = MD.group(0, 1.42, 0.25, g); kb.rotation.x = 0.35;
+    MD.box(1.6, 0.08, 0.5, MD.phong(0x1e2433), 0, 0, 0, kb);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 8; c++) MD.box(0.13, 0.05, 0.1, MD.glow(pick([0x33bbff, 0x33bbff, 0x39ff6a, 0xff9a2a])), -0.6 + c * 0.17, 0.05, -0.15 + r * 0.14, kb);
+    MD.cyl(0.03, 0.03, 0.3, MD.phong(0x15181f), 0.65, 0.18, 0.15, kb); MD.ball(0.06, MD.glow(0xff3030), 0.65, 0.33, 0.15, kb, 0);
+    MD.box(0.6, 0.45, 0.1, MD.phong(0x30384c), s * 0.7, 2.05, 0.1, g).rotation.x = -0.2;
+    MD.box(0.5, 0.35, 0.02, MD.glow(0x0a5a3a), s * 0.7, 2.06, 0.17, g).rotation.x = -0.2;
+    D.cable([s * 0.8, 0.1, -0.3], [s * 2.5, 0.05, -1.8], 0, 0.06, MD.phong(0x15181f), g);
     g.rotation.y = s * -0.5;
   }
 }
@@ -157,6 +182,7 @@ function buildOutside() {
     MD.rock(r, MD.lam(0x3aff6a, { emissive: 0x22d84a, emissiveIntensity: 0.8 }), rnd(-120, 120), rnd(30, 110), rnd(-120, -260), outside);
   }
   for (let i = 0; i < 6; i++) MD.box(rnd(2, 4), rnd(3, 7), rnd(2, 4), MD.lam(0x4a2a5a), rnd(-25, 25), 1.5, rnd(-25, -45), outside).rotation.set(rnd(-0.3, 0.3), rnd(0, 3), rnd(-0.3, 0.3));
+  outside.add(D.battlefield([-110, 110, -28, -170], (x, z) => (Math.abs(x) < 9 && z > -60) || Math.hypot(x, z) < R + 6));
   for (let i = 0; i < 4; i++) {
     const s = MD.glowSprite(0xff7a20, 8, 0); s.position.set(rnd(-60, 60), rnd(2, 15), rnd(-60, -160)); outside.add(s);
     s.userData.t = rnd(-4, 0);
@@ -181,7 +207,7 @@ function buildLights() {
   L.muzzle = new THREE.PointLight(0x55b8ff, 0, 9, 0); L.muzzle.position.set(0.5, -0.3, -3.5); camera.add(L.muzzle);
   L.fill = new THREE.PointLight(0x8fb0ff, 1.4, 6, 0); L.fill.position.set(0, 1, -0.5); camera.add(L.fill);
   // UNIT-07's headlamp for the night mission
-  L.head = new THREE.SpotLight(0xfff0d0, 0, 70, 0.45, 0.5, 1); L.head.position.set(0.4, 0.2, 0); L.head.target.position.set(0, -1.2, -10);
+  L.head = new THREE.SpotLight(0xfff0d0, 0, 70, 0.45, 0.5, 1); L.head.position.set(0.4, 0.2, -2.2); // in front of the arms so they are not blown out L.head.target.position.set(0, -1.2, -10);
   camera.add(L.head); camera.add(L.head.target);
 }
 
@@ -221,7 +247,7 @@ function clearAll() {
   for (const e of enemies) if (e.pool) scene.remove(e.pool);
   enemies = []; balls = []; shots = []; rings = []; hazards = []; boss = null; props = [];
   for (const c of covers) c.used = false;
-  fx.clear(); fxBig.clear(); debris.clear();
+  fx.clear(); fxBig.clear(); debris.clear(); blasts.clear(); smoke.clear();
   H.clearDialog(); H.clearWarn(); H.clearScan();
   scanBeam.visible = false; scanTarget = null;
 }
@@ -331,7 +357,7 @@ function stepWorld(dt) {
   updateScan(dt);
   updatePatch(dt);
   updateRoom(dt);
-  fx.update(dt); fxBig.update(dt); debris.update(dt);
+  fx.update(dt); fxBig.update(dt); debris.update(dt); blasts.update(dt); smoke.update(dt);
   if (phase === 'fight' && !P.dead) {
     chatT -= dt;
     if (chatT <= 0 && !H.dialogBusy() && kills > 2) { chatT = rnd(9, 16); const [who, s] = pick(inJungle && Math.random() < 0.6 ? CHATTER2 : CHATTER); H.bark(who, s, 1.4); }
@@ -648,6 +674,12 @@ function updateRoom(dt) {
   L.emer.intensity = Math.sin(t * 4) > 0 ? 2.8 : 0.4;
   L.ceil.intensity = 2.2 * (Math.random() < 0.02 ? 0.3 : 1);
   L.doorStrip.material.color.setHex(Math.sin(t * 6) > 0 ? 0xff3020 : 0x601008);
+  beacons.forEach((b, i) => b.children[1].material.color.setHex(Math.sin(t * 7 + i * 1.6) > 0 ? 0xff7a00 : 0x3a1800));
+  // broken wires spit sparks
+  if (sparkPts.length && Math.random() < dt * 4) {
+    const sp = pick(sparkPts);
+    if (sp.grp.visible) { sp.grp.localToWorld(tmp.copy(sp.p)); fx.burst(tmp, pick([0xffd27a, 0x9fe8ff]), 7, 3.5, 0.4, -10); }
+  }
   lightningT -= dt;
   if (lightningT <= 0) { lightningT = rnd(6, 12); flashT = 0.25; setTimeout(() => sfx.thunder(), 250); }
   flashT -= dt;
@@ -826,7 +858,7 @@ function upBrute(e, dt) {
     if (e.stT <= 0) {
       spawnRing(e.x, e.z, 11, 15, 0xff8a1a);
       sfx.slam(); G.shake = Math.max(G.shake, 0.5);
-      fxBig.burst(tmp.set(e.x, 0.3, e.z + 1), 0xff8a1a, 20, 8, 0.6, -5);
+      fxBig.burst(tmp.set(e.x, 0.3, e.z + 1), 0xff8a1a, 20, 8, 0.6, -5); blasts.boom(tmp, 0xff8a1a, 1.2); smoke.puff(tmp, 8, 0x3a3038, 1.4, 1.2);
       e.st = 'recover'; e.stT = 1.4; e.P.chest.scale.setScalar(1); e.P.chestGlow.material.opacity = 0.8;
     }
   } else if (e.st === 'recover') {
@@ -931,6 +963,8 @@ function killEnemy(e, quiet) {
   fxBig.burst(c, e.type === 'voidfly' ? 0x9b30ff : 0x39ff6a, big ? 40 : 18, big ? 10 : 7, 0.7, -8);
   fx.burst(c, 0xffffff, 12, 9, 0.4, 0);
   debris.burst(c, ENEMY_COLORS[e.type], big ? 12 : 6, big ? 8 : 6, big ? 0.45 : 0.25);
+  blasts.boom(c, ENEMY_COLORS[e.type][0], big ? 1.6 : 0.8);
+  smoke.puff(c, big ? 14 : 6, 0x2a2630, big ? 1.4 : 0.8);
   if (quiet) return;
   kills++;
   score = addScore(POINTS[e.type] || 100, score);
@@ -1271,7 +1305,7 @@ function upPatient(dt) {
       }
       if (e.stT <= 0) {
         tmp.set(e.x, 7, e.z);
-        fxBig.burst(tmp, 0xff4af0, 120, 26, 1.3, -3); fx.burst(tmp, 0xffffff, 60, 20, 0.6, 0);
+        fxBig.burst(tmp, 0xff4af0, 120, 26, 1.3, -3); fx.burst(tmp, 0xffffff, 60, 20, 0.6, 0); blasts.boom(tmp, 0xff4af0, 3); smoke.puff(tmp, 30, 0x2a1a2a, 2.5, 2.5);
         debris.burst(tmp, [0x8a9a7a, 0x8a1a8a, 0x6a2aff], 24, 12, 0.7);
         sfx.boom(); sfx.bigkill(); flashT = 0.6; G.shake = 1.4;
         scene.remove(e.g); e.extra.forEach(m => scene.remove(m));
@@ -1305,7 +1339,7 @@ function popShot(s, byPlayer) {
   removeShot(s);
   fx.burst(s.pos, SHOT_COL[s.kind], 14, 6, 0.4, -4);
   if (LOBBED[s.kind]) {
-    fxBig.burst(s.pos, s.kind === 'mud' ? 0x8a6a30 : 0xff8a20, 24, 8, 0.6, -4); sfx.boom();
+    fxBig.burst(s.pos, s.kind === 'mud' ? 0x8a6a30 : 0xff8a20, 24, 8, 0.6, -4); sfx.boom(); blasts.boom(s.pos, s.kind === 'mud' ? 0x8a6a30 : 0xff8a20, 1); smoke.puff(s.pos, 6, s.kind === 'mud' ? 0x3a2a14 : 0x2a2630, 1);
     if (!byPlayer && Math.hypot(s.pos.x - P.x, s.pos.z - PZ) < 2.6 && P.y < 2) hurt(s.dmg);
   } else if (byPlayer) sfx.hit();
 }
@@ -1522,7 +1556,7 @@ function upVrax(dt) {
       if (Math.random() < 0.4) { tmp.set(v.x + rnd(-2, 2), rnd(1, 6), v.z + rnd(-1, 1)); fxBig.burst(tmp, pick([0xc070ff, 0xff4af0, 0xffffff]), 10, 6, 0.5, -3); sfx.hit(); }
       if (v.stT <= 0) {
         tmp.set(v.x, 4, v.z);
-        fxBig.burst(tmp, 0xc070ff, 80, 14, 1.0, -6); fx.burst(tmp, 0xffffff, 60, 16, 0.6, 0);
+        fxBig.burst(tmp, 0xc070ff, 80, 14, 1.0, -6); fx.burst(tmp, 0xffffff, 60, 16, 0.6, 0); blasts.boom(tmp, 0xc070ff, 3); smoke.puff(tmp, 30, 0x221a2e, 2.5, 2.5);
         debris.burst(tmp, [0x17131f, 0x7a24e0, 0xe0a0ff], 20, 10, 0.6);
         sfx.boom(); sfx.bigkill(); G.shake = 1; flashT = 0.3;
         scene.remove(v.g); boss = null;
@@ -1568,7 +1602,7 @@ function breakWall() {
   roof.userData.fly = 0.001;
   sfx.boom(); sfx.slam(); G.shake = 1.2; flashT = 0.3;
   debris.burst(tmp.set(0, 3, -14), [0x6a7590, 0x525c78, 0xffa200], 30, 10, 0.6);
-  fxBig.burst(tmp, 0xffffff, 40, 12, 0.8, -4);
+  fxBig.burst(tmp, 0xffffff, 40, 12, 0.8, -4); blasts.boom(tmp, 0xffa040, 2.5); smoke.puff(tmp, 30, 0x2a2630, 3, 2.5);
 }
 const EMP_SEQ = ['sweep', 'bombs', 'strike', 'shock', 'rift'];
 function emperorHit(b) {
@@ -1718,7 +1752,7 @@ function upEmperor(dt) {
       }
       e.g.position.y -= dt * 1.2;
       if (e.stT <= 0) {
-        fxBig.burst(tmp.set(0, 18, -30), 0xffffff, 120, 30, 1.4, -2);
+        fxBig.burst(tmp.set(0, 18, -30), 0xffffff, 120, 30, 1.4, -2); blasts.boom(tmp, 0xd23cff, 6); smoke.puff(tmp, 40, 0x1a1026, 5, 3);
         sfx.boom(); sfx.bigkill(); flashT = 0.8; G.shake = 1.5;
         scene.remove(e.g); e.extra.forEach(m => scene.remove(m));
         boss = null;

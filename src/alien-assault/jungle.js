@@ -3,33 +3,11 @@
 import { THREE } from './engine.js';
 import * as MD from './models.js';
 import * as J from './models2.js';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-
-// Glue a whole plant or tree into two meshes (lit parts + glowing parts) so the jungle draws fast.
-const bakedLit = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.05, side: THREE.DoubleSide });
-const bakedGlow = new THREE.MeshBasicMaterial({ vertexColors: true });
-function bake(g) {
-  g.updateMatrixWorld(true);
-  const lit = [], glw = [], col = new THREE.Color();
-  g.traverse(o => {
-    if (!o.isMesh) return;
-    let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
-    for (const k of Object.keys(geo.attributes)) if (k !== 'position' && k !== 'normal') geo.deleteAttribute(k);
-    geo.applyMatrix4(o.matrixWorld);
-    const m = o.material, isGlow = m.type === 'MeshBasicMaterial' || (m.emissive && m.emissiveIntensity > 0.3 && m.emissive.getHex() !== 0);
-    col.copy(isGlow && m.emissive ? m.emissive : m.color);
-    const n = geo.attributes.position.count, c = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) c.set([col.r, col.g, col.b], i * 3);
-    geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
-    (isGlow ? glw : lit).push(geo);
-  });
-  const out = new THREE.Group();
-  if (lit.length) { const m = new THREE.Mesh(mergeGeometries(lit), bakedLit); m.castShadow = true; m.receiveShadow = true; out.add(m); }
-  if (glw.length) out.add(new THREE.Mesh(mergeGeometries(glw), bakedGlow));
-  return out;
-}
+import { bake } from './models.js';
+import * as D from './detail.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[(Math.random() * a.length) | 0];
 const FAR = -170, NEAR = 30;
 
 function canvasTex(w, h, draw, repeat) {
@@ -88,6 +66,10 @@ export function buildJungle(scene) {
   for (let i = 0; i < 26; i++) add(bake(J.makeMushroom()), side() * rnd(6, 28), rnd(FAR, NEAR), rnd(0.8, 1.8));
   for (let i = 0; i < 14; i++) add(bake(J.makeRockPile()), side() * rnd(6, 30), rnd(FAR, NEAR));
   for (let i = 0; i < 30; i++) add(bake(J.makeFlower()), side() * rnd(5, 20), rnd(FAR, NEAR), rnd(0.8, 1.5));
+  for (let i = 0; i < 20; i++) add(bake(J.makeBush()), side() * rnd(6, 26), rnd(FAR, NEAR), rnd(0.8, 1.6));
+  for (let i = 0; i < 14; i++) add(bake(J.makeGiantLeaf()), side() * rnd(7, 30), rnd(FAR, NEAR), rnd(0.8, 1.3));
+  for (let i = 0; i < 8; i++) add(bake(D.crystals(pick([0x3dfff0, 0xff4ad8, 0xb0ff3d]), 6, rnd(1, 2))), side() * rnd(7, 28), rnd(FAR, NEAR));
+  for (let i = 0; i < 5; i++) add(bake(J.makeColonyJunk(), { roughness: 0.6, metalness: 0.2 }), side() * rnd(8, 20), rnd(FAR, NEAR));
 
   // fireflies drifting in the air
   const n = 260, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), c = new THREE.Color();

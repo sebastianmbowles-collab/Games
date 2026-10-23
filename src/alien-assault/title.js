@@ -3,6 +3,7 @@ import { G, GFX, isTouch, rnd, clamp, lerp, smooth, pick, damp, loadSave, saveSe
 import { sfx, playMusic, applyVolumes } from './audio.js';
 import { TEX } from './textures.js';
 import * as MD from './models.js';
+import * as D from './detail.js';
 import { Particles } from './fx.js';
 import { CREDITS, DIFFS } from './data.js';
 import * as H from './hud.js';
@@ -102,6 +103,7 @@ export function buildTitle() {
   }
   const dome = MD.mesh(new THREE.SphereGeometry(12, 14, 8, 0, Math.PI * 1.4, 0, Math.PI / 2), MD.lam(0x5a6a9a, { side: THREE.DoubleSide }), -34, 0, -70, scene);
   dome.rotation.y = 0.8;
+  scene.add(D.battlefield([-90, 90, -22, -130], (x, z) => Math.abs(x) < 10 && z > -50));
   // fires among the ruins
   for (let i = 0; i < 12; i++) {
     const s = MD.glowSprite(pick([0xff6a00, 0xff9a20, 0xff3a10]), rnd(4, 9), 0.9);

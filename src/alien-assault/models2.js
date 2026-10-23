@@ -90,6 +90,35 @@ export function makeFlower() {
   ball(0.12, glow(0xffffff), 0, 1.65, 0, g, 0);
   return g;
 }
+// a round leafy bush
+export function makeBush() {
+  const g = new THREE.Group(), m = lam(pick([0x1f7a3a, 0x2a8a4a, 0x186a4a]), { roughness: 0.7, side: THREE.DoubleSide });
+  for (let i = 0; i < 4; i++) blob(rnd(0.7, 1.3), m, rnd(-0.8, 0.8), rnd(0.4, 0.9), rnd(-0.8, 0.8), g, 0.2, i).scale.y = 0.75;
+  for (let i = 0; i < 10; i++) mesh(leafGeo(0.5, rnd(1, 1.6), 0.4), m, rnd(-0.6, 0.6), 0.3, rnd(-0.6, 0.6), g).rotation.set(rnd(0.6, 1.2), rnd(0, 6.3), 0, 'YXZ');
+  if (Math.random() < 0.5) for (let i = 0; i < 5; i++) ball(0.09, glow(pick([0xff4ad8, 0x3dfff0, 0xffe03d])), rnd(-1, 1), rnd(0.8, 1.6), rnd(-1, 1), g, 0);
+  return g;
+}
+// one huge alien leaf fan
+export function makeGiantLeaf() {
+  const g = new THREE.Group(), m = lam(pick([0x2aa05a, 0x1a8a7a, 0x3a9a3a]), { roughness: 0.55, side: THREE.DoubleSide });
+  const n = 4 + ((Math.random() * 3) | 0);
+  for (let i = 0; i < n; i++) mesh(leafGeo(rnd(1.4, 2.2), rnd(4, 6.5), 0.35), m, 0, 0, 0, g).rotation.set(rnd(0.3, 0.8), (i / n) * Math.PI * 2 + rnd(-0.3, 0.3), 0, 'YXZ');
+  tube([[0, 0, 0], [0.1, 0.6, 0], [0, 1.2, 0.1]], 0.12, lam(0x2a6a2a), g);
+  return g;
+}
+// what is left of the human colony: crates, a barrel, a sign and a smashed solar panel
+export function makeColonyJunk() {
+  const g = new THREE.Group(), crate = lam(pick([0x8a6a3a, 0x5a6a7a]), { roughness: 0.8 }), dark = paint(0x2a2f3a, { metalness: 0.4, roughness: 0.5 });
+  for (let i = 0; i < 3; i++) { const c = box(1.1, 1.1, 1.1, crate, rnd(-1.5, 1.5), 0.55 + (i === 2 ? 1.1 : 0), rnd(-1, 1), g); c.rotation.y = rnd(0, 1.5); for (const y of [-0.4, 0.4]) box(1.14, 0.1, 1.14, dark, 0, y, 0, c); }
+  const b = cyl(0.45, 0.45, 1.3, paint(0xd84a1a, { metalness: 0.3, roughness: 0.5 }), 2, 0.45, 1, g); b.rotation.set(Math.PI / 2, 0, rnd(0, 3));
+  for (const y of [-0.4, 0.4]) ring(0.46, 0.04, dark, 0, y, 0, b).rotation.x = Math.PI / 2;
+  const post = cyl(0.08, 0.08, 2.6, dark, -2.4, 1.3, 0.5, g); post.rotation.z = 0.25;
+  const sign = box(1.6, 0.8, 0.08, lam(0xe8e0c8), -2.7, 2.4, 0.5, g); sign.rotation.z = 0.25;
+  box(1.3, 0.12, 0.09, lam(0xc02020), -2.7, 2.55, 0.5, g).rotation.z = 0.25;
+  const panel = box(2.2, 0.08, 1.4, paint(0x1a3a8a, { metalness: 0.6, roughness: 0.2 }), 0.5, 0.35, -1.8, g); panel.rotation.set(0.3, 0.4, 0.2);
+  for (let i = 0; i < 4; i++) tube([[rnd(-2, 2), 0, rnd(-2, 2)], [rnd(-1, 1), rnd(0.8, 1.6), rnd(-1, 1)], [rnd(-2, 2), 0.2, rnd(-2, 2)]], 0.05, lam(0x2f7a3a), g);
+  return g;
+}
 // glowing swamp pool that swamp monsters rise out of
 export function makePool(r = 3) {
   const g = new THREE.Group();

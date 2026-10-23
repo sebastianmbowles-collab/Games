@@ -1,7 +1,7 @@
 import { THREE } from './engine.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { TEX } from './textures.js';
-import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeVertices, mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // ===== Building blocks =====
 // Shiny, smooth materials that react to light and reflections. "shininess" from the old look still works.
@@ -67,6 +67,37 @@ export function makeStars(parent, n = 700, r = 380) {
 }
 const alongZ = m => { m.rotation.x = Math.PI / 2; return m; };
 
+// Glue a whole group of parts into two meshes (lit parts + glowing parts) so it draws fast.
+const bakedLit = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.05, side: THREE.DoubleSide });
+const bakedGlow = new THREE.MeshBasicMaterial({ vertexColors: true });
+const bakedMats = {};
+export function bake(g, o) {
+  const key = o ? JSON.stringify(o) : '';
+  const litMat = o ? (bakedMats[key] ??= new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, ...o })) : bakedLit;
+  g.updateMatrixWorld(true);
+  const lit = [], glw = [], col = new THREE.Color();
+  g.traverse(o => {
+    if (!o.isMesh) return;
+    let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    // something already baked keeps its own colours
+    const m = o.material, keep = m.vertexColors && geo.attributes.color;
+    for (const k of Object.keys(geo.attributes)) if (k !== 'position' && k !== 'normal' && !(keep && k === 'color')) geo.deleteAttribute(k);
+    geo.applyMatrix4(o.matrixWorld);
+    const isGlow = m.type === 'MeshBasicMaterial' || (m.emissive && m.emissiveIntensity > 0.3 && m.emissive.getHex() !== 0);
+    if (!keep) {
+      col.copy(isGlow && m.emissive ? m.emissive : m.color);
+      const n = geo.attributes.position.count, c = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) c.set([col.r, col.g, col.b], i * 3);
+      geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    }
+    (isGlow ? glw : lit).push(geo);
+  });
+  const out = new THREE.Group();
+  if (lit.length) { const m = new THREE.Mesh(mergeGeometries(lit), litMat); m.castShadow = true; m.receiveShadow = true; out.add(m); }
+  if (glw.length) out.add(new THREE.Mesh(mergeGeometries(glw), bakedGlow));
+  return out;
+}
+
 // ===== Smooth shapes =====
 // glossy painted armour (clear coat over metal) and soft alien skin
 export const paint = (color, o = {}) => new THREE.MeshPhysicalMaterial({ color, metalness: 0.5, roughness: 0.38, clearcoat: 0.5, clearcoatRoughness: 0.28, ...o });
@@ -129,6 +160,23 @@ export const tube = (pts, r, mat, p, taper) => mesh(tubeGeo(pts, r, taper), mat,
 export const dome = (r, mat, x, y, z, p, thetaLen = Math.PI / 2, phiStart = 0, phiLen = Math.PI * 2, thetaStart = 0) =>
   mesh(new THREE.SphereGeometry(r, 40, 20, phiStart, phiLen, thetaStart, thetaLen), mat, x, y, z, p);
 
+// painted stencil text, like a serial number on armour
+const decals = {};
+export function decal(text, w, h, color = '#e8eef8') {
+  const key = text + color;
+  if (!decals[key]) {
+    const c = document.createElement('canvas'); c.width = 256; c.height = Math.round(256 * h / w);
+    const x = c.getContext('2d');
+    x.font = `bold ${c.height * 0.72}px monospace`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillStyle = color; x.fillText(text, c.width / 2, c.height / 2 + 2);
+    x.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 90; i++) x.fillRect(Math.random() * c.width, Math.random() * c.height, 2 + Math.random() * 4, 1 + Math.random() * 2);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    decals[key] = new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.6, metalness: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  }
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), decals[key]);
+}
+
 // ===== UNIT-07 (full body, for the title screen) =====
 export function makeUnit07() {
   const g = new THREE.Group(), P = {};
@@ -163,6 +211,8 @@ export function makeUnit07() {
   // chest, angled plates and the core
   box(1.9, 1.2, 1.15, metal, 0, 0.95, 0, T);
   for (const s of [-1, 1]) box(0.72, 0.78, 0.22, lite, s * 0.58, 1.08, 0.56, T).rotation.y = s * 0.2;
+  const num = decal('07', 0.5, 0.32); num.position.set(-0.6, 1.22, 0.681); num.rotation.y = -0.2; T.add(num);
+  const warn = decal('DANGER', 0.55, 0.12, '#ffb020'); warn.position.set(0.6, 0.86, 0.681); warn.rotation.y = 0.2; T.add(warn);
   ring(0.27, 0.07, dark, 0, 0.85, 0.6, T);
   P.core = ball(0.2, blue, 0, 0.85, 0.62, T);
   ring(0.33, 0.02, blue, 0, 0.85, 0.63, T);
@@ -248,6 +298,7 @@ export function makeFPArms() {
   box(0.7, 0.14, 1.1, lite, 0, 0.36, -1.75, R);
   box(0.04, 0.06, 0.9, blue, 0.34, -0.2, -1.75, R);
   box(0.5, 0.05, 0.3, hz, 0, 0.44, -1.4, R);
+  const tag = decal('UNIT-07', 0.6, 0.16); tag.rotation.set(-Math.PI / 2, 0, Math.PI / 2); tag.position.set(0.18, 0.431, -1.95); R.add(tag);
   const B = group(0, 0.02, -2.4, R); P.blaster = B;
   alongZ(cyl(0.4, 0.4, 0.55, dark, 0, 0, -0.2, B));
   ring(0.4, 0.04, metal, 0, 0, 0.07, B);
@@ -263,6 +314,7 @@ export function makeFPArms() {
 
   const L = arm(-1, scr); P.L = L;
   L.rotation.set(0.16, -0.16, 0);
+  const tag2 = decal('07', 0.34, 0.24, '#c8d0dc'); tag2.position.set(-0.322, 0.0, -1.95); tag2.rotation.y = -Math.PI / 2; L.add(tag2);
   // the blocking arm wears a shield plate
   box(0.8, 0.14, 1.2, dark, 0, 0.38, -1.7, L);
   for (const z of [-1.25, -2.15]) for (const x of [-0.28, 0.28]) ball(0.05, joint, x, 0.46, z, L, 0);

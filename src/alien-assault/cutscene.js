@@ -4,6 +4,7 @@ import { G, rnd, lerp, smooth, damp, pick } from './state.js';
 import { sfx, playMusic } from './audio.js';
 import { TEX } from './textures.js';
 import * as MD from './models.js';
+import * as D from './detail.js';
 import { Particles } from './fx.js';
 import * as H from './hud.js';
 
@@ -11,24 +12,72 @@ let scene, camera, composer, unit, UP, sci, SP, fx, alarm, alarmL, keyL, arcs = 
 
 function makeScientist() {
   const g = new THREE.Group(), P = {};
-  const coat = MD.lam(0xc8ccd4, { roughness: 0.8 }), dark = MD.lam(0x15141a, { roughness: 0.9 });
-  MD.cyl(0.35, 0.55, 1.4, coat, 0, 0.7, 0, g, 10);
-  MD.cyl(0.3, 0.36, 0.7, coat, 0, 1.75, 0, g, 10);
-  for (const s of [-1, 1]) MD.box(0.14, 0.9, 0.14, dark, s * 0.15, 0.45, 0, g);
+  const coat = MD.skin(0xc8ccd4, { roughness: 0.8, clearcoat: 0, sheen: 0.6 }), dark = MD.lam(0x15141a, { roughness: 0.9 }), glove = MD.paint(0x2a2a30, { metalness: 0, roughness: 0.4 });
+  // long lab coat with a split at the front, collar, pockets and an ID badge
+  const cg = new THREE.CylinderGeometry(0.34, 0.58, 1.5, 28, 6, true, 0.25, Math.PI * 2 - 0.5), cp = cg.attributes.position;
+  for (let k = 0; k < cp.count; k++) { const y = cp.getY(k); if (y < -0.6) cp.setY(k, y + Math.sin(Math.atan2(cp.getZ(k), cp.getX(k)) * 6) * 0.04); }
+  cg.computeVertexNormals();
+  const skirt = MD.mesh(cg, coat, 0, 0.8, 0, g); skirt.material = coat.clone(); skirt.material.side = THREE.DoubleSide;
+  MD.limb(0.36, 0.3, 0.75, coat, 0, 2.1, 0, g).scale.z = 0.8;
+  for (const s of [-1, 1]) {
+    MD.limb(0.1, 0.08, 0.8, dark, s * 0.15, 0.95, 0, g);
+    MD.box(0.15, 0.08, 0.3, dark, s * 0.15, 0.04, 0.06, g);
+    MD.box(0.18, 0.2, 0.03, coat, s * 0.2, 1.05, 0.5, g).rotation.x = 0.25;
+    MD.box(0.16, 0.25, 0.04, coat, s * 0.13, 2.0, 0.24, g).rotation.set(-0.2, s * 0.4, 0);
+  }
+  MD.box(0.12, 0.16, 0.02, MD.glow(0xbfe8ff), -0.16, 1.75, 0.28, g);
+  for (let k = 0; k < 2; k++) MD.cyl(0.012, 0.012, 0.16, MD.lam(k ? 0xc02020 : 0x2040c0), 0.14 + k * 0.03, 1.8, 0.27, g);
   const head = MD.group(0, 2.3, 0, g); P.head = head;
-  MD.mesh(new THREE.SphereGeometry(0.28, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), dark, 0, 0.02, -0.02, head).scale.set(1, 1.1, 1.1);
+  MD.cyl(0.08, 0.1, 0.18, dark, 0, -0.12, 0, head);
+  MD.mesh(new THREE.SphereGeometry(0.28, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.62), dark, 0, 0.02, -0.02, head).scale.set(1, 1.1, 1.1);
   MD.ball(0.2, MD.glow(0x000000), 0, -0.02, 0.06, head);
-  for (const s of [-1, 1]) MD.ball(0.055, MD.glow(0x7affd8), s * 0.08, 0.02, 0.24, head, 0);
+  MD.box(0.32, 0.06, 0.06, glove, 0, 0.02, 0.2, head);
+  for (const s of [-1, 1]) { MD.ring(0.07, 0.018, glove, s * 0.08, 0.02, 0.24, head); MD.ball(0.055, MD.glow(0x7affd8), s * 0.08, 0.02, 0.24, head, 0); }
   P.goggles = MD.glowSprite(0x7affd8, 0.6, 0.8); P.goggles.position.set(0, 0.02, 0.3); head.add(P.goggles);
   P.arms = [];
   for (const s of [-1, 1]) {
     const a = MD.group(s * 0.36, 2.0, 0, g); P.arms.push(a);
-    MD.cyl(0.08, 0.07, 0.8, coat, 0, -0.4, 0, a, 8);
-    MD.ball(0.07, MD.lam(0x2a2a30), 0, -0.82, 0, a);
+    MD.limb(0.09, 0.075, 0.72, coat, 0, 0, 0, a);
+    MD.ball(0.07, glove, 0, -0.82, 0, a);
+    for (const k of [-1, 0, 1]) MD.limb(0.018, 0.014, 0.08, glove, k * 0.03, -0.86, 0.03, a);
     a.rotation.x = -0.3;
   }
   g.userData.parts = P;
   return g;
+}
+
+// lab clutter: benches with glassware, shelves, server racks, cables and papers
+function labClutter() {
+  const g = new THREE.Group(), metal = MD.phong(0x4a5068, { roughness: 0.4 }), dark = MD.phong(0x1e2433, { roughness: 0.5 }), paper = MD.lam(0xe8e8e0);
+  // back wall pipes, vents and lockers
+  for (let i = 0; i < 9; i++) { const w = D.wallDetail(i + 1, 4, 9, false, 0); w.g.position.set(-16 + i * 4, 0, -7.95); g.add(w.g); }
+  for (const s of [-1, 1]) for (let i = 0; i < 6; i++) { const w = D.wallDetail(i + 3, 4, 9, false, 0); w.g.position.set(s * 11.95, 0, -6 + i * 4); w.g.rotation.y = -s * Math.PI / 2; g.add(w.g); }
+  // bench with beakers and flasks
+  const bench = MD.group(6, 0, -6.6, g);
+  MD.box(4, 0.15, 1.2, metal, 0, 1.1, 0, bench);
+  for (const x of [-1.8, 1.8]) for (const z of [-0.5, 0.5]) MD.box(0.1, 1.1, 0.1, dark, x, 0.55, z, bench);
+  for (let k = 0; k < 7; k++) {
+    const x = -1.6 + k * 0.5, c = pick([0x3aff9a, 0xff4ad8, 0x33bbff, 0xffd84a]);
+    MD.cyl(0.12, 0.14, 0.4, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, roughness: 0.05 }), x, 1.38, 0.1, bench);
+    MD.cyl(0.11, 0.13, 0.2 + (k % 3) * 0.06, MD.glow(c), x, 1.28 + (k % 3) * 0.03, 0.1, bench);
+  }
+  MD.box(0.6, 0.02, 0.4, paper, -1.2, 1.19, -0.3, bench).rotation.y = 0.3;
+  // shelves of boxes
+  const sh = MD.group(-10.5, 0, 3, g); sh.rotation.y = Math.PI / 2;
+  for (let y = 0; y < 4; y++) { MD.box(3, 0.08, 0.8, metal, 0, 0.6 + y * 1.2, 0, sh); for (let k = 0; k < 4; k++) MD.box(rnd(0.4, 0.6), rnd(0.4, 0.8), 0.5, MD.lam(pick([0x8a6a3a, 0x5a6a7a, 0x3a4a5a])), -1.1 + k * 0.7, 0.85 + y * 1.2, 0, sh); }
+  for (const x of [-1.5, 1.5]) MD.box(0.08, 5, 0.8, dark, x, 2.5, 0, sh);
+  // server racks with blinking lights
+  for (let r = 0; r < 3; r++) {
+    const rk = MD.group(9 + r * 0.95, 0, -3 + r * 0.2, g); rk.rotation.y = -Math.PI / 2 + 0.2;
+    MD.box(0.9, 3.4, 1, dark, 0, 1.7, 0, rk);
+    for (let k = 0; k < 14; k++) MD.box(0.05, 0.05, 0.02, MD.glow(pick([0x39ff6a, 0x39ff6a, 0x33bbff, 0xff3030])), rnd(-0.35, 0.35), 0.3 + k * 0.21, 0.51, rk);
+  }
+  // thick cables from the cradle into the floor and the console
+  for (let k = 0; k < 4; k++) D.cable([-2.2 + k * 1.4, 7.9, -2.9], [-3.4 + k * 2.2, 0.05, -5.6 - k * 0.3], 0, 0.07, MD.lam(0x15141a), g);
+  for (let k = 0; k < 3; k++) D.cable([-2.4, 0.3 + k * 0.1, -2.4 + k * 0.2], [-4.4, 0.05, -2.4], 0.2, 0.06, MD.lam(0x15141a), g);
+  // papers scattered on the floor
+  for (let k = 0; k < 14; k++) { const p = MD.box(0.4, 0.01, 0.55, paper, rnd(-8, 8), 0.01, rnd(-6, 4), g); p.rotation.y = rnd(0, 6); }
+  return MD.bake(g, D.METAL);
 }
 
 export function buildCutscene() {
@@ -53,12 +102,16 @@ export function buildCutscene() {
   MD.box(5.2, 0.4, 0.8, frame, 0, 8, -2.6, scene);
   MD.box(5.2, 0.3, 2.4, frame, 0, 0.15, -2, scene);
   for (let i = 0; i < 4; i++) MD.box(0.12, 0.12, 2, MD.glow(0x2a9dff), -1.6 + i * 1.07, 7.6, -2.0, scene);
+  scene.add(labClutter());
   unit = shadows(MD.makeUnit07()); UP = unit.userData.parts; unit.position.set(0, 0.3, -2.2); scene.add(unit);
   // glass tubes with things floating in green liquid
   for (const [x, z] of [[-7, -5], [-9, -1], [7.5, -5], [9.5, -1.5]]) {
     MD.cyl(1, 1, 5, new THREE.MeshStandardMaterial({ color: 0x3aff9a, emissive: 0x1aff6a, emissiveIntensity: 0.35, transparent: true, opacity: 0.35, roughness: 0.05 }), x, 2.8, z, scene, 16);
     MD.cyl(1.1, 1.1, 0.4, frame, x, 0.2, z, scene, 16); MD.cyl(1.1, 1.1, 0.4, frame, x, 5.4, z, scene, 16);
-    const blob = MD.ball(0.5, MD.lam(0x3a5a3a), x, 2.8, z, scene); blob.scale.set(0.8, 1.4, 0.8);
+    const blob = MD.blob(0.5, MD.skin(0x3a5a3a), x, 2.8, z, scene, 0.15, x); blob.scale.set(0.8, 1.4, 0.8);
+    for (let k = 0; k < 4; k++) { const a = k * 1.6; MD.tube([[x, 2.4, z], [x + Math.cos(a) * 0.4, 1.8, z + Math.sin(a) * 0.4], [x + Math.cos(a + 0.5) * 0.6, 1.2, z + Math.sin(a + 0.5) * 0.6]], 0.06, MD.skin(0x3a5a3a), scene, 0.8); }
+    for (let k = 0; k < 2; k++) MD.ball(0.08, MD.glow(0xffe020), x + (k - 0.5) * 0.25, 3.3, z + 0.35, scene, 0);
+    MD.cyl(0.08, 0.08, 3, MD.phong(0x1e2433), x, 7.0, z, scene);
   }
   // monitors and the console with the big lever
   for (let i = 0; i < 5; i++) {
