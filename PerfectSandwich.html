@@ -4,261 +4,663 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Perfect Sandwich</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#fdf3e1; --ink:#3b2a1a; --accent:#e0702b; --panel:#fff8ec; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,sans-serif;
-         display:flex; flex-direction:column; align-items:center; min-height:100vh; padding:12px 16px; }
-  h1 { margin:4px 0 8px; font-size:1.6rem; }
-  #wrap { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; max-width:100%; }
-  canvas { background:#cfe8f7; border:4px solid var(--ink); border-radius:12px; max-width:100%; touch-action:manipulation; }
-  #side { width:220px; max-width:100%; display:flex; flex-direction:column; gap:10px; }
-  .card { background:var(--panel); border:3px solid var(--ink); border-radius:10px; padding:10px; }
-  .card h2 { margin:0 0 6px; font-size:1rem; }
-  #order li { padding:2px 0; }
-  #order li.done { text-decoration:line-through; opacity:.5; }
-  #order li.next { font-weight:bold; color:var(--accent); }
-  #shelf { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-  #shelf button { font-size:.8rem; padding:6px 2px; border:2px solid var(--ink); border-radius:8px;
-                  background:#fff; cursor:pointer; color:var(--ink); }
-  #shelf button:hover { background:#ffe2c4; }
-  #shelf button.sel { background:var(--accent); color:#fff; }
-  #shelf button .k { display:block; font-size:.65rem; opacity:.6; }
-  .stats { font-size:.95rem; line-height:1.5; }
-  .help { font-size:.8rem; line-height:1.4; }
+  body { margin:0; background:#1b1b2f; color:#fff; font-family:'Press Start 2P',monospace;
+         display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:12px 16px; }
+  canvas { width:min(100%, 960px); aspect-ratio:16/9; image-rendering:pixelated; border:4px solid #000;
+           background:#000; touch-action:none; display:block; }
+  #pad { display:none; width:min(100%, 960px); justify-content:space-between; margin-top:12px; gap:12px; }
+  #pad div { display:flex; gap:12px; }
+  #pad button { font:inherit; font-size:18px; width:64px; height:64px; border:4px solid #000; border-radius:8px;
+                background:#ffd36b; color:#000; touch-action:none; user-select:none; }
+  @media (pointer:coarse) { #pad { display:flex; } }
 </style>
 </head>
 <body>
-<h1>🥪 The Perfect Sandwich</h1>
-<div id="wrap">
-  <canvas id="c" width="420" height="600"></canvas>
-  <div id="side">
-    <div class="card"><h2>📝 Order</h2><ol id="order"></ol></div>
-    <div class="card"><h2>🧺 Pick a topping</h2><div id="shelf"></div></div>
-    <div class="card stats" id="stats"></div>
-    <div class="card help">
-      Pick the <b>next</b> thing on the order (click or keys 1–9).<br>
-      It swings above the sandwich. Press <b>Space</b> or tap the picture to drop it.<br>
-      Land it right in the middle for a <b>PERFECT!</b> If it hangs off too far, it falls and you lose a ❤️.
-    </div>
-  </div>
+<canvas id="c" width="960" height="540"></canvas>
+<div id="pad">
+  <div><button data-k="left">◀</button><button data-k="right">▶</button></div>
+  <div><button data-k="act">E</button><button data-k="jump">▲</button></div>
 </div>
 <script>
+// Everything is drawn on a tiny 320x180 "pixel" world, blown up 3x so it looks retro.
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-const W = cv.width, H = cv.height;
+const S = 3, VW = 320, VH = 180, GROUND = 150, PRICE = 30;
+ctx.imageSmoothingEnabled = false;
 
-// Each ingredient: name, height in px, how to draw it
-const ING = [
-  { id:'bread',   name:'Bread',   h:22, col:'#e4b56a', crust:'#a8692a' },
-  { id:'lettuce', name:'Lettuce', h:10, col:'#7cc24a', wavy:true },
-  { id:'tomato',  name:'Tomato',  h:10, col:'#e2412f', dots:'#f7c6a3' },
-  { id:'cheese',  name:'Cheese',  h:8,  col:'#f6c533', drip:true },
-  { id:'ham',     name:'Ham',     h:9,  col:'#f19aa5' },
-  { id:'bacon',   name:'Bacon',   h:8,  col:'#b8452e', stripe:'#f2c7a6' },
-  { id:'egg',     name:'Egg',     h:10, col:'#ffffff', yolk:'#f7b500' },
-  { id:'pickle',  name:'Pickle',  h:8,  col:'#5d8a2c', dots:'#a6c96a' },
-  { id:'onion',   name:'Onion',   h:7,  col:'#d9b3e6' },
-];
-const byId = Object.fromEntries(ING.map(i => [i.id, i]));
-const CUSTOMERS = ['🐻 Bear','🤖 Robot','👽 Alien','🦖 Dino','🧙 Wizard','🐱 Cat','👨‍🚀 Astronaut','🦈 Shark'];
+// ---------- input ----------
+const keys = {}, pressed = {}, raw = {};
+const KEYMAP = { ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right', ArrowUp:'jump', KeyW:'jump',
+                 Space:'jump', KeyE:'act', ArrowDown:'act', KeyS:'act', Enter:'act' };
+function down(k) { if (!keys[k]) pressed[k] = true; keys[k] = true; }
+function up(k) { keys[k] = false; }
+addEventListener('keydown', e => { raw[e.code] = true; const k = KEYMAP[e.code]; if (k) { e.preventDefault(); down(k); } });
+addEventListener('keyup', e => { raw[e.code] = false; const k = KEYMAP[e.code]; if (k) up(k); });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; for (const k in raw) raw[k] = false; });
+document.querySelectorAll('#pad button').forEach(b => {
+  const k = b.dataset.k;
+  b.addEventListener('pointerdown', e => { e.preventDefault(); down(k); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => up(k)));
+});
+const pointer = { x:160, y:90, moved:false };
+function pointerPos(e) {
+  const r = cv.getBoundingClientRect();
+  pointer.x = (e.clientX - r.left) / r.width * VW; pointer.y = (e.clientY - r.top) / r.height * VH; pointer.moved = true;
+}
+cv.addEventListener('pointermove', pointerPos);
+cv.addEventListener('pointerdown', e => { pointerPos(e); pressed.tap = true; });
 
-let level, lives, score, order, stackPos, stack, falling, held, msg, msgT, combo, state, perfects;
-const PW = 180;                // width of every layer
-const PLATE_Y = H - 50;
-
-function newGame() { level = 1; lives = 3; score = 0; combo = 0; perfects = 0; newOrder(); state = 'play'; }
-
-function newOrder() {
-  const fillings = ING.filter(i => i.id !== 'bread');
-  const n = Math.min(2 + level, 9);
-  order = ['bread'];
-  for (let i = 0; i < n; i++) order.push(fillings[Math.floor(Math.random()*fillings.length)].id);
-  order.push('bread');
-  order.customer = CUSTOMERS[Math.floor(Math.random()*CUSTOMERS.length)];
-  stackPos = 0; stack = []; falling = []; held = null;
-  say(order.customer + ' wants a sandwich!');
-  renderSide();
+// ---------- sound ----------
+let AC;
+function beep(f, d = .08, type = 'square', v = .05) {
+  try {
+    AC = AC || new AudioContext();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.value = f; g.gain.value = v;
+    g.gain.exponentialRampToValueAtTime(.0001, AC.currentTime + d);
+    o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime + d);
+  } catch (e) { /* no sound, no problem */ }
 }
 
-function say(t) { msg = t; msgT = 120; }
-
-function topY() { return PLATE_Y - stack.reduce((s, l) => s + byId[l.id].h, 0); }
-function topX() { return stack.length ? stack[stack.length-1].x : W/2; }
-
-function pick(id) {
-  if (state !== 'play' || (held && held.dropping)) return;
-  const speed = 1.6 + level * 0.5;
-  held = { id, x: W/2, y: 70, dir: Math.random() < .5 ? 1 : -1, speed, dropping:false, vy:0 };
-  renderSide();
-}
-
-function drop() {
-  if (state === 'over' || state === 'served') { if (state === 'over') newGame(); else { level++; newOrder(); state='play'; } return; }
-  if (held && !held.dropping) held.dropping = true;
-}
-
-function land() {
-  const want = order[stackPos];
-  const off = held.x - topX();
-  if (Math.abs(off) > PW * 0.55) {          // fell off the side
-    falling.push({ ...held, vx: Math.sign(off) * 3, rot: 0 });
-    lives--; combo = 0;
-    say('Oops! It fell off! 💥');
-    held = null;
-    if (lives <= 0) { state = 'over'; }
-    renderSide(); return;
-  }
-  stack.push({ id: held.id, x: held.x });
-  if (held.id !== want) {
-    score = Math.max(0, score - 20); combo = 0;
-    say('Wrong one! They wanted ' + byId[want].name + ' 😬');
-  } else {
-    let pts = 10; const a = Math.abs(off);
-    if (a < 5)       { combo++; perfects++; pts = 50 * combo; say('PERFECT! ✨' + (combo > 1 ? ' x' + combo : '')); }
-    else if (a < 20) { combo = 0; pts = 25; say('Nice!'); }
-    else             { combo = 0; say('Wobbly...'); }
-    score += pts;
-  }
-  stackPos++;
-  held = null;
-  if (stackPos >= order.length) serve();
-  renderSide();
-}
-
-function serve() {
-  // tidiness = how lined-up the stack is, correctness = right items in order
-  let right = 0, wobble = 0;
-  stack.forEach((l, i) => { if (l.id === order[i]) right++; wobble += Math.abs(l.x - W/2); });
-  const acc = right / order.length, tidy = Math.max(0, 1 - wobble / stack.length / 60);
-  const stars = Math.max(1, Math.round((acc * 0.6 + tidy * 0.4) * 5));
-  score += stars * 20;
-  if (stars === 5) { lives = Math.min(lives + 1, 5); }
-  state = 'served';
-  served = { stars, acc, tidy };
-}
-let served = null;
-
-// ---------- drawing ----------
-function drawLayer(id, cx, y) {   // y = top of layer
-  const g = byId[id], x = cx - PW/2;
-  ctx.save();
-  if (id === 'bread') {
-    ctx.fillStyle = g.crust; round(x, y, PW, g.h, 10); ctx.fill();
-    ctx.fillStyle = g.col;   round(x+4, y+4, PW-8, g.h-8, 7); ctx.fill();
-  } else if (id === 'tomato' || id === 'pickle' || id === 'onion') {
-    const n = id === 'onion' ? 4 : 3, w = PW / n;
-    for (let i = 0; i < n; i++) {
-      ctx.fillStyle = g.col; ctx.beginPath();
-      ctx.ellipse(x + w*i + w/2, y + g.h/2, w/2 + 4, g.h/2, 0, 0, Math.PI*2); ctx.fill();
-      if (g.dots) { ctx.fillStyle = g.dots; for (let d = -1; d <= 1; d++) { ctx.beginPath(); ctx.arc(x + w*i + w/2 + d*10, y + g.h/2, 2, 0, 7); ctx.fill(); } }
-      if (id === 'onion') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x + w*i + w/2, y + g.h/2, w/3, g.h/3, 0, 0, 7); ctx.stroke(); }
-    }
-  } else if (g.wavy) {
-    ctx.fillStyle = g.col; ctx.beginPath(); ctx.moveTo(x - 8, y + g.h);
-    for (let i = 0; i <= 12; i++) ctx.lineTo(x - 8 + i * (PW+16)/12, y + (i % 2 ? 0 : g.h*0.6));
-    ctx.lineTo(x + PW + 8, y + g.h); ctx.closePath(); ctx.fill();
-  } else if (id === 'egg') {
-    ctx.fillStyle = g.col; ctx.beginPath(); ctx.ellipse(cx, y + g.h/2, PW/2, g.h/2, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = g.yolk; ctx.beginPath(); ctx.ellipse(cx, y + g.h/2, 22, g.h/2 - 1, 0, 0, 7); ctx.fill();
-  } else {
-    ctx.fillStyle = g.col; round(x, y, PW, g.h, 3); ctx.fill();
-    if (g.drip) { ctx.beginPath(); ctx.moveTo(x+20,y+g.h); ctx.lineTo(x+35,y+g.h+8); ctx.lineTo(x+50,y+g.h); ctx.moveTo(x+PW-60,y+g.h); ctx.lineTo(x+PW-45,y+g.h+10); ctx.lineTo(x+PW-30,y+g.h); ctx.fill(); }
-    if (g.stripe) { ctx.strokeStyle = g.stripe; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x+4, y+g.h/2); ctx.lineTo(x+PW-4, y+g.h/2); ctx.stroke(); }
-  }
+// ---------- drawing helpers ----------
+function R(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+function T(str, x, y, size = 12, color = '#fff', align = 'left') {
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = size + 'px "Press Start 2P", monospace'; ctx.textAlign = align; ctx.textBaseline = 'top';
+  ctx.fillStyle = '#000'; ctx.fillText(str, x * S + 2, y * S + 2);
+  ctx.fillStyle = color; ctx.fillText(str, x * S, y * S);
   ctx.restore();
 }
-function round(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
-
-function frame() {
-  // update
-  if (held) {
-    if (!held.dropping) {
-      held.x += held.dir * held.speed;
-      if (held.x > W - PW/2 - 10 || held.x < PW/2 + 10) held.dir *= -1;
-    } else {
-      held.vy += 0.6; held.y += held.vy;
-      if (held.y + byId[held.id].h >= topY()) { held.y = topY() - byId[held.id].h; land(); }
-    }
+function disc(cx, cy, r, c) { for (let y = -r; y <= r; y++) { const w = Math.floor(Math.sqrt(r * r - y * y)); R(cx - w, cy + y, w * 2 + 1, 1, c); } }
+function drawRows(rows, l, t, pal, flip, sc = 1) {
+  for (let r = 0; r < rows.length; r++) for (let c = 0; c < rows[r].length; c++) {
+    const ch = rows[r][c]; if (ch === '.') continue;
+    const cx = flip ? rows[r].length - 1 - c : c;
+    R(l + cx * sc, t + r * sc, sc, sc, pal[ch]);
   }
-  falling.forEach(f => { f.vy = (f.vy || 0) + 0.5; f.y += f.vy; f.x += f.vx; f.rot += f.vx * 0.02; });
-  falling = falling.filter(f => f.y < H + 50);
-  if (msgT > 0) msgT--;
-
-  // draw
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#c98a4b'; ctx.fillRect(0, H - 40, W, 40);          // counter
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(W/2, PLATE_Y + 6, 130, 14, 0, 0, 7); ctx.fill(); // plate
-  ctx.strokeStyle = '#ccc'; ctx.lineWidth = 2; ctx.stroke();
-
-  let y = PLATE_Y;
-  stack.forEach(l => { y -= byId[l.id].h; drawLayer(l.id, l.x, y); });
-  falling.forEach(f => { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot); ctx.translate(-f.x, -f.y); drawLayer(f.id, f.x, f.y); ctx.restore(); });
-
-  if (held) {
-    if (!held.dropping) { ctx.strokeStyle = 'rgba(0,0,0,.2)'; ctx.setLineDash([6,6]); ctx.beginPath(); ctx.moveTo(held.x, held.y+20); ctx.lineTo(held.x, topY()); ctx.stroke(); ctx.setLineDash([]); }
-    drawLayer(held.id, held.x, held.y);
-  } else if (state === 'play') {
-    ctx.fillStyle = 'rgba(59,42,26,.6)'; ctx.font = 'bold 18px system-ui'; ctx.textAlign = 'center';
-    ctx.fillText('Pick a topping from the shelf!', W/2, 80);
-  }
-
-  // customer + message
-  ctx.textAlign = 'left'; ctx.fillStyle = '#3b2a1a'; ctx.font = 'bold 16px system-ui';
-  ctx.fillText('Level ' + level + '   ' + order.customer, 12, 26);
-  ctx.textAlign = 'right'; ctx.fillText('❤️'.repeat(lives), W - 12, 26);
-  if (msgT > 0) { ctx.textAlign = 'center'; ctx.font = 'bold 24px system-ui'; ctx.globalAlpha = Math.min(1, msgT/30);
-    ctx.fillStyle = '#e0702b'; ctx.fillText(msg, W/2, 130); ctx.globalAlpha = 1; }
-
-  if (state === 'served' || state === 'over') {
-    ctx.fillStyle = 'rgba(255,248,236,.92)'; round(40, 170, W-80, 200, 16); ctx.fill();
-    ctx.strokeStyle = '#3b2a1a'; ctx.lineWidth = 3; ctx.stroke();
-    ctx.fillStyle = '#3b2a1a'; ctx.textAlign = 'center';
-    if (state === 'served') {
-      ctx.font = 'bold 26px system-ui'; ctx.fillText(order.customer + ' says:', W/2, 210);
-      ctx.font = '34px system-ui'; ctx.fillText('⭐'.repeat(served.stars) + '☆'.repeat(5 - served.stars), W/2, 260);
-      ctx.font = '16px system-ui';
-      ctx.fillText('Right order: ' + Math.round(served.acc*100) + '%   Tidy: ' + Math.round(served.tidy*100) + '%', W/2, 295);
-      if (served.stars === 5) ctx.fillText('THE PERFECT SANDWICH! +1 ❤️', W/2, 320);
-      ctx.fillText('Space / tap for the next customer', W/2, 350);
-    } else {
-      ctx.font = 'bold 30px system-ui'; ctx.fillText('Kitchen closed!', W/2, 220);
-      ctx.font = '20px system-ui'; ctx.fillText('Score: ' + score + '   Level: ' + level, W/2, 265);
-      ctx.fillText('Perfect drops: ' + perfects, W/2, 295);
-      ctx.font = '16px system-ui'; ctx.fillText('Space / tap to play again', W/2, 345);
-    }
-  }
-  requestAnimationFrame(frame);
+}
+function bubbleAt(text, sx, sy) {   // sx, sy = logical screen coords of the speaker's head
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = '14px "Press Start 2P", monospace';
+  const w = ctx.measureText(text).width + 20, h = 30;
+  const x = Math.max(4, Math.min(cv.width - w - 4, sx * S - w / 2)), y = sy * S - h - 12;
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+  ctx.fillRect(x, y, w, h); ctx.strokeRect(x, y, w, h);
+  ctx.beginPath(); ctx.moveTo(sx * S - 7, y + h); ctx.lineTo(sx * S, y + h + 10); ctx.lineTo(sx * S + 7, y + h);
+  ctx.fill(); ctx.stroke(); ctx.fillRect(sx * S - 5, y + h - 2, 10, 4);
+  ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, x + w / 2, y + h / 2 + 1);
+  ctx.restore();
 }
 
-// ---------- side panel ----------
-const shelf = document.getElementById('shelf');
-ING.forEach((g, i) => {
-  const b = document.createElement('button');
-  b.innerHTML = g.name + '<span class="k">' + (i+1) + '</span>';
-  b.onclick = () => pick(g.id);
-  b.dataset.id = g.id; shelf.appendChild(b);
-});
-function renderSide() {
-  const ol = document.getElementById('order'); ol.innerHTML = '';
-  // order is listed top-to-bottom like a real sandwich, so reverse it
-  order.map((id, i) => ({ id, i })).reverse().forEach(({ id, i }) => {
-    const li = document.createElement('li'); li.textContent = byId[id].name;
-    if (i < stackPos) li.className = 'done'; else if (i === stackPos) li.className = 'next';
-    ol.appendChild(li);
+// ---------- sprites ----------
+const BODY = [
+  "...hhhh...",
+  "..hhhhhh..",
+  "..hssssh..",
+  "..sesses..",
+  "..ssssss..",
+  "...smms...",
+  "....ss....",
+  "..rrrrrr..",
+  ".srrrrrrs.",
+  ".srrrrrrs.",
+  "..rrrrrr..",
+  "..pppppp..",
+];
+const LEGS = [
+  ["..pp..pp..", "..pp..pp..", "..pp..pp..", ".kkk..kkk."],
+  ["..pp..pp..", ".pp....pp.", ".pp....pp.", "kkk....kkk"],
+];
+const BASE = { h:'#5a3418', s:'#f2c194', e:'#111', m:'#a33', r:'#d63a2f', p:'#2f55a4', k:'#222' };
+const STEVE = BASE;
+const GARY = { ...BASE, r:'#7b3fb5', p:'#3b3b3b' };   // same face, purple shirt + pineapple hat
+const STAR = ["...y...", "..yyy..", "yyyyyyy", ".yyyyy.", "..yyy..", ".yy.yy.", ".y...y."];
+
+function drawPerson(x, y, pal, face, walk, sc = 1) {   // x = center, y = feet
+  const l = Math.round(x - 5 * sc), t = Math.round(y - 16 * sc);
+  drawRows(BODY, l, t, pal, face < 0, sc);
+  drawRows(LEGS[Math.floor(walk) % 2], l, t + 12 * sc, pal, face < 0, sc);
+}
+function pineappleHat(x, y) {
+  const l = Math.round(x - 5), t = Math.round(y - 16);
+  R(l + 4, t - 7, 1, 3, '#3a9a2a'); R(l + 5, t - 8, 1, 4, '#3a9a2a'); R(l + 6, t - 7, 1, 3, '#3a9a2a');
+  R(l + 3, t - 4, 5, 4, '#f2c12e'); R(l + 4, t - 3, 1, 1, '#a0711c'); R(l + 6, t - 2, 1, 1, '#a0711c');
+}
+
+// sandwich layers
+const LAY = {
+  bread:   { h:6, c:'#e9b86b', d:'#a8692a', name:'BREAD' },
+  lettuce: { h:3, c:'#6dbb3c', d:'#3f8a22', name:'LETTUCE' },
+  tomato:  { h:3, c:'#e2412f', d:'#9e2418', name:'TOMATO' },
+  cheese:  { h:2, c:'#f6c533', d:'#d49a12', name:'CHEESE' },
+  ham:     { h:3, c:'#f19aa5', d:'#c96d7a', name:'HAM' },
+  bacon:   { h:2, c:'#b8452e', d:'#f2c7a6', name:'BACON' },
+  egg:     { h:3, c:'#ffffff', d:'#f7b500', name:'EGG' },
+  pickle:  { h:2, c:'#5d8a2c', d:'#a6c96a', name:'PICKLE' },
+  onion:   { h:2, c:'#e6c6f0', d:'#b58ac4', name:'ONION' },
+};
+const FILLINGS = ['lettuce', 'tomato', 'cheese', 'ham', 'bacon', 'egg', 'pickle', 'onion'];
+const LW = 56;
+function drawLayer(id, cx, y) {   // y = top of layer
+  const g = LAY[id], x = Math.round(cx - LW / 2);
+  if (id === 'bread') { R(x + 1, y, LW - 2, g.h, g.d); R(x, y + 1, LW, g.h - 2, g.d); R(x + 2, y + 1, LW - 4, g.h - 3, g.c); }
+  else if (id === 'tomato' || id === 'pickle' || id === 'onion') {
+    for (let i = 0; i < 3; i++) { R(x + i * 19, y, 18, g.h, g.c); R(x + i * 19 + 6, y + 1, 6, 1, g.d); }
+  } else if (id === 'lettuce') {
+    R(x - 2, y + 1, LW + 4, 2, g.c); for (let i = 0; i < LW + 4; i += 6) R(x - 2 + i, y, 3, 1, g.c); R(x - 2, y + 2, LW + 4, 1, g.d);
+  } else if (id === 'cheese') {
+    R(x, y, LW, g.h, g.c); R(x + 10, y + 2, 3, 2, g.c); R(x + 40, y + 2, 3, 3, g.c);
+  } else if (id === 'egg') {
+    R(x + 2, y, LW - 4, g.h, g.c); R(x, y + 1, LW, 1, g.c); R(cx - 6, y, 12, g.h, g.d);
+  } else if (id === 'bacon') {
+    R(x, y, LW, g.h, g.c); R(x + 2, y + 1, LW - 4, 1, g.d);
+  } else { R(x, y, LW, g.h, g.c); R(x, y + g.h - 1, LW, 1, g.d); }
+}
+
+// ---------- game state ----------
+let G, scene, camX, fade, P, npcs, car, mini, screen, bubble, bubbleQ, fridgeOpen, frameN = 0;
+function resetGame() {
+  G = { money:0, fridge:false, broke:false, food:false, won:false, done:{ deli:0, wash:0, pizza:0 } };
+  scene = 'home'; camX = 0; fade = 0; npcs = null; car = null; mini = null; bubble = null; bubbleQ = []; fridgeOpen = 0;
+  P = { x:40, y:GROUND, vy:0, face:1, walk:0, ground:true };
+  screen = { type:'title', t:0 };
+}
+function say(text) { bubble = { text, t:150 }; bubbleQ = []; }
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const shuffle = a => a.map(v => [Math.random(), v]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
+
+function objective() {
+  if (G.food) return 'Go HOME. Make the perfect sandwich at the counter!';
+  if (!G.fridge) return 'Look in the fridge.';
+  if (!G.broke) return 'Go to the STORE. Avoid strangers, police + Gary!';
+  if (G.money >= PRICE) return 'You have $' + PRICE + '! Go buy food at the STORE.';
+  if (!G.done.deli) return 'Get a job! The DELI is hiring.';
+  if (!G.done.wash) return 'Need more money! The CAR WASH is hiring.';
+  if (!G.done.pizza) return 'Need more money! PIZZA is hiring.';
+  return 'Work any job until you have $' + PRICE + '.';
+}
+
+// ---------- places ----------
+const BUILDINGS = [
+  { name:'HOME',     x:10,  w:70,  col:'#c9a36b', door:38 },
+  { name:'DELI',     x:220, w:90,  col:'#e07a5f', door:258, job:'deli' },
+  { name:'CAR WASH', x:420, w:100, col:'#4f9dd6', door:462, job:'wash' },
+  { name:'PIZZA',    x:630, w:90,  col:'#f2b134', door:668, job:'pizza' },
+  { name:'STORE',    x:850, w:120, col:'#6cbf6c', door:902 },
+];
+function jobOpen(job) {
+  if (!G.broke) return false;
+  if (job === 'deli') return true;
+  if (job === 'wash') return G.done.deli > 0;
+  return G.done.wash > 0;
+}
+const SCENES = {
+  home: { w:320, things: () => [
+    { x:110, w:24, label:'Open fridge', act() {
+      fridgeOpen = 120; beep(300);
+      if (G.food) say('food goes on the counter');
+      else { say('nothing :('); G.fridge = true; }
+    } },
+    { x:160, w:54, label: G.food ? 'Make sandwich!' : 'Counter', act() {
+      if (G.food) startStack('final'); else say(G.fridge ? 'no food :(' : 'hungry >:(');
+    } },
+    { x:282, w:22, label:'Go outside', act() {
+      if (!G.fridge) say('fridge first...'); else goTo('street', 45);
+    } },
+  ] },
+  street: { w:1000, things: () => BUILDINGS.map(b => ({ x:b.door, w:14,
+    label: b.job ? (jobOpen(b.job) ? 'Work at ' + b.name : b.name + ' (closed)') : 'Enter ' + b.name, act() {
+      if (b.name === 'HOME') goTo('home', 280);
+      else if (b.name === 'STORE') goTo('store', 34);
+      else if (!G.broke) say('I need food, not a job');
+      else if (!jobOpen(b.job)) say('closed :( try another job');
+      else startJob(b.job);
+    } })) },
+  store: { w:320, things: () => [
+    { x:8, w:18, label:'Go outside', act() { goTo('street', 902); } },
+    { x:236, w:30, label:'Buy food $' + PRICE, act() {
+      if (G.food) say('got it already!');
+      else if (G.money < PRICE) { say('I broke :('); G.broke = true; beep(160, .3, 'sawtooth'); }
+      else { G.money -= PRICE; G.food = true; say('YES :D'); beep(660); setTimeout(() => beep(990), 100); }
+    } },
+  ] },
+};
+
+function goTo(name, x) {
+  scene = name; P.x = x; P.y = GROUND; P.vy = 0; P.ground = true; car = null; fade = 1;
+  if (name !== 'street') return;
+  if (!npcs) makeNpcs();
+  // nobody is standing right on the doorstep when you come out
+  for (const n of npcs) {
+    if (n.kind === 'gary') { if (Math.abs(n.x - P.x) < 200) n.x = P.x > 500 ? P.x - 260 : P.x + 260; }
+    else if (Math.abs(n.x - P.x) < 60) n.x = clamp(P.x + (n.x >= P.x ? 1 : -1) * 90, 20, 980);
+    n.cool = 60; n.phone = 0;
+  }
+}
+function makeNpcs() {
+  const looks = [
+    { h:'#222', r:'#3c9d5b', p:'#555' }, { h:'#e8c15a', r:'#e88c2a', p:'#2d2d6b' },
+    { h:'#999', r:'#2c7da0', p:'#6b4a2b' }, { h:'#b5402b', r:'#ec6fa8', p:'#333' },
+  ];
+  npcs = [150, 370, 560, 790].map((x, i) => ({ kind:'stranger', x, min:x - 50, max:x + 50, dir:i % 2 ? 1 : -1,
+    sp:.35 + .1 * i, walk:0, cool:0, phone:0, pal:{ ...BASE, s: i === 2 ? '#c68a5a' : BASE.s, ...looks[i] } }));
+  npcs.push({ kind:'gary', x:600, min:300, max:820, dir:-1, sp:.5, walk:0, cool:0, phone:0, pal:GARY });
+}
+
+// ---------- world update ----------
+function nearest() {
+  return SCENES[scene].things().find(t => Math.abs(P.x - (t.x + t.w / 2)) < t.w / 2 + 6);
+}
+function updateWorld() {
+  const sc = SCENES[scene];
+  const mv = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+  P.x = clamp(P.x + mv * 1.4, 6, sc.w - 6);
+  if (mv) { P.face = mv; P.walk += .15; } else P.walk = 0;
+  if (pressed.jump && P.ground) { P.vy = -4.2; P.ground = false; beep(520, .06); }
+  P.vy += .25; P.y += P.vy;
+  if (P.y >= GROUND) { P.y = GROUND; P.vy = 0; P.ground = true; }
+  camX = Math.round(clamp(P.x - VW / 2, 0, sc.w - VW));
+  if (fridgeOpen > 0) fridgeOpen--;
+  if (fade > 0) fade -= .05;
+  if (scene === 'street' && updateStreet()) return;
+  const n = nearest();
+  if (pressed.act && n) n.act();
+  if (bubble && --bubble.t <= 0) bubble = null;
+  if (!bubble && bubbleQ.length) bubble = { text:bubbleQ.shift(), t:120 };
+}
+function updateStreet() {   // returns true if Steve got sent to jail
+  for (const n of npcs) {
+    n.walk += .12; if (n.cool > 0) n.cool--;
+    if (n.phone > 0) n.phone--;
+    else if (n.kind === 'gary' && Math.abs(P.x - n.x) < 70) { n.dir = Math.sign(P.x - n.x) || 1; n.x = clamp(n.x + n.dir * .85, 10, 990); }
+    else { n.x += n.dir * n.sp; if (n.x < n.min) n.dir = 1; if (n.x > n.max) n.dir = -1; }
+    const hit = Math.abs(P.x - n.x) < 7 && P.y > GROUND - 13;
+    if (!hit) continue;
+    if (n.kind === 'gary') { jail('gary'); return true; }
+    if (!n.cool) { n.cool = 400; n.phone = 120; beep(880, .15); callPolice(); }
+  }
+  if (car) {
+    car.x += car.dir * 2.3;
+    if (frameN % 15 === 0) beep(frameN % 30 ? 700 : 950, .1, 'square', .02);
+    if (!car.turned && (car.dir > 0 ? car.x > P.x + 180 : car.x < P.x - 180)) { car.dir *= -1; car.turned = true; }
+    else if (car.turned && Math.abs(car.x - P.x) > 260) car = null;
+    if (car && Math.abs(car.x - P.x) < 17 && P.y > GROUND - 11) { jail('police'); return true; }
+  }
+  return false;
+}
+function callPolice() {
+  if (car) return;
+  let x = P.x + P.face * 200;
+  if (x < 0 || x > 1000) x = P.x - P.face * 200;
+  car = { x, dir: Math.sign(P.x - x), turned:false };
+}
+function jail(reason) {
+  const bail = Math.min(5, G.money);
+  G.money -= bail;
+  screen = { type:'jail', reason, bail, t:0 };
+  beep(200, .4, 'sawtooth'); car = null;
+}
+
+// ---------- world drawing ----------
+function drawHome() {
+  R(0, 0, VW, VH, '#f1ddb0');
+  for (let x = 0; x < VW; x += 16) R(x, 0, 6, GROUND, '#ead09c');
+  R(0, GROUND, VW, VH - GROUND, '#9a6234');
+  for (let x = 0; x < VW; x += 24) R(x, GROUND, 1, VH - GROUND, '#7a4a24');
+  R(0, GROUND - 4, VW, 4, '#6b4226');
+  // window
+  R(58, 54, 36, 30, '#6b4226'); R(61, 57, 30, 24, '#9fd8ff'); R(75, 57, 2, 24, '#6b4226'); R(61, 68, 30, 2, '#6b4226');
+  // bed
+  R(14, GROUND - 14, 44, 14, '#7a4b2a'); R(16, GROUND - 19, 40, 7, '#5f8fd6'); R(17, GROUND - 22, 11, 4, '#fff');
+  // picture of Steve and Gary
+  R(226, 64, 34, 22, '#6b4226'); R(228, 66, 30, 18, '#cfe8f7');
+  drawPerson(236, 86, STEVE, 1, 0, 1); drawPerson(250, 86, GARY, 1, 0, 1); pineappleHat(250, 86);
+  R(226, 84, 34, 2, '#6b4226');
+  // fridge
+  if (fridgeOpen > 0) {
+    R(110, GROUND - 46, 24, 46, '#9aa7ae'); R(112, GROUND - 44, 20, 42, '#f5fbff');
+    [14, 26, 38].forEach(y => R(112, GROUND - 46 + y, 20, 1, '#b8c6cc'));
+    R(134, GROUND - 46, 7, 46, '#cfd8dc'); R(135, GROUND - 40, 1, 10, '#888');
+  } else {
+    R(110, GROUND - 46, 24, 46, '#dfe6ea'); R(110, GROUND - 30, 24, 1, '#a9b4ba');
+    R(130, GROUND - 42, 2, 8, '#888'); R(130, GROUND - 26, 2, 12, '#888');
+  }
+  // counter
+  R(158, GROUND - 26, 58, 3, '#d8d8d8'); R(160, GROUND - 23, 54, 23, '#8b5a2b');
+  R(164, GROUND - 19, 22, 15, '#a06a35'); R(190, GROUND - 19, 22, 15, '#a06a35');
+  R(172, GROUND - 28, 26, 2, '#c58f4f');
+  if (G.food) { R(198, GROUND - 38, 13, 12, '#c9a46b'); R(200, GROUND - 41, 3, 4, '#6dbb3c'); R(205, GROUND - 42, 4, 5, '#e9b86b'); }
+  // door
+  R(280, GROUND - 38, 26, 38, '#4a2d1a'); R(282, GROUND - 36, 22, 36, '#6b4226'); R(300, GROUND - 18, 2, 2, '#f2c12e');
+}
+function drawStore() {
+  for (let y = 0; y < GROUND; y += 8) for (let x = 0; x < VW; x += 8) R(x, y, 8, 8, (x + y) % 16 ? '#f4f1e6' : '#efeadc');
+  for (let y = GROUND; y < VH; y += 6) for (let x = 0; x < VW; x += 6) R(x, y, 6, 6, (x + y) % 12 ? '#dcd6c8' : '#c9c1b0');
+  R(8, GROUND - 36, 20, 36, '#4a2d1a'); R(10, GROUND - 34, 16, 34, '#9fd8ff'); R(17, GROUND - 34, 2, 34, '#4a2d1a');
+  const itemCols = ['#e2412f', '#f6c533', '#6dbb3c', '#3c7fd6', '#f19aa5', '#fff', '#e88c2a', '#8b5a2b'];
+  for (let s = 0; s < 3; s++) {
+    const x = 46 + s * 60;
+    R(x, GROUND - 52, 52, 52, '#b07a46'); R(x + 2, GROUND - 50, 48, 48, '#8a5a30');
+    for (let l = 0; l < 3; l++) {
+      R(x + 2, GROUND - 36 + l * 16, 48, 2, '#d39a5e');
+      for (let i = 0; i < 7; i++) R(x + 4 + i * 7, GROUND - 46 + l * 16, 5, 10 - ((i + l + s) % 3) * 2, itemCols[(i * 3 + l * 5 + s) % 8]);
+    }
+  }
+  drawPerson(282, GROUND - 6, { ...BASE, h:'#222', r:'#2f8f4f' }, -1, 0);   // cashier (doesn't talk)
+  R(236, GROUND - 22, 64, 22, '#7b5a3c'); R(234, GROUND - 24, 68, 3, '#5a3f28');
+  R(242, GROUND - 31, 14, 8, '#333'); R(244, GROUND - 30, 10, 3, '#7cf07c');
+  R(244, GROUND - 74, 52, 14, '#fff8e0'); R(244, GROUND - 74, 52, 1, '#000'); R(244, GROUND - 61, 52, 1, '#000');
+}
+function drawStreet() {
+  R(0, 0, VW, VH, '#8fd3ff');
+  for (let i = 0; i < 6; i++) {
+    const x = ((i * 90 - camX * .3) % 540 + 540) % 540 - 60;
+    R(x, 24 + (i % 3) * 10, 30, 6, '#fff'); R(x + 6, 20 + (i % 3) * 10, 16, 4, '#fff');
+  }
+  ctx.save(); ctx.translate(-camX, 0);
+  for (let x = 0; x < 1000; x += 46) R(x, 60 + (x * 7) % 25, 40, GROUND - 60, '#a9c6db');
+  for (const b of BUILDINGS) {
+    const top = GROUND - 70;
+    R(b.x, top, b.w, 70, b.col); R(b.x - 3, top - 4, b.w + 6, 6, '#5b3a29');
+    R(b.x + 8, top + 4, b.w - 16, 12, '#fff8e0');
+    for (let wx = b.x + 8; wx < b.x + b.w - 14; wx += 22) if (Math.abs(wx + 6 - b.door - 7) > 12) R(wx, top + 24, 12, 12, '#cdeeff');
+    R(b.door - 1, GROUND - 25, 16, 25, '#3a2414'); R(b.door, GROUND - 24, 14, 24, '#6b4226'); R(b.door + 11, GROUND - 13, 2, 2, '#f2c12e');
+    if (b.job && !jobOpen(b.job)) { R(b.door + 1, GROUND - 18, 12, 6, '#d33'); }
+  }
+  R(0, GROUND, 1000, 8, '#b5b5b5'); for (let x = 0; x < 1000; x += 20) R(x, GROUND, 1, 8, '#999');
+  R(0, GROUND + 8, 1000, VH - GROUND - 8, '#3d3d3d'); for (let x = 0; x < 1000; x += 30) R(x, GROUND + 18, 14, 2, '#f2d13a');
+  for (const n of npcs) {
+    drawPerson(n.x, GROUND, n.pal, n.phone ? (P.x > n.x ? 1 : -1) : n.dir, n.phone ? 0 : n.walk);
+    if (n.kind === 'gary') pineappleHat(n.x, GROUND);
+    if (n.phone) { R(n.x + 3, GROUND - 13, 2, 4, '#222'); R(n.x - 1, GROUND - 26, 2, 6, '#e22'); R(n.x - 1, GROUND - 19, 2, 2, '#e22'); }
+  }
+  if (car) {
+    const x = Math.round(car.x - 15), y = GROUND - 12, on = frameN % 20 < 10;
+    R(x, y + 3, 30, 7, '#fff'); R(x + 6, y, 17, 4, '#fff'); R(x + 8, y + 1, 6, 3, '#9fd3ff'); R(x + 15, y + 1, 6, 3, '#9fd3ff');
+    R(x, y + 6, 30, 2, '#1d3d8f'); R(x + 10, y - 2, 4, 2, on ? '#ff2a2a' : '#601010'); R(x + 15, y - 2, 4, 2, on ? '#202060' : '#2a5bff');
+    R(x + 3, y + 9, 7, 3, '#111'); R(x + 20, y + 9, 7, 3, '#111');
+  }
+  drawPerson(P.x, P.y, STEVE, P.face, P.walk);
+  ctx.restore();
+  for (const b of BUILDINGS) {
+    T(b.name, b.x + b.w / 2 - camX, GROUND - 66, 11, '#3a2414', 'center');
+    if (b.job) T(jobOpen(b.job) ? 'HIRING' : 'CLOSED', b.x + b.w / 2 - camX, GROUND - 40, 9, jobOpen(b.job) ? '#7cf07c' : '#ff6b6b', 'center');
+  }
+}
+function drawWorld() {
+  if (scene === 'home') { drawHome(); drawPerson(P.x, P.y, STEVE, P.face, P.walk); }
+  else if (scene === 'store') { drawStore(); drawPerson(P.x, P.y, STEVE, P.face, P.walk); T('FOOD $' + PRICE, 270, GROUND - 70, 11, '#3a2414', 'center'); }
+  else drawStreet();
+  const n = nearest();
+  if (bubble) bubbleAt(bubble.text, P.x - camX, P.y - 18);
+  else if (n) T('[E] ' + n.label, P.x - camX, P.y - 30, 10, '#ffe066', 'center');
+  R(0, 0, VW, 13, 'rgba(0,0,0,.65)');
+  T(objective(), 4, 3, 11, '#fff');
+  T('$' + G.money + '/' + PRICE, 316, 3, 11, '#7cf07c', 'right');
+  if (fade > 0) R(0, 0, VW, VH, 'rgba(0,0,0,' + fade + ')');
+}
+
+// ---------- jobs ----------
+const JOB_NAMES = { deli:'DELI', wash:'CAR WASH', pizza:'PIZZA DELIVERY' };
+function startJob(job) { if (job === 'deli') startStack('deli'); else if (job === 'wash') startWash(); else startPizza(); }
+function payday(job, amount, lines) { mini = null; screen = { type:'pay', job, amount, lines, t:0 }; }
+
+// --- Deli + the final sandwich: drop the swinging layer onto the stack ---
+const PLATE = 166;
+function startStack(kind) {
+  const orders = kind === 'final'
+    ? [['bread', ...FILLINGS, 'bread']]
+    : [0, 1, 2].map(() => ['bread', ...shuffle(FILLINGS).slice(0, 2 + (Math.random() * 2 | 0)), 'bread']);
+  mini = { type:'stack', kind, orders, oi:0, stack:[], held:null, falling:[], earned:0, perfect:0, nice:0,
+           msg:'', msgT:0, wait:40, doneT:0, update:updStack, draw:drawStack };
+}
+function stackTop(m) { return PLATE - m.stack.reduce((s, l) => s + LAY[l.id].h, 0); }
+function updStack() {
+  const m = mini;
+  if (m.msgT > 0) m.msgT--;
+  m.falling.forEach(f => { f.vy += .3; f.y += f.vy; f.x += f.vx; });
+  m.falling = m.falling.filter(f => f.y < VH + 20);
+  if (m.doneT > 0) {
+    if (--m.doneT === 0) { m.oi++; m.stack = []; if (m.oi >= m.orders.length) finishStack(m); }
+    return;
+  }
+  if (!m.held) {
+    if (--m.wait <= 0) m.held = { id: m.orders[m.oi][m.stack.length], x: 70 + Math.random() * 180, y:30,
+      dir: Math.random() < .5 ? 1 : -1, sp: (m.kind === 'final' ? 1.8 : 1.2) + m.oi * .35, drop:false, vy:0 };
+    return;
+  }
+  const h = m.held;
+  if (!h.drop) {
+    h.x += h.dir * h.sp;
+    if (h.x > VW - LW / 2 - 6) h.dir = -1; if (h.x < LW / 2 + 6) h.dir = 1;
+    if (pressed.jump || pressed.act || pressed.tap) h.drop = true;
+  } else {
+    h.vy += .35; h.y += h.vy;
+    if (h.y + LAY[h.id].h >= stackTop(m)) landStack(m);
+  }
+}
+function landStack(m) {
+  const h = m.held, cx = m.stack.length ? m.stack[m.stack.length - 1].x : VW / 2, off = h.x - cx, a = Math.abs(off);
+  const pay = m.kind === 'deli';
+  m.held = null; m.wait = 25; m.msgT = 50;
+  if (a > LW * .6) { m.falling.push({ ...h, vx: Math.sign(off) * 1.5, vy:0 }); m.msg = 'Oops! Try again'; beep(150, .2, 'sawtooth'); return; }
+  m.stack.push({ id:h.id, x:h.x });
+  if (a < 3) { m.perfect++; if (pay) m.earned += 2; m.msg = pay ? 'PERFECT! +$2' : 'PERFECT!'; beep(880, .1); setTimeout(() => beep(1320, .1), 80); }
+  else if (a < 10) { m.nice++; if (pay) m.earned += 1; m.msg = pay ? 'Nice! +$1' : 'Nice!'; beep(660); }
+  else { m.msg = 'Wobbly...'; beep(330); }
+  if (m.stack.length >= m.orders[m.oi].length) { m.doneT = 70; m.msg = m.kind === 'final' ? 'DONE!' : 'Sandwich done!'; }
+}
+function finishStack(m) {
+  if (m.kind === 'deli') { payday('deli', m.earned, ['Sandwiches made: 3', 'Perfect drops: ' + m.perfect]); return; }
+  const score = m.perfect * 2 + m.nice, stars = clamp(1 + Math.round(score / 20 * 4), 1, 5);
+  mini = null; G.won = true; G.food = false;
+  screen = { type:'end', stars, stack: m.orders[0], t:0 };
+}
+function drawStack() {
+  const m = mini;
+  for (let y = 0; y < VH; y += 10) for (let x = 0; x < VW; x += 10) R(x, y, 10, 10, (x + y) % 20 ? '#fbe3c8' : '#f6d6b2');
+  R(0, 170, VW, 10, '#8b5a2b'); R(0, 168, VW, 2, '#d8d8d8');
+  R(110, PLATE, 100, 3, '#fff'); R(116, PLATE + 3, 88, 2, '#d4d4d4');
+  let y = PLATE;
+  for (const l of m.stack) { y -= LAY[l.id].h; drawLayer(l.id, l.x, y); }
+  for (const f of m.falling) drawLayer(f.id, f.x, f.y);
+  if (m.held) {
+    if (!m.held.drop) for (let gy = m.held.y + 8; gy < stackTop(m); gy += 6) R(m.held.x, gy, 1, 3, 'rgba(0,0,0,.25)');
+    drawLayer(m.held.id, m.held.x, m.held.y);
+    T('NEXT: ' + LAY[m.held.id].name, 6, 22, 11, '#3a2414');
+  }
+  // order list, top of sandwich first
+  const order = m.orders[Math.min(m.oi, m.orders.length - 1)];
+  T('ORDER', 262, 22, 10, '#3a2414');
+  order.slice().reverse().forEach((id, i) => {
+    const idx = order.length - 1 - i, done = idx < m.stack.length || m.doneT > 0;
+    T((done ? '- ' : idx === m.stack.length ? '> ' : '  ') + LAY[id].name, 258, 32 + i * 8, 9, done ? '#9a8a7a' : idx === m.stack.length ? '#e0702b' : '#3a2414');
   });
-  ol.reversed = true;
-  [...shelf.children].forEach(b => b.classList.toggle('sel', !!held && b.dataset.id === held.id));
-  document.getElementById('stats').innerHTML = '🏆 Score: <b>' + score + '</b><br>🔥 Combo: ' + combo + '<br>✨ Perfects: ' + perfects;
+  if (m.msgT > 0) T(m.msg, VW / 2, 70, 16, '#e0702b', 'center');
+  R(0, 0, VW, 13, 'rgba(0,0,0,.65)');
+  if (m.kind === 'deli') T('DELI JOB  Sandwich ' + Math.min(m.oi + 1, 3) + '/3   Earned $' + m.earned, 4, 3, 11);
+  else T('THE PERFECT SANDWICH', 4, 3, 11, '#ffe066');
+  T('SPACE / TAP = drop', 316, 3, 10, '#ccc', 'right');
 }
 
-addEventListener('keydown', e => {
-  if (e.code === 'Space') { e.preventDefault(); drop(); }
-  const n = parseInt(e.key); if (n >= 1 && n <= ING.length) pick(ING[n-1].id);
-});
-cv.addEventListener('pointerdown', drop);
+// --- Car wash: scrub the mud off before time runs out ---
+function startWash() {
+  const spots = [];
+  for (let i = 0; i < 9; i++) spots.push({ x: 90 + Math.random() * 140, y: 82 + Math.random() * 40, r: 4 + (Math.random() * 3 | 0), dirt:1 });
+  mini = { type:'wash', t:20 * 60, spots, sx:160, sy:50, earned:0, bub:[], end:0, msg:'', update:updWash, draw:drawWash };
+}
+function updWash() {
+  const m = mini;
+  m.bub.forEach(b => { b.y -= .4; b.t--; }); m.bub = m.bub.filter(b => b.t > 0);
+  if (m.end) { if (--m.end === 0) payday('wash', m.earned, ['Mud spots cleaned: ' + m.spots.filter(s => s.dirt <= 0).length + '/9', m.msg]); return; }
+  const dx = (raw.ArrowRight || raw.KeyD ? 1 : 0) - (raw.ArrowLeft || raw.KeyA ? 1 : 0);
+  const dy = (raw.ArrowDown || raw.KeyS ? 1 : 0) - (raw.ArrowUp || raw.KeyW ? 1 : 0);
+  m.sx += dx * 2.4; m.sy += dy * 2.4;
+  if (keys.left || keys.right) m.sx += ((keys.right ? 1 : 0) - (keys.left ? 1 : 0)) * (dx ? 0 : 2.4);
+  if (pointer.moved) { m.sx = pointer.x; m.sy = pointer.y; }
+  m.sx = clamp(m.sx, 6, VW - 6); m.sy = clamp(m.sy, 16, VH - 6);
+  for (const s of m.spots) {
+    if (s.dirt <= 0 || Math.hypot(s.x - m.sx, s.y - m.sy) > s.r + 6) continue;
+    s.dirt -= .03;
+    if (frameN % 4 === 0) m.bub.push({ x: m.sx + Math.random() * 12 - 6, y: m.sy + Math.random() * 6 - 3, t:30 });
+    if (s.dirt <= 0) { m.earned += 1; beep(990, .08); }
+  }
+  if (m.spots.every(s => s.dirt <= 0)) { m.earned += 3; m.msg = 'Sparkly clean bonus: +$3'; m.end = 60; beep(1320, .2); }
+  else if (--m.t <= 0) { m.msg = 'Time ran out!'; m.end = 60; beep(200, .3); }
+}
+function drawWash() {
+  const m = mini;
+  for (let y = 0; y < 140; y += 12) for (let x = 0; x < VW; x += 12) R(x, y, 12, 12, (x + y) % 24 ? '#bfe3f5' : '#a9d6ee');
+  R(0, 140, VW, 40, '#7a8a96'); R(0, 140, VW, 2, '#5c6b76');
+  R(115, 64, 90, 26, '#e04848'); R(121, 68, 36, 18, '#bfe6ff'); R(163, 68, 36, 18, '#bfe6ff');
+  R(80, 88, 160, 38, '#e04848'); R(80, 104, 160, 2, '#a82e2e'); R(232, 94, 8, 6, '#ffe066'); R(80, 96, 6, 6, '#ff9b9b');
+  disc(108, 128, 11, '#222'); disc(108, 128, 5, '#aaa'); disc(212, 128, 11, '#222'); disc(212, 128, 5, '#aaa');
+  for (const s of m.spots) if (s.dirt > 0) { ctx.globalAlpha = Math.min(1, s.dirt + .2); disc(Math.round(s.x), Math.round(s.y), s.r, '#6b4a2b'); ctx.globalAlpha = 1; }
+  for (const b of m.bub) R(b.x, b.y, 2, 2, '#fff');
+  R(m.sx - 7, m.sy - 5, 14, 10, '#ffd34d'); R(m.sx - 4, m.sy - 2, 2, 2, '#e0a92a'); R(m.sx + 2, m.sy + 1, 2, 2, '#e0a92a');
+  R(0, 0, VW, 13, 'rgba(0,0,0,.65)');
+  T('CAR WASH   Time: ' + Math.ceil(Math.max(0, m.t) / 60) + '   Earned $' + m.earned, 4, 3, 11);
+  T('Move the sponge onto the mud', 316, 3, 9, '#ccc', 'right');
+}
 
-newGame();
-frame();
+// --- Pizza delivery: ride past houses, jump cones and (illegal) pineapples ---
+function startPizza() {
+  mini = { type:'pizza', sp:2, py:GROUND, vy:0, obs:[], houses:[], pizzas:6, delivered:0, crashes:0, next:90,
+           nextHouse:60, housesLeft:6, flash:0, end:0, pops:[], scroll:0, update:updPizza, draw:drawPizza };
+}
+function updPizza() {
+  const m = mini;
+  m.pops.forEach(p => { p.y -= .3; p.t--; }); m.pops = m.pops.filter(p => p.t > 0);
+  if (m.flash > 0) m.flash--;
+  if (m.end) { if (--m.end === 0) payday('pizza', m.delivered * 2 + (m.crashes ? 0 : 3),
+    ['Pizzas delivered: ' + m.delivered, m.crashes ? 'Crashes: ' + m.crashes : 'No crashes! Tip: +$3']); return; }
+  m.sp += .0015; m.scroll += m.sp;
+  if ((pressed.jump || pressed.tap || pressed.act) && m.py >= GROUND) { m.vy = -4.4; beep(520, .06); }
+  m.vy += .25; m.py = Math.min(GROUND, m.py + m.vy);
+  if (--m.next <= 0) { m.obs.push({ x:VW + 10, kind: Math.random() < .4 ? 'pine' : 'cone' }); m.next = 60 + Math.random() * 70; }
+  if (m.housesLeft > 0 && --m.nextHouse <= 0) { m.houses.push({ x:VW + 10, done:false, col:['#e07a5f', '#81b29a', '#f2cc8f', '#9db4e0'][m.housesLeft % 4] }); m.housesLeft--; m.nextHouse = 150 + Math.random() * 60; }
+  for (const h of m.houses) {
+    h.x -= m.sp;
+    if (!h.done && h.x + 22 < 60) {
+      h.done = true;
+      if (m.pizzas > 0) { m.pizzas--; m.delivered++; m.pops.push({ text:'+$2', x:60, y:GROUND - 40, t:50 }); beep(990, .1); }
+    }
+  }
+  for (const o of m.obs) {
+    o.x -= m.sp;
+    const h = o.kind === 'pine' ? 10 : 8;
+    if (!o.hit && o.x < 66 && o.x + 7 > 54 && m.py > GROUND - h) {
+      o.hit = true; m.crashes++; m.flash = 30; beep(140, .25, 'sawtooth');
+      if (m.pizzas > 0) m.pizzas--;
+      m.pops.push({ text: o.kind === 'pine' ? 'EW pineapple!' : 'CRASH!', x:60, y:GROUND - 40, t:60 });
+    }
+  }
+  m.obs = m.obs.filter(o => o.x > -20); m.houses = m.houses.filter(h => h.x > -60);
+  if (m.housesLeft === 0 && m.houses.length === 0) m.end = 50;
+}
+function drawPizza() {
+  const m = mini;
+  R(0, 0, VW, VH, '#ffcf9e'); R(0, 40, VW, 60, '#ffb98a');
+  for (let i = 0; i < 5; i++) { const x = ((i * 80 - m.scroll * .2) % 400 + 400) % 400 - 40; R(x, 90, 40, 60, '#e8a27a'); }
+  for (const h of m.houses) {
+    R(h.x, GROUND - 40, 44, 40, h.col);
+    for (let i = 0; i < 8; i++) R(h.x - 2 + i * 3, GROUND - 42 - i * 2, 48 - i * 6, 2, '#7a3b2a');
+    R(h.x + 16, GROUND - 20, 12, 20, '#6b4226'); R(h.x + 4, GROUND - 32, 9, 8, '#cdeeff'); R(h.x + 31, GROUND - 32, 9, 8, '#cdeeff');
+    if (h.done) R(h.x + 18, GROUND - 6, 8, 3, '#e2412f');
+  }
+  R(0, GROUND, VW, VH - GROUND, '#555'); for (let x = -(m.scroll % 30); x < VW; x += 30) R(x, GROUND + 12, 14, 2, '#f2d13a');
+  for (const o of m.obs) {
+    if (o.hit) ctx.globalAlpha = .3;
+    if (o.kind === 'cone') { R(o.x + 3, GROUND - 8, 1, 2, '#ff7a1a'); R(o.x + 2, GROUND - 6, 3, 2, '#fff'); R(o.x + 1, GROUND - 4, 5, 2, '#ff7a1a'); R(o.x, GROUND - 2, 7, 2, '#ff7a1a'); }
+    else { R(o.x + 2, GROUND - 10, 1, 3, '#3a9a2a'); R(o.x + 4, GROUND - 10, 1, 3, '#3a9a2a'); R(o.x + 1, GROUND - 7, 6, 7, '#f2c12e'); R(o.x + 2, GROUND - 5, 1, 1, '#a0711c'); R(o.x + 5, GROUND - 3, 1, 1, '#a0711c'); }
+    ctx.globalAlpha = 1;
+  }
+  if (!(m.flash % 6 > 2)) {
+    const y = Math.round(m.py), spin = Math.floor(m.scroll / 4) % 2;
+    disc(52, y - 4, 4, '#222'); disc(68, y - 4, 4, '#222'); R(52, y - 4 - spin, 1, 1, '#aaa'); R(68, y - 4 - spin, 1, 1, '#aaa');
+    R(52, y - 8, 16, 2, '#2a9d8f'); R(58, y - 11, 2, 4, '#2a9d8f');
+    drawPerson(60, y - 7, STEVE, 1, 0);
+    for (let i = 0; i < m.pizzas; i++) R(46, y - 14 - i * 3, 9, 2, i % 2 ? '#d9a066' : '#c48a50');
+  }
+  for (const p of m.pops) T(p.text, p.x, p.y, 11, '#fff', 'center');
+  R(0, 0, VW, 13, 'rgba(0,0,0,.65)');
+  T('PIZZA   Pizzas: ' + m.pizzas + '   Delivered: ' + m.delivered + '   $' + m.delivered * 2, 4, 3, 11);
+  T('SPACE = jump', 316, 3, 10, '#ccc', 'right');
+}
+
+// ---------- full-screen cards ----------
+function updateScreen() {
+  const s = screen; s.t++;
+  if (s.t < 40 || !(pressed.jump || pressed.act || pressed.tap)) return;
+  if (s.type === 'title') {
+    screen = null; bubbleQ = ['Hi!', "I'm hungry >:("];
+  } else if (s.type === 'jail') {
+    screen = null; goTo('home', 265); bubbleQ = ['not Gary >:('];
+  } else if (s.type === 'pay') {
+    G.money += s.amount; G.done[s.job]++; screen = null;
+    goTo('street', BUILDINGS.find(b => b.job === s.job).door + 7);
+    beep(990, .1); setTimeout(() => beep(1320, .15), 100);
+  } else if (s.type === 'end') resetGame();
+}
+function drawScreen() {
+  const s = screen;
+  if (s.type === 'title') {
+    R(0, 0, VW, VH, '#2b1d3a');
+    for (let i = 0; i < 30; i++) R((i * 53) % VW, (i * 37) % 120, 1, 1, '#fff');
+    T('THE PERFECT', VW / 2, 22, 30, '#ffe066', 'center');
+    T('SANDWICH', VW / 2, 40, 30, '#ffe066', 'center');
+    let y = 128; ['bread', 'tomato', 'cheese', 'lettuce', 'ham', 'bread'].forEach(id => { y -= LAY[id].h; drawLayer(id, 200, y); });
+    R(168, 128, 64, 3, '#fff');
+    drawPerson(100, 130, STEVE, 1, 0, 3);
+    T('Move: < >   Jump: SPACE   Use: E', VW / 2, 142, 11, '#ccc', 'center');
+    if (frameN % 60 < 40) T('Press SPACE or tap to start', VW / 2, 160, 12, '#fff', 'center');
+  } else if (s.type === 'jail') {
+    R(0, 0, VW, VH, '#3a3a44'); R(0, 120, VW, 60, '#2a2a30');
+    drawPerson(160, 120, STEVE, 1, 0, 3);
+    for (let x = 100; x <= 220; x += 12) R(x, 40, 3, 84, '#888');
+    R(96, 40, 130, 4, '#888'); R(96, 120, 130, 4, '#888');
+    T('JAIL!', VW / 2, 12, 24, '#ff6b6b', 'center');
+    const lines = s.reason === 'gary'
+      ? ['Gary told the police HE was Steve.', 'So the police took YOU!']
+      : ['The police thought you were GARY.', 'Gary puts APPLE + PINEAPPLE on pizza.', "That's ILLEGAL!"];
+    lines.forEach((l, i) => T(l, VW / 2, 130 + i * 9, 10, '#fff', 'center'));
+    T('Bail: -$' + s.bail + '   (SPACE to go home)', VW / 2, 162, 10, '#ffe066', 'center');
+  } else if (s.type === 'pay') {
+    R(0, 0, VW, VH, '#1f3b2c');
+    T('SHIFT OVER!', VW / 2, 24, 22, '#ffe066', 'center');
+    T(JOB_NAMES[s.job], VW / 2, 50, 14, '#fff', 'center');
+    s.lines.forEach((l, i) => T(l, VW / 2, 74 + i * 12, 11, '#ddd', 'center'));
+    T('You earned $' + s.amount, VW / 2, 110, 18, '#7cf07c', 'center');
+    if (s.t > 40) T('SPACE to go back outside', VW / 2, 150, 11, '#fff', 'center');
+  } else if (s.type === 'end') {
+    R(0, 0, VW, VH, '#fff1d6');
+    for (let x = 0; x < VW; x += 20) R(x, 0, 10, VH, '#ffe8bf');
+    T('THE PERFECT SANDWICH!', VW / 2, 10, 20, '#e0702b', 'center');
+    let y = 130; s.stack.forEach(id => { y -= LAY[id].h; drawLayer(id, 200, y); });
+    R(168, 130, 64, 3, '#fff'); R(172, 133, 56, 2, '#ddd');
+    drawPerson(100, 134, STEVE, 1, 0, 3);
+    bubbleAt('yum :D', 100, 86);
+    for (let i = 0; i < 5; i++) drawRows(STAR, 122 + i * 16, 40, { y: i < s.stars ? '#ffcc00' : '#c9b98f' }, false, 2);
+    T('THE END', VW / 2, 146, 16, '#3a2414', 'center');
+    if (s.t > 40) T('SPACE to play again', VW / 2, 164, 10, '#6b4a2b', 'center');
+  }
+}
+
+// ---------- main loop ----------
+function loop() {
+  frameN++;
+  if (screen) updateScreen(); else if (mini) mini.update(); else updateWorld();
+  ctx.setTransform(S, 0, 0, S, 0, 0);
+  if (screen) drawScreen(); else if (mini) mini.draw(); else drawWorld();
+  for (const k in pressed) delete pressed[k];
+  pointer.moved = false;
+  requestAnimationFrame(loop);
+}
+resetGame();
+loop();
 </script>
 </body>
 </html>
