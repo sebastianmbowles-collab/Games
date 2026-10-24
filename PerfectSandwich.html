@@ -36,7 +36,15 @@ const KEYMAP = { ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right'
                  Space:'jump', KeyE:'act', ArrowDown:'act', KeyS:'act', Enter:'act' };
 function down(k) { if (!keys[k]) pressed[k] = true; keys[k] = true; }
 function up(k) { keys[k] = false; }
-addEventListener('keydown', e => { raw[e.code] = true; const k = KEYMAP[e.code]; if (k) { e.preventDefault(); down(k); } });
+addEventListener('keydown', e => {
+  raw[e.code] = true;
+  if (!e.repeat) {
+    if (e.code === 'KeyM') muted = !muted;
+    if (e.code === 'KeyP' && !screen) paused = !paused;
+    if (e.code === 'KeyN') pressed.newGame = true;
+  }
+  const k = KEYMAP[e.code]; if (k) { e.preventDefault(); down(k); }
+});
 addEventListener('keyup', e => { raw[e.code] = false; const k = KEYMAP[e.code]; if (k) up(k); });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; for (const k in raw) raw[k] = false; });
 document.querySelectorAll('#pad button').forEach(b => {
@@ -53,8 +61,9 @@ cv.addEventListener('pointermove', pointerPos);
 cv.addEventListener('pointerdown', e => { pointerPos(e); pressed.tap = true; });
 
 // ---------- sound ----------
-let AC;
+let AC, muted = false, paused = false;
 function beep(f, d = .08, type = 'square', v = .05) {
+  if (muted) return;
   try {
     AC = AC || new AudioContext();
     const o = AC.createOscillator(), g = AC.createGain();
@@ -63,6 +72,18 @@ function beep(f, d = .08, type = 'square', v = .05) {
     o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime + d);
   } catch (e) { /* no sound, no problem */ }
 }
+// a little bouncy background tune (0 = rest), with a bass note every 4 steps
+const TUNE = [72,0,76,0,79,0,76,0,74,0,77,0,81,0,77,0,72,0,76,0,79,0,84,0,83,0,79,0,74,0,0,0];
+const BASS = [48,48,53,53,48,48,55,55];
+const midi = n => 440 * Math.pow(2, (n - 69) / 12);
+let step = 0;
+setInterval(() => {
+  if (!AC || muted || paused || (screen && screen.type === 'title')) return;
+  const n = TUNE[step % TUNE.length];
+  if (n) beep(midi(n), .12, 'square', .012);
+  if (step % 4 === 0) beep(midi(BASS[(step / 4) % BASS.length]), .3, 'triangle', .03);
+  step++;
+}, 160);
 
 // ---------- drawing helpers ----------
 function R(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
@@ -141,6 +162,7 @@ const LAY = {
   egg:     { h:3, c:'#ffffff', d:'#f7b500', name:'EGG' },
   pickle:  { h:2, c:'#5d8a2c', d:'#a6c96a', name:'PICKLE' },
   onion:   { h:2, c:'#e6c6f0', d:'#b58ac4', name:'ONION' },
+  pineapple: { h:3, c:'#f2c12e', d:'#a0711c', name:'PINEAPPLE' },
 };
 const FILLINGS = ['lettuce', 'tomato', 'cheese', 'ham', 'bacon', 'egg', 'pickle', 'onion'];
 const LW = 56;
@@ -162,13 +184,22 @@ function drawLayer(id, cx, y) {   // y = top of layer
 
 // ---------- game state ----------
 let G, scene, camX, fade, P, npcs, car, mini, screen, bubble, bubbleQ, fridgeOpen, frameN = 0;
-function resetGame() {
-  G = { money:0, fridge:false, broke:false, food:false, won:false, done:{ deli:0, wash:0, pizza:0 } };
+let parts = [], pines = [], shake = 0;
+const SAVE_KEY = 'perfectSandwichSave';
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* saving is optional */ } }
+function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.done) return s; } catch (e) { /* ignore */ } return null; }
+function resetGame(fresh) {
+  G = (!fresh && load()) || { money:0, fridge:false, broke:false, food:false, done:{ deli:0, wash:0, pizza:0 } };
+  if (fresh) save();
   scene = 'home'; camX = 0; fade = 0; npcs = null; car = null; mini = null; bubble = null; bubbleQ = []; fridgeOpen = 0;
+  parts = []; pines = []; shake = 0;
   P = { x:40, y:GROUND, vy:0, face:1, walk:0, ground:true };
   screen = { type:'title', t:0 };
 }
 function say(text) { bubble = { text, t:150 }; bubbleQ = []; }
+function puff(x, y, c, n = 4, spd = .6) {
+  for (let i = 0; i < n; i++) parts.push({ x, y, vx:(Math.random() - .5) * spd * 2, vy:-Math.random() * spd, t:20 + Math.random() * 15, c });
+}
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const shuffle = a => a.map(v => [Math.random(), v]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
 
@@ -196,6 +227,13 @@ function jobOpen(job) {
   if (job === 'deli') return true;
   if (job === 'wash') return G.done.deli > 0;
   return G.done.wash > 0;
+}
+function targetDoor() {   // where the arrow on the street points
+  let name;
+  if (G.food) name = 'HOME';
+  else if (!G.broke || G.money >= PRICE) name = 'STORE';
+  else { const b = BUILDINGS.find(b => b.job && jobOpen(b.job) && !G.done[b.job]); if (!b) return null; name = b.name; }
+  return BUILDINGS.find(b => b.name === name).door + 7;
 }
 const SCENES = {
   home: { w:320, things: () => [
@@ -230,7 +268,7 @@ const SCENES = {
 };
 
 function goTo(name, x) {
-  scene = name; P.x = x; P.y = GROUND; P.vy = 0; P.ground = true; car = null; fade = 1;
+  scene = name; P.x = x; P.y = GROUND; P.vy = 0; P.ground = true; car = null; fade = 1; pines = []; parts = [];
   if (name !== 'street') return;
   if (!npcs) makeNpcs();
   // nobody is standing right on the doorstep when you come out
@@ -258,10 +296,11 @@ function updateWorld() {
   const sc = SCENES[scene];
   const mv = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
   P.x = clamp(P.x + mv * 1.4, 6, sc.w - 6);
-  if (mv) { P.face = mv; P.walk += .15; } else P.walk = 0;
+  if (mv) { P.face = mv; P.walk += .15; if (P.ground && frameN % 12 === 0) puff(P.x - mv * 3, GROUND - 1, '#d8c8a8', 2, .3); } else P.walk = 0;
   if (pressed.jump && P.ground) { P.vy = -4.2; P.ground = false; beep(520, .06); }
   P.vy += .25; P.y += P.vy;
-  if (P.y >= GROUND) { P.y = GROUND; P.vy = 0; P.ground = true; }
+  if (P.y >= GROUND) { if (!P.ground) puff(P.x, GROUND - 1, '#d8c8a8', 5, .5); P.y = GROUND; P.vy = 0; P.ground = true; }
+  parts.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += .05; p.t--; }); parts = parts.filter(p => p.t > 0);
   camX = Math.round(clamp(P.x - VW / 2, 0, sc.w - VW));
   if (fridgeOpen > 0) fridgeOpen--;
   if (fade > 0) fade -= .05;
@@ -274,6 +313,14 @@ function updateWorld() {
 function updateStreet() {   // returns true if Steve got sent to jail
   for (const n of npcs) {
     n.walk += .12; if (n.cool > 0) n.cool--;
+    if (n.kind === 'gary') {   // Gary throws pineapples at you from a distance
+      const d = Math.abs(P.x - n.x);
+      n.throwT = (n.throwT || 120) - 1;
+      if (n.throwT <= 0 && d > 70 && d < 170) {
+        n.throwT = 150 + Math.random() * 90; n.dir = Math.sign(P.x - n.x) || 1;
+        pines.push({ x:n.x, y:GROUND - 14, vx:n.dir * 1.8, vy:-2, t:220 }); beep(400, .05);
+      }
+    }
     if (n.phone > 0) n.phone--;
     else if (n.kind === 'gary' && Math.abs(P.x - n.x) < 70) { n.dir = Math.sign(P.x - n.x) || 1; n.x = clamp(n.x + n.dir * .85, 10, 990); }
     else { n.x += n.dir * n.sp; if (n.x < n.min) n.dir = 1; if (n.x > n.max) n.dir = -1; }
@@ -282,6 +329,16 @@ function updateStreet() {   // returns true if Steve got sent to jail
     if (n.kind === 'gary') { jail('gary'); return true; }
     if (!n.cool) { n.cool = 400; n.phone = 120; beep(880, .15); callPolice(); }
   }
+  for (const p of pines) {
+    p.vy += .2; p.y += p.vy; p.x += p.vx; p.t--;
+    if (p.y >= GROUND - 7) { p.y = GROUND - 7; p.vy = -Math.abs(p.vy) * .4; }
+    if (Math.abs(p.x - P.x) < 6 && P.y > p.y + 2 && P.y - 16 < p.y + 7) {
+      p.t = 0; shake = 8; puff(p.x, p.y, '#f2c12e', 10, 1.2); beep(180, .2, 'sawtooth');
+      const lost = Math.min(2, G.money); G.money -= lost;
+      say(lost ? 'ow! -$' + lost : 'ow! >:(');
+    }
+  }
+  pines = pines.filter(p => p.t > 0);
   if (car) {
     car.x += car.dir * 2.3;
     if (frameN % 15 === 0) beep(frameN % 30 ? 700 : 950, .1, 'square', .02);
@@ -315,6 +372,11 @@ function drawHome() {
   R(58, 54, 36, 30, '#6b4226'); R(61, 57, 30, 24, '#9fd8ff'); R(75, 57, 2, 24, '#6b4226'); R(61, 68, 30, 2, '#6b4226');
   // bed
   R(14, GROUND - 14, 44, 14, '#7a4b2a'); R(16, GROUND - 19, 40, 7, '#5f8fd6'); R(17, GROUND - 22, 11, 4, '#fff');
+  // TV on a stand, and a plant by the door
+  R(64, GROUND - 10, 28, 10, '#6b4226'); R(66, GROUND - 27, 24, 17, '#222');
+  R(68, GROUND - 25, 20, 13, ['#4a90d9', '#5aa0e9', '#3a80c9'][Math.floor(frameN / 20) % 3]);
+  R(72, GROUND - 20, 6, 4, '#f2c12e'); R(76, GROUND - 31, 1, 4, '#333'); R(80, GROUND - 31, 1, 4, '#333');
+  R(262, GROUND - 8, 9, 8, '#b5552b'); disc(266, GROUND - 13, 5, '#3f9a3f'); R(265, GROUND - 22, 2, 5, '#3f9a3f');
   // picture of Steve and Gary
   R(226, 64, 34, 22, '#6b4226'); R(228, 66, 30, 18, '#cfe8f7');
   drawPerson(236, 86, STEVE, 1, 0, 1); drawPerson(250, 86, GARY, 1, 0, 1); pineappleHat(250, 86);
@@ -360,8 +422,13 @@ function drawStreet() {
     const x = ((i * 90 - camX * .3) % 540 + 540) % 540 - 60;
     R(x, 24 + (i % 3) * 10, 30, 6, '#fff'); R(x + 6, 20 + (i % 3) * 10, 16, 4, '#fff');
   }
+  for (let i = 0; i < 3; i++) {   // birds
+    const bx = ((frameN * .4 + i * 120 - camX * .15) % 400 + 400) % 400 - 40, by = 30 + i * 9 + Math.sin(frameN / 20 + i) * 3, f = Math.floor(frameN / 10 + i) % 2;
+    R(bx, by + f, 2, 1, '#333'); R(bx + 2, by + 1, 1, 1, '#333'); R(bx + 3, by + f, 2, 1, '#333');
+  }
   ctx.save(); ctx.translate(-camX, 0);
   for (let x = 0; x < 1000; x += 46) R(x, 60 + (x * 7) % 25, 40, GROUND - 60, '#a9c6db');
+  for (const x of [110, 340, 560, 780]) { R(x, GROUND - 14, 4, 14, '#6b4226'); disc(x + 2, GROUND - 24, 10, '#3f9a3f'); disc(x - 3, GROUND - 19, 6, '#4fae4a'); disc(x + 7, GROUND - 20, 6, '#358a35'); }
   for (const b of BUILDINGS) {
     const top = GROUND - 70;
     R(b.x, top, b.w, 70, b.col); R(b.x - 3, top - 4, b.w + 6, 6, '#5b3a29');
@@ -372,6 +439,12 @@ function drawStreet() {
   }
   R(0, GROUND, 1000, 8, '#b5b5b5'); for (let x = 0; x < 1000; x += 20) R(x, GROUND, 1, 8, '#999');
   R(0, GROUND + 8, 1000, VH - GROUND - 8, '#3d3d3d'); for (let x = 0; x < 1000; x += 30) R(x, GROUND + 18, 14, 2, '#f2d13a');
+  for (const x of [190, 400, 610, 830]) { R(x, GROUND - 42, 2, 42, '#333'); R(x - 3, GROUND - 46, 8, 4, '#333'); R(x - 2, GROUND - 42, 6, 2, '#ffe9a0'); }
+  R(840, GROUND - 8, 5, 8, '#d33'); R(839, GROUND - 6, 7, 2, '#d33'); R(841, GROUND - 10, 3, 2, '#b22');
+  for (const p of pines) {
+    const x = Math.round(p.x - 3), y = Math.round(p.y);
+    R(x + 2, y - 3, 1, 3, '#3a9a2a'); R(x + 4, y - 3, 1, 3, '#3a9a2a'); R(x + 1, y, 6, 7, '#f2c12e'); R(x + 2, y + 2, 1, 1, '#a0711c'); R(x + 5, y + 4, 1, 1, '#a0711c');
+  }
   for (const n of npcs) {
     drawPerson(n.x, GROUND, n.pal, n.phone ? (P.x > n.x ? 1 : -1) : n.dir, n.phone ? 0 : n.walk);
     if (n.kind === 'gary') pineappleHat(n.x, GROUND);
@@ -389,11 +462,19 @@ function drawStreet() {
     T(b.name, b.x + b.w / 2 - camX, GROUND - 66, 11, '#3a2414', 'center');
     if (b.job) T(jobOpen(b.job) ? 'HIRING' : 'CLOSED', b.x + b.w / 2 - camX, GROUND - 40, 9, jobOpen(b.job) ? '#7cf07c' : '#ff6b6b', 'center');
   }
+  // arrow showing where to go next
+  const tx = targetDoor();
+  if (tx !== null) {
+    const sx = tx - camX, bob = Math.round(Math.sin(frameN / 8) * 2), c = { y:'#ffe066' };
+    if (sx > 8 && sx < VW - 8) drawRows(["yyyyy", ".yyy.", "..y.."], sx - 5, GROUND - 36 + bob, c, false, 2);
+    else drawRows(["..y", ".yy", "yyy", ".yy", "..y"], sx < 8 ? 4 + bob : VW - 10 - bob, GROUND - 40, c, sx > 8, 2);
+  }
 }
 function drawWorld() {
   if (scene === 'home') { drawHome(); drawPerson(P.x, P.y, STEVE, P.face, P.walk); }
   else if (scene === 'store') { drawStore(); drawPerson(P.x, P.y, STEVE, P.face, P.walk); T('FOOD $' + PRICE, 270, GROUND - 70, 11, '#3a2414', 'center'); }
   else drawStreet();
+  for (const p of parts) R(p.x - camX, p.y, 1, 1, p.c);
   const n = nearest();
   if (bubble) bubbleAt(bubble.text, P.x - camX, P.y - 18);
   else if (n) T('[E] ' + n.label, P.x - camX, P.y - 30, 10, '#ffe066', 'center');
@@ -413,9 +494,9 @@ const PLATE = 166;
 function startStack(kind) {
   const orders = kind === 'final'
     ? [['bread', ...FILLINGS, 'bread']]
-    : [0, 1, 2].map(() => ['bread', ...shuffle(FILLINGS).slice(0, 2 + (Math.random() * 2 | 0)), 'bread']);
+    : [0, 1].map(() => ['bread', ...shuffle(FILLINGS).slice(0, 2 + (Math.random() * 2 | 0)), 'bread']);
   mini = { type:'stack', kind, orders, oi:0, stack:[], held:null, falling:[], earned:0, perfect:0, nice:0,
-           msg:'', msgT:0, wait:40, doneT:0, update:updStack, draw:drawStack };
+           sneaks:0, dodged:0, ew:0, msg:'', msgT:0, wait:40, doneT:0, update:updStack, draw:drawStack };
 }
 function stackTop(m) { return PLATE - m.stack.reduce((s, l) => s + LAY[l.id].h, 0); }
 function updStack() {
@@ -428,11 +509,19 @@ function updStack() {
     return;
   }
   if (!m.held) {
-    if (--m.wait <= 0) m.held = { id: m.orders[m.oi][m.stack.length], x: 70 + Math.random() * 180, y:30,
-      dir: Math.random() < .5 ? 1 : -1, sp: (m.kind === 'final' ? 1.8 : 1.2) + m.oi * .35, drop:false, vy:0 };
+    if (--m.wait > 0) return;
+    // in the final sandwich, Gary sometimes sneaks a pineapple in. Don't drop it!
+    const sneak = m.kind === 'final' && m.sneaks < 3 && m.stack.length > 0 && m.stack.length < 9 && Math.random() < .3;
+    if (sneak) { m.sneaks++; beep(300, .15, 'sawtooth'); }
+    m.held = { id: sneak ? 'pineapple' : m.orders[m.oi][m.stack.length], x: 70 + Math.random() * 180, y:30, life:170,
+      dir: Math.random() < .5 ? 1 : -1, sp: (m.kind === 'final' ? 1.8 : 1.2 + G.done.deli * .25) + m.oi * .35, drop:false, vy:0 };
     return;
   }
   const h = m.held;
+  if (h.id === 'pineapple' && !h.drop && --h.life <= 0) {
+    m.held = null; m.wait = 20; m.dodged++; m.msg = 'NO pineapple! Good!'; m.msgT = 60; beep(990, .1);
+    return;
+  }
   if (!h.drop) {
     h.x += h.dir * h.sp;
     if (h.x > VW - LW / 2 - 6) h.dir = -1; if (h.x < LW / 2 + 6) h.dir = 1;
@@ -446,6 +535,10 @@ function landStack(m) {
   const h = m.held, cx = m.stack.length ? m.stack[m.stack.length - 1].x : VW / 2, off = h.x - cx, a = Math.abs(off);
   const pay = m.kind === 'deli';
   m.held = null; m.wait = 25; m.msgT = 50;
+  if (h.id === 'pineapple') {
+    m.ew++; m.falling.push({ ...h, vx: off < 0 ? -1.5 : 1.5, vy:-2 }); m.msg = "EW! Gary's pineapple!"; m.msgT = 70; beep(140, .3, 'sawtooth');
+    return;
+  }
   if (a > LW * .6) { m.falling.push({ ...h, vx: Math.sign(off) * 1.5, vy:0 }); m.msg = 'Oops! Try again'; beep(150, .2, 'sawtooth'); return; }
   m.stack.push({ id:h.id, x:h.x });
   if (a < 3) { m.perfect++; if (pay) m.earned += 2; m.msg = pay ? 'PERFECT! +$2' : 'PERFECT!'; beep(880, .1); setTimeout(() => beep(1320, .1), 80); }
@@ -454,10 +547,10 @@ function landStack(m) {
   if (m.stack.length >= m.orders[m.oi].length) { m.doneT = 70; m.msg = m.kind === 'final' ? 'DONE!' : 'Sandwich done!'; }
 }
 function finishStack(m) {
-  if (m.kind === 'deli') { payday('deli', m.earned, ['Sandwiches made: 3', 'Perfect drops: ' + m.perfect]); return; }
-  const score = m.perfect * 2 + m.nice, stars = clamp(1 + Math.round(score / 20 * 4), 1, 5);
-  mini = null; G.won = true; G.food = false;
-  screen = { type:'end', stars, stack: m.orders[0], t:0 };
+  if (m.kind === 'deli') { payday('deli', m.earned, ['Sandwiches made: 2', 'Perfect drops: ' + m.perfect]); return; }
+  const score = m.perfect * 2 + m.nice + m.dodged - m.ew * 3, stars = clamp(1 + Math.round(score / 20 * 4), 1, 5);
+  mini = null; G.food = false;
+  screen = { type:'end', stars, stack: m.orders[0], ew:m.ew, t:0 };
 }
 function drawStack() {
   const m = mini;
@@ -470,7 +563,10 @@ function drawStack() {
   if (m.held) {
     if (!m.held.drop) for (let gy = m.held.y + 8; gy < stackTop(m); gy += 6) R(m.held.x, gy, 1, 3, 'rgba(0,0,0,.25)');
     drawLayer(m.held.id, m.held.x, m.held.y);
-    T('NEXT: ' + LAY[m.held.id].name, 6, 22, 11, '#3a2414');
+    if (m.held.id === 'pineapple') {
+      T("GARY'S PINEAPPLE! DON'T DROP IT!", VW / 2, 52, 12, frameN % 20 < 10 ? '#d33' : '#3a2414', 'center');
+      if (!m.held.drop) drawPerson(m.held.x, 30, GARY, m.held.dir, frameN / 8);
+    } else T('NEXT: ' + LAY[m.held.id].name, 6, 22, 11, '#3a2414');
   }
   // order list, top of sandwich first
   const order = m.orders[Math.min(m.oi, m.orders.length - 1)];
@@ -481,21 +577,21 @@ function drawStack() {
   });
   if (m.msgT > 0) T(m.msg, VW / 2, 70, 16, '#e0702b', 'center');
   R(0, 0, VW, 13, 'rgba(0,0,0,.65)');
-  if (m.kind === 'deli') T('DELI JOB  Sandwich ' + Math.min(m.oi + 1, 3) + '/3   Earned $' + m.earned, 4, 3, 11);
+  if (m.kind === 'deli') T('DELI JOB  Sandwich ' + Math.min(m.oi + 1, m.orders.length) + '/' + m.orders.length + '   Earned $' + m.earned, 4, 3, 11);
   else T('THE PERFECT SANDWICH', 4, 3, 11, '#ffe066');
   T('SPACE / TAP = drop', 316, 3, 10, '#ccc', 'right');
 }
 
 // --- Car wash: scrub the mud off before time runs out ---
 function startWash() {
-  const spots = [];
-  for (let i = 0; i < 9; i++) spots.push({ x: 90 + Math.random() * 140, y: 82 + Math.random() * 40, r: 4 + (Math.random() * 3 | 0), dirt:1 });
+  const spots = [], count = Math.min(8 + G.done.wash * 2, 14);
+  for (let i = 0; i < count; i++) spots.push({ x: 90 + Math.random() * 140, y: 82 + Math.random() * 40, r: 4 + (Math.random() * 3 | 0), dirt:1 });
   mini = { type:'wash', t:20 * 60, spots, sx:160, sy:50, earned:0, bub:[], end:0, msg:'', update:updWash, draw:drawWash };
 }
 function updWash() {
   const m = mini;
   m.bub.forEach(b => { b.y -= .4; b.t--; }); m.bub = m.bub.filter(b => b.t > 0);
-  if (m.end) { if (--m.end === 0) payday('wash', m.earned, ['Mud spots cleaned: ' + m.spots.filter(s => s.dirt <= 0).length + '/9', m.msg]); return; }
+  if (m.end) { if (--m.end === 0) payday('wash', m.earned, ['Mud spots cleaned: ' + m.spots.filter(s => s.dirt <= 0).length + '/' + m.spots.length, m.msg]); return; }
   const dx = (raw.ArrowRight || raw.KeyD ? 1 : 0) - (raw.ArrowLeft || raw.KeyA ? 1 : 0);
   const dy = (raw.ArrowDown || raw.KeyS ? 1 : 0) - (raw.ArrowUp || raw.KeyW ? 1 : 0);
   m.sx += dx * 2.4; m.sy += dy * 2.4;
@@ -506,7 +602,10 @@ function updWash() {
     if (s.dirt <= 0 || Math.hypot(s.x - m.sx, s.y - m.sy) > s.r + 6) continue;
     s.dirt -= .03;
     if (frameN % 4 === 0) m.bub.push({ x: m.sx + Math.random() * 12 - 6, y: m.sy + Math.random() * 6 - 3, t:30 });
-    if (s.dirt <= 0) { m.earned += 1; beep(990, .08); }
+    if (s.dirt <= 0) {
+      m.earned += 1; beep(990, .08);
+      for (let i = 0; i < 8; i++) m.bub.push({ x: s.x + Math.random() * 14 - 7, y: s.y + Math.random() * 10 - 5, t:40, c:'#fff7a0' });
+    }
   }
   if (m.spots.every(s => s.dirt <= 0)) { m.earned += 3; m.msg = 'Sparkly clean bonus: +$3'; m.end = 60; beep(1320, .2); }
   else if (--m.t <= 0) { m.msg = 'Time ran out!'; m.end = 60; beep(200, .3); }
@@ -519,7 +618,7 @@ function drawWash() {
   R(80, 88, 160, 38, '#e04848'); R(80, 104, 160, 2, '#a82e2e'); R(232, 94, 8, 6, '#ffe066'); R(80, 96, 6, 6, '#ff9b9b');
   disc(108, 128, 11, '#222'); disc(108, 128, 5, '#aaa'); disc(212, 128, 11, '#222'); disc(212, 128, 5, '#aaa');
   for (const s of m.spots) if (s.dirt > 0) { ctx.globalAlpha = Math.min(1, s.dirt + .2); disc(Math.round(s.x), Math.round(s.y), s.r, '#6b4a2b'); ctx.globalAlpha = 1; }
-  for (const b of m.bub) R(b.x, b.y, 2, 2, '#fff');
+  for (const b of m.bub) R(b.x, b.y, 2, 2, b.c || '#fff');
   R(m.sx - 7, m.sy - 5, 14, 10, '#ffd34d'); R(m.sx - 4, m.sy - 2, 2, 2, '#e0a92a'); R(m.sx + 2, m.sy + 1, 2, 2, '#e0a92a');
   R(0, 0, VW, 13, 'rgba(0,0,0,.65)');
   T('CAR WASH   Time: ' + Math.ceil(Math.max(0, m.t) / 60) + '   Earned $' + m.earned, 4, 3, 11);
@@ -528,7 +627,7 @@ function drawWash() {
 
 // --- Pizza delivery: ride past houses, jump cones and (illegal) pineapples ---
 function startPizza() {
-  mini = { type:'pizza', sp:2, py:GROUND, vy:0, obs:[], houses:[], pizzas:6, delivered:0, crashes:0, next:90,
+  mini = { type:'pizza', sp:2 + G.done.pizza * .3, py:GROUND, vy:0, obs:[], houses:[], pizzas:6, delivered:0, crashes:0, next:90,
            nextHouse:60, housesLeft:6, flash:0, end:0, pops:[], scroll:0, update:updPizza, draw:drawPizza };
 }
 function updPizza() {
@@ -546,7 +645,7 @@ function updPizza() {
     h.x -= m.sp;
     if (!h.done && h.x + 22 < 60) {
       h.done = true;
-      if (m.pizzas > 0) { m.pizzas--; m.delivered++; m.pops.push({ text:'+$2', x:60, y:GROUND - 40, t:50 }); beep(990, .1); }
+      if (m.pizzas > 0) { m.pizzas--; m.delivered++; m.pops.push({ text:'+$2', x:60, y:GROUND - 40 - m.pops.length * 9, t:50 }); beep(990, .1); }
     }
   }
   for (const o of m.obs) {
@@ -555,7 +654,7 @@ function updPizza() {
     if (!o.hit && o.x < 66 && o.x + 7 > 54 && m.py > GROUND - h) {
       o.hit = true; m.crashes++; m.flash = 30; beep(140, .25, 'sawtooth');
       if (m.pizzas > 0) m.pizzas--;
-      m.pops.push({ text: o.kind === 'pine' ? 'EW pineapple!' : 'CRASH!', x:60, y:GROUND - 40, t:60 });
+      m.pops.push({ text: o.kind === 'pine' ? 'EW pineapple!' : 'CRASH!', x:60, y:GROUND - 40 - m.pops.length * 9, t:60 });
     }
   }
   m.obs = m.obs.filter(o => o.x > -20); m.houses = m.houses.filter(h => h.x > -60);
@@ -594,16 +693,17 @@ function drawPizza() {
 // ---------- full-screen cards ----------
 function updateScreen() {
   const s = screen; s.t++;
+  if (s.type === 'title' && pressed.newGame && G.fridge) { resetGame(true); return; }
   if (s.t < 40 || !(pressed.jump || pressed.act || pressed.tap)) return;
   if (s.type === 'title') {
-    screen = null; bubbleQ = ['Hi!', "I'm hungry >:("];
+    screen = null; bubbleQ = G.fridge ? ['back to work!'] : ['Hi!', "I'm hungry >:("];
   } else if (s.type === 'jail') {
     screen = null; goTo('home', 265); bubbleQ = ['not Gary >:('];
   } else if (s.type === 'pay') {
     G.money += s.amount; G.done[s.job]++; screen = null;
     goTo('street', BUILDINGS.find(b => b.job === s.job).door + 7);
     beep(990, .1); setTimeout(() => beep(1320, .15), 100);
-  } else if (s.type === 'end') resetGame();
+  } else if (s.type === 'end') resetGame(true);
 }
 function drawScreen() {
   const s = screen;
@@ -615,8 +715,10 @@ function drawScreen() {
     let y = 128; ['bread', 'tomato', 'cheese', 'lettuce', 'ham', 'bread'].forEach(id => { y -= LAY[id].h; drawLayer(id, 200, y); });
     R(168, 128, 64, 3, '#fff');
     drawPerson(100, 130, STEVE, 1, 0, 3);
-    T('Move: < >   Jump: SPACE   Use: E', VW / 2, 142, 11, '#ccc', 'center');
-    if (frameN % 60 < 40) T('Press SPACE or tap to start', VW / 2, 160, 12, '#fff', 'center');
+    drawPerson(268, 130, GARY, -1, 0, 2); pineappleHat(268, 114);
+    T('Move: < >  Jump: SPACE  Use: E  Sound: M  Pause: P', VW / 2, 140, 10, '#ccc', 'center');
+    if (G.fridge) T('Saved game: $' + G.money + '   (N = new game)', VW / 2, 151, 10, '#7cf07c', 'center');
+    if (frameN % 60 < 40) T(G.fridge ? 'Press SPACE or tap to continue' : 'Press SPACE or tap to start', VW / 2, 164, 12, '#fff', 'center');
   } else if (s.type === 'jail') {
     R(0, 0, VW, VH, '#3a3a44'); R(0, 120, VW, 60, '#2a2a30');
     drawPerson(160, 120, STEVE, 1, 0, 3);
@@ -642,7 +744,12 @@ function drawScreen() {
     let y = 130; s.stack.forEach(id => { y -= LAY[id].h; drawLayer(id, 200, y); });
     R(168, 130, 64, 3, '#fff'); R(172, 133, 56, 2, '#ddd');
     drawPerson(100, 134, STEVE, 1, 0, 3);
-    bubbleAt('yum :D', 100, 86);
+    bubbleAt(s.ew ? 'yum... (less pineapple pls)' : 'yum :D', 100, 86);
+    // meanwhile, Gary finally got caught with his pineapple pizza
+    drawPerson(276, 130, GARY, -1, 0, 2);
+    for (let x = 258; x <= 294; x += 6) R(x, 92, 2, 40, '#777');
+    R(256, 92, 40, 2, '#777'); R(256, 130, 40, 2, '#777');
+    T('Gary got caught!', 276, 134, 8, '#3a2414', 'center');
     for (let i = 0; i < 5; i++) drawRows(STAR, 122 + i * 16, 40, { y: i < s.stars ? '#ffcc00' : '#c9b98f' }, false, 2);
     T('THE END', VW / 2, 146, 16, '#3a2414', 'center');
     if (s.t > 40) T('SPACE to play again', VW / 2, 164, 10, '#6b4a2b', 'center');
@@ -652,9 +759,15 @@ function drawScreen() {
 // ---------- main loop ----------
 function loop() {
   frameN++;
-  if (screen) updateScreen(); else if (mini) mini.update(); else updateWorld();
-  ctx.setTransform(S, 0, 0, S, 0, 0);
+  if (!paused) {
+    if (screen) updateScreen(); else if (mini) mini.update(); else updateWorld();
+    if (shake > 0) shake--;
+    if (frameN % 60 === 0) save();
+  }
+  const sx = shake ? (Math.random() - .5) * shake * .6 : 0, sy = shake ? (Math.random() - .5) * shake * .6 : 0;
+  ctx.setTransform(S, 0, 0, S, sx * S, sy * S);
   if (screen) drawScreen(); else if (mini) mini.draw(); else drawWorld();
+  if (paused) { ctx.setTransform(S, 0, 0, S, 0, 0); R(0, 0, VW, VH, 'rgba(0,0,0,.6)'); T('PAUSED', VW / 2, 70, 28, '#ffe066', 'center'); T('Press P to keep playing', VW / 2, 100, 12, '#fff', 'center'); }
   for (const k in pressed) delete pressed[k];
   pointer.moved = false;
   requestAnimationFrame(loop);
