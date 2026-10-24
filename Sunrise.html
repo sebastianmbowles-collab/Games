@@ -140,6 +140,9 @@ const SFX = {
   yip() { note(900, 0, 0.07, 'square', 0.08, null, 1300); note(1100, 0.08, 0.09, 'square', 0.08, null, 700); },
   mural() { [392, 494, 587, 784].forEach((f, i) => note(f, i * 0.18, 0.8, 'sine', 0.14)); },
   gate() { noise(0, 0.8, 0.45, 180); },
+  step() { noise(0, 0.03, 0.05, 1400); },
+  land() { noise(0, 0.07, 0.12, 500); },
+  poof() { noise(0, 0.2, 0.12, 2500, 'highpass'); note(600, 0, 0.15, 'sine', 0.08, null, 900); },
 };
 
 // calm music: a slow wandering melody over a soft drone; each part of the world has its own notes
@@ -274,7 +277,7 @@ const LEVELS = [{
     '....................',
     '.........CCC........',
     '.GG.............GGGG',
-    'GGG....w........GGGG',
+    'GGG..........w..GGGG',
     'GGGGGDDGGGDDGGGGGGGG',
     'GGGGGGGGGGGGGGGGGGGG',
     'GGGGGGGGGGGGGGGGGGGG',
@@ -307,7 +310,7 @@ const LEVELS = [{
   ]],
 }, {
   name: 'Edge of the Forest', zone: 'forest', templeAhead: true,
-  hints: ['Climb the vine and cross the thorns along the high branch.', 'Two wolves share one pen. Dig a trap in the middle and wait for one to tumble in.', 'The tunnel under the old ruin hides a berry. Dig beside the sign.'],
+  hints: ['Climb the vine and cross the thorns along the high branch.', 'A wolf guards the pen. Dig a trap in its path, hop out of the hole quickly, and wait for it to tumble in.', 'The tunnel under the old ruin hides a berry. Dig beside the sign.'],
   screens: [[
     '....................',
     '....................',
@@ -330,7 +333,7 @@ const LEVELS = [{
     '....................',
     '........CCCC........',
     '..S..............S..',
-    '..S...w.....w....S..',
+    '..S.........w....S..',
     'GGGGGGGGDDGGGGGGGGGG',
     'GGGGGGGGGGGGGGGGGGGG',
     'GGGGGGGGGGGGGGGGGGGG',
@@ -355,9 +358,9 @@ const LEVELS = [{
     '..........C..C......',
     '.............T......',
     '...........SSSSSSSSS',
-    '........SSSSSSSSSSSS',
-    'S.w..SSSSSSSSSSSSSSS',
-    'GGGGGGGGGGGGGGGGGGGG',
+    '..........SSSSSSSSSS',
+    'S......w.SSSSSSSSSSS',
+    'GGGGDDGGGGGGGGGGGGGG',
     'GGGGGGGGGGGGGGGGGGGG',
     'GGGGGGGGGGGGGGGGGGGG',
   ]],
@@ -522,7 +525,7 @@ const LEVELS = [{
     '......R......R......',
     '....................',
     '....................',
-    '...g.............T..',
+    'S..g.............T..',
     'SSSSSSSDDSSSSSSSSSSS',
     'SSSSSSSSSSSSSSSSSSSS',
     'SSSSSSSSSSSSSSSSSSSS',
@@ -792,7 +795,7 @@ function loadLevel(i) {
     index: i, def, name: def.name, zone: ZONES[def.zone], w, h,
     tiles: rows.map(r => r.split('')), coins: [], berries: [], torch: null, orb: null,
     start: { x: 0, y: 0 }, fireflies: [], slots: [], clues: [], murals: [], shooters: [], roots: [],
-    lock: def.code ? { code: def.code, solved: false } : null, hintI: 0, lights: [], dug: new Set(), stuck: new Map(),
+    lock: def.code ? { code: def.code, solved: false } : null, hintI: 0, lights: [], dug: new Set(), stuck: new Map(), sinking: [],
   };
   occ = new Array(w * h).fill(null);
   blocks = []; enemies = []; rocks = []; darts = []; pieces = new Map();
@@ -837,6 +840,8 @@ function loadLevel(i) {
     }
   }
   level.slots.sort((a, b) => a.tx - b.tx);
+  // golems and wolves start out walking away from Pip, so nobody is ambushed at the start
+  for (const e of enemies) e.dir = e.x > level.start.x ? 1 : -1;
   // the first solid row in each column; anything deeper is underground and gets a dark earth wall behind it
   level.surface = [];
   for (let tx = 0; tx < w; tx++) {
@@ -1082,6 +1087,7 @@ function checkLock() {
   level.tiles.forEach((row, ty) => row.forEach((t, tx) => {
     if (t !== 'X') return;
     row[tx] = '.';
+    level.sinking.push({ tx, ty, t: 0 });
     for (let k = 0; k < 6; k++) particles.push({ x: tx * TILE + Math.random() * 16, y: ty * TILE + Math.random() * 16, vx: (Math.random() - 0.5) * 40, vy: -Math.random() * 40, g: 60, life: 0.8, c: '#9a9080', s: 2 });
   }));
 }
@@ -1089,6 +1095,8 @@ function checkLock() {
 // ---------- Pip ----------
 const RUN = 118, JUMP = 274, GRAV = 980, MAXFALL = 330, CLIMB = 62;
 let pip, lives = 3, coins = 0, levelCoins = 0, cam = { x: 0 }, state = 'title', paused = false, time = 0;
+let fadeIn = 0, leaving = 0, hudPop = 0;
+const hurtLog = [];
 let banner = 0, dawn = 0, doneT = 0, outT = 0, flash = 0, shake = 0, restartAsk = 0, toast = null;
 let dialog = null, owl = null, muralView = null, introI = 0, introT = 0, ending = null;
 
@@ -1097,6 +1105,7 @@ function newPip() {
     x: level.start.x, y: level.start.y, w: 10, h: 11, vx: 0, vy: 0, face: 1,
     onGround: false, coyote: 0, buffer: 0, jumpKey: 'jump', jumping: false, wasWater: false,
     climbing: false, dig: 0, digTx: 0, digTy: 0, squash: 1, anim: 0, hurt: 0, pushT: 0, pull: null, grabbing: false,
+    dying: 0, idle: 0, lastStep: 0,
     safe: { x: level.start.x, y: level.start.y },
   };
 }
@@ -1125,19 +1134,24 @@ function splash(x, y) {
   for (let i = 0; i < 10; i++) particles.push({ x, y, vx: (Math.random() - 0.5) * 90, vy: -40 - Math.random() * 90, g: 400, life: 0.5, c: '#9ad0f0', s: 1 });
 }
 
-function blockAhead(p, dir) {
-  const tx = dir > 0 ? Math.floor((p.x + p.w + 1) / TILE) : Math.floor((p.x - 1) / TILE);
+function blockAhead(p, dir, reach = 1.5) {
+  const tx = dir > 0 ? Math.floor((p.x + p.w + reach) / TILE) : Math.floor((p.x - reach) / TILE);
   const ty = Math.floor((p.y + p.h / 2) / TILE);
   const b = occAt(tx, ty);
   if (!isResting(b) || b.tx !== tx || b.ty !== ty) return null;
   const gap = dir > 0 ? tx * TILE - (p.x + p.w) : p.x - (tx + 1) * TILE;
-  return gap < 1.5 ? b : null;
+  return gap < reach ? b : null;
+}
+
+function turnCandidates(p) {
+  const cx = Math.floor((p.x + p.w / 2) / TILE), cy = Math.floor((p.y + p.h / 2) / TILE);
+  const fx = cx + p.face;
+  return [[fx, cy], [fx, cy + 1], [cx, cy + 1], [cx, cy], [cx, cy - 1], [fx, cy - 1]];
 }
 
 function rotateNear(p) {
   const cx = Math.floor((p.x + p.w / 2) / TILE), cy = Math.floor((p.y + p.h / 2) / TILE);
-  const fx = cx + p.face;
-  const cands = [[fx, cy], [fx, cy + 1], [cx, cy + 1], [cx, cy], [cx, cy - 1], [fx, cy - 1]];
+  const cands = turnCandidates(p);
   // pressing G again soon keeps turning the same vine; otherwise prefer a vine that would join the bridge
   const last = p.lastTurn && time - p.lastTurn.t < 2 && p.lastTurn.px === cx && p.lastTurn.py === cy && cands.find(c => c[0] === p.lastTurn.x && c[1] === p.lastTurn.y);
   let pick = null, first = null;
@@ -1158,8 +1172,11 @@ function rotateNear(p) {
 
 function updatePip(dt) {
   const p = pip;
+  if (p.dying > 0) { updateDying(dt); return; }
   const ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
   p.anim += dt;
+  if (ix || !p.onGround || Math.abs(p.vx) > 5 || keys.up || keys.down || keys.grab || keys.jump) p.idle = 0;
+  else p.idle += dt;
   p.squash = lerp(p.squash, 1, Math.min(1, dt * 14));
   if (p.hurt > 0) p.hurt -= dt;
 
@@ -1255,7 +1272,7 @@ function updatePip(dt) {
   }
 
   const accel = p.onGround ? 1500 : 950;
-  const decel = p.onGround ? 2200 : 520;
+  const decel = p.onGround ? 2200 : 1100;
   if (p.grabbing && ix === -p.face) {
     // pull: only when there is room behind Pip
     const b = blockAhead(p, p.face);
@@ -1288,12 +1305,19 @@ function updatePip(dt) {
   const wasGround = p.onGround, fallV = p.vy;
   moveX(p, p.vx * dt);
   moveY(p, p.vy * dt);
-  if (!wasGround && p.onGround && fallV > 140) { p.squash = 0.7; dust(p.x + p.w / 2, p.y + p.h, 5, 80); }
+  if (!wasGround && p.onGround && fallV > 140) { p.squash = 0.7; dust(p.x + p.w / 2, p.y + p.h, 5, 80); SFX.land(); }
+  const stepNow = Math.floor(p.anim * 12) % 2;
+  if (p.onGround && Math.abs(p.vx) > 30 && stepNow !== p.lastStep) SFX.step();
+  p.lastStep = stepNow;
   if (p.onGround && Math.abs(p.vx) > RUN * 0.85 && Math.random() < dt * 9) dust(p.x + p.w / 2 - p.face * 5, p.y + p.h, 1, 20);
 
   if (pressed.down && p.onGround) {
     const tx = Math.floor((p.x + p.w / 2) / TILE), ty = Math.floor((p.y + p.h + 1) / TILE);
-    if (tileAt(tx, ty) === 'D') { p.dig = 0.22; p.digTx = tx; p.digTy = ty; p.squash = 0.8; SFX.dig(); }
+    if (tileAt(tx, ty) === 'D') {
+      p.dig = 0.22; p.digTx = tx; p.digTy = ty; p.squash = 0.8; SFX.dig();
+      // stand over the middle of the hole so Pip drops into it
+      p.x = tx * TILE + (TILE - p.w) / 2;
+    }
   }
   afterMove(p);
 }
@@ -1321,20 +1345,38 @@ function afterMove(p) {
   const box = { x: p.x + 1, y: p.y, w: p.w - 2, h: p.h };
   for (let ty = Math.floor(p.y / TILE); ty <= Math.floor((p.y + p.h) / TILE); ty++) {
     for (let tx = lt; tx <= rt; tx++) {
-      if (tileAt(tx, ty) === '^' && overlap(box, { x: tx * TILE + 2, y: ty * TILE + 8, w: 12, h: 8 })) hurt();
+      if (tileAt(tx, ty) === '^' && overlap(box, { x: tx * TILE + 3, y: ty * TILE + 10, w: 10, h: 6 })) hurt();
     }
   }
   if (p.y > H + 16) hurt(true);
 }
 
 function hurt(force) {
-  if (state !== 'play' || (pip.hurt > 0 && !force)) return;
+  if (state !== 'play' || pip.dying > 0 || (pip.hurt > 0 && !force)) return;
+  hurtLog.push({ level: level.index + 1, x: +((pip.x + 5) / TILE).toFixed(1), y: +((pip.y + pip.h) / TILE).toFixed(1), why: new Error().stack.split('\n')[2].trim().split(' ')[1] });
   SFX.hurt();
   flash = 0.25;
   shake = 0.3;
   lives--;
-  if (lives <= 0) { state = 'out'; outT = 2.6; return; }
-  Object.assign(pip, { x: pip.safe.x, y: pip.safe.y, vx: 0, vy: 0, climbing: false, dig: 0, pull: null, hurt: 1.5 });
+  // Pip pops up, tumbles, then reappears at the last safe spot
+  const fell = pip.y > H;
+  Object.assign(pip, { vx: 0, vy: fell ? 0 : -170, climbing: false, dig: 0, pull: null, grabbing: false, dying: fell ? 0.5 : 0.9 });
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    particles.push({ x: pip.x + 5, y: pip.y + 4, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, g: 0, life: 0.4, c: '#ffe58a', s: 1 });
+  }
+}
+
+function updateDying(dt) {
+  const p = pip;
+  p.dying -= dt;
+  p.vy += GRAV * 0.7 * dt;
+  p.y += p.vy * dt;
+  if (p.dying > 0) return;
+  if (lives <= 0) { state = 'out'; outT = 2.2; return; }
+  Object.assign(p, { x: p.safe.x, y: p.safe.y, vx: 0, vy: 0, hurt: 1.5, dying: 0, idle: 0 });
+  for (let i = 0; i < 12; i++) particles.push({ x: p.x + 5, y: p.y + 6, vx: (Math.random() - 0.5) * 70, vy: (Math.random() - 0.5) * 70, g: 0, life: 0.45, c: '#f6ecd8', s: 1 });
+  SFX.poof();
 }
 
 // ---------- enemies, rocks, darts ----------
@@ -1466,6 +1508,7 @@ function startLevel(i) {
   pip = newPip();
   cam.x = clamp(pip.x - W / 2, 0, level.w * TILE - W);
   banner = 3;
+  fadeIn = 0.5;
   dawn = 0;
   doneT = 0;
   dialog = null;
@@ -1519,10 +1562,11 @@ function updateWorld(dt) {
   ambient(dt);
   if (state !== 'play' && state !== 'done') return;
   const p = pip;
+  if (p.dying > 0) return;
   const reach = { x: p.x - 5, y: p.y - 5, w: p.w + 10, h: p.h + 10 };
   for (const c of level.coins) {
     if (c.got || !overlap(reach, { x: c.x, y: c.y, w: 0.1, h: 0.1 })) continue;
-    c.got = true; coins++;
+    c.got = true; coins++; hudPop = 0.25;
     SFX.coin();
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
@@ -1549,6 +1593,7 @@ function updateWorld(dt) {
   const t = level.torch;
   if (t && !t.lit && state === 'play' && p.x + p.w > t.x - 6 && p.x < t.x + 6 && p.y + p.h > t.y - 22 && p.y < t.y) {
     t.lit = true; state = 'done'; doneT = 0;
+    if (p.onGround) { p.vy = -170; p.onGround = false; }
     SFX.torch();
     SFX.yip();
     for (let i = 0; i < 30; i++) {
@@ -1593,6 +1638,10 @@ function update(dt) {
   if (shake > 0) shake -= dt;
   if (toast && (toast.t -= dt) <= 0) toast = null;
   if (restartAsk > 0) restartAsk -= dt;
+  if (fadeIn > 0) fadeIn -= dt;
+  if (hudPop > 0) hudPop -= dt;
+  if (leaving > 0) { leaving -= dt; if (leaving <= 0) startLevel(level.index + 1); }
+  for (const g of level ? level.sinking : []) g.t += dt;
   if (state === 'title') {
     const hasSave = save && (save.checkpoint > 0 || save.coins > 0);
     if (pressed.new || (!hasSave && (pressed.start || pressed.jump))) newGame();
@@ -1638,7 +1687,7 @@ function update(dt) {
     moveY(pip, pip.vy * dt);
     updateBlocks(dt);
     updateWorld(dt);
-    if (doneT > 1.5 && (pressed.start || pressed.jump)) startLevel(level.index + 1);
+    if (doneT > 1.5 && leaving <= 0 && (pressed.start || pressed.jump)) leaving = 0.4;
   } else if (state === 'out') {
     outT -= dt;
     updateWorld(dt);
@@ -2108,6 +2157,17 @@ function drawTiles(cx) {
       }
     }
   }
+  // an opened gate slides down into the floor
+  for (const g of level.sinking) {
+    if (g.t > 0.8) continue;
+    const sx = g.tx * TILE - cx, sy = g.ty * TILE;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(sx, sy, TILE, TILE);
+    ctx.clip();
+    drawGate(sx, sy + Math.round((g.t / 0.8) * TILE), g.tx, g.ty);
+    ctx.restore();
+  }
   if (forest) {
     // bottomless pits fade to black
     const pit = ctx.createLinearGradient(0, H - 52, 0, H);
@@ -2355,13 +2415,33 @@ function sprite(rows, w, h, tint) {
   });
   return c;
 }
+const BLINK = rows => rows.map((r, i) => (i === 4 && r[12] === 'k' ? r.slice(0, 12) + 'o' + r.slice(13) : r));
+const WAG = rows => rows.map((r, i) => (i === 4 ? 'w' + '.' + r.slice(2) : i === 6 ? '.' + r.slice(1) : r));
+const SIT = [
+  '................',
+  '................',
+  '..........d..d..',
+  '..........oo.oo.',
+  '..........ooooo.',
+  '..........ookooo',
+  '.........ooowwwk',
+  'w......ooooww...',
+  'ww...oooooowww..',
+  'wwoooooooooww...',
+  '.ooooddoooooo...',
+  '.....kk...kk....',
+];
+LEGS.blink = LEGS.stand;
+LEGS.wag = LEGS.stand;
 const frames = {}, shadowFrames = {};
 for (const k in LEGS) {
   const rows = BODY.map(r => r).concat(LEGS[k]);
   if (k === 'runB') { rows.shift(); rows.splice(8, 0, '................'); }
-  frames[k] = sprite(rows, 16, 12);
+  frames[k] = sprite(k === 'blink' ? BLINK(rows) : k === 'wag' ? WAG(rows) : rows, 16, 12);
   shadowFrames[k] = sprite(rows, 16, 12, '#2a2418');
 }
+frames.sit = sprite(SIT, 16, 12);
+frames.sitBlink = sprite(SIT.map((r, i) => (i === 5 ? r.slice(0, 12) + 'o' + r.slice(13) : r)), 16, 12);
 const wolfFrames = WOLF_LEGS.map(l => sprite(WOLF.concat(l), 16, 10));
 const owlSprite = sprite(OWL, 12, 12);
 const owlShadow = sprite(OWL, 12, 12, '#2a2418');
@@ -2370,11 +2450,23 @@ function pipFrame(p) {
   if (p.climbing) return Math.floor(p.anim * 8) % 2 ? 'climbA' : 'climbB';
   if (!p.onGround) return 'air';
   if (Math.abs(p.vx) > 15 || p.pull) return Math.floor(p.anim * 12) % 2 ? 'runA' : 'runB';
+  const blink = time % 3.3 < 0.12;
+  if (p.idle > 6) return blink ? 'sitBlink' : 'sit';
+  if (blink) return 'blink';
+  if (p.idle > 1.5 && Math.floor(time * 5) % 2) return 'wag';
   return 'stand';
 }
 
 function drawPip(cx) {
   const p = pip;
+  if (p.dying > 0) {
+    ctx.save();
+    ctx.translate(Math.round(p.x + p.w / 2 - cx), Math.round(p.y + p.h / 2));
+    ctx.rotate((0.9 - p.dying) * 9 * p.face);
+    ctx.drawImage(frames.air, -8, -6);
+    ctx.restore();
+    return;
+  }
   if (p.hurt > 0 && Math.floor(p.hurt * 12) % 2) return;
   const f = frames[pipFrame(p)];
   const fx = Math.round(p.x + p.w / 2 - cx), fy = Math.round(p.y + p.h + 1);
@@ -2522,7 +2614,7 @@ function drawHUD() {
   x = Math.max(x, 35) + 8;
   ctx.fillStyle = '#a87a1e'; ctx.fillRect(x, 3, 6, 8);
   ctx.fillStyle = '#f2c94c'; ctx.fillRect(x + 1, 4, 4, 6);
-  text('x' + coins, x + 9, 4, 8, '#f6ecd8');
+  text('x' + coins, x + 9, 4 - (hudPop > 0 ? 1 : 0), 8, hudPop > 0 ? '#ffe58a' : '#f6ecd8');
   text('LEVEL ' + (level.index + 1) + '/10', W - 5, 4, 8, '#f6ecd8', 'right');
 }
 
@@ -2878,6 +2970,7 @@ function render() {
   drawOwl(cx);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (flash > 0) { ctx.fillStyle = `rgba(255,60,40,${flash})`; ctx.fillRect(0, 0, W, H); }
+  drawPrompt(cx);
 
   drawHUD();
   if (banner > 0 && !dialog && !paused) {
@@ -2916,6 +3009,34 @@ function render() {
     text('P or ESC to keep going', W / 2, 172, 8, '#8a93b8', 'center');
   }
   if (snd.muted) text('MUTE', W - 5, 180, 8, '#8a93b8', 'right');
+  const black = Math.max(fadeIn > 0 ? fadeIn / 0.5 : 0, leaving > 0 ? 1 - leaving / 0.4 : 0);
+  if (black > 0) { ctx.fillStyle = `rgba(0,0,0,${black})`; ctx.fillRect(0, 0, W, H); }
+}
+
+// a little key picture above Pip when there is something to do right here
+function drawPrompt(cx) {
+  const p = pip;
+  if (state !== 'play' || dialog || paused || p.dying > 0 || p.climbing || Math.abs(p.vx) > 20 || !(p.onGround || inWater(p))) return;
+  let key = null;
+  if (blockAhead(p, p.face, 6)) key = 'G';
+  else if (turnCandidates(p).some(c => pieceAt(c[0], c[1]))) key = 'G';
+  else if (p.onGround && tileAt(Math.floor((p.x + p.w / 2) / TILE), Math.floor((p.y + p.h + 1) / TILE)) === 'D') key = 'v';
+  else if (onVine(p)) key = '^';
+  if (!key) return;
+  const x = Math.round(p.x + p.w / 2 - cx) - 5, y = Math.round(p.y) - 16 + Math.round(Math.sin(time * 4));
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = '#2a2418';
+  ctx.fillRect(x, y, 11, 11);
+  ctx.fillStyle = '#f6ecd8';
+  ctx.fillRect(x + 1, y + 1, 9, 9);
+  ctx.fillStyle = '#2a2418';
+  if (key === 'G') { ctx.font = `8px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('G', x + 2, y + 2); }
+  else {
+    const up = key === '^';
+    for (let k = 0; k < 3; k++) ctx.fillRect(x + 5 - k, y + (up ? 3 + k : 7 - k), 1 + k * 2, 1);
+    ctx.fillRect(x + 5, y + (up ? 5 : 3), 1, 3);
+  }
+  ctx.globalAlpha = 1;
 }
 
 // ---------- loop ----------
@@ -2934,9 +3055,10 @@ loadLevel(0);
 // a handle for testing from the browser console
 window.sunrise = {
   get pip() { return pip; }, get level() { return level; }, get state() { return state; }, get blocks() { return blocks; },
-  get enemies() { return enemies; }, get lives() { return lives; }, get coins() { return coins; }, get dialog() { return dialog; },
+  get enemies() { return enemies; }, get darts() { return darts; }, get lives() { return lives; }, get coins() { return coins; }, get dialog() { return dialog; },
   get pieces() { return pieces; }, LEVELS, startLevel: i => { lives = 3; startLevel(i); }, setCoins: c => { coins = c; },
   closeDialog: () => { dialog = null; owl = null; }, startEnding,
+  hurtLog,
   freeze: (v, camX) => { frozen = v; if (camX !== undefined) cam.x = camX; }, get save() { return save; },
 };
 requestAnimationFrame(frame);
