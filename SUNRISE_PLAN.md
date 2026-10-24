@@ -47,16 +47,22 @@ Built from 100 questions. The game is `Sunrise.html`.
 
 ## Look and sound
 - Pixel art. Levels are 4 screens wide and scroll.
-- Forest (1-3), then temple zones: mossy halls, flooded caves, golden sanctum.
+- Forest (1-3), then temple zones: mossy halls (4-6), flooded caves (7-8), golden sanctum (9-10).
+- Forest dangers: wolves, thorns, pits, falling branches. Temple: golems, spikes, falling rocks, darts.
 - Dim, with glowing moss. Animated fireflies, dripping water, swaying vines.
 - Each level ends by lighting a torch. The room brightens.
 - Top of screen: lives, coins, level number.
 - Calm music. Sound effects for jump/dig, coins/berries, traps, puzzle solved.
 
-## Build steps
+## Build steps (all done)
 1. Pip moving, jumping, digging and climbing in level 1. Movement feel matters most.
 2. Blocks, gems, vine tiles, symbol locks.
-3. Golems, traps, lives, checkpoints, saving.
+3. Golems, wolves, traps, lives, checkpoints, saving.
 4. All 10 levels.
 5. Professor Feathers, hints, murals, intro, ending.
-6. Music and sound.
+6. Music and sound (made in the browser, no sound files).
+
+## Murals
+- Level 5: behind a fake wall above the vine near the end.
+- Level 8: dive in the first pool and swim west through a wall.
+- Level 9: behind a fake wall above the vine near the end.

@@ -14,8 +14,8 @@ canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);image-r
 <canvas id="game" width="320" height="192"></canvas>
 <script>
 'use strict';
-// Sunrise. Pip the fox crosses the dark forest to reach the temple, then finds the Sun Stone.
-// Step 1: Pip running, jumping, climbing and digging through level 1.
+// Sunrise. Pip the fox crosses the dark forest, enters the ancient temple and carries
+// the Sun Stone home to end the endless night.
 
 const W = 320, H = 192, TILE = 16, STEP = 1 / 120;
 const FONT = '"Press Start 2P", monospace';
@@ -37,12 +37,14 @@ const KEYMAP = {
   ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', Space: 'jump',
   KeyG: 'grab', KeyH: 'hint', KeyP: 'pause', Escape: 'pause', KeyM: 'mute', Enter: 'start',
+  KeyR: 'restart', KeyN: 'new',
 };
 const keys = {}, pressed = {};
 addEventListener('keydown', e => {
   const k = KEYMAP[e.code];
   if (!k) return;
   e.preventDefault();
+  audioInit();
   if (!keys[k]) pressed[k] = true;
   keys[k] = true;
 });
@@ -57,12 +59,143 @@ function hash(x, y) {
 }
 const approach = (v, t, d) => (v < t ? Math.min(v + d, t) : Math.max(v - d, t));
 const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+// ---------- sound ----------
+// Everything is made with the Web Audio API, so there are no sound files to load.
+const snd = { ctx: null, master: null, music: null, sfx: null, muted: false, next: 0, step: 0, mel: 3 };
+
+function audioInit() {
+  if (snd.ctx) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    snd.ctx = new AC();
+    snd.master = snd.ctx.createGain();
+    snd.master.gain.value = snd.muted ? 0 : 0.8;
+    snd.master.connect(snd.ctx.destination);
+    snd.music = snd.ctx.createGain();
+    snd.music.gain.value = 0.16;
+    snd.music.connect(snd.master);
+    snd.sfx = snd.ctx.createGain();
+    snd.sfx.gain.value = 0.45;
+    snd.sfx.connect(snd.master);
+    snd.next = snd.ctx.currentTime + 0.2;
+    setInterval(scheduleMusic, 100);
+  } catch (e) { snd.ctx = null; }
+}
+
+function note(freq, at, dur, type, vol, dest, slideTo) {
+  if (!snd.ctx) return;
+  const t = snd.ctx.currentTime + (at || 0);
+  const o = snd.ctx.createOscillator(), g = snd.ctx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + Math.min(0.02, dur / 3));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g);
+  g.connect(dest || snd.sfx);
+  o.start(t);
+  o.stop(t + dur + 0.05);
+}
+
+let noiseBuf = null;
+function noise(at, dur, vol, freq, kind) {
+  if (!snd.ctx) return;
+  if (!noiseBuf) {
+    noiseBuf = snd.ctx.createBuffer(1, snd.ctx.sampleRate, snd.ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const t = snd.ctx.currentTime + (at || 0);
+  const s = snd.ctx.createBufferSource(), f = snd.ctx.createBiquadFilter(), g = snd.ctx.createGain();
+  s.buffer = noiseBuf;
+  f.type = kind || 'lowpass';
+  f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(snd.sfx);
+  s.start(t);
+  s.stop(t + dur + 0.05);
+}
+
+const SFX = {
+  jump() { note(420, 0, 0.09, 'square', 0.1, null, 640); },
+  dig() { noise(0, 0.16, 0.5, 700); },
+  coin() { note(988, 0, 0.07, 'square', 0.08); note(1319, 0.07, 0.15, 'square', 0.08); },
+  berry() { [523, 659, 784, 1047].forEach((f, i) => note(f, i * 0.07, 0.16, 'triangle', 0.2)); },
+  hurt() { note(760, 0, 0.16, 'sawtooth', 0.12, null, 300); noise(0, 0.12, 0.3, 500); },
+  push() { noise(0, 0.12, 0.3, 260); },
+  rotate() { note(330, 0, 0.08, 'triangle', 0.2, null, 494); noise(0, 0.06, 0.12, 3000, 'highpass'); },
+  match() { [784, 988, 1175, 1568].forEach((f, i) => note(f, i * 0.06, 0.18, 'triangle', 0.16)); },
+  solve() { [523, 659, 784, 1047, 1319].forEach((f, i) => note(f, i * 0.1, 0.4, 'sine', 0.2)); noise(0.3, 0.7, 0.4, 180); },
+  crash() { noise(0, 0.35, 0.5, 500); },
+  rumble() { noise(0, 0.4, 0.2, 140); },
+  dart() { noise(0, 0.08, 0.15, 2200, 'bandpass'); },
+  splash() { noise(0, 0.25, 0.3, 900, 'bandpass'); },
+  torch() { note(300, 0, 0.5, 'sine', 0.2, null, 900); noise(0, 0.4, 0.3, 1500, 'highpass'); },
+  hoot() { note(420, 0, 0.22, 'sine', 0.22, null, 360); note(420, 0.3, 0.3, 'sine', 0.22, null, 340); },
+  yip() { note(900, 0, 0.07, 'square', 0.08, null, 1300); note(1100, 0.08, 0.09, 'square', 0.08, null, 700); },
+  mural() { [392, 494, 587, 784].forEach((f, i) => note(f, i * 0.18, 0.8, 'sine', 0.14)); },
+  gate() { noise(0, 0.8, 0.45, 180); },
+};
+
+// calm music: a slow wandering melody over a soft drone; each part of the world has its own notes
+const SCALES = {
+  forest: [220, 247, 277, 330, 370, 440, 494, 554],
+  halls: [147, 175, 196, 220, 262, 294, 349, 392],
+  caves: [165, 196, 220, 247, 294, 330, 392, 440],
+  sanctum: [262, 294, 330, 392, 440, 523, 587, 659],
+  ending: [262, 330, 392, 440, 523, 659, 784, 880],
+};
+function musicZone() {
+  if (state === 'ending') return 'ending';
+  if (state === 'title' || state === 'intro' || !level) return 'forest';
+  return level.def.zone;
+}
+function scheduleMusic() {
+  if (!snd.ctx) return;
+  while (snd.next < snd.ctx.currentTime + 0.3) {
+    const sc = SCALES[musicZone()], t = snd.next - snd.ctx.currentTime;
+    if (snd.step % 16 === 0) {
+      note(sc[0] / 2, t, 6, 'sine', 0.3, snd.music);
+      note(sc[3] / 2, t + 0.2, 6, 'sine', 0.18, snd.music);
+    }
+    if (snd.step % 2 === 0 && Math.random() > 0.25) {
+      snd.mel = clamp(snd.mel + Math.floor(Math.random() * 5) - 2, 0, sc.length - 1);
+      note(sc[snd.mel], t, 1.6, 'triangle', 0.35, snd.music);
+    }
+    snd.step++;
+    snd.next += 0.42;
+  }
+}
+function toggleMute() {
+  snd.muted = !snd.muted;
+  if (snd.master) snd.master.gain.value = snd.muted ? 0 : 0.8;
+}
+
+// ---------- saving ----------
+function loadSave() {
+  try { return JSON.parse(localStorage.getItem('sunrise-save')); } catch (e) { return null; }
+}
+function writeSave() {
+  try { localStorage.setItem('sunrise-save', JSON.stringify(save)); } catch (e) { /* private window: no saving */ }
+}
+let save = loadSave();
 
 // ---------- levels ----------
-// G ground, D soft dirt (diggable), S stone, W branch (stand on it from above), V vine,
-// C coin, T torch, P start, a / A wooden signs pointing up / down.
+// Tiles: G ground, D soft dirt, S stone, W branch/plank (stand on it from above), V vine,
+//   ^ thorns/spikes, ~ water, X gate (opens when the symbol lock is solved), Z fake wall,
+//   < > dart shooters, Y vine root, o symbol slot, q carved clue, M mural, a/A signs.
+// Bridge vines (turn with G): h v straight, 5 6 7 8 corners.
+// Things: P start, C coin, B berry, T torch, O Sun Stone, b stone block, 1-4 gem blocks,
+//   s m t l symbol blocks (sun moon star leaf), g golem, w wolf, R falling rock or branch.
 const LEVELS = [{
-  name: 'The Dark Forest',
+  name: 'The Dark Forest', zone: 'forest',
+  owl: ['Hoo! A young fox, out alone in this endless night?', 'The temple lies east, through the forest. If you ever need advice, press H. My advice costs five coins.'],
+  hints: ['Press Up to climb a vine, and Down to dig through soft, lumpy dirt.', 'The great stone wall cannot be climbed. But dirt is soft... and tunnels go under things.'],
   screens: [[
     '....................',
     '....................',
@@ -72,7 +205,7 @@ const LEVELS = [{
     '....................',
     '...............CC...',
     '..........C...GGGG..',
-    '...P.....GGG..GGGG..',
+    '...P.....GGG^^GGGG..',
     'GGGGGGGGGGGGGGGGGGGG',
     'GGGGGGGGGGGGGGGGGGGG',
     'GGGGGGGGGGGGGGGGGGGG',
@@ -116,36 +249,619 @@ const LEVELS = [{
     'GGGGGGGGGGGGGGGGGGGG',
     'GGGGGGGGGGGGGGGGGGGG',
   ]],
+}, {
+  name: 'Wolf Hollow', zone: 'forest',
+  hints: ['Wolves cannot jump. Leap over them, or dig a hole in their path. A wolf that falls in stays stuck.', 'Branches fall when a fox walks beneath them. Keep moving!'],
+  screens: [[
+    '....................',
+    '....................',
+    '....................',
+    '......R.............',
+    '....................',
+    '....................',
+    '....................',
+    '...........C........',
+    '..P.......GGG..^^...',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+  ], [
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '.........CCC........',
+    '.GG.............GGGG',
+    'GGG....w........GGGG',
+    'GGGGGDDGGGDDGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+  ], [
+    '....................',
+    '............R.......',
+    '....................',
+    '.......C.B..C.......',
+    '....................',
+    '......WWW..WWW......',
+    '....................',
+    'GGGG............GGGG',
+    'GGGG.^^^^^^^^^^.GGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+  ], [
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '.................T..',
+    '................GGGG',
+    '........C......GGGGG',
+    'GGGG..........GGGGGG',
+    'GGGG.....w....GGGGGG',
+    'GGGGGGGDDGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+  ]],
+}, {
+  name: 'Edge of the Forest', zone: 'forest', templeAhead: true,
+  hints: ['Climb the vine and cross the thorns along the high branch.', 'Two wolves share one pen. Dig a trap in the middle and wait for one to tumble in.', 'The tunnel under the old ruin hides a berry. Dig beside the sign.'],
+  screens: [[
+    '....................',
+    '....................',
+    '......R.............',
+    '....................',
+    '..............CCC...',
+    '............VWWWWWW.',
+    '............V.......',
+    '............V.......',
+    '..P.........V.^^^^..',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+  ], [
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '........CCCC........',
+    '..S..............S..',
+    '..S...w.....w....S..',
+    'GGGGGGGGDDGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+  ], [
+    '....SSSS............',
+    '....SSSS............',
+    '....SSSS............',
+    '....SSSS............',
+    '....SSSS............',
+    '....SSSS............',
+    '....SSSS............',
+    '....SSSS............',
+    'A...SSSS............',
+    'GDDGGGGGGGGGVGGGGGGG',
+    'G..C.C.C..B.VGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+  ], [
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '..........C..C......',
+    '.............T......',
+    '...........SSSSSSSSS',
+    '........SSSSSSSSSSSS',
+    'S.w..SSSSSSSSSSSSSSS',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+    'GGGGGGGGGGGGGGGGGGGG',
+  ]],
+}, {
+  name: 'The Mossy Halls', zone: 'halls',
+  owl: ['Ahem! Welcome to the temple, young fox. I am Professor Feathers, keeper of these halls, scholar of stones, and connoisseur of beetles.', 'Blocks can be pushed. Hold G to pull one back toward you. And should you ever get truly stuck, press R twice to restart the room. It will, alas, cost you a life.'],
+  hints: ['Ahem! Observe: a block pushed against a tall wall becomes a most serviceable step.', 'Golems are slow of wit and slower of foot. Leap over them, or dig a hole in their path, and they shall trouble you no more.', 'Gems of one color, three in a row, vanish like morning mist. Jump over the first red gem and push the far one first, lest one block the other.'],
+  screens: [[
+    'SSSSSSSSSSSSSSSSSSSS',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S..............CCC..',
+    'S.............SSSSSS',
+    'S.............SSSSSS',
+    'S.P.....b.....SSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    'SSSS....CC..........',
+    'SSSS...........SSSSS',
+    'SSSS......g....SSSSS',
+    'SSSSSSSSDDSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '.....SSSSSSSSSSSSSSS',
+    '.....SSSSSSSSSSSSSSS',
+    '.....SSSSSSSSSSSSSSS',
+    '.....SSSSSSSSSSSSSSS',
+    '.....SSSSSSSSSSSSSSS',
+    '............2.......',
+    'SS..........2.......',
+    'SS...1.1....1.......',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSS..............',
+    'SSSSSS..............',
+    'SSSSSS..............',
+    'SSSSSS..............',
+    'SSSSSS..CC..........',
+    '.................T..',
+    '........WW.....SSSSS',
+    '......^^^^^^...SSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ]],
+}, {
+  name: 'Halls of Roots', zone: 'halls', code: 'ms', mural: 0,
+  hints: ['The wilted vines across the pit are bridge-vines. Stand beside one and press G to turn it. A vine joined to a root springs to life beneath your paws.', 'Study the carvings on the corridor wall, dear fox: a moon, then a sun, from left to right. Push the sun first; the moon must wait its turn.', 'Darts fly low. A well-timed leap is worth a thousand regrets.', 'Ahem... I really should not say, but not every wall in this temple is as solid as it pretends to be. Look high, beside the old vine.'],
+  screens: [[
+    'SSSSSSSSSSSSSSSSSSSS',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S......CCCC.........',
+    'S.P.................',
+    'SSSSSYvhvvhvYSSSSSSS',
+    'SSSSSS^^^^^^SSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    '..qq.............X..',
+    '.............CCC.X..',
+    '......m.s..oo....X..',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSS.......',
+    'SSSSSSSSSSSSS.......',
+    'SSSSSSSSSSSSS.......',
+    'SSSSSSSSSSSSS.......',
+    'SSSSSSSSSSSSS.......',
+    '....................',
+    '....................',
+    '......C.....C......<',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '..SSSSSSSSSSSS......',
+    '..SSSSSSSS...S......',
+    '.........Z.M.S......',
+    '.VSSSSSSSSSSSS......',
+    '.V..................',
+    '.V..................',
+    '.V..................',
+    '.V..............T...',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ]],
+}, {
+  name: 'The Golem Gallery', zone: 'halls',
+  hints: ['Two golems guard the first hall. Soft dirt makes a splendid golem trap, if I do say so myself.', 'The stone block must fill the hole before the blue gem crosses it. Jump over the gem and push the block first.', 'A bent vine turns a corner. Fix the low corner first, then climb, turning each vine above you as you go.', 'Rocks fall when a fox walks beneath them. Run, dear fox, run!'],
+  screens: [[
+    'SSSSSSSSSSSSSSSSSSSS',
+    'S...................',
+    'S....R.......R......',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S.P......g..........',
+    'SSSSSSDDSSSSSDDSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '....SSSSSSSSSSSSSSSS',
+    '....SSSSSSSSSSSSSSSS',
+    '....SSSSSSSSSSSSSSSS',
+    '....SSSSSSSSSSSSSSSS',
+    '....SSSSSSSSSSSSSSSS',
+    '...............3....',
+    '...S...........3....',
+    '...S.2.b......22....',
+    'SSSSSSSSS.SSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SS..................',
+    'SS..................',
+    'SS..................',
+    'SS..................',
+    'SS..................',
+    '........8vhhvhY.....',
+    '........v.....SSSSSS',
+    '....CCC.h.....SSSSSS',
+    'SSYvhvhv5.....SSSSSS',
+    'SSS^^^^^^^^^^^SSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '....................',
+    '......R......R......',
+    '....................',
+    '....................',
+    '...g.............T..',
+    'SSSSSSSDDSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ]],
+}, {
+  name: 'The Flooded Caves', zone: 'caves',
+  owl: ['Water! Splendid for swimming, dreadful for feathers. Hold Up or Space to swim upward, and Down to dive.'],
+  hints: ['Swim across, then press Up or Space at the surface to leap out of the water.', 'Blocks float, you know. Swim behind the floating block and nudge it all the way to the far wall. Then use it as a step.', 'The way forward lies beneath the hanging wall. Take a deep breath, dear fox. Dive!', 'Darts skim the surface of the last pool. Dive below them as they pass.'],
+  screens: [[
+    'SSSSSSSSSSSSSSSSSSSS',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S.P.................',
+    'SSSSS~~~~~~~~~~SSSSS',
+    'SSSSS~~~C~~C~~~SSSSS',
+    'SSSSS~~~~~~~~~~SSSSS',
+    'SSSSS~~C~~~~C~~SSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '....................',
+    '....................',
+    '....................',
+    '...........CCC......',
+    '..........SSSSSSSSSS',
+    '..........SSSSSSSSSS',
+    'SSSS~~b~~~SSSSSSSSSS',
+    'SSSS~~~~~~SSSSSSSSSS',
+    'SSSS~~~~~~SSSSSSSSSS',
+    'SSSS~~~~~~SSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '.........SS.........',
+    '.........SS.........',
+    '.........SS.........',
+    '.........SS.........',
+    'SSSS.....SS.....SSSS',
+    'SSSS~~~~~SS~~~~~SSSS',
+    'SSSS~~~~~SS~~~~~SSSS',
+    'SSSS~~~~~SS~~~~~SSSS',
+    'SSSS~~C~~~~~~C~~SSSS',
+    'SSSS~~~~~~~~~~~~SSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '....................',
+    '....................',
+    '....................',
+    '.................T..',
+    'SSSS...........SSSSS',
+    'SSSS~~~~~~~~~~~<SSSS',
+    'SSSS~~~~~~~~~~~SSSSS',
+    'SSSS~~~~~~~~~~~SSSSS',
+    'SSSS~~C~~~C~~~~SSSSS',
+    'SSSS~~~~~~~~~~~SSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ]],
+}, {
+  name: 'The Drowned Shrine', zone: 'caves', code: 'lts', mural: 1,
+  hints: ['Hmm, these carvings... a leaf, a star, a sun. That, dear fox, is the order of the slots, from left to right.', 'Push the farthest block first. Swim behind each one and nudge it to shore.', 'I once saw a fox dive deep in the first pool and swim west, straight through a wall. Remarkable creature. Rather like you.', 'Falling rocks, a dart, and a berry on a plank. What more could a fox desire?'],
+  screens: [[
+    'SSSSSSSSSSSSSSSSSSSS',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S.......qqq.........',
+    'S...................',
+    'S.P.................',
+    'SSSSSSSSSSSS~~~~~~~~',
+    'SSSSSSSSSSSS~~~~~~~~',
+    'SSS..Z~~~~~~~~~~~~~~',
+    'SSS.MZ~~~~~~~~~~~~~~',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '.................X..',
+    '.................X..',
+    '.................X..',
+    '.................X..',
+    '.................X..',
+    '.................X..',
+    '~~~l~t~s~~..ooo..X..',
+    '~~~~~~~~~~SSSSSSSSSS',
+    '~~~~~~~~~~SSSSSSSSSS',
+    '~~~~~~~~~~SSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '...R.....R.....R....',
+    '....................',
+    '....................',
+    '....................',
+    '............B.......',
+    '...........WWW......',
+    '........C.........<.',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '....................',
+    '.................T..',
+    'SSSSS~~~~~SSSSSSSSSS',
+    'SSSSS~~~~~SSSSSSSSSS',
+    'SSSSS~~~~~SSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ]],
+}, {
+  name: 'The Golden Sanctum', zone: 'sanctum', code: 'mstl', mural: 2,
+  hints: ['Jump over the red gem and push the yellow one first. Two yellows already wait by the wall.', 'This bridge zigzags. When you reach the high corner, climb DOWN the far side rather than walking off. Spikes are terribly rude.', 'The carvings above the bridge read: moon, sun, star, leaf. The leaf waits on the high shelf. Push it off from the right side.', 'Above the old vine, a wall that is not a wall. You will know it when you walk through it.'],
+  screens: [[
+    'SSSSSSSSSSSSSSSSSSSS',
+    'S....SSSSSSSSSSSSSSS',
+    'S....SSSSSSSSSSSSSSS',
+    'S....SSSSSSSSSSSSSSS',
+    'S....SSSSSSSSSSSSSSS',
+    'S....SSSSSSSSSSSSSSS',
+    'S.............4.....',
+    'S.............1.....',
+    'S.P....1.3...331....',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '....................',
+    '....................',
+    '.............qqqq...',
+    '....................',
+    '....................',
+    '....................',
+    '.....CC.............',
+    '....8vh7............',
+    'SYvh5..8vhvYSSSSSSSS',
+    'SS^^^^^^^^^SSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '.................X..',
+    '.................X..',
+    '.................X..',
+    '.................X..',
+    '.................X..',
+    '...............l.X..',
+    '..............SSSX..',
+    '..m.s.t...ooooSSSX..',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '...R..R...SSSSSSSSSS',
+    '..........SSSSSSSSSS',
+    '............B..Z.M.S',
+    '.........VSSSSSSSSSS',
+    '.........V..........',
+    '.........V..........',
+    '.........V..........',
+    '>...g....V.....T....',
+    'SSSSSSSDDSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ]],
+}, {
+  name: 'The Heart of the Temple', zone: 'sanctum', code: 'tlms',
+  owl: ['We are nearly there, dear fox. The Sun Stone lies beyond the great vault. I have waited a very, very long time for this day.'],
+  hints: ['The golems again! Dig, dear fox, dig.', 'Climb the bridge-vine to the top of the great wall, turning each vine above you as you go.', 'Blue beside blue beside blue. And mind the darts.', 'Read the carvings in the vault: star, leaf, moon, sun. Push the moon first. The sun must be pushed from its right side.'],
+  screens: [[
+    'SSSSSSSSSSSSSSSSSSSS',
+    'S..R.....R.....R....',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S...................',
+    'S.P...g......g......',
+    'SSSSSDDSSSSDDSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '....................',
+    '........CCC.........',
+    '......hSSSSSSSSSSSSS',
+    '......vSSSSSSSSSSSSS',
+    '......hSSSSSSSSSSSSS',
+    '......hSSSSSSSSSSSSS',
+    '......vSSSSSSSSSSSSS',
+    '......hSSSSSSSSSSSSS',
+    'SSSSSSYSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '..........1.........',
+    '....2.....22.......<',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ], [
+    'SSSSSSSSSSSSSSSSSSSS',
+    '...............X....',
+    '...............X....',
+    'SSS............X....',
+    'SSS.qqqq.......X....',
+    'SSS............X....',
+    'SSS............X....',
+    'SSS............X.O..',
+    'SSS.t.l.moooos.X.S..',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+    'SSSSSSSSSSSSSSSSSSSS',
+  ]],
 }];
 
-const SOLID = { G: 1, D: 1, S: 1 };
-let level;
+const MURALS = [
+  { title: 'The First Mural', text: 'Once, three foxes lived at the edge of the forest. One night the father fox walked away into the dark. Nobody knows why. He never came back.' },
+  { title: 'The Second Mural', text: 'Then the sun went out. The mother fox went into the temple to bring it back. A kind old owl showed her the way.' },
+  { title: 'The Third Mural', text: 'The Sun Stone was fading. To keep it glowing, she gave it all of her own light. The owl stayed behind to guard it, and waited for her kit.' },
+];
+
+const ZONES = {
+  forest: { amb: [120, 132, 196], s: ['#5d6473', '#717a8a', '#3d424e'], moss: '#3f7a3c', light: '110,130,40' },
+  halls: { amb: [92, 120, 108], s: ['#58645b', '#6e7c70', '#373f39'], moss: '#4c9a48', light: '70,150,80', back: ['#1d2621', '#26302a', '#141a16'] },
+  caves: { amb: [84, 102, 146], s: ['#47546b', '#5c6b85', '#2c3546'], moss: '#3c8a7a', light: '60,130,160', back: ['#141b28', '#1b2435', '#0d121c'] },
+  sanctum: { amb: [150, 118, 86], s: ['#8c6c36', '#ad8a49', '#5c4522'], moss: '#7a8a3a', light: '180,130,60', back: ['#2a1f12', '#362817', '#1d150b'] },
+};
+
+const STATIC_SOLID = { G: 1, D: 1, S: 1, X: 1, Y: 1, '<': 1, '>': 1, K: 1 };
+const U = 1, R = 2, D = 4, L = 8;
+const DIRS = [[0, -1, U, D], [1, 0, R, L], [0, 1, D, U], [-1, 0, L, R]];
+const GEM = {
+  1: ['#d8433c', '#ff9a88', '#8a1f1c'], 2: ['#3a7ad8', '#9acaff', '#1c3f8a'],
+  3: ['#e0b52c', '#fff08a', '#8a6a10'], 4: ['#9a4ad8', '#d9a6ff', '#552080'],
+};
+const GEM_LIGHT = { 1: '160,40,30', 2: '40,80,170', 3: '160,130,30', 4: '110,50,160' };
+
+let level, occ = [], blocks = [], enemies = [], rocks = [], darts = [], pieces = new Map();
+const particles = [];
 
 function loadLevel(i) {
   const def = LEVELS[i];
   const rows = [];
   for (let r = 0; r < def.screens[0].length; r++) rows.push(def.screens.map(s => s[r]).join(''));
+  const w = rows[0].length, h = rows.length;
   level = {
-    index: i, name: def.name, w: rows[0].length, h: rows.length,
-    tiles: rows.map(r => r.split('')), coins: [], torch: null, start: { x: 0, y: 0 }, fireflies: [],
+    index: i, def, name: def.name, zone: ZONES[def.zone], w, h,
+    tiles: rows.map(r => r.split('')), coins: [], berries: [], torch: null, orb: null,
+    start: { x: 0, y: 0 }, fireflies: [], slots: [], clues: [], murals: [], shooters: [], roots: [],
+    lock: def.code ? { code: def.code, solved: false } : null, hintI: 0, lights: [], dug: new Set(), stuck: new Map(),
   };
+  occ = new Array(w * h).fill(null);
+  blocks = []; enemies = []; rocks = []; darts = []; pieces = new Map();
+  particles.length = 0;
+  const PIECE = { h: ['s', 0], v: ['s', 1], 5: ['c', 0], 6: ['c', 1], 7: ['c', 2], 8: ['c', 3] };
+  let clueI = 0;
   level.tiles.forEach((row, ty) => row.forEach((t, tx) => {
-    if (t === 'C') { level.coins.push({ x: tx * TILE + 8, y: ty * TILE + 8, got: false, ph: hash(tx, ty) * 6 }); row[tx] = '.'; }
-    if (t === 'T') { level.torch = { x: tx * TILE + 8, y: (ty + 1) * TILE, lit: false }; row[tx] = '.'; }
-    if (t === 'P') { level.start = { x: tx * TILE + 3, y: (ty + 1) * TILE - 11 }; row[tx] = '.'; }
+    const x = tx * TILE + 8, y = ty * TILE + 8;
+    let clear = true;
+    if (t === 'C') level.coins.push({ x, y, got: false, ph: hash(tx, ty) * 6 });
+    else if (t === 'B') level.berries.push({ x, y, got: false });
+    else if (t === 'T') level.torch = { x, y: (ty + 1) * TILE, lit: false };
+    else if (t === 'O') level.orb = { x, y };
+    else if (t === 'P') level.start = { x: tx * TILE + 3, y: (ty + 1) * TILE - 11 };
+    else if (t === 'b') addBlock('stone', tx, ty, null);
+    else if (t >= '1' && t <= '4') addBlock('gem', tx, ty, +t);
+    else if ('smtl'.includes(t)) addBlock('sym', tx, ty, t);
+    else if (t === 'g') enemies.push(makeEnemy('golem', tx, ty));
+    else if (t === 'w') enemies.push(makeEnemy('wolf', tx, ty));
+    else if (t === 'R') rocks.push({ x0: x, y0: ty * TILE + 6, x, y: ty * TILE + 6, vy: 0, state: 'hang', t: 0 });
+    else if (PIECE[t]) { pieces.set(ty * w + tx, { type: PIECE[t][0], rot: PIECE[t][1], active: false }); row[tx] = '+'; clear = false; }
+    else {
+      clear = false;
+      if (t === 'o') level.slots.push({ tx, ty });
+      if (t === 'q') level.clues.push({ tx, ty, i: clueI++ });
+      if (t === 'M') level.murals.push({ tx, ty, seen: false });
+      if (t === 'Y') level.roots.push({ tx, ty });
+      if (t === '<' || t === '>') level.shooters.push({ tx, ty, dir: t === '<' ? -1 : 1, t: 1 + hash(tx, ty) * 1.5 });
+    }
+    // things placed in a pool sit in water, not in a pocket of air
+    if (clear) row[tx] = rows[ty][tx - 1] === '~' || rows[ty][tx + 1] === '~' ? '~' : '.';
   }));
+  // secret rooms: everything behind a fake wall is hidden until Pip walks in
+  level.cover = new Set();
+  for (const m of level.murals) {
+    const todo = [[m.tx, m.ty]];
+    while (todo.length) {
+      const [x, y] = todo.pop(), k = y * w + x;
+      if (level.cover.has(k) || !inBounds(x, y) || STATIC_SOLID[level.tiles[y][x]]) continue;
+      level.cover.add(k);
+      if (level.tiles[y][x] !== 'Z') for (const [dx, dy] of DIRS) todo.push([x + dx, y + dy]);
+    }
+  }
+  level.slots.sort((a, b) => a.tx - b.tx);
   // the first solid row in each column; anything deeper is underground and gets a dark earth wall behind it
   level.surface = [];
-  for (let tx = 0; tx < level.w; tx++) {
+  for (let tx = 0; tx < w; tx++) {
     let ty = 0;
-    while (ty < level.h && !SOLID[level.tiles[ty][tx]]) ty++;
+    while (ty < h && !STATIC_SOLID[level.tiles[ty][tx]]) ty++;
     level.surface.push(ty);
   }
-  level.dug = new Set();
-  for (let i = 0; i < 26; i++) {
-    level.fireflies.push({ x: hash(i, 91) * level.w * TILE, y: 20 + hash(i, 17) * 110, ph: hash(i, 5) * 6.28, sp: 0.4 + hash(i, 3) * 0.6 });
+  if (def.zone === 'forest') {
+    for (let k = 0; k < 26; k++) level.fireflies.push({ x: hash(k, 91 + i) * w * TILE, y: 20 + hash(k, 17 + i) * 110, ph: hash(k, 5) * 6.28, sp: 0.4 + hash(k, 3) * 0.6 });
+  } else {
+    // glowing moss (or crystals, or gold) on stone that faces open air
+    for (let ty = 1; ty < h; ty++) for (let tx = 0; tx < w; tx++) {
+      if (level.tiles[ty][tx] === 'S' && level.tiles[ty - 1][tx] !== 'S' && !STATIC_SOLID[level.tiles[ty - 1][tx]] && hash(tx * 3, ty * 7 + i) < 0.12) {
+        level.lights.push({ x: tx * TILE + 8, y: ty * TILE });
+      }
+    }
   }
+  computeActive();
   buildLayers();
+}
+
+function makeEnemy(kind, tx, ty) {
+  const golem = kind === 'golem';
+  const w = 14, h = golem ? 15 : 10;
+  return { kind, x: tx * TILE + 1, y: (ty + 1) * TILE - h, w, h, vx: 0, vy: 0, dir: -1, speed: golem ? 22 : 48, anim: 0, onGround: false, dead: false };
 }
 
 function tileAt(tx, ty) {
@@ -153,7 +869,57 @@ function tileAt(tx, ty) {
   if (ty < 0 || ty >= level.h) return '.';
   return level.tiles[ty][tx];
 }
-const isSolid = (tx, ty) => !!SOLID[tileAt(tx, ty)];
+const inBounds = (tx, ty) => tx >= 0 && ty >= 0 && tx < level.w && ty < level.h;
+const occAt = (tx, ty) => (inBounds(tx, ty) ? occ[ty * level.w + tx] : null);
+function occSet(tx, ty, v) { if (inBounds(tx, ty)) occ[ty * level.w + tx] = v; }
+const pieceAt = (tx, ty) => (tileAt(tx, ty) === '+' ? pieces.get(ty * level.w + tx) : null);
+function openings(p) {
+  if (p.type === 's') return p.rot % 2 ? U | D : L | R;
+  return [R | D, D | L, L | U, U | R][p.rot];
+}
+const isStaticSolid = (tx, ty) => !!STATIC_SOLID[tileAt(tx, ty)];
+const isSolid = (tx, ty) => isStaticSolid(tx, ty) || !!occAt(tx, ty);
+function isPlatform(tx, ty) {
+  const t = tileAt(tx, ty);
+  if (t === 'W') return true;
+  const p = t === '+' && pieces.get(ty * level.w + tx);
+  return !!(p && p.active && openings(p) & (L | R));
+}
+function isClimb(tx, ty) {
+  const t = tileAt(tx, ty);
+  if (t === 'V') return true;
+  const p = t === '+' && pieces.get(ty * level.w + tx);
+  return !!(p && p.active && openings(p) & (U | D));
+}
+
+// a bridge-vine comes alive when it is joined, opening to opening, to a root
+function computeActive() {
+  for (const p of pieces.values()) p.active = false;
+  const queue = [];
+  for (const r of level.roots) {
+    for (const [dx, dy, , back] of DIRS) {
+      const p = pieceAt(r.tx + dx, r.ty + dy);
+      if (p && !p.active && openings(p) & back) { p.active = true; queue.push([r.tx + dx, r.ty + dy]); }
+    }
+  }
+  while (queue.length) {
+    const [x, y] = queue.shift();
+    const o = openings(pieceAt(x, y));
+    for (const [dx, dy, out, back] of DIRS) {
+      if (!(o & out)) continue;
+      const p = pieceAt(x + dx, y + dy);
+      if (p && !p.active && openings(p) & back) { p.active = true; queue.push([x + dx, y + dy]); }
+    }
+  }
+}
+function frontier(tx, ty) {
+  const p = pieceAt(tx, ty);
+  if (!p || p.active) return false;
+  return DIRS.some(([dx, dy]) => {
+    const n = pieceAt(tx + dx, ty + dy);
+    return (n && n.active) || tileAt(tx + dx, ty + dy) === 'Y';
+  });
+}
 
 // ---------- collision ----------
 function moveX(b, dx) {
@@ -161,14 +927,15 @@ function moveX(b, dx) {
   const t0 = Math.floor(b.y / TILE), t1 = Math.floor((b.y + b.h - 0.01) / TILE);
   if (dx > 0) {
     const tx = Math.floor((b.x + b.w - 0.01) / TILE);
-    for (let ty = t0; ty <= t1; ty++) if (isSolid(tx, ty)) { b.x = tx * TILE - b.w; b.vx = 0; return; }
+    for (let ty = t0; ty <= t1; ty++) if (isSolid(tx, ty)) { b.x = tx * TILE - b.w; b.vx = 0; return true; }
   } else if (dx < 0) {
     const tx = Math.floor(b.x / TILE);
-    for (let ty = t0; ty <= t1; ty++) if (isSolid(tx, ty)) { b.x = (tx + 1) * TILE; b.vx = 0; return; }
+    for (let ty = t0; ty <= t1; ty++) if (isSolid(tx, ty)) { b.x = (tx + 1) * TILE; b.vx = 0; return true; }
   }
+  return false;
 }
 
-function moveY(b, dy) {
+function moveY(b, dy, climbing) {
   const oldBottom = b.y + b.h;
   b.y += dy;
   b.onGround = false;
@@ -176,8 +943,9 @@ function moveY(b, dy) {
   if (dy > 0) {
     const ty = Math.floor((b.y + b.h - 0.01) / TILE);
     for (let tx = l; tx <= r; tx++) {
-      const t = tileAt(tx, ty);
-      if (SOLID[t] || (t === 'W' && oldBottom <= ty * TILE + 0.01)) {
+      // a climber passes down through a vine corner when the vine keeps going below it
+      const plat = isPlatform(tx, ty) && oldBottom <= ty * TILE + 0.01 && !(climbing && isClimb(tx, ty + 1));
+      if (isSolid(tx, ty) || plat) {
         b.y = ty * TILE - b.h; b.vy = 0; b.onGround = true; return;
       }
     }
@@ -187,38 +955,205 @@ function moveY(b, dy) {
   }
 }
 
+function boxFree(x, y, w, h) {
+  for (let ty = Math.floor(y / TILE); ty <= Math.floor((y + h - 0.01) / TILE); ty++) {
+    for (let tx = Math.floor(x / TILE); tx <= Math.floor((x + w - 0.01) / TILE); tx++) if (isSolid(tx, ty)) return false;
+  }
+  return true;
+}
+
+// ---------- blocks ----------
+function addBlock(kind, tx, ty, val) {
+  const b = { kind, val, tx, ty, x: tx * TILE, y: ty * TILE, mv: null, dead: 0 };
+  blocks.push(b);
+  occSet(tx, ty, b);
+}
+const BLOCK_PASS = { '.': 1, '~': 1, o: 1, q: 1, a: 1, A: 1, M: 1 };
+function blockFree(tx, ty) {
+  if (occAt(tx, ty)) return false;
+  const t = tileAt(tx, ty);
+  if (t === '+') return !pieces.get(ty * level.w + tx).active;
+  return !!BLOCK_PASS[t];
+}
+function startMove(b, dx, dy, dur) {
+  occSet(b.tx + dx, b.ty + dy, b);
+  b.mv = { fx: b.tx, fy: b.ty, tx: b.tx + dx, ty: b.ty + dy, t: 0, dur };
+}
+function enemyInTile(tx, ty) {
+  const r = { x: tx * TILE, y: ty * TILE, w: TILE, h: TILE };
+  return enemies.some(e => !e.dead && overlap(e, r));
+}
+function pipInTile(tx, ty) {
+  return overlap(pip, { x: tx * TILE + 1, y: ty * TILE + 1, w: TILE - 2, h: TILE - 2 });
+}
+const isResting = b => b && !b.mv && !b.dead;
+function canFall(b) {
+  if (tileAt(b.tx, b.ty) === '~') return tileAt(b.tx, b.ty - 1) === '~' && blockFree(b.tx, b.ty - 1);
+  return blockFree(b.tx, b.ty + 1);
+}
+
+function updateBlocks(dt) {
+  let settled = false;
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const b = blocks[i];
+    if (b.dead > 0) {
+      b.dead -= dt;
+      if (b.dead <= 0) {
+        if (occAt(b.tx, b.ty) === b) occSet(b.tx, b.ty, null);
+        blocks.splice(i, 1);
+        settled = true;
+      }
+      continue;
+    }
+    if (b.mv) {
+      const m = b.mv;
+      m.t += dt / m.dur;
+      const k = Math.min(1, m.t);
+      b.x = lerp(m.fx, m.tx, k) * TILE;
+      b.y = lerp(m.fy, m.ty, k) * TILE;
+      if (m.t >= 1) {
+        if (occAt(m.fx, m.fy) === b) occSet(m.fx, m.fy, null);
+        b.tx = m.tx; b.ty = m.ty; b.mv = null;
+        if (b.ty >= level.h) { occSet(b.tx, b.ty, null); blocks.splice(i, 1); continue; }
+        if (m.ty > m.fy && tileAt(b.tx, b.ty) === '~' && tileAt(b.tx, b.ty - 1) !== '~') {
+          SFX.splash();
+          splash(b.x + 8, b.y);
+        }
+        settled = true;
+      }
+      continue;
+    }
+    if (tileAt(b.tx, b.ty) === '~') {
+      if (tileAt(b.tx, b.ty - 1) === '~' && blockFree(b.tx, b.ty - 1)) startMove(b, 0, -1, 0.3);
+    } else if (blockFree(b.tx, b.ty + 1) && !enemyInTile(b.tx, b.ty + 1)) {
+      if (state === 'play' && pipInTile(b.tx, b.ty + 1)) hurt();
+      startMove(b, 0, 1, 0.085);
+    }
+  }
+  if (settled && !blocks.some(b => b.mv)) {
+    checkMatches();
+    checkLock();
+  }
+}
+
+function checkMatches() {
+  const gemAt = (x, y) => {
+    const b = occAt(x, y);
+    return b && b.kind === 'gem' && isResting(b) && b.tx === x && b.ty === y && !canFall(b) ? b : null;
+  };
+  const hit = new Set();
+  const scan = (len1, len2, at) => {
+    for (let a = 0; a < len1; a++) {
+      let run = [];
+      for (let c = 0; c <= len2; c++) {
+        const g = c < len2 ? at(a, c) : null;
+        if (g && run.length && run[0].val === g.val) run.push(g);
+        else {
+          if (run.length >= 3) run.forEach(r => hit.add(r));
+          run = g ? [g] : [];
+        }
+      }
+    }
+  };
+  scan(level.h, level.w, (y, x) => gemAt(x, y));
+  scan(level.w, level.h, (x, y) => gemAt(x, y));
+  if (!hit.size) return;
+  SFX.match();
+  for (const b of hit) {
+    b.dead = 0.4;
+    for (let k = 0; k < 10; k++) {
+      particles.push({ x: b.x + 8, y: b.y + 8, vx: (Math.random() - 0.5) * 120, vy: (Math.random() - 0.5) * 120, g: 0, life: 0.5, c: GEM[b.val][1], s: 1 });
+    }
+  }
+}
+
+function checkLock() {
+  const lk = level.lock;
+  if (!lk || lk.solved || level.slots.length !== lk.code.length) return;
+  const ok = level.slots.every((s, i) => {
+    const b = occAt(s.tx, s.ty);
+    return b && isResting(b) && b.kind === 'sym' && b.val === lk.code[i] && b.tx === s.tx && b.ty === s.ty;
+  });
+  if (!ok) return;
+  lk.solved = true;
+  SFX.solve();
+  SFX.gate();
+  shake = 0.6;
+  level.tiles.forEach((row, ty) => row.forEach((t, tx) => {
+    if (t !== 'X') return;
+    row[tx] = '.';
+    for (let k = 0; k < 6; k++) particles.push({ x: tx * TILE + Math.random() * 16, y: ty * TILE + Math.random() * 16, vx: (Math.random() - 0.5) * 40, vy: -Math.random() * 40, g: 60, life: 0.8, c: '#9a9080', s: 2 });
+  }));
+}
+
 // ---------- Pip ----------
 const RUN = 118, JUMP = 274, GRAV = 980, MAXFALL = 330, CLIMB = 62;
-let pip, lives, coins, cam, state, paused, time = 0, banner = 0, dawn = 0, doneT = 0, outT = 0;
-const particles = [];
+let pip, lives = 3, coins = 0, levelCoins = 0, cam = { x: 0 }, state = 'title', paused = false, time = 0;
+let banner = 0, dawn = 0, doneT = 0, outT = 0, flash = 0, shake = 0, restartAsk = 0, toast = null;
+let dialog = null, owl = null, muralView = null, introI = 0, introT = 0, ending = null;
 
 function newPip() {
   return {
     x: level.start.x, y: level.start.y, w: 10, h: 11, vx: 0, vy: 0, face: 1,
-    onGround: false, coyote: 0, buffer: 0, jumpKey: 'jump', jumping: false,
-    climbing: false, dig: 0, digTx: 0, digTy: 0, squash: 1, anim: 0, hurt: 0,
+    onGround: false, coyote: 0, buffer: 0, jumpKey: 'jump', jumping: false, wasWater: false,
+    climbing: false, dig: 0, digTx: 0, digTy: 0, squash: 1, anim: 0, hurt: 0, pushT: 0, pull: null, grabbing: false,
     safe: { x: level.start.x, y: level.start.y },
   };
 }
 
-function vineAtPoint(x, y) { return tileAt(Math.floor(x / TILE), Math.floor(y / TILE)) === 'V'; }
+function climbAt(x, y) { return isClimb(Math.floor(x / TILE), Math.floor(y / TILE)); }
 function onVine(p) {
   const cx = p.x + p.w / 2;
-  return vineAtPoint(cx, p.y + p.h / 2) || vineAtPoint(cx, p.y + p.h);
+  return climbAt(cx, p.y + p.h / 2) || climbAt(cx, p.y + p.h);
 }
 function vineTopY(p) {
   const tx = Math.floor((p.x + p.w / 2) / TILE);
   let ty = Math.floor((p.y + p.h) / TILE);
-  if (tileAt(tx, ty) !== 'V') ty = Math.floor((p.y + p.h / 2) / TILE);
-  if (tileAt(tx, ty) !== 'V') return null;
-  while (tileAt(tx, ty - 1) === 'V') ty--;
+  if (!isClimb(tx, ty)) ty = Math.floor((p.y + p.h / 2) / TILE);
+  if (!isClimb(tx, ty)) return null;
+  while (isClimb(tx, ty - 1)) ty--;
   return ty * TILE;
 }
+const inWater = p => tileAt(Math.floor((p.x + p.w / 2) / TILE), Math.floor((p.y + p.h / 2 - 4) / TILE)) === '~';
 
 function dust(x, y, n, spread) {
   for (let i = 0; i < n; i++) {
     particles.push({ x, y, vx: (Math.random() - 0.5) * spread, vy: -Math.random() * 30, g: 60, life: 0.35 + Math.random() * 0.2, c: '#8b8a99', s: 1 });
   }
+}
+function splash(x, y) {
+  for (let i = 0; i < 10; i++) particles.push({ x, y, vx: (Math.random() - 0.5) * 90, vy: -40 - Math.random() * 90, g: 400, life: 0.5, c: '#9ad0f0', s: 1 });
+}
+
+function blockAhead(p, dir) {
+  const tx = dir > 0 ? Math.floor((p.x + p.w + 1) / TILE) : Math.floor((p.x - 1) / TILE);
+  const ty = Math.floor((p.y + p.h / 2) / TILE);
+  const b = occAt(tx, ty);
+  if (!isResting(b) || b.tx !== tx || b.ty !== ty) return null;
+  const gap = dir > 0 ? tx * TILE - (p.x + p.w) : p.x - (tx + 1) * TILE;
+  return gap < 1.5 ? b : null;
+}
+
+function rotateNear(p) {
+  const cx = Math.floor((p.x + p.w / 2) / TILE), cy = Math.floor((p.y + p.h / 2) / TILE);
+  const fx = cx + p.face;
+  const cands = [[fx, cy], [fx, cy + 1], [cx, cy + 1], [cx, cy], [cx, cy - 1], [fx, cy - 1]];
+  // pressing G again soon keeps turning the same vine; otherwise prefer a vine that would join the bridge
+  const last = p.lastTurn && time - p.lastTurn.t < 2 && p.lastTurn.px === cx && p.lastTurn.py === cy && cands.find(c => c[0] === p.lastTurn.x && c[1] === p.lastTurn.y);
+  let pick = null, first = null;
+  for (const c of cands) {
+    if (!pieceAt(c[0], c[1])) continue;
+    if (!first) first = c;
+    if (frontier(c[0], c[1])) { pick = c; break; }
+  }
+  pick = last || pick || first;
+  if (!pick) return;
+  const pc = pieceAt(pick[0], pick[1]);
+  pc.rot = (pc.rot + 1) % 4;
+  p.lastTurn = { x: pick[0], y: pick[1], t: time, px: cx, py: cy };
+  computeActive();
+  SFX.rotate();
+  for (let k = 0; k < 6; k++) particles.push({ x: pick[0] * TILE + 8, y: pick[1] * TILE + 8, vx: (Math.random() - 0.5) * 60, vy: -Math.random() * 50, g: 120, life: 0.5, c: pc.active ? '#7dd174' : '#a08a5a', s: 1 });
 }
 
 function updatePip(dt) {
@@ -232,29 +1167,52 @@ function updatePip(dt) {
     p.dig -= dt;
     p.vx = 0;
     if (Math.random() < 0.6) {
-      particles.push({ x: p.digTx * TILE + 3 + Math.random() * 10, y: p.digTy * TILE, vx: (Math.random() - 0.5) * 80, vy: -40 - Math.random() * 60, g: 400, life: 0.5, c: Math.random() < 0.5 ? '#7d5838' : '#5a3d24', s: 1 });
+      particles.push({ x: p.digTx * TILE + 3 + Math.random() * 10, y: p.digTy * TILE, vx: (Math.random() - 0.5) * 80, vy: -40 - Math.random() * 60, g: 400, life: 0.5, c: Math.random() < 0.5 ? '#a8743f' : '#6e4a2a', s: 1 });
     }
     if (p.dig <= 0) {
       level.tiles[p.digTy][p.digTx] = '.';
       level.dug.add(p.digTy * level.w + p.digTx);
       for (let i = 0; i < 14; i++) {
-        particles.push({ x: p.digTx * TILE + Math.random() * 16, y: p.digTy * TILE + Math.random() * 16, vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 120, g: 500, life: 0.6, c: i % 2 ? '#7d5838' : '#4f3520', s: 2 });
+        particles.push({ x: p.digTx * TILE + Math.random() * 16, y: p.digTy * TILE + Math.random() * 16, vx: (Math.random() - 0.5) * 120, vy: -Math.random() * 120, g: 500, life: 0.6, c: i % 2 ? '#a8743f' : '#4e321a', s: 2 });
       }
     }
     return;
   }
 
+  // pulling a block: Pip steps back one tile and the block follows
+  if (p.pull) {
+    p.pull.t += dt / 0.3;
+    p.x = lerp(p.pull.from, p.pull.to, Math.min(1, p.pull.t));
+    if (p.pull.t >= 1) p.pull = null;
+    p.vx = 0;
+    p.vy = Math.min(MAXFALL, p.vy + GRAV * dt);
+    moveY(p, p.vy * dt);
+    return;
+  }
+
+  const water = inWater(p);
+  if (water && !p.wasWater && p.vy > 60) { SFX.splash(); splash(p.x + p.w / 2, p.y + p.h / 2); }
+  p.wasWater = water;
+
   const vine = onVine(p);
   if (pressed.jump || (pressed.up && !vine)) { p.buffer = 0.12; p.jumpKey = pressed.jump ? 'jump' : 'up'; }
   else p.buffer = Math.max(0, p.buffer - dt);
 
-  if (!p.climbing && vine && (keys.up || (keys.down && !p.onGround))) {
+  if (pressed.grab) {
+    const b = blockAhead(p, p.face);
+    if (!b) rotateNear(p);
+  }
+  p.grabbing = !!(keys.grab && (p.onGround || water) && blockAhead(p, p.face));
+
+  const standingOnVine = p.onGround && climbAt(p.x + p.w / 2, p.y + p.h + 1) && climbAt(p.x + p.w / 2, p.y + p.h + 17);
+  if (!water && !p.climbing && (vine || standingOnVine) && (keys.up || (keys.down && (!p.onGround || standingOnVine)))) {
     p.climbing = true; p.vx = 0; p.vy = 0; p.jumping = false;
   }
 
   if (p.climbing) {
     if (pressed.jump) {
       p.climbing = false; p.vy = -JUMP * 0.85; p.vx = ix * RUN; p.jumping = true; p.jumpKey = 'jump'; p.squash = 1.25;
+      SFX.jump();
     } else {
       const iy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
       p.vx = ix * CLIMB * 0.8;
@@ -268,7 +1226,7 @@ function updatePip(dt) {
       // find the top of the vine before moving, so one step past it can't make Pip let go
       const top = vineTopY(p);
       moveX(p, p.vx * dt);
-      moveY(p, p.vy * dt);
+      moveY(p, p.vy * dt, true);
       if (top !== null && p.y + p.h < top) p.y = top - p.h;
       if (!onVine(p)) p.climbing = false;
       else if (p.onGround && iy > 0) p.climbing = false;
@@ -276,18 +1234,50 @@ function updatePip(dt) {
     }
   }
 
+  if (water) {
+    p.vx = approach(p.vx, ix * 58, 700 * dt);
+    if (ix && !p.grabbing) p.face = ix;
+    const nearTop = tileAt(Math.floor((p.x + p.w / 2) / TILE), Math.floor((p.y + p.h / 2 - 12) / TILE)) !== '~';
+    if (p.buffer > 0 && nearTop) {
+      p.vy = -JUMP * 0.9; p.buffer = 0; p.jumping = true; p.squash = 1.25;
+      SFX.jump();
+      splash(p.x + p.w / 2, p.y);
+    } else if (keys.down) p.vy = approach(p.vy, 70, 500 * dt);
+    else if (keys.up || keys.jump) p.vy = approach(p.vy, -75, 500 * dt);
+    else p.vy = approach(p.vy, -35, 260 * dt);
+    pushBlocks(p, ix, dt, true);
+    moveX(p, p.vx * dt);
+    moveY(p, p.vy * dt);
+    p.coyote = 0;
+    if (Math.random() < dt * 2) particles.push({ x: p.x + p.w / 2 + p.face * 4, y: p.y + 2, vx: 0, vy: -20, g: -10, life: 0.8, c: '#bfe6ff', s: 1 });
+    afterMove(p);
+    return;
+  }
+
   const accel = p.onGround ? 1500 : 950;
   const decel = p.onGround ? 2200 : 520;
-  if (ix) {
+  if (p.grabbing && ix === -p.face) {
+    // pull: only when there is room behind Pip
+    const b = blockAhead(p, p.face);
+    const nx = p.x - p.face * TILE;
+    if (b && boxFree(nx, p.y, p.w, p.h)) {
+      startMove(b, -p.face, 0, 0.3);
+      p.pull = { from: p.x, to: nx, t: 0 };
+      SFX.push();
+    }
+    p.vx = 0;
+  } else if (ix) {
     const turning = p.vx !== 0 && Math.sign(p.vx) !== ix;
     p.vx = approach(p.vx, ix * RUN, (turning ? accel * 1.8 : accel) * dt);
-    p.face = ix;
+    if (!p.grabbing) p.face = ix;
   } else p.vx = approach(p.vx, 0, decel * dt);
+  pushBlocks(p, ix, dt, false);
 
   if (p.onGround) p.coyote = 0.1; else p.coyote -= dt;
   if (p.buffer > 0 && p.coyote > 0) {
     p.vy = -JUMP; p.buffer = 0; p.coyote = 0; p.onGround = false; p.jumping = true; p.squash = 1.3;
     dust(p.x + p.w / 2, p.y + p.h, 4, 60);
+    SFX.jump();
   }
   if (p.jumping && p.vy < 0 && !keys[p.jumpKey]) { p.vy *= 0.5; p.jumping = false; }
   if (p.vy >= 0) p.jumping = false;
@@ -303,61 +1293,264 @@ function updatePip(dt) {
 
   if (pressed.down && p.onGround) {
     const tx = Math.floor((p.x + p.w / 2) / TILE), ty = Math.floor((p.y + p.h + 1) / TILE);
-    if (tileAt(tx, ty) === 'D') { p.dig = 0.22; p.digTx = tx; p.digTy = ty; p.squash = 0.8; }
+    if (tileAt(tx, ty) === 'D') { p.dig = 0.22; p.digTx = tx; p.digTy = ty; p.squash = 0.8; SFX.dig(); }
   }
+  afterMove(p);
+}
 
-  if (p.onGround && isSolid(Math.floor(p.x / TILE), Math.floor((p.y + p.h + 1) / TILE)) &&
-      isSolid(Math.floor((p.x + p.w - 0.01) / TILE), Math.floor((p.y + p.h + 1) / TILE))) {
+function pushBlocks(p, ix, dt, water) {
+  if (!ix || !(p.onGround || water)) { p.pushT = 0; return; }
+  const b = blockAhead(p, ix);
+  if (!b) { p.pushT = 0; return; }
+  p.pushT += dt;
+  if (p.pushT > 0.14) {
+    p.pushT = 0;
+    if (blockFree(b.tx + ix, b.ty)) { startMove(b, ix, 0, 0.22); SFX.push(); }
+  }
+}
+
+function afterMove(p) {
+  const fl = Math.floor((p.y + p.h + 1) / TILE);
+  const lt = Math.floor(p.x / TILE), rt = Math.floor((p.x + p.w - 0.01) / TILE);
+  if (p.onGround && p.hurt <= 0 && isStaticSolid(lt, fl) && isStaticSolid(rt, fl) &&
+      !enemies.some(e => !e.dead && Math.abs(e.x - p.x) < 56 && Math.abs(e.y - p.y) < 24) &&
+      tileAt(lt - 1, fl - 1) !== '^' && tileAt(rt + 1, fl - 1) !== '^' && tileAt(lt, fl - 1) !== '^' && tileAt(rt, fl - 1) !== '^') {
     p.safe = { x: p.x, y: p.y };
   }
-  if (p.y > H + 16) loseLife();
+  // thorns and spikes hurt when Pip touches their lower half
+  const box = { x: p.x + 1, y: p.y, w: p.w - 2, h: p.h };
+  for (let ty = Math.floor(p.y / TILE); ty <= Math.floor((p.y + p.h) / TILE); ty++) {
+    for (let tx = lt; tx <= rt; tx++) {
+      if (tileAt(tx, ty) === '^' && overlap(box, { x: tx * TILE + 2, y: ty * TILE + 8, w: 12, h: 8 })) hurt();
+    }
+  }
+  if (p.y > H + 16) hurt(true);
 }
 
-function loseLife() {
+function hurt(force) {
+  if (state !== 'play' || (pip.hurt > 0 && !force)) return;
+  SFX.hurt();
+  flash = 0.25;
+  shake = 0.3;
   lives--;
-  if (lives <= 0) { outT = 2.2; state = 'out'; return; }
-  Object.assign(pip, { x: pip.safe.x, y: pip.safe.y, vx: 0, vy: 0, climbing: false, hurt: 1.2 });
+  if (lives <= 0) { state = 'out'; outT = 2.6; return; }
+  Object.assign(pip, { x: pip.safe.x, y: pip.safe.y, vx: 0, vy: 0, climbing: false, dig: 0, pull: null, hurt: 1.5 });
 }
 
+// ---------- enemies, rocks, darts ----------
+function updateEnemies(dt) {
+  for (const e of enemies) {
+    if (e.dead) continue;
+    e.anim += dt;
+    e.vy = Math.min(MAXFALL, e.vy + GRAV * dt);
+    if (e.onGround && moveX(e, e.dir * e.speed * dt)) e.dir *= -1;
+    moveY(e, e.vy * dt);
+    if (e.y > H + 24) { e.dead = true; continue; }
+    if (e.onGround) {
+      // a one-tile hole holds a golem or wolf for good
+      const tx = Math.floor((e.x + e.w / 2) / TILE), ty = Math.floor((e.y + e.h / 2) / TILE);
+      if (isSolid(tx - 1, ty) && isSolid(tx + 1, ty) && !isSolid(tx, ty) && tileAt(tx, ty) === '.' && e.x >= tx * TILE - 0.5 && e.x + e.w <= tx * TILE + TILE + 0.5) {
+        level.tiles[ty][tx] = 'K';
+        level.stuck.set(ty * level.w + tx, e.kind);
+        e.dead = true;
+        dust(tx * TILE + 8, ty * TILE + 4, 8, 60);
+        SFX.crash();
+        continue;
+      }
+    }
+    if (state === 'play' && overlap({ x: e.x + 2, y: e.y + 2, w: e.w - 4, h: e.h - 2 }, pip)) hurt();
+  }
+}
+
+function updateRocks(dt) {
+  for (const r of rocks) {
+    if (r.state === 'hang') {
+      if (Math.abs(pip.x + pip.w / 2 - r.x0) < 14 && pip.y > r.y0) { r.state = 'shake'; r.t = 0.4; SFX.rumble(); }
+    } else if (r.state === 'shake') {
+      r.t -= dt;
+      if (r.t <= 0) { r.state = 'fall'; r.vy = 0; r.x = r.x0; r.y = r.y0; }
+    } else if (r.state === 'fall') {
+      r.vy = Math.min(400, r.vy + GRAV * dt);
+      r.y += r.vy * dt;
+      if (state === 'play' && overlap({ x: r.x - 5, y: r.y - 5, w: 10, h: 10 }, pip)) hurt();
+      if (isSolid(Math.floor(r.x / TILE), Math.floor((r.y + 5) / TILE)) || r.y > H + 10) {
+        r.state = 'gone'; r.t = 3.5;
+        if (r.y < H) {
+          SFX.crash();
+          const c = level.def.zone === 'forest' ? '#6b4423' : level.zone.s[0];
+          for (let k = 0; k < 12; k++) particles.push({ x: r.x, y: r.y, vx: (Math.random() - 0.5) * 140, vy: -Math.random() * 120, g: 500, life: 0.6, c, s: 2 });
+        }
+      }
+    } else {
+      r.t -= dt;
+      if (r.t <= 0) { r.state = 'hang'; r.y = r.y0; }
+    }
+  }
+}
+
+function updateDarts(dt) {
+  for (const s of level.shooters) {
+    s.t -= dt;
+    if (s.t <= 0) {
+      s.t = 2.4;
+      darts.push({ x: s.tx * TILE + 8 + s.dir * 9, y: s.ty * TILE + 8, vx: s.dir * 130 });
+      if (Math.abs(s.tx * TILE - cam.x - W / 2) < W) SFX.dart();
+    }
+  }
+  for (let i = darts.length - 1; i >= 0; i--) {
+    const d = darts[i];
+    d.x += d.vx * dt;
+    if (isSolid(Math.floor(d.x / TILE), Math.floor(d.y / TILE)) || d.x < 0 || d.x > level.w * TILE) {
+      dust(d.x, d.y, 2, 30);
+      darts.splice(i, 1);
+      continue;
+    }
+    if (state === 'play' && overlap({ x: d.x - 3, y: d.y - 1, w: 6, h: 2 }, pip)) { darts.splice(i, 1); hurt(); }
+  }
+}
+
+// ---------- the owl and talking ----------
+function wrap(str, n) {
+  const words = str.split(' '), out = [];
+  let line = '';
+  for (const w of words) {
+    if ((line + ' ' + w).trim().length > n) { out.push(line); line = w; }
+    else line = (line + ' ' + w).trim();
+  }
+  if (line) out.push(line);
+  return out;
+}
+function say(lines, then) {
+  dialog = { lines, i: 0, shown: 0, then };
+  owl = { x: cam.x + W + 20, y: 20, state: 'in', anim: 0 };
+  SFX.hoot();
+}
+function updateDialog(dt) {
+  dialog.shown += dt * 45;
+  if (pressed.start || pressed.jump || pressed.hint || pressed.grab) {
+    const len = dialog.lines[dialog.i].length;
+    if (dialog.shown < len) dialog.shown = len;
+    else {
+      dialog.i++;
+      dialog.shown = 0;
+      if (dialog.i >= dialog.lines.length) {
+        const then = dialog.then;
+        dialog = null;
+        if (owl) owl.state = 'out';
+        if (then) then();
+      }
+    }
+  }
+}
+function updateOwl(dt) {
+  if (!owl) return;
+  owl.anim += dt;
+  const tx = (pip ? pip.x - pip.face * 18 : cam.x + 160) , ty = pip ? Math.max(18, pip.y - 30) : 60;
+  if (owl.state === 'in') {
+    const dx = tx - owl.x, dy = ty - owl.y, d = Math.hypot(dx, dy);
+    if (d < 3) owl.state = 'stay';
+    else { const s = Math.min(d, 220 * dt); owl.x += (dx / d) * s; owl.y += (dy / d) * s; }
+  } else if (owl.state === 'stay') {
+    owl.x = lerp(owl.x, tx, dt * 3);
+    owl.y = lerp(owl.y, ty, dt * 3);
+  } else {
+    owl.x += 160 * dt;
+    owl.y -= 110 * dt;
+    if (owl.y < -30) owl = null;
+  }
+}
+
+// ---------- flow ----------
 function startLevel(i) {
   loadLevel(i);
   pip = newPip();
-  cam = { x: 0 };
+  cam.x = clamp(pip.x - W / 2, 0, level.w * TILE - W);
   banner = 3;
   dawn = 0;
   doneT = 0;
-  particles.length = 0;
+  dialog = null;
+  owl = null;
+  levelCoins = coins;
   state = 'play';
+  paused = false;
+  if (i % 3 === 0) save.checkpoint = i;
+  save.coins = coins;
+  writeSave();
+  const def = level.def;
+  if (def.owl && !save.owl[i]) {
+    save.owl[i] = true;
+    writeSave();
+    say(def.owl);
+  }
 }
 
 function newGame() {
+  save = { checkpoint: 0, coins: 0, murals: [false, false, false], owl: {} };
+  writeSave();
   lives = 3;
   coins = 0;
-  startLevel(0);
+  state = 'intro';
+  introI = 0;
+  introT = 0;
 }
 
-// ---------- world ----------
+function continueGame() {
+  lives = 3;
+  coins = save.coins || 0;
+  startLevel(save.checkpoint || 0);
+}
+
+function restartRoom() {
+  lives--;
+  coins = levelCoins;
+  if (lives <= 0) { state = 'out'; outT = 2.6; return; }
+  const keep = lives;
+  startLevel(level.index);
+  lives = keep;
+  banner = 1.5;
+}
+
 function updateWorld(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const q = particles[i];
     q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt;
     if (q.life <= 0) particles.splice(i, 1);
   }
+  ambient(dt);
   if (state !== 'play' && state !== 'done') return;
   const p = pip;
+  const reach = { x: p.x - 5, y: p.y - 5, w: p.w + 10, h: p.h + 10 };
   for (const c of level.coins) {
-    if (c.got) continue;
-    if (c.x > p.x - 5 && c.x < p.x + p.w + 5 && c.y > p.y - 5 && c.y < p.y + p.h + 5) {
-      c.got = true; coins++;
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        particles.push({ x: c.x, y: c.y, vx: Math.cos(a) * 50, vy: Math.sin(a) * 50, g: 0, life: 0.35, c: '#ffe58a', s: 1 });
-      }
+    if (c.got || !overlap(reach, { x: c.x, y: c.y, w: 0.1, h: 0.1 })) continue;
+    c.got = true; coins++;
+    SFX.coin();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      particles.push({ x: c.x, y: c.y, vx: Math.cos(a) * 50, vy: Math.sin(a) * 50, g: 0, life: 0.35, c: '#ffe58a', s: 1 });
     }
   }
+  for (const b of level.berries) {
+    if (b.got || !overlap(reach, { x: b.x, y: b.y, w: 0.1, h: 0.1 })) continue;
+    b.got = true; lives++;
+    SFX.berry();
+    toast = { text: 'EXTRA LIFE!', t: 1.6 };
+    for (let i = 0; i < 14; i++) particles.push({ x: b.x, y: b.y, vx: (Math.random() - 0.5) * 100, vy: -Math.random() * 100, g: 60, life: 0.7, c: '#ff8ab0', s: 1 });
+  }
+  for (const m of level.murals) {
+    if (m.seen || !overlap(p, { x: m.tx * TILE + 2, y: m.ty * TILE, w: 12, h: 16 })) continue;
+    m.seen = true;
+    save.murals[level.def.mural] = true;
+    writeSave();
+    muralView = { i: level.def.mural, t: 0 };
+    state = 'mural';
+    SFX.mural();
+    return;
+  }
   const t = level.torch;
-  if (t && !t.lit && p.x + p.w > t.x - 6 && p.x < t.x + 6 && p.y + p.h > t.y - 22 && p.y < t.y) {
+  if (t && !t.lit && state === 'play' && p.x + p.w > t.x - 6 && p.x < t.x + 6 && p.y + p.h > t.y - 22 && p.y < t.y) {
     t.lit = true; state = 'done'; doneT = 0;
+    SFX.torch();
+    SFX.yip();
     for (let i = 0; i < 30; i++) {
       particles.push({ x: t.x, y: t.y - 18, vx: (Math.random() - 0.5) * 140, vy: -Math.random() * 160, g: 120, life: 0.9, c: i % 3 ? '#ffb347' : '#fff1a8', s: 1 });
     }
@@ -365,20 +1558,75 @@ function updateWorld(dt) {
   if (t && t.lit && Math.random() < 0.4) {
     particles.push({ x: t.x + (Math.random() - 0.5) * 6, y: t.y - 20, vx: (Math.random() - 0.5) * 12, vy: -20 - Math.random() * 30, g: -10, life: 0.8, c: '#ffcf6b', s: 1 });
   }
+  const o = level.orb;
+  if (o && state === 'play' && overlap(p, { x: o.x - 7, y: o.y - 7, w: 14, h: 14 })) startEnding();
   const tx = p.x + p.w / 2 - W / 2 + p.face * 22;
   cam.x = lerp(cam.x, tx, Math.min(1, dt * 5));
-  cam.x = Math.max(0, Math.min(level.w * TILE - W, cam.x));
+  cam.x = clamp(cam.x, 0, level.w * TILE - W);
 }
 
+// little living details: drips in the caves, spores in the halls, golden dust in the sanctum
+function ambient(dt) {
+  if (!level || state === 'title' || state === 'intro' || state === 'ending') return;
+  const z = level.def.zone;
+  if (z === 'forest' || Math.random() > dt * 6) return;
+  const x = cam.x + Math.random() * W;
+  if (z === 'caves') {
+    const tx = Math.floor(x / TILE);
+    for (let ty = 1; ty < level.h; ty++) {
+      if (isStaticSolid(tx, ty - 1) && !isStaticSolid(tx, ty)) {
+        particles.push({ x: tx * TILE + 4 + Math.random() * 8, y: ty * TILE, vx: 0, vy: 0, g: 300, life: 0.9, c: '#8ac0e8', s: 1 });
+        break;
+      }
+    }
+  } else {
+    particles.push({ x, y: 20 + Math.random() * 150, vx: (Math.random() - 0.5) * 8, vy: -4 - Math.random() * 6, g: 0, life: 3, c: z === 'halls' ? '#8ae07a' : '#ffd77a', s: 1 });
+  }
+}
+
+let frozen = false;
 function update(dt) {
   time += dt;
+  if (frozen) return;
+  if (pressed.mute) toggleMute();
+  if (flash > 0) flash -= dt;
+  if (shake > 0) shake -= dt;
+  if (toast && (toast.t -= dt) <= 0) toast = null;
+  if (restartAsk > 0) restartAsk -= dt;
   if (state === 'title') {
-    if (pressed.start || pressed.jump) newGame();
+    const hasSave = save && (save.checkpoint > 0 || save.coins > 0);
+    if (pressed.new || (!hasSave && (pressed.start || pressed.jump))) newGame();
+    else if (hasSave && (pressed.start || pressed.jump)) continueGame();
+  } else if (state === 'intro') {
+    introT += dt;
+    if (pressed.start || pressed.jump) {
+      if (introT < INTRO[introI].text.length / 40) introT = 99;
+      else { introI++; introT = 0; if (introI >= INTRO.length) startLevel(0); }
+    }
   } else if (state === 'play') {
-    if (pressed.pause) paused = !paused;
-    if (!paused) {
+    if (pressed.pause && !dialog) paused = !paused;
+    updateOwl(dt);
+    if (paused) { /* frozen */ }
+    else if (dialog) updateDialog(dt);
+    else {
+      if (pressed.restart) {
+        if (restartAsk > 0) { restartAsk = 0; restartRoom(); for (const k in pressed) delete pressed[k]; return; }
+        restartAsk = 2;
+      }
+      if (pressed.hint) {
+        if (coins >= 5) {
+          coins -= 5;
+          const hs = level.def.hints;
+          say([hs[Math.min(level.hintI, hs.length - 1)]]);
+          level.hintI++;
+        } else say(['Ahem. Alas, my counsel costs five coins, young fox. Do come back when your purse is a little heavier.']);
+      }
       banner = Math.max(0, banner - dt);
       updatePip(dt);
+      updateBlocks(dt);
+      updateEnemies(dt);
+      updateRocks(dt);
+      updateDarts(dt);
       updateWorld(dt);
     }
   } else if (state === 'done') {
@@ -388,12 +1636,18 @@ function update(dt) {
     pip.vy = Math.min(MAXFALL, pip.vy + GRAV * dt);
     moveX(pip, pip.vx * dt);
     moveY(pip, pip.vy * dt);
+    updateBlocks(dt);
     updateWorld(dt);
-    if (doneT > 1.5 && (pressed.start || pressed.jump)) newGame();
+    if (doneT > 1.5 && (pressed.start || pressed.jump)) startLevel(level.index + 1);
   } else if (state === 'out') {
     outT -= dt;
     updateWorld(dt);
-    if (outT <= 0) { lives = 3; startLevel(level.index); }
+    if (outT <= 0) { lives = 3; startLevel(Math.floor(level.index / 3) * 3); }
+  } else if (state === 'mural') {
+    muralView.t += dt;
+    if (muralView.t > 1 && (pressed.start || pressed.jump)) { state = 'play'; muralView = null; }
+  } else if (state === 'ending') {
+    updateEnding(dt);
   }
   for (const k in pressed) delete pressed[k];
 }
@@ -405,13 +1659,13 @@ let layers = [];
 function pixelCircle(g, cx, cy, r) {
   for (let dy = -r; dy <= r; dy++) {
     const hw = Math.round(Math.sqrt(r * r - dy * dy));
-    g.fillRect(cx - hw, cy + dy, hw * 2 + 1, 1);
+    g.fillRect(Math.round(cx - hw), Math.round(cy + dy), hw * 2 + 1, 1);
   }
 }
 
-function makeLayer(par, color, kind, seed, baseY) {
+function makeLayer(par, color, kind, seed, baseY, worldW) {
   const c = document.createElement('canvas');
-  c.width = Math.ceil(W + (level.w * TILE - W) * par) + 4;
+  c.width = Math.ceil(W + (worldW - W) * par) + 4;
   c.height = H;
   const g = c.getContext('2d');
   g.fillStyle = color;
@@ -442,27 +1696,93 @@ function makeLayer(par, color, kind, seed, baseY) {
   return { c, par };
 }
 
-function buildLayers() {
-  layers = [
-    makeLayer(0.15, '#1e2c5c', 'pine', 11, 150),
-    makeLayer(0.35, '#16214a', 'pine', 23, 160),
-    makeLayer(0.6, '#0f1736', 'round', 37, 172),
-  ];
+function drawTempleShape(g, cx, baseY, color, glow) {
+  g.fillStyle = color;
+  for (let k = 0; k < 6; k++) g.fillRect(cx - 60 + k * 9, baseY - 12 - k * 11, 120 - k * 18, 12);
+  g.fillRect(cx - 8, baseY - 86, 16, 10);
+  if (glow) { g.fillStyle = '#e8b04a'; g.fillRect(cx - 2, baseY - 82, 4, 4); }
 }
 
-function drawBackground(cx) {
+function makeTempleLayer(zone, worldW) {
+  const par = 0.5;
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(W + (worldW - W) * par) + 4;
+  c.height = H;
+  const g = c.getContext('2d');
+  const [base, hi, lo] = ZONES[zone].back;
+  g.fillStyle = base;
+  g.fillRect(0, 0, c.width, H);
+  if (zone === 'caves') {
+    for (let k = 0; k < c.width / 6; k++) {
+      g.fillStyle = k % 3 ? lo : hi;
+      pixelCircle(g, hash(k, 3) * c.width, hash(k, 4) * H, 3 + Math.floor(hash(k, 5) * 8));
+    }
+    g.fillStyle = lo;
+    for (let x = 0; x < c.width; x += 14) {
+      const h = 6 + Math.floor(hash(x, 9) * 26);
+      for (let y = 0; y < h; y++) g.fillRect(x + Math.floor(y / 4), y, Math.max(1, 6 - Math.floor(y / 4) * 2 + 4), 1);
+    }
+  } else {
+    for (let y = 0; y < H; y += 12) {
+      g.fillStyle = lo;
+      g.fillRect(0, y + 11, c.width, 1);
+      for (let x = (y / 12) % 2 ? 0 : 12; x < c.width; x += 24) {
+        g.fillRect(x, y, 1, 11);
+        g.fillStyle = hi;
+        if (hash(x, y) < 0.25) g.fillRect(x + 2, y + 2, 18, 1);
+        g.fillStyle = lo;
+      }
+    }
+    for (let x = 40; x < c.width; x += 120) {
+      g.fillStyle = hi;
+      g.fillRect(x, 0, 18, H);
+      g.fillStyle = lo;
+      g.fillRect(x + 17, 0, 2, H);
+      g.fillRect(x - 3, 30, 24, 4);
+      if (zone === 'sanctum') {
+        g.fillStyle = '#5a4520';
+        pixelCircle(g, x + 9, 60, 5);
+        for (let a = 0; a < 8; a++) g.fillRect(x + 9 + Math.round(Math.cos(a * 0.785) * 8), 60 + Math.round(Math.sin(a * 0.785) * 8), 1, 1);
+      }
+    }
+  }
+  return { c, par };
+}
+
+function buildLayers() {
+  const worldW = level.w * TILE;
+  if (level.def.zone === 'forest') {
+    layers = [
+      makeLayer(0.15, '#1e2c5c', 'pine', 11 + level.index, 150, worldW),
+      makeLayer(0.35, '#16214a', 'pine', 23 + level.index, 160, worldW),
+      makeLayer(0.6, '#0f1736', 'round', 37 + level.index, 172, worldW),
+    ];
+    if (level.def.templeAhead) {
+      const g = layers[0].c.getContext('2d');
+      drawTempleShape(g, layers[0].c.width - 120, 150, '#1a2650', true);
+    }
+  } else layers = [makeTempleLayer(level.def.zone, worldW)];
+}
+
+function drawSky(cx, d) {
   const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#0a0f2e');
-  sky.addColorStop(1, '#2b3b74');
+  sky.addColorStop(0, mixColor([10, 15, 46], [90, 150, 220], d));
+  sky.addColorStop(0.7, mixColor([43, 59, 116], [255, 170, 110], d));
+  sky.addColorStop(1, mixColor([43, 59, 116], [255, 210, 140], d));
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
   for (const s of stars) {
     const x = ((s.x - cx * 0.03) % (W * 1.5) + W * 1.5) % (W * 1.5);
     if (x > W) continue;
     const tw = 0.5 + 0.5 * Math.sin(time * 2 + s.ph);
-    ctx.fillStyle = s.b > 0.8 ? `rgba(255,250,220,${0.6 + tw * 0.4})` : `rgba(200,210,255,${0.3 + tw * 0.4})`;
+    const a = (s.b > 0.8 ? 0.6 + tw * 0.4 : 0.3 + tw * 0.4) * (1 - d);
+    ctx.fillStyle = s.b > 0.8 ? `rgba(255,250,220,${a})` : `rgba(200,210,255,${a})`;
     ctx.fillRect(Math.round(x), Math.round(s.y), 1, 1);
   }
+}
+function mixColor(a, b, t) { return `rgb(${a.map((v, i) => Math.round(lerp(v, b[i], t)))})`; }
+
+function drawMoon(cx) {
   const mx = Math.round(252 - cx * 0.02), my = 30;
   const halo = ctx.createRadialGradient(mx, my, 4, mx, my, 40);
   halo.addColorStop(0, 'rgba(220,225,255,0.35)');
@@ -475,6 +1795,13 @@ function drawBackground(cx) {
   ctx.fillRect(mx - 4, my - 2, 3, 3);
   ctx.fillRect(mx + 2, my + 3, 2, 2);
   ctx.fillRect(mx + 1, my - 5, 2, 1);
+}
+
+function drawBackground(cx) {
+  if (level.def.zone === 'forest') {
+    drawSky(cx, 0);
+    drawMoon(cx);
+  }
   for (const l of layers) ctx.drawImage(l.c, -Math.round(cx * l.par), 0);
 }
 
@@ -487,7 +1814,7 @@ function drawGround(sx, sy, tx, ty) {
     ctx.fillStyle = i % 2 ? '#5c412c' : '#362418';
     ctx.fillRect(sx + Math.floor(a * 14), sy + Math.floor(b * 14), 2, 1 + (i % 2));
   }
-  if (!isSolid(tx, ty - 1) && !isBack(tx, ty - 1)) {
+  if (!isStaticSolid(tx, ty - 1) && !isBack(tx, ty - 1)) {
     ctx.fillStyle = '#33803a';
     ctx.fillRect(sx, sy, 16, 4);
     for (let i = 0; i < 16; i += 2) {
@@ -533,29 +1860,35 @@ function drawBack(sx, sy, tx, ty) {
 }
 
 function isBack(tx, ty) {
+  if (level.def.zone !== 'forest' || !inBounds(tx, ty)) return false;
   if (level.dug.has(ty * level.w + tx)) return true;
   const s = level.surface;
   if (s[tx] >= level.h) return false; // a bottomless pit, not a tunnel
   return ty > s[tx] || ty > Math.max(s[tx - 1] ?? s[tx], s[tx + 1] ?? s[tx]);
 }
 
-function drawStone(sx, sy, tx, ty) {
-  ctx.fillStyle = '#5d6473';
+function drawStone(sx, sy, tx, ty, pal) {
+  const [base, hi, lo] = pal || level.zone.s;
+  ctx.fillStyle = base;
   ctx.fillRect(sx, sy, 16, 16);
-  ctx.fillStyle = '#717a8a';
+  ctx.fillStyle = hi;
   ctx.fillRect(sx, sy, 16, 1);
   ctx.fillRect(sx, sy + 8, 16, 1);
-  ctx.fillStyle = '#3d424e';
+  ctx.fillStyle = lo;
   ctx.fillRect(sx, sy + 7, 16, 1);
   ctx.fillRect(sx, sy + 15, 16, 1);
   const off = ty % 2 ? 4 : 11;
   ctx.fillRect(sx + off, sy, 1, 7);
   ctx.fillRect(sx + ((off + 8) % 16), sy + 8, 1, 7);
-  if (hash(tx, ty * 3) < 0.55) {
-    ctx.fillStyle = '#3f7a3c';
+  if (hash(tx, ty * 3) < 0.45) {
+    ctx.fillStyle = level.zone.moss;
     const mx = Math.floor(hash(tx + 4, ty) * 10);
     ctx.fillRect(sx + mx, sy + 8, 5, 2);
     ctx.fillRect(sx + mx + 1, sy + 10, 2, 2);
+  }
+  if (!isStaticSolid(tx, ty - 1) && level.def.zone !== 'forest') {
+    ctx.fillStyle = level.zone.moss;
+    for (let i = 0; i < 16; i++) if (hash(tx * 16 + i, ty * 5) < 0.4) ctx.fillRect(sx + i, sy - 1, 1, 2);
   }
 }
 
@@ -569,20 +1902,20 @@ function drawBranch(sx, sy, tx, ty) {
   ctx.fillStyle = '#4b2e16';
   ctx.fillRect(x0, sy + 6, w, 1);
   ctx.fillRect(sx + 4 + Math.floor(hash(tx, ty) * 6), sy + 3, 3, 1);
-  if (right && hash(tx, 99) < 2) {
+  if (right) {
     ctx.fillStyle = '#3f8a3a';
     ctx.fillRect(sx + 13, sy - 2, 3, 2);
   }
 }
 
-function drawVine(sx, sy, tx, ty) {
-  const sway = Math.round(Math.sin(time * 1.4 + ty * 0.6) * 1);
-  ctx.fillStyle = '#2f7432';
+function drawVineStem(sx, sy, ty, col, leaf, hi) {
+  const sway = Math.round(Math.sin(time * 1.4 + ty * 0.6));
+  ctx.fillStyle = col;
   for (let y = 0; y < 16; y++) ctx.fillRect(sx + 7 + sway + Math.round(Math.sin((ty * 16 + y) * 0.35)), sy + y, 2, 1);
-  ctx.fillStyle = '#4caa4c';
+  ctx.fillStyle = leaf;
   ctx.fillRect(sx + 3 + sway, sy + 3, 4, 2);
   ctx.fillRect(sx + 10 + sway, sy + 10, 4, 2);
-  ctx.fillStyle = '#7dd174';
+  ctx.fillStyle = hi;
   ctx.fillRect(sx + 3 + sway, sy + 3, 1, 1);
   ctx.fillRect(sx + 13 + sway, sy + 10, 1, 1);
 }
@@ -600,29 +1933,257 @@ function drawSign(sx, sy, up) {
   else { ctx.fillRect(sx + 5, sy + 6, 6, 1); ctx.fillRect(sx + 6, sy + 7, 4, 1); }
 }
 
+function drawSpikes(sx, sy) {
+  if (level.def.zone === 'forest') {
+    ctx.fillStyle = '#2c4a22';
+    ctx.fillRect(sx, sy + 11, 16, 5);
+    ctx.fillRect(sx + 2, sy + 8, 5, 4);
+    ctx.fillRect(sx + 9, sy + 7, 5, 5);
+    ctx.fillStyle = '#d8d0b0';
+    for (const [x, y] of [[1, 10], [4, 7], [8, 9], [11, 6], [14, 9], [6, 12], [12, 12]]) ctx.fillRect(sx + x, sy + y, 1, 2);
+  } else {
+    for (let i = 0; i < 4; i++) {
+      const x = sx + i * 4;
+      ctx.fillStyle = '#8a8f99';
+      ctx.fillRect(x + 1, sy + 9, 2, 7);
+      ctx.fillRect(x, sy + 13, 4, 3);
+      ctx.fillStyle = '#d8dde6';
+      ctx.fillRect(x + 1, sy + 8, 1, 3);
+    }
+  }
+}
+
+function drawWater(sx, sy, tx, ty) {
+  const top = tileAt(tx, ty - 1) !== '~';
+  ctx.fillStyle = 'rgba(40,110,170,0.55)';
+  ctx.fillRect(sx, sy + (top ? 3 : 0), 16, top ? 13 : 16);
+  if (top) {
+    const wv = Math.round(Math.sin(time * 3 + tx) * 1);
+    ctx.fillStyle = 'rgba(150,210,255,0.8)';
+    ctx.fillRect(sx, sy + 3 + wv, 16, 1);
+    ctx.fillStyle = 'rgba(40,110,170,0.4)';
+    ctx.fillRect(sx, sy + 2 + wv, 16, 1);
+  }
+}
+
+function drawGate(sx, sy, tx, ty) {
+  drawStone(sx, sy, tx, ty, [level.zone.s[2], level.zone.s[0], '#1c1c22']);
+  ctx.fillStyle = '#2a2a30';
+  ctx.fillRect(sx + 3, sy, 2, 16);
+  ctx.fillRect(sx + 11, sy, 2, 16);
+  if (tileAt(tx, ty - 1) !== 'X') {
+    ctx.fillStyle = '#c9a24a';
+    ctx.fillRect(sx + 2, sy + 2, 12, 2);
+  }
+}
+
+function drawRoot(sx, sy, tx, ty) {
+  drawStone(sx, sy, tx, ty);
+  ctx.fillStyle = '#6b4a2a';
+  ctx.fillRect(sx + 6, sy + 4, 4, 8);
+  ctx.fillRect(sx + 2, sy + 9, 12, 2);
+  ctx.fillRect(sx + 7, sy, 2, 4);
+  ctx.fillStyle = '#5ab04a';
+  ctx.fillRect(sx + 6, sy + 2, 2, 2);
+  ctx.fillRect(sx + 9, sy + 1, 2, 2);
+}
+
+function drawPiece(sx, sy, pc) {
+  const o = openings(pc);
+  if (!pc.active) {
+    ctx.fillStyle = 'rgba(60,50,35,0.6)';
+    ctx.fillRect(sx, sy, 2, 2); ctx.fillRect(sx + 14, sy, 2, 2);
+    ctx.fillRect(sx, sy + 14, 2, 2); ctx.fillRect(sx + 14, sy + 14, 2, 2);
+    ctx.fillStyle = '#7a6440';
+    if (o & U) ctx.fillRect(sx + 7, sy, 2, 8);
+    if (o & D) ctx.fillRect(sx + 7, sy + 8, 2, 8);
+    if (o & L) ctx.fillRect(sx, sy + 7, 8, 2);
+    if (o & R) ctx.fillRect(sx + 8, sy + 7, 8, 2);
+    ctx.fillStyle = '#9a8258';
+    ctx.fillRect(sx + 6, sy + 6, 4, 4);
+    return;
+  }
+  ctx.fillStyle = '#2f7432';
+  if (o & U) ctx.fillRect(sx + 6, sy, 4, 8);
+  if (o & D) ctx.fillRect(sx + 6, sy + 4, 4, 12);
+  ctx.fillStyle = '#3f9a44';
+  if (o & L) ctx.fillRect(sx, sy, 10, 4);
+  if (o & R) ctx.fillRect(sx + 6, sy, 10, 4);
+  if (o & (L | R) && o & (U | D)) ctx.fillRect(sx + 6, sy, 4, 8);
+  ctx.fillStyle = '#7dd174';
+  if (o & L) ctx.fillRect(sx + 1, sy, 6, 1);
+  if (o & R) ctx.fillRect(sx + 9, sy, 6, 1);
+  if (o & (U | D)) { ctx.fillRect(sx + 3, sy + 9, 3, 2); ctx.fillRect(sx + 10, sy + 5, 3, 2); }
+  ctx.fillStyle = '#4caa4c';
+  if (o & (L | R)) { ctx.fillRect(sx + 3, sy + 4, 2, 2); ctx.fillRect(sx + 11, sy + 4, 2, 2); }
+}
+
+const SYMBOLS = {
+  s: ['x..x..x', '.xxxxx.', '.xxxxx.', 'xxxxxxx', '.xxxxx.', '.xxxxx.', 'x..x..x'],
+  m: ['..xxx..', '.xx....', 'xx.....', 'xx.....', 'xx.....', '.xx....', '..xxx..'],
+  t: ['...x...', '...x...', 'xxxxxxx', '.xxxxx.', '..xxx..', '.xx.xx.', 'x.....x'],
+  l: ['....xxx', '..xxxxx', '.xxxx.x', '.xxx.xx', 'xx.xxx.', 'x.xxx..', 'xx.....'],
+};
+function drawSymbol(sym, x, y, color) {
+  ctx.fillStyle = color;
+  SYMBOLS[sym].forEach((row, j) => { for (let i = 0; i < 7; i++) if (row[i] === 'x') ctx.fillRect(x + i, y + j, 1, 1); });
+}
+
+function drawSlot(sx, sy, s) {
+  const solved = level.lock && level.lock.solved;
+  ctx.fillStyle = solved ? '#e8c060' : level.zone.s[2];
+  ctx.fillRect(sx + 1, sy + 12, 2, 4);
+  ctx.fillRect(sx + 13, sy + 12, 2, 4);
+  ctx.fillRect(sx + 1, sy + 15, 14, 1);
+  ctx.fillStyle = solved ? '#fff0a0' : '#8a7a50';
+  ctx.fillRect(sx + 6, sy + 14, 4, 1);
+}
+
+function drawClue(sx, sy, c) {
+  const code = level.lock ? level.lock.code : '';
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(sx + 2, sy + 2, 12, 12);
+  if (code[c.i]) drawSymbol(code[c.i], sx + 4, sy + 4, '#c9a24a');
+}
+
+function drawMuralTile(sx, sy, m) {
+  ctx.fillStyle = '#a89a78';
+  ctx.fillRect(sx + 1, sy + 1, 14, 15);
+  ctx.fillStyle = '#7a6c50';
+  ctx.fillRect(sx + 3, sy + 3, 10, 10);
+  ctx.fillStyle = '#c9a24a';
+  ctx.fillRect(sx + 5, sy + 6, 2, 2);
+  ctx.fillRect(sx + 9, sy + 8, 2, 2);
+  if (!m.seen && Math.floor(time * 3) % 2) { ctx.fillStyle = '#fff6c0'; ctx.fillRect(sx + 12, sy + 2, 1, 1); }
+}
+
+function drawStuck(sx, sy, kind) {
+  if (kind === 'golem') {
+    ctx.fillStyle = '#5f6a5c';
+    ctx.fillRect(sx + 1, sy + 1, 14, 15);
+    ctx.fillStyle = '#4c9a48';
+    ctx.fillRect(sx + 1, sy + 1, 14, 3);
+    ctx.fillStyle = '#7a5a2a';
+    ctx.fillRect(sx + 4, sy + 7, 2, 1);
+    ctx.fillRect(sx + 10, sy + 7, 2, 1);
+  } else {
+    ctx.fillStyle = '#5a6075';
+    ctx.fillRect(sx + 2, sy + 4, 12, 12);
+    ctx.fillRect(sx + 3, sy + 1, 2, 3);
+    ctx.fillRect(sx + 11, sy + 1, 2, 3);
+    ctx.fillStyle = '#ffe066';
+    ctx.fillRect(sx + 5, sy + 7, 1, 1);
+    ctx.fillRect(sx + 10, sy + 7, 1, 1);
+  }
+}
+
 function drawTiles(cx) {
   const t0 = Math.floor(cx / TILE), t1 = t0 + Math.ceil(W / TILE);
+  const forest = level.def.zone === 'forest';
   for (let ty = 0; ty < level.h; ty++) {
-    for (let tx = t0; tx <= t1; tx++) {
-      const t = tileAt(tx, ty);
-      if (tx < 0 || tx >= level.w) continue;
+    for (let tx = Math.max(0, t0); tx <= Math.min(level.w - 1, t1); tx++) {
+      const t = level.tiles[ty][tx];
       const sx = tx * TILE - cx, sy = ty * TILE;
-      if (!SOLID[t] && isBack(tx, ty)) drawBack(sx, sy, tx, ty);
+      if (!STATIC_SOLID[t] && isBack(tx, ty)) drawBack(sx, sy, tx, ty);
       if (t === 'G') drawGround(sx, sy, tx, ty);
       else if (t === 'D') drawDirt(sx, sy, tx, ty);
       else if (t === 'S') drawStone(sx, sy, tx, ty);
       else if (t === 'W') drawBranch(sx, sy, tx, ty);
-      else if (t === 'V') drawVine(sx, sy, tx, ty);
+      else if (t === 'V') drawVineStem(sx, sy, ty, '#2f7432', '#4caa4c', '#7dd174');
       else if (t === 'a' || t === 'A') drawSign(sx, sy, t === 'a');
+      else if (t === '^') drawSpikes(sx, sy);
+      else if (t === 'X') drawGate(sx, sy, tx, ty);
+      else if (t === 'Y') drawRoot(sx, sy, tx, ty);
+      else if (t === '+') drawPiece(sx, sy, pieces.get(ty * level.w + tx));
+      else if (t === 'o') drawSlot(sx, sy);
+      else if (t === 'q') drawClue(sx, sy, level.clues.find(c => c.tx === tx && c.ty === ty));
+      else if (t === 'M') drawMuralTile(sx, sy, level.murals.find(m => m.tx === tx && m.ty === ty));
+      else if (t === 'K') drawStuck(sx, sy, level.stuck.get(ty * level.w + tx));
+      else if (t === '<' || t === '>') {
+        drawStone(sx, sy, tx, ty);
+        ctx.fillStyle = '#1a1410';
+        ctx.fillRect(sx + (t === '<' ? 0 : 12), sy + 6, 4, 4);
+        ctx.fillStyle = '#c9a24a';
+        ctx.fillRect(sx + 5, sy + 3, 6, 2);
+      }
     }
   }
-  // bottomless pits fade to black
-  const pit = ctx.createLinearGradient(0, H - 52, 0, H);
-  pit.addColorStop(0, 'rgba(3,3,8,0)');
-  pit.addColorStop(1, 'rgba(3,3,8,1)');
-  ctx.fillStyle = pit;
-  for (let tx = Math.max(0, t0); tx <= Math.min(level.w - 1, t1); tx++) {
-    if (level.surface[tx] >= level.h) ctx.fillRect(tx * TILE - cx, H - 52, TILE, 52);
+  if (forest) {
+    // bottomless pits fade to black
+    const pit = ctx.createLinearGradient(0, H - 52, 0, H);
+    pit.addColorStop(0, 'rgba(3,3,8,0)');
+    pit.addColorStop(1, 'rgba(3,3,8,1)');
+    ctx.fillStyle = pit;
+    for (let tx = Math.max(0, t0); tx <= Math.min(level.w - 1, t1); tx++) {
+      if (level.surface[tx] >= level.h) ctx.fillRect(tx * TILE - cx, H - 52, TILE, 52);
+    }
+  }
+}
+
+function drawFront(cx) {
+  // fake walls are drawn over Pip, and fade when Pip is inside them
+  const t0 = Math.floor(cx / TILE), t1 = t0 + Math.ceil(W / TILE);
+  const ptx = Math.floor((pip.x + pip.w / 2) / TILE), pty = Math.floor((pip.y + pip.h / 2) / TILE);
+  const inSecret = level.cover.has(pty * level.w + ptx) || tileAt(ptx, pty) === 'Z';
+  for (let ty = 0; ty < level.h; ty++) {
+    for (let tx = Math.max(0, t0); tx <= Math.min(level.w - 1, t1); tx++) {
+      const t = level.tiles[ty][tx];
+      const sx = tx * TILE - cx, sy = ty * TILE;
+      if (t === '~' && !level.cover.has(ty * level.w + tx)) drawWater(sx, sy, tx, ty);
+      else if (t === 'Z' || level.cover.has(ty * level.w + tx)) {
+        if (t === '~') drawWater(sx, sy, tx, ty);
+        ctx.globalAlpha = inSecret ? 0.25 : 1;
+        drawStone(sx, sy, tx, ty);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+}
+
+function drawBlock(b, cx) {
+  const x = Math.round(b.x - cx), y = Math.round(b.y);
+  if (x < -16 || x > W) return;
+  if (b.dead > 0 && Math.floor(b.dead * 20) % 2) return;
+  if (b.kind === 'gem') {
+    const [base, hi, lo] = GEM[b.val];
+    ctx.fillStyle = lo;
+    ctx.fillRect(x, y, 16, 16);
+    ctx.fillStyle = base;
+    ctx.fillRect(x + 1, y + 1, 14, 14);
+    ctx.fillStyle = hi;
+    ctx.fillRect(x + 2, y + 2, 7, 2);
+    ctx.fillRect(x + 2, y + 2, 2, 7);
+    ctx.fillStyle = lo;
+    ctx.fillRect(x + 7, y + 13, 7, 1);
+    ctx.fillRect(x + 13, y + 7, 1, 7);
+    // a shape on each color, so the colors can be told apart without seeing color
+    ctx.fillStyle = hi;
+    if (b.val === 1) { ctx.fillRect(x + 7, y + 5, 2, 6); ctx.fillRect(x + 5, y + 7, 6, 2); }
+    else if (b.val === 2) pixelCircle(ctx, x + 8, y + 8, 3);
+    else if (b.val === 3) { for (let k = 0; k < 4; k++) ctx.fillRect(x + 8 - k, y + 5 + k * 2, k * 2 + 1, 2); }
+    else { ctx.fillRect(x + 5, y + 5, 6, 6); ctx.fillStyle = base; ctx.fillRect(x + 7, y + 7, 2, 2); }
+    if (Math.floor(time * 2 + b.tx) % 5 === 0) { ctx.fillStyle = '#fff'; ctx.fillRect(x + 11, y + 3, 1, 1); }
+  } else {
+    const [, base, lo] = level.zone.s;
+    ctx.fillStyle = '#16161c';
+    ctx.fillRect(x, y, 16, 16);
+    ctx.fillStyle = base;
+    ctx.fillRect(x + 1, y + 1, 14, 14);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fillRect(x + 1, y + 1, 14, 2);
+    ctx.fillRect(x + 1, y + 1, 2, 14);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(x + 2, y + 13, 13, 2);
+    ctx.fillRect(x + 13, y + 2, 2, 13);
+    if (b.kind === 'sym') {
+      ctx.fillStyle = lo;
+      ctx.fillRect(x + 3, y + 3, 11, 11);
+      drawSymbol(b.val, x + 5, y + 5, '#e8c060');
+    } else {
+      ctx.fillStyle = lo;
+      ctx.fillRect(x + 5, y + 6, 4, 1);
+      ctx.fillRect(x + 8, y + 7, 1, 3);
+    }
   }
 }
 
@@ -638,6 +2199,19 @@ function drawCoins(cx) {
     ctx.fillStyle = '#f2c94c';
     ctx.fillRect(x - w, y - 3, w * 2, 6);
     if (w > 1) { ctx.fillStyle = '#fff2b0'; ctx.fillRect(x - w + 1, y - 3, 1, 3); }
+  }
+  for (const b of level.berries) {
+    if (b.got) continue;
+    const x = Math.round(b.x - cx), y = Math.round(b.y + Math.sin(time * 2) * 1.5);
+    ctx.fillStyle = '#3f8a3a';
+    ctx.fillRect(x - 1, y - 6, 4, 2);
+    ctx.fillStyle = '#e8336a';
+    pixelCircle(ctx, x - 2, y, 2);
+    pixelCircle(ctx, x + 2, y, 2);
+    pixelCircle(ctx, x, y - 3, 2);
+    ctx.fillStyle = '#ffc0d8';
+    ctx.fillRect(x - 3, y - 1, 1, 1);
+    ctx.fillRect(x - 1, y - 4, 1, 1);
   }
 }
 
@@ -668,8 +2242,59 @@ function drawTorch(cx) {
   }
 }
 
-// ---------- art: Pip ----------
-const PAL = { o: '#ec7a2c', d: '#b0501c', w: '#f6ecd8', k: '#1b1210', e: '#1b1210' };
+function drawOrb(x, y, r) {
+  ctx.fillStyle = '#c98a1e';
+  pixelCircle(ctx, x, y, r);
+  ctx.fillStyle = '#ffd24a';
+  pixelCircle(ctx, x - 1, y - 1, r - 1);
+  ctx.fillStyle = '#fff4b0';
+  pixelCircle(ctx, x - Math.ceil(r / 3), y - Math.ceil(r / 3), Math.max(1, Math.floor(r / 3)));
+}
+
+function drawRocks(cx) {
+  const forest = level.def.zone === 'forest';
+  for (const r of rocks) {
+    if (r.state === 'gone') continue;
+    const jit = r.state === 'shake' ? Math.round(Math.sin(time * 60)) : 0;
+    const x = Math.round(r.x - cx) + jit, y = Math.round(r.y);
+    if (forest) {
+      if (r.state !== 'fall') { ctx.fillStyle = '#3b2a1a'; ctx.fillRect(x, 0, 1, y - 3); }
+      ctx.fillStyle = '#6b4423';
+      ctx.fillRect(x - 7, y - 2, 14, 4);
+      ctx.fillStyle = '#8f5f33';
+      ctx.fillRect(x - 7, y - 2, 14, 1);
+      ctx.fillStyle = '#3f8a3a';
+      ctx.fillRect(x - 9, y - 4, 4, 3);
+      ctx.fillRect(x + 5, y - 3, 4, 3);
+    } else {
+      if (r.state !== 'fall') { ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x - 1, y - 7, 1, 2); ctx.fillRect(x + 1, y - 8, 1, 2); }
+      const [base, hi, lo] = level.zone.s;
+      ctx.fillStyle = lo;
+      ctx.fillRect(x - 5, y - 5, 10, 10);
+      ctx.fillStyle = base;
+      ctx.fillRect(x - 4, y - 5, 8, 9);
+      ctx.fillStyle = hi;
+      ctx.fillRect(x - 4, y - 5, 5, 2);
+    }
+  }
+}
+
+function drawDarts(cx) {
+  for (const d of darts) {
+    const x = Math.round(d.x - cx), y = Math.round(d.y);
+    ctx.fillStyle = '#d8d0b0';
+    ctx.fillRect(x - 3, y, 6, 1);
+    ctx.fillStyle = '#c03a2a';
+    ctx.fillRect(d.vx > 0 ? x - 4 : x + 3, y - 1, 2, 3);
+  }
+}
+
+// ---------- art: creatures ----------
+const PAL = {
+  o: '#ec7a2c', d: '#b0501c', w: '#f6ecd8', k: '#1b1210',
+  g: '#5a6075', G: '#383c4c', l: '#9aa0b5', y: '#ffe066',
+  b: '#7a5634', r: '#d8b24a', W: '#f4ecd0', t: '#c9a77a', Y: '#e8a23a',
+};
 const BODY = [
   '................',
   '..........d..d..',
@@ -689,29 +2314,62 @@ const LEGS = {
   climbA: ['.....oo...oo....', '.....kk....dd...', '...........kk...'],
   climbB: ['.....oo...oo....', '.....dd...kk....', '.....kk.........'],
 };
-const frames = {};
-for (const k in LEGS) {
+const WOLF = [
+  '...........G.G..',
+  '..........ggggg.',
+  'GG........ggyggg',
+  '.Gggggggggggggkk',
+  '..ggggggggggggg.',
+  '..gllllllllgg...',
+  '..ggggggggggg...',
+];
+const WOLF_LEGS = [
+  ['..gg.g....gg.g..', '..g..g....g..g..', '.GG.GG...GG.GG..'],
+  ['...g.gg....g.gg.', '...g..g....g..g.', '..GG..GG..GG..GG'],
+];
+const OWL = [
+  '..b......b..',
+  '..bbbbbbbb..',
+  '.brrrbbrrrb.',
+  '.brWkrrWkrb.',
+  '.brrrbbrrrb.',
+  '..bbbYYbbb..',
+  '.bbttttttbb.',
+  'bbbtttttttbb',
+  'bbbttttttbbb',
+  '.bbbttttbbb.',
+  '..bbbbbbbb..',
+  '...Y....Y...',
+];
+
+function sprite(rows, w, h, tint) {
   const c = document.createElement('canvas');
-  c.width = 16; c.height = 12;
+  c.width = w; c.height = h;
   const g = c.getContext('2d');
-  const rows = BODY.concat(LEGS[k]);
-  // legs push the body up by one pixel on the gathered running frame
-  const lift = k === 'runB' ? -1 : 0;
   rows.forEach((row, y) => {
-    for (let x = 0; x < 16; x++) {
-      const ch = row[x];
-      if (ch === '.') continue;
-      g.fillStyle = PAL[ch];
-      g.fillRect(x, y + (y < 9 ? lift : 0), 1, 1);
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === '.') continue;
+      g.fillStyle = tint || PAL[row[x]];
+      g.fillRect(x, y, 1, 1);
     }
   });
-  frames[k] = c;
+  return c;
 }
+const frames = {}, shadowFrames = {};
+for (const k in LEGS) {
+  const rows = BODY.map(r => r).concat(LEGS[k]);
+  if (k === 'runB') { rows.shift(); rows.splice(8, 0, '................'); }
+  frames[k] = sprite(rows, 16, 12);
+  shadowFrames[k] = sprite(rows, 16, 12, '#2a2418');
+}
+const wolfFrames = WOLF_LEGS.map(l => sprite(WOLF.concat(l), 16, 10));
+const owlSprite = sprite(OWL, 12, 12);
+const owlShadow = sprite(OWL, 12, 12, '#2a2418');
 
 function pipFrame(p) {
   if (p.climbing) return Math.floor(p.anim * 8) % 2 ? 'climbA' : 'climbB';
   if (!p.onGround) return 'air';
-  if (Math.abs(p.vx) > 15) return Math.floor(p.anim * 12) % 2 ? 'runA' : 'runB';
+  if (Math.abs(p.vx) > 15 || p.pull) return Math.floor(p.anim * 12) % 2 ? 'runA' : 'runB';
   return 'stand';
 }
 
@@ -728,6 +2386,56 @@ function drawPip(cx) {
   ctx.scale(p.face * sx, sy);
   ctx.drawImage(f, -8, -12);
   ctx.restore();
+  if (p.grabbing) {
+    ctx.fillStyle = '#f6ecd8';
+    ctx.fillRect(fx + p.face * 7, fy - 7, 2, 2);
+  }
+}
+
+function drawEnemies(cx) {
+  for (const e of enemies) {
+    if (e.dead) continue;
+    const x = Math.round(e.x - cx), y = Math.round(e.y);
+    if (x < -20 || x > W + 4) continue;
+    const step = Math.floor(e.anim * (e.kind === 'golem' ? 4 : 10)) % 2;
+    if (e.kind === 'wolf') {
+      ctx.save();
+      ctx.translate(x + 7, y);
+      ctx.scale(e.dir, 1);
+      ctx.drawImage(wolfFrames[step], -8, 0);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#4a5348';
+      ctx.fillRect(x + 2 + step, y + 12, 4, 3);
+      ctx.fillRect(x + 8 - step, y + 12, 4, 3);
+      ctx.fillStyle = '#6a7466';
+      ctx.fillRect(x, y + 3, 14, 10);
+      ctx.fillRect(x + 2, y, 10, 4);
+      ctx.fillStyle = '#7f8a7a';
+      ctx.fillRect(x + 2, y + 1, 6, 2);
+      ctx.fillStyle = '#4c9a48';
+      ctx.fillRect(x + 1, y + 2, 4, 2);
+      ctx.fillRect(x + 9, y + 9, 4, 2);
+      ctx.fillStyle = '#2a2e28';
+      ctx.fillRect(x + (e.dir > 0 ? 7 : 3), y + 5, 4, 3);
+      ctx.fillStyle = '#ffd36b';
+      ctx.fillRect(x + (e.dir > 0 ? 8 : 4), y + 6, 1, 1);
+      ctx.fillRect(x + (e.dir > 0 ? 10 : 6), y + 6, 1, 1);
+      ctx.fillStyle = '#3a4238';
+      ctx.fillRect(x - 1, y + 6, 2, 5);
+      ctx.fillRect(x + 13, y + 6, 2, 5);
+    }
+  }
+}
+
+function drawOwl(cx) {
+  if (!owl) return;
+  const x = Math.round(owl.x - cx), y = Math.round(owl.y + Math.sin(owl.anim * 4) * 2);
+  const flap = Math.floor(owl.anim * 10) % 2;
+  ctx.drawImage(owlSprite, x - 6, y - 6);
+  ctx.fillStyle = '#5e4126';
+  if (flap) { ctx.fillRect(x - 10, y - 4, 4, 2); ctx.fillRect(x + 6, y - 4, 4, 2); }
+  else { ctx.fillRect(x - 9, y + 1, 3, 4); ctx.fillRect(x + 6, y + 1, 3, 4); }
 }
 
 function drawParticles(cx) {
@@ -757,22 +2465,30 @@ function glow(x, y, r, rgb, a) {
 }
 
 function applyLight(cx, withPip) {
-  const amb = [lerp(120, 255, dawn), lerp(132, 244, dawn), lerp(196, 228, dawn)].map(Math.round);
+  const z = level.zone.amb;
+  const amb = [lerp(z[0], 255, dawn), lerp(z[1], 244, dawn), lerp(z[2], 228, dawn)].map(Math.round);
   lctx.globalCompositeOperation = 'source-over';
   lctx.fillStyle = `rgb(${amb})`;
   lctx.fillRect(0, 0, W, H);
   lctx.globalCompositeOperation = 'lighter';
+  const vis = x => x - cx > -40 && x - cx < W + 40;
   if (withPip) glow(pip.x + pip.w / 2 - cx, pip.y + 4, 56, '120,96,60', 0.9);
   for (const f of level.fireflies) {
     const q = fireflyPos(f);
-    if (q.x - cx > -20 && q.x - cx < W + 20) glow(q.x - cx, q.y, 16, '110,130,40', q.a * 0.8);
+    if (vis(q.x)) glow(q.x - cx, q.y, 16, '110,130,40', q.a * 0.8);
   }
-  for (const c of level.coins) if (!c.got && c.x - cx > -20 && c.x - cx < W + 20) glow(c.x - cx, c.y, 12, '120,100,30', 0.7);
+  for (const l of level.lights) if (vis(l.x)) glow(l.x - cx, l.y, 26, level.zone.light, 0.7 + Math.sin(time * 1.5 + l.x) * 0.15);
+  for (const c of level.coins) if (!c.got && vis(c.x)) glow(c.x - cx, c.y, 12, '120,100,30', 0.7);
+  for (const b of level.berries) if (!b.got && vis(b.x)) glow(b.x - cx, b.y, 18, '170,50,90', 0.8);
+  for (const b of blocks) if (b.kind === 'gem' && vis(b.x)) glow(b.x + 8 - cx, b.y + 8, 18, GEM_LIGHT[b.val], 0.6);
+  for (const m of level.murals) if (vis(m.tx * TILE)) glow(m.tx * TILE + 8 - cx, m.ty * TILE + 8, 22, '150,130,80', 0.6);
   const t = level.torch;
   if (t) {
     if (t.lit) glow(t.x - cx, t.y - 24, 150 + Math.sin(time * 9) * 4, '255,170,90', 1);
     else glow(t.x - cx, t.y - 18, 22, '90,90,130', 0.6);
   }
+  if (level.orb) glow(level.orb.x - cx, level.orb.y, 70 + Math.sin(time * 2) * 6, '255,200,90', 1);
+  if (owl) glow(owl.x - cx, owl.y, 30, '100,90,60', 0.6);
   ctx.globalCompositeOperation = 'multiply';
   ctx.drawImage(lightC, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
@@ -783,17 +2499,9 @@ function applyLight(cx, withPip) {
   }
 }
 
-// ---------- HUD ----------
+// ---------- HUD and text ----------
 const HEAD = ['.d...d.', '.oo.oo.', 'ooooooo', 'okoooko', '.owwwo.', '..wkw..'];
-function drawHead(x, y) {
-  HEAD.forEach((row, j) => {
-    for (let i = 0; i < row.length; i++) {
-      if (row[i] === '.') continue;
-      ctx.fillStyle = PAL[row[i]];
-      ctx.fillRect(x + i, y + j, 1, 1);
-    }
-  });
-}
+const headSprite = sprite(HEAD, 7, 6);
 
 function text(str, x, y, size, color, align) {
   ctx.font = `${size}px ${FONT}`;
@@ -808,67 +2516,406 @@ function text(str, x, y, size, color, align) {
 function drawHUD() {
   ctx.fillStyle = 'rgba(4,6,18,0.55)';
   ctx.fillRect(0, 0, W, 15);
-  for (let i = 0; i < lives; i++) drawHead(5 + i * 10, 4);
-  const cx0 = 5 + Math.max(3, lives) * 10 + 8;
-  ctx.fillStyle = '#a87a1e'; ctx.fillRect(cx0, 3, 6, 8);
-  ctx.fillStyle = '#f2c94c'; ctx.fillRect(cx0 + 1, 4, 4, 6);
-  text('x' + coins, cx0 + 9, 4, 8, '#f6ecd8');
+  let x = 5;
+  if (lives <= 5) for (let i = 0; i < lives; i++) { ctx.drawImage(headSprite, x, 4); x += 10; }
+  else { ctx.drawImage(headSprite, x, 4); text('x' + lives, x + 9, 4, 8, '#f6ecd8'); x += 34; }
+  x = Math.max(x, 35) + 8;
+  ctx.fillStyle = '#a87a1e'; ctx.fillRect(x, 3, 6, 8);
+  ctx.fillStyle = '#f2c94c'; ctx.fillRect(x + 1, 4, 4, 6);
+  text('x' + coins, x + 9, 4, 8, '#f6ecd8');
   text('LEVEL ' + (level.index + 1) + '/10', W - 5, 4, 8, '#f6ecd8', 'right');
+}
+
+function drawDialog() {
+  const lines = wrap(dialog.lines[dialog.i], 32);
+  const shown = Math.floor(dialog.shown);
+  const top = H - 14 - lines.length * 10 - 10;
+  ctx.fillStyle = 'rgba(10,8,20,0.88)';
+  ctx.fillRect(6, top, W - 12, H - top - 6);
+  ctx.fillStyle = '#c9a24a';
+  ctx.fillRect(6, top, W - 12, 1);
+  ctx.fillRect(6, H - 7, W - 12, 1);
+  ctx.save();
+  ctx.translate(12, top + 6);
+  ctx.scale(2, 2);
+  ctx.drawImage(owlSprite, 0, 0);
+  ctx.restore();
+  let left = shown;
+  lines.forEach((ln, i) => {
+    const part = ln.slice(0, Math.max(0, left));
+    left -= ln.length + 1;
+    text(part, 44, top + 8 + i * 10, 8, '#f6ecd8');
+  });
+  if (shown >= dialog.lines[dialog.i].length && Math.floor(time * 3) % 2) text('>', W - 18, H - 18, 8, '#c9a24a');
+}
+
+function centerBox(y, h) {
+  ctx.fillStyle = 'rgba(4,6,18,0.7)';
+  ctx.fillRect(28, y, W - 56, h);
+  ctx.fillStyle = '#c9a24a';
+  ctx.fillRect(28, y, W - 56, 1);
+  ctx.fillRect(28, y + h - 1, W - 56, 1);
+}
+
+// the murals are carved pictures: two shades of stone and a little gold
+function drawMuralScene(i, x, y) {
+  const fox = (fx, fy, s, face) => {
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.scale(face * s, s);
+    ctx.drawImage(shadowFrames.stand, -8, -12);
+    ctx.restore();
+  };
+  ctx.fillStyle = '#b8a888';
+  ctx.fillRect(x, y, 200, 70);
+  ctx.fillStyle = '#9a8a6a';
+  for (let k = 0; k < 200; k += 9) ctx.fillRect(x + k, y + 60 + (k % 3), 9, 10);
+  ctx.fillStyle = '#2a2418';
+  if (i === 0) {
+    pixelCircle(ctx, x + 170, y + 14, 6);
+    ctx.fillStyle = '#b8a888';
+    pixelCircle(ctx, x + 173, y + 12, 5);
+    fox(x + 40, y + 62, 2, 1);
+    fox(x + 70, y + 62, 1, 1);
+    fox(x + 150, y + 62, 1.5, 1);
+    ctx.fillStyle = '#2a2418';
+    for (let k = 0; k < 4; k++) ctx.fillRect(x + 100 + k * 10, y + 58, 4, 1);
+  } else if (i === 1) {
+    drawTempleSil(x + 150, y + 62);
+    fox(x + 70, y + 62, 2, 1);
+    ctx.save();
+    ctx.translate(x + 95, y + 24);
+    ctx.scale(2, 2);
+    ctx.drawImage(owlShadow, -6, -6);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#c9a24a';
+    pixelCircle(ctx, x + 100, y + 34, 16);
+    ctx.fillStyle = '#e8c870';
+    pixelCircle(ctx, x + 98, y + 32, 12);
+    for (let a = 0; a < 12; a++) ctx.fillRect(x + 100 + Math.round(Math.cos(a * 0.52) * 22), y + 34 + Math.round(Math.sin(a * 0.52) * 22), 2, 2);
+    fox(x + 100, y + 64, 1.5, -1);
+    ctx.save();
+    ctx.translate(x + 160, y + 46);
+    ctx.scale(2, 2);
+    ctx.drawImage(owlShadow, -6, -6);
+    ctx.restore();
+  }
+}
+function drawTempleSil(cx, baseY) {
+  ctx.fillStyle = '#2a2418';
+  for (let k = 0; k < 4; k++) ctx.fillRect(cx - 30 + k * 7, baseY - 10 - k * 9, 60 - k * 14, 10);
+}
+
+function drawMuralView() {
+  const m = MURALS[muralView.i];
+  ctx.fillStyle = 'rgba(4,6,18,0.82)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = Math.min(1, muralView.t * 2);
+  text(m.title.toUpperCase(), W / 2, 14, 8, '#c9a24a', 'center');
+  ctx.fillStyle = '#5a4a34';
+  ctx.fillRect(56, 28, 208, 78);
+  drawMuralScene(muralView.i, 60, 32);
+  wrap(m.text, 36).forEach((ln, k) => text(ln, W / 2, 114 + k * 11, 8, '#f6ecd8', 'center'));
+  const found = save.murals.filter(Boolean).length;
+  text('MURALS FOUND ' + found + '/3', W / 2, 172, 8, '#8a93b8', 'center');
+  if (muralView.t > 1 && Math.floor(time * 2) % 2) text('ENTER', W - 12, 180, 8, '#c9a24a', 'right');
+  ctx.globalAlpha = 1;
+}
+
+// ---------- intro ----------
+const INTRO = [
+  { text: 'Long ago, the sun set over the forest... and it never rose again.' },
+  { text: 'Pip grew up in the endless night, in a small den beneath an old oak. Alone.' },
+  { text: 'Every animal knows the old story: deep in the ancient temple, the Sun Stone still glows.' },
+  { text: 'Tonight, Pip is going to find it.' },
+];
+let introLayers = null;
+function sceneLayers() {
+  if (!introLayers) {
+    introLayers = [
+      makeLayer(0.15, '#1e2c5c', 'pine', 11, 150, 2000),
+      makeLayer(0.35, '#16214a', 'pine', 23, 160, 2000),
+      makeLayer(0.6, '#0f1736', 'round', 37, 172, 2000),
+    ];
+  }
+  return introLayers;
+}
+function drawForestScene(cx, d, tint) {
+  drawSky(cx, d);
+  for (const l of sceneLayers()) {
+    ctx.drawImage(l.c, -Math.round(cx * l.par), 0);
+  }
+  ctx.fillStyle = tint || '#0b1022';
+  ctx.fillRect(0, 172, W, 20);
+}
+
+function drawIntro() {
+  const i = introI, t = introT;
+  if (i === 0) {
+    const d = Math.max(0, 0.8 - t * 0.15);
+    drawSky(0, d);
+    const sy = 120 + t * 10;
+    ctx.fillStyle = '#ffb24a';
+    pixelCircle(ctx, 160, sy, 18);
+    for (const l of sceneLayers()) ctx.drawImage(l.c, 0, 0);
+    ctx.fillStyle = '#0b1022';
+    ctx.fillRect(0, 172, W, 20);
+  } else if (i === 1) {
+    drawForestScene(200, 0);
+    drawMoon(0);
+    ctx.fillStyle = '#0b1022';
+    ctx.fillRect(140, 130, 90, 50);
+    pixelCircle(ctx, 185, 132, 40);
+    ctx.fillStyle = '#05070f';
+    pixelCircle(ctx, 178, 166, 10);
+    ctx.fillRect(168, 166, 21, 10);
+    ctx.save();
+    ctx.translate(176, 175);
+    ctx.drawImage(frames.stand, -8, -12);
+    ctx.restore();
+  } else if (i === 2) {
+    drawForestScene(400, 0);
+    ctx.fillStyle = '#121a3c';
+    for (let k = 0; k < 6; k++) ctx.fillRect(160 - 60 + k * 9, 150 - 12 - k * 11, 120 - k * 18, 12);
+    const gl = ctx.createRadialGradient(160, 70, 1, 160, 70, 24);
+    gl.addColorStop(0, `rgba(255,200,90,${0.6 + Math.sin(time * 2) * 0.2})`);
+    gl.addColorStop(1, 'rgba(255,200,90,0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(130, 40, 60, 60);
+    ctx.fillStyle = '#ffd24a';
+    ctx.fillRect(158, 68, 4, 4);
+  } else {
+    drawForestScene((time * 60) % 1600, 0);
+    const f = Math.floor(time * 12) % 2 ? frames.runA : frames.runB;
+    ctx.drawImage(f, 140, 163);
+  }
+  const lines = wrap(INTRO[i].text, 34);
+  const shown = Math.floor(t * 40);
+  ctx.fillStyle = 'rgba(4,6,18,0.75)';
+  ctx.fillRect(0, 0, W, 18 + lines.length * 11);
+  let left = shown;
+  lines.forEach((ln, k) => {
+    text(ln.slice(0, Math.max(0, left)), W / 2, 8 + k * 11, 8, '#f6ecd8', 'center');
+    left -= ln.length + 1;
+  });
+  if (shown >= INTRO[i].text.length && Math.floor(time * 2) % 2) text('ENTER', W - 8, H - 12, 8, '#c9a24a', 'right');
+}
+
+// ---------- ending ----------
+// The ending is a short scene in steps. Some steps wait for Enter.
+function startEnding() {
+  state = 'ending';
+  ending = { step: 0, t: 0, orbY: 0, owlX: 0, owlY: 0 };
+  save.done = true;
+  writeSave();
+  SFX.solve();
+}
+const ENDING_STEPS = [
+  { dur: 5.5 }, // Pip runs home through the forest with the Sun Stone
+  { dur: 3 }, // Pip sets the stone at the roots of the old oak
+  { dur: 6 }, // the stone rises and the sun comes up
+  { dur: 3 }, // the owl lands on a branch
+  { wait: true, say: 'Thank you, Pip.' },
+  { dur: 5 }, // the owl flies away into the sunrise
+  { wait: true, say: 'Professor Feathers never came back. Pip sat beneath the old oak and watched the sun rise. Alone.' },
+  { wait: true, extra: true }, // only if all three murals were found
+  { wait: true, end: true },
+];
+function updateEnding(dt) {
+  const e = ending;
+  let st = ENDING_STEPS[e.step];
+  if (st.extra && !save.murals.every(Boolean)) { e.step++; e.t = 0; st = ENDING_STEPS[e.step]; }
+  e.t += dt;
+  if (st.dur && e.t >= st.dur) { e.step++; e.t = 0; if (e.step === 3) SFX.hoot(); }
+  else if (st.wait && e.t > 0.6 && (pressed.start || pressed.jump)) {
+    // the first press finishes the typing, the next one moves on
+    if (st.say && e.t * 30 < st.say.length) { e.t = st.say.length / 30 + 1; return; }
+    if (st.end) { state = 'title'; ending = null; return; }
+    e.step++; e.t = 0;
+  }
+}
+function drawEnding() {
+  const e = ending, s = e.step, t = e.t;
+  const dawnAt = s < 2 ? 0 : s === 2 ? Math.min(1, t / 5) : 1;
+  if (s === 0) {
+    drawForestScene(t * 70, 0);
+    const f = Math.floor(time * 12) % 2 ? frames.runA : frames.runB;
+    ctx.drawImage(f, 150, 163);
+    drawOrb(160, 155 + Math.round(Math.sin(time * 12)), 4);
+    text('Pip carried the Sun Stone home.', W / 2, 10, 8, '#f6ecd8', 'center');
+    return;
+  }
+  // the old oak at sunrise
+  drawSky(0, dawnAt);
+  if (dawnAt > 0) {
+    const sunY = 150 - dawnAt * 90;
+    const gl = ctx.createRadialGradient(240, sunY, 2, 240, sunY, 60);
+    gl.addColorStop(0, `rgba(255,220,140,${dawnAt * 0.7})`);
+    gl.addColorStop(1, 'rgba(255,220,140,0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(180, sunY - 60, 120, 120);
+  }
+  const ls = sceneLayers();
+  ctx.globalAlpha = 1;
+  for (const l of ls) ctx.drawImage(l.c, 0, 0);
+  ctx.fillStyle = `rgba(255,190,120,${dawnAt * 0.35})`;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = mixColor([11, 16, 34], [60, 50, 40], dawnAt);
+  ctx.fillRect(0, 172, W, 20);
+  // the oak
+  ctx.fillStyle = mixColor([20, 16, 12], [70, 46, 26], dawnAt);
+  ctx.fillRect(84, 70, 18, 104);
+  ctx.fillRect(100, 92, 40, 5);
+  ctx.fillRect(70, 166, 46, 8);
+  ctx.fillStyle = mixColor([14, 30, 18], [60, 110, 50], dawnAt);
+  pixelCircle(ctx, 92, 60, 34);
+  pixelCircle(ctx, 62, 74, 22);
+  pixelCircle(ctx, 124, 70, 24);
+  // the stone, then the sun
+  let orbX = 112, orbY = 164;
+  if (s === 2) { orbX = lerp(112, 240, Math.min(1, t / 5)); orbY = lerp(164, 60, Math.min(1, t / 5)); }
+  if (s >= 3) { orbX = 240; orbY = 60; }
+  const r = s >= 2 ? Math.round(lerp(4, 16, s === 2 ? Math.min(1, t / 5) : 1)) : 4;
+  drawOrb(Math.round(orbX), Math.round(orbY), r);
+  ctx.save();
+  ctx.translate(128, 175);
+  ctx.scale(-1, 1);
+  ctx.drawImage(s === 1 ? frames.stand : frames.stand, -8, -12);
+  ctx.restore();
+  // the owl
+  if (s >= 3 && s <= 5) {
+    let ox = 130, oy = 84;
+    if (s === 3) { ox = lerp(340, 130, Math.min(1, t / 2.5)); oy = lerp(10, 84, Math.min(1, t / 2.5)); }
+    if (s === 5) { ox = lerp(130, 250, Math.min(1, t / 5)); oy = lerp(84, 55, Math.min(1, t / 5)); }
+    const sc = s === 5 ? Math.max(0.2, 1 - t / 5) : 1;
+    ctx.save();
+    ctx.translate(Math.round(ox), Math.round(oy));
+    ctx.scale(sc, sc);
+    ctx.drawImage(owlSprite, -6, -6);
+    ctx.restore();
+  }
+  if (s === 1) wrap('At the roots of the old oak, Pip set down the stone.', 34).forEach((ln, k) => text(ln, W / 2, 8 + k * 11, 8, '#f6ecd8', 'center'));
+  const st = ENDING_STEPS[s];
+  if (st.say) {
+    const lines = wrap(st.say, 34);
+    ctx.fillStyle = 'rgba(4,6,18,0.7)';
+    ctx.fillRect(0, 0, W, 16 + lines.length * 11);
+    const shown = Math.floor(t * 30);
+    let left = shown;
+    lines.forEach((ln, k) => { text(ln.slice(0, Math.max(0, left)), W / 2, 8 + k * 11, 8, '#f6ecd8', 'center'); left -= ln.length + 1; });
+  }
+  if (st.extra) {
+    ctx.fillStyle = 'rgba(4,6,18,0.85)';
+    ctx.fillRect(0, 0, W, H);
+    const gl = ctx.createRadialGradient(160, 84, 4, 160, 84, 70);
+    gl.addColorStop(0, 'rgba(255,210,110,0.6)');
+    gl.addColorStop(1, 'rgba(255,210,110,0)');
+    ctx.fillStyle = gl;
+    ctx.fillRect(90, 14, 140, 140);
+    drawOrb(160, 84, 40);
+    ctx.globalAlpha = 0.6 + Math.sin(time * 2) * 0.25;
+    ctx.save();
+    ctx.translate(160, 96);
+    ctx.scale(2, 2);
+    ctx.drawImage(sprite(BODY.concat(LEGS.stand), 16, 12, '#fffbe8'), -8, -12);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    wrap('Deep inside the Sun Stone, a small light glows. It is shaped like a fox.', 36).forEach((ln, k) => text(ln, W / 2, 142 + k * 11, 8, '#f6ecd8', 'center'));
+  }
+  if (st.end) {
+    ctx.fillStyle = 'rgba(4,6,18,0.55)';
+    ctx.fillRect(0, 40, W, 80);
+    text('THE END', W / 2, 52, 16, '#ffc86b', 'center');
+    text('Coins ' + coins + '   Murals ' + save.murals.filter(Boolean).length + '/3', W / 2, 80, 8, '#f6ecd8', 'center');
+    if (Math.floor(time * 2) % 2) text('ENTER', W / 2, 100, 8, '#c9a24a', 'center');
+  }
+  if (st.wait && t > 0.6 && !st.end && Math.floor(time * 2) % 2) text('ENTER', W - 8, H - 12, 8, '#c9a24a', 'right');
 }
 
 // ---------- render ----------
 function render() {
-  const cx = state === 'title' ? Math.round((Math.sin(time * 0.08) * 0.5 + 0.5) * 300) : Math.round(cam.x);
-  drawBackground(cx);
-  drawTiles(cx);
-  drawTorch(cx);
-  drawCoins(cx);
-  if (state !== 'title') drawPip(cx);
-  drawParticles(cx);
-  applyLight(cx, state !== 'title');
-
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (state === 'intro') { drawIntro(); return; }
+  if (state === 'ending') { drawEnding(); return; }
   if (state === 'title') {
+    if (!level || level.index !== 0) loadLevel(0);
+    const cx = Math.round((Math.sin(time * 0.08) * 0.5 + 0.5) * 300);
+    drawBackground(cx);
+    drawTiles(cx);
+    drawTorch(cx);
+    drawCoins(cx);
+    applyLight(cx, false);
     ctx.fillStyle = 'rgba(4,6,18,0.45)';
     ctx.fillRect(0, 0, W, H);
-    text('SUNRISE', W / 2, 46, 24, '#ffc86b', 'center');
-    text('A fox. A temple.', W / 2, 84, 8, '#c9d1f0', 'center');
-    text('An endless night.', W / 2, 96, 8, '#c9d1f0', 'center');
-    if (Math.floor(time * 2) % 2 === 0) text('PRESS ENTER', W / 2, 130, 8, '#f6ecd8', 'center');
+    text('SUNRISE', W / 2, 40, 24, '#ffc86b', 'center');
+    text('A fox. A temple.', W / 2, 78, 8, '#c9d1f0', 'center');
+    text('An endless night.', W / 2, 90, 8, '#c9d1f0', 'center');
+    const hasSave = save && (save.checkpoint > 0 || save.coins > 0);
+    if (hasSave) {
+      if (Math.floor(time * 2) % 2 === 0) text('ENTER  CONTINUE (LEVEL ' + (save.checkpoint + 1) + ')', W / 2, 118, 8, '#f6ecd8', 'center');
+      text('N  NEW GAME', W / 2, 132, 8, '#c9d1f0', 'center');
+    } else if (Math.floor(time * 2) % 2 === 0) text('PRESS ENTER', W / 2, 124, 8, '#f6ecd8', 'center');
     text('ARROWS/WASD MOVE  SPACE JUMP', W / 2, 160, 8, '#8a93b8', 'center');
-    text('UP CLIMB  DOWN DIG', W / 2, 172, 8, '#8a93b8', 'center');
+    text('UP CLIMB  DOWN DIG  G GRAB', W / 2, 172, 8, '#8a93b8', 'center');
     return;
   }
+  let cx = Math.round(cam.x);
+  if (shake > 0) ctx.setTransform(1, 0, 0, 1, Math.round((Math.random() - 0.5) * 3), Math.round((Math.random() - 0.5) * 3));
+  drawBackground(cx);
+  drawTiles(cx);
+  for (const b of blocks) drawBlock(b, cx);
+  drawTorch(cx);
+  if (level.orb) drawOrb(level.orb.x - cx, level.orb.y + Math.round(Math.sin(time * 2) * 2), 7);
+  drawCoins(cx);
+  drawRocks(cx);
+  drawEnemies(cx);
+  drawPip(cx);
+  drawDarts(cx);
+  drawParticles(cx);
+  drawFront(cx);
+  applyLight(cx, true);
+  drawOwl(cx);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (flash > 0) { ctx.fillStyle = `rgba(255,60,40,${flash})`; ctx.fillRect(0, 0, W, H); }
 
   drawHUD();
-  if (banner > 0) {
+  if (banner > 0 && !dialog && !paused) {
     ctx.globalAlpha = Math.min(1, banner);
     text('LEVEL ' + (level.index + 1), W / 2, 60, 16, '#ffc86b', 'center');
     text(level.name.toUpperCase(), W / 2, 84, 8, '#c9d1f0', 'center');
     ctx.globalAlpha = 1;
   }
+  if (toast) text(toast.text, W / 2, 24, 8, '#ff9ac0', 'center');
+  if (restartAsk > 0 && state === 'play') text('PRESS R AGAIN TO RESTART (-1 LIFE)', W / 2, 24, 8, '#ffb08a', 'center');
+  if (dialog) drawDialog();
   if (state === 'done' && doneT > 0.8) {
     const got = level.coins.filter(c => c.got).length;
     ctx.globalAlpha = Math.min(1, (doneT - 0.8) * 2);
-    ctx.fillStyle = 'rgba(4,6,18,0.5)';
-    ctx.fillRect(40, 48, W - 80, 84);
+    centerBox(48, 84);
     text('TORCH LIT!', W / 2, 58, 16, '#ffc86b', 'center');
-    text('Level 1 complete', W / 2, 84, 8, '#f6ecd8', 'center');
+    text('Level ' + (level.index + 1) + ' complete', W / 2, 84, 8, '#f6ecd8', 'center');
     text('Coins ' + got + '/' + level.coins.length, W / 2, 98, 8, '#f2c94c', 'center');
-    if (doneT > 1.5 && Math.floor(time * 2) % 2 === 0) text('ENTER: PLAY AGAIN', W / 2, 116, 8, '#c9d1f0', 'center');
+    if (doneT > 1.5 && Math.floor(time * 2) % 2 === 0) text('ENTER: KEEP GOING', W / 2, 116, 8, '#c9d1f0', 'center');
     ctx.globalAlpha = 1;
   }
   if (state === 'out') {
     ctx.fillStyle = 'rgba(4,6,18,0.6)';
     ctx.fillRect(0, 0, W, H);
     text('OUT OF LIVES', W / 2, 76, 16, '#ff8a6b', 'center');
-    text('Back to the checkpoint...', W / 2, 102, 8, '#c9d1f0', 'center');
+    text('Back to the checkpoint: level ' + (Math.floor(level.index / 3) * 3 + 1), W / 2, 102, 8, '#c9d1f0', 'center');
   }
+  if (state === 'mural') drawMuralView();
   if (paused) {
-    ctx.fillStyle = 'rgba(4,6,18,0.6)';
+    ctx.fillStyle = 'rgba(4,6,18,0.75)';
     ctx.fillRect(0, 0, W, H);
-    text('PAUSED', W / 2, 80, 16, '#f6ecd8', 'center');
-    text('P or ESC to keep going', W / 2, 104, 8, '#c9d1f0', 'center');
+    text('PAUSED', W / 2, 24, 16, '#f6ecd8', 'center');
+    const help = ['ARROWS/WASD  move', 'UP/SPACE    jump, swim', 'UP          climb vines', 'DOWN        dig, dive', 'G           grab block, turn vine', 'H           ask the owl (5 coins)', 'R R         restart room (-1 life)', 'M           sound on/off'];
+    help.forEach((h, k) => text(h, 36, 52 + k * 12, 8, '#c9d1f0'));
+    text('MURALS FOUND ' + save.murals.filter(Boolean).length + '/3', W / 2, 156, 8, '#c9a24a', 'center');
+    text('P or ESC to keep going', W / 2, 172, 8, '#8a93b8', 'center');
   }
+  if (snd.muted) text('MUTE', W - 5, 180, 8, '#8a93b8', 'right');
 }
 
 // ---------- loop ----------
@@ -881,14 +2928,17 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+if (!save || !save.murals) save = { checkpoint: 0, coins: 0, murals: [false, false, false], owl: {} };
+if (!save.owl) save.owl = {};
 loadLevel(0);
-cam = { x: 0 };
-state = 'title';
-paused = false;
-lives = 3;
-coins = 0;
 // a handle for testing from the browser console
-window.sunrise = { get pip() { return pip; }, get level() { return level; }, get state() { return state; } };
+window.sunrise = {
+  get pip() { return pip; }, get level() { return level; }, get state() { return state; }, get blocks() { return blocks; },
+  get enemies() { return enemies; }, get lives() { return lives; }, get coins() { return coins; }, get dialog() { return dialog; },
+  get pieces() { return pieces; }, LEVELS, startLevel: i => { lives = 3; startLevel(i); }, setCoins: c => { coins = c; },
+  closeDialog: () => { dialog = null; owl = null; }, startEnding,
+  freeze: (v, camX) => { frozen = v; if (camX !== undefined) cam.x = camX; }, get save() { return save; },
+};
 requestAnimationFrame(frame);
 </script>
 </body>
