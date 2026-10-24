@@ -791,8 +791,8 @@ function setWhere(s){if(whereEl.textContent!==s)whereEl.textContent=s;}
 
 const INTRO=["HELLO, BLOB. I AM 9-BIT.","I TRAPPED YOU IN MY 11 GAMES.","LAST 30 SECONDS IN EACH. HA HA."];
 const BOSS_INTRO=["FINE. NOW PLAY MY GAME.","DODGE UNTIL I OVERHEAT."];
-const CRASH_LINES=["NO... MY GAMES...","PROJECT STARFISH... BEGINS."];
-const NEWS_LINES=["THIS JUST IN.","A LONELY BOY TURNED HIMSELF INTO A COMPUTER.","HE CALLS HIMSELF 9-BIT."];
+const CRASH_LINES=["NO... MY GAMES...","IT DOESN'T MATTER. STARFISH IS ALREADY OUT."];
+const NEWS_LINES=["THIS JUST IN.","A LONELY BOY TURNED HIMSELF INTO A COMPUTER.","HE CALLS HIMSELF 9-BIT.","HE BUILT A VIRUS CALLED STARFISH.","IT CAN FIND ANYONE."];
 
 function setFace(f,d){face=f;faceT=d;}
 function alive(){return(scene==='world'||scene==='boss')&&phase==='play';}
@@ -970,17 +970,23 @@ function drawNews(){R(0,0,SW,SH,'#0a0a12');pline(62,4,74,18,PAL.g);pline(98,4,86
   R(24,88,40,4,'#6a3410');monitor(42,76);drawMap(BOY,28,64,2,ch=>ch==='h'?'#6a3a10':ch==='s'?'#ffcfa0':ch==='k'?'#000':PAL.b);
   text('>',72,72,PAL.y,2);
   drawCollar(92,52);drawHead(92,52,'smug',tG,false);
-  R(14,104,132,12,'#000');const msg='BOY BECOMES COMPUTER   +++   ';const w=textW(msg)+4,off=Math.floor(endT*30)%w;text(msg+msg+msg,14-off+6,108,PAL.y);
+  R(14,104,132,12,'#000');const msg='VIRUS ALERT: STARFISH   +++   ';const w=textW(msg)+4,off=Math.floor(endT*30)%w;text(msg+msg+msg,14-off+6,108,PAL.y);
   if(Math.floor(tG*2)%2)R(134,38,6,6,PAL.r);text('LIVE',118,39,'#fff');
   ctx.restore();R(130,120,4,3,PAL.G);R(136,120,4,3,PAL.d);}
-const CREDITS=[['B10b','#fff'],['',''],['STARRING',PAL.y],['B10B THE BLOB','#fff'],['9-BIT','#fff'],['',''],['THE GAMES',PAL.y],...WORLDS.map(w=>[w.name,'#fff']),["9-BIT'S GAME",'#fff'],['',''],['GAME DESIGN',PAL.y],['YOU','#fff'],['',''],['THANKS FOR PLAYING',PAL.c],['',''],['SCORE',PAL.m],['HITS',PAL.r]];
+const CREDITS=[['B10b','#fff'],['',''],['STARRING',PAL.y],['B10B THE BLOB','#fff'],['9-BIT','#fff'],['STARFISH',PAL.o],['',''],['THE GAMES',PAL.y],...WORLDS.map(w=>[w.name,'#fff']),["9-BIT'S GAME",'#fff'],['',''],['GAME DESIGN',PAL.y],['YOU','#fff'],['',''],['THANKS FOR PLAYING',PAL.c],['',''],['SCORE',PAL.m],['HITS',PAL.r]];
 function drawCredits(){drawStars(titleStars,tG);for(let i=0;i<CREDITS.length;i++){const y=Math.round(credY+i*10);if(y<-10||y>SH)continue;let[s,c]=CREDITS[i];if(s==='SCORE')s='SCORE '+pad6(score);else if(s==='HITS')s='HITS '+hits;ctext(s,80,y,c,i===0?2:1);}}
+const PEOPLE=[[20,30],[140,40],[30,136],[130,128],[14,90],[148,96],[70,24],[100,182]];
 function drawStarfish(){R(0,0,SW,SH,'#000');const pulse=(Math.sin(endT*2.2)+1)/2;
-  const x=60,y=78,sc=3;
+  const x=60,y=78,sc=3,cx=79,cy=95,scan=(endT-.8)*45;
+  for(let gx=0;gx<SW;gx+=10)R(gx,0,1,SH,'#071a0c');for(let gy=0;gy<SH;gy+=10)R(0,gy,SW,1,'#071a0c');
+  if(endT>.8){const rad=scan%110;for(let i=0;i<40;i++){const a=i/40*Math.PI*2;R(Math.round(cx+Math.cos(a)*rad),Math.round(cy+Math.sin(a)*rad),1,1,rad<70?PAL.o:'#5a2a00');}}
+  let found=0;for(const[px,py]of PEOPLE){const f=endT>.8&&scan>Math.hypot(px-cx,py-cy);if(f)found++;const c=f?PAL.r:PAL.n;R(px,py,1,1,c);R(px-1,py+1,3,2,c);R(px-1,py+3,1,1,c);R(px+1,py+3,1,1,c);if(f&&Math.floor(tG*4)%2)rectLine(px-3,py-3,7,10,PAL.r);}
+  if(found)text('FOUND '+found,4,4,PAL.r);
   if(endT>.8){ctx.globalAlpha=.25+.35*pulse;for(const[dx,dy]of[[-2,0],[2,0],[0,-2],[0,2]])drawMap(STARFISH,x+dx,y+dy,sc,()=>PAL.o);ctx.globalAlpha=1;
     drawMap(STARFISH,x,y,sc,ch=>ch==='y'?(pulse>.5?'#fff':PAL.y):(pulse>.6?PAL.y:PAL.o));}
   if(secretRun){if(endT>2.5){const k=clamp((endT-2.5)/.6,0,1),eh=Math.max(1,Math.round(7*k)),ex=79,ey=95;R(ex-7,ey-Math.floor(eh/2),15,eh,'#fff');if(k>.5){const px=Math.round(Math.sin(endT*1.3)*3);R(ex-2+px,ey-2,4,4,PAL.r);R(ex-1+px,ey-1,2,2,'#000');}}
-    if(endT>3.6){ctext('PROJECT STARFISH 2',80,146,PAL.o,1,'#000');if(Math.floor(endT*2)%2)ctext('COMING SOON',80,158,PAL.y);}}
+    if(endT>3.6){for(const[a,b,w,h]of[[2,14,12,1],[2,14,1,12],[146,14,12,1],[157,14,1,12],[2,197,12,1],[2,186,1,12],[146,197,12,1],[157,186,1,12]])R(a,b,w,h,PAL.r);if(Math.floor(tG*3)%2)ctext('TARGET: YOU',80,62,PAL.r,1,'#000');
+      ctext('PROJECT STARFISH 2',80,146,PAL.o,1,'#000');if(Math.floor(endT*2)%2)ctext('COMING SOON',80,158,PAL.y);}}
   else{if(endT>4)ctext('TO BE CONTINUED',80,150,Math.floor(endT*2)%2?PAL.n:'#4a4a5c');if(endT>5)ctext('SECRET: 5 HITS OR LESS',80,170,'#3a3a4c');}
   drawFx();}
 function glitchStrips(){for(let k=0;k<4;k++){const y=Math.floor(Math.random()*SH),h=1+Math.floor(Math.random()*5),dx=Math.round((Math.random()-.5)*12);ctx.drawImage(cv,0,y,SW,h,dx,y,SW,h);}}
