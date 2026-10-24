@@ -22,6 +22,7 @@
 <canvas id="c" width="960" height="540"></canvas>
 <div id="pad">
   <div><button data-k="left">◀</button><button data-k="right">▶</button></div>
+  <div><button id="bPause">II</button><button id="bSound">♪</button></div>
   <div><button data-k="act">E</button><button data-k="jump">▲</button></div>
 </div>
 <script>
@@ -58,7 +59,11 @@ function pointerPos(e) {
   pointer.x = (e.clientX - r.left) / r.width * VW; pointer.y = (e.clientY - r.top) / r.height * VH; pointer.moved = true;
 }
 cv.addEventListener('pointermove', pointerPos);
-cv.addEventListener('pointerdown', e => { pointerPos(e); pressed.tap = true; });
+cv.addEventListener('pointerdown', e => { pointerPos(e); pressed.tap = true; pointer.down = true; });
+addEventListener('pointerup', () => { pointer.down = false; });
+addEventListener('pointercancel', () => { pointer.down = false; });
+document.getElementById('bPause').addEventListener('pointerdown', e => { e.preventDefault(); if (!screen) paused = !paused; });
+document.getElementById('bSound').addEventListener('pointerdown', e => { e.preventDefault(); muted = !muted; });
 
 // ---------- sound ----------
 let AC, muted = false, paused = false;
@@ -72,18 +77,33 @@ function beep(f, d = .08, type = 'square', v = .05) {
     o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime + d);
   } catch (e) { /* no sound, no problem */ }
 }
-// a little bouncy background tune (0 = rest), with a bass note every 4 steps
-const TUNE = [72,0,76,0,79,0,76,0,74,0,77,0,81,0,77,0,72,0,76,0,79,0,84,0,83,0,79,0,74,0,0,0];
-const BASS = [48,48,53,53,48,48,55,55];
+// every place has its own little song (0 = rest). "every" = how many 40ms ticks per note
+const TUNES = {
+  street: { mel:[72,0,76,0,79,0,76,0,74,0,77,0,81,0,77,0,72,0,76,0,79,0,84,0,83,0,79,0,74,0,0,0], bass:[48,48,53,53,48,48,55,55], every:4, bassEvery:4 },
+  inside: { mel:[67,0,0,72,0,0,71,0,0,67,0,0,69,0,0,65,0,0,64,0,0,0,0,0], bass:[48,43,45,41], every:5, bassEvery:6 },
+  job:    { mel:[76,79,76,72,74,77,74,71,72,76,79,84,83,79,74,0], bass:[48,55,53,55], every:3, bassEvery:4 },
+  jail:   { mel:[69,0,72,0,71,0,68,0,69,0,0,0,64,0,0,0], bass:[45,40], every:6, bassEvery:8 },
+  title:  { mel:[60,64,67,72,0,67,72,76,0,72,76,79,84,0,0,0], bass:[48,53,55,48], every:4, bassEvery:4 },
+  end:    { mel:[72,76,79,84,0,79,84,0,0,0,88,0,0,0,0,0], bass:[48,53,55,60], every:3, bassEvery:4 },
+  secret: { mel:[70,0,73,0,75,0,78,0,77,0,73,0,0,0,0,0], bass:[46,42], every:5, bassEvery:8 },
+};
 const midi = n => 440 * Math.pow(2, (n - 69) / 12);
-let step = 0;
+function tuneName() {
+  if (screen) return { title:'title', jail:'jail', pay:'job', end:'end', secret:'secret' }[screen.type];
+  if (mini) return 'job';
+  return scene === 'street' ? 'street' : 'inside';
+}
+let tick = 0, step = 0, curTune = '';
 setInterval(() => {
-  if (!AC || muted || paused || (screen && screen.type === 'title')) return;
-  const n = TUNE[step % TUNE.length];
+  if (!AC || muted || paused || !G) return;
+  const name = tuneName(), t = TUNES[name];
+  if (name !== curTune) { curTune = name; step = 0; tick = 0; }
+  if (tick++ % t.every) return;
+  const n = t.mel[step % t.mel.length];
   if (n) beep(midi(n), .12, 'square', .012);
-  if (step % 4 === 0) beep(midi(BASS[(step / 4) % BASS.length]), .3, 'triangle', .03);
+  if (step % t.bassEvery === 0) beep(midi(t.bass[(step / t.bassEvery) % t.bass.length]), .3, 'triangle', .03);
   step++;
-}, 160);
+}, 40);
 
 // ---------- drawing helpers ----------
 function R(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
@@ -145,6 +165,44 @@ function drawPerson(x, y, pal, face, walk, sc = 1) {   // x = center, y = feet
   drawRows(BODY, l, t, pal, face < 0, sc);
   drawRows(LEGS[Math.floor(walk) % 2], l, t + 12 * sc, pal, face < 0, sc);
 }
+// ---------- shop items ----------
+const ITEMS = [
+  { id:'cap',    slot:'hat',   name:'CAP',        price:4 },
+  { id:'chef',   slot:'hat',   name:'CHEF HAT',   price:6 },
+  { id:'cowboy', slot:'hat',   name:'COWBOY HAT', price:6 },
+  { id:'crown',  slot:'hat',   name:'CROWN',      price:15 },
+  { id:'blue',   slot:'shirt', name:'BLUE SHIRT', price:3, col:'#3a7bd5' },
+  { id:'green',  slot:'shirt', name:'GREEN SHIRT', price:3, col:'#3c9d5b' },
+  { id:'gold',   slot:'shirt', name:'GOLD SHIRT', price:10, col:'#e8b923' },
+  { id:'shades', slot:'face',  name:'SUNGLASSES', price:6, info:'strangers notice you less' },
+  { id:'stache', slot:'face',  name:'MUSTACHE',   price:8, info:"Gary won't know you" },
+  { id:'cat',    slot:'pet',   name:'CAT',        price:8 },
+  { id:'dog',    slot:'pet',   name:'DOG',        price:8 },
+];
+const HATS = {
+  cap:    { rows:["...cccc...", "..cccccccc"], pal:{ c:'#2f55a4' } },
+  chef:   { rows:["..wwwwww..", ".wwwwwwww.", ".wwwwwwww.", "..wwwwww..", "..wwwwww.."], pal:{ w:'#fff' } },
+  cowboy: { rows:["...bbbb...", "...bbbb...", "bbbbbbbbbb"], pal:{ b:'#8b5a2b' } },
+  crown:  { rows:["..y.yy.y..", "..yyyyyy..", "..yryyby.."], pal:{ y:'#ffcc00', r:'#e22', b:'#36f' } },
+};
+const PETS = {
+  cat: { rows:["....c.c", "c...ccc", ".c..cec", ".ccccc.", ".c.c.c."], pal:{ c:'#8a8a8a', e:'#111' } },
+  dog: { rows:["d....dd.", ".d..ddde", "..ddddd.", "..ddddd.", "..d.d.d."], pal:{ d:'#a0612b', e:'#111' } },
+};
+function drawHat(id, l, t, flip, sc = 1) { const h = HATS[id]; drawRows(h.rows, l, t - (h.rows.length - 1) * sc, h.pal, flip, sc); }
+function drawSteve(x, y, face, walk, sc = 1) {
+  const w = G ? G.wear : {}, shirt = w.shirt && ITEMS.find(i => i.id === w.shirt);
+  drawPerson(x, y, shirt ? { ...STEVE, r:shirt.col } : STEVE, face, walk, sc);
+  const l = Math.round(x - 5 * sc), t = Math.round(y - 16 * sc), flip = face < 0;
+  if (w.face === 'shades') drawRows(["..gggggg.."], l, t + 3 * sc, { g:'#111' }, flip, sc);
+  if (w.face === 'stache') drawRows(["..kkkkkk.."], l, t + 5 * sc, { k:'#3a2010' }, flip, sc);
+  if (w.hat) drawHat(w.hat, l, t, flip, sc);
+}
+function drawPet() {
+  const p = G.wear.pet && PETS[G.wear.pet];
+  if (!p) return;
+  drawRows(p.rows, Math.round(pet.x - camX - 4), GROUND - 5 - pet.hop, p.pal, pet.x > P.x);
+}
 function pineappleHat(x, y) {
   const l = Math.round(x - 5), t = Math.round(y - 16);
   R(l + 4, t - 7, 1, 3, '#3a9a2a'); R(l + 5, t - 8, 1, 4, '#3a9a2a'); R(l + 6, t - 7, 1, 3, '#3a9a2a');
@@ -184,16 +242,23 @@ function drawLayer(id, cx, y) {   // y = top of layer
 
 // ---------- game state ----------
 let G, scene, camX, fade, P, npcs, car, mini, screen, bubble, bubbleQ, fridgeOpen, frameN = 0;
-let parts = [], pines = [], shake = 0;
+let parts = [], pines = [], shake = 0, pet;
 const SAVE_KEY = 'perfectSandwichSave';
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* saving is optional */ } }
-function load() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.done) return s; } catch (e) { /* ignore */ } return null; }
+function newSave() { return { money:0, fridge:false, broke:false, food:false, done:{ deli:0, wash:0, pizza:0, lemon:0 }, owned:[], wear:{} }; }
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s && s.done) { const d = newSave(); return { ...d, ...s, done:{ ...d.done, ...s.done } }; }
+  } catch (e) { /* ignore */ }
+  return null;
+}
 function resetGame(fresh) {
-  G = (!fresh && load()) || { money:0, fridge:false, broke:false, food:false, done:{ deli:0, wash:0, pizza:0 } };
+  G = (!fresh && load()) || newSave();
   if (fresh) save();
   scene = 'home'; camX = 0; fade = 0; npcs = null; car = null; mini = null; bubble = null; bubbleQ = []; fridgeOpen = 0;
   parts = []; pines = []; shake = 0;
-  P = { x:40, y:GROUND, vy:0, face:1, walk:0, ground:true };
+  P = { x:40, y:GROUND, vy:0, face:1, walk:0, ground:true }; pet = { x:20, hop:0 };
   screen = { type:'title', t:0 };
 }
 function say(text) { bubble = { text, t:150 }; bubbleQ = []; }
@@ -211,22 +276,28 @@ function objective() {
   if (!G.done.deli) return 'Get a job! The DELI is hiring.';
   if (!G.done.wash) return 'Need more money! The CAR WASH is hiring.';
   if (!G.done.pizza) return 'Need more money! PIZZA is hiring.';
+  if (!G.done.lemon) return 'Need more money! LEMONADE is hiring.';
   return 'Work any job until you have $' + PRICE + '.';
 }
 
 // ---------- places ----------
+const STREET_W = 1340;
 const BUILDINGS = [
-  { name:'HOME',     x:10,  w:70,  col:'#c9a36b', door:38 },
-  { name:'DELI',     x:220, w:90,  col:'#e07a5f', door:258, job:'deli' },
-  { name:'CAR WASH', x:420, w:100, col:'#4f9dd6', door:462, job:'wash' },
-  { name:'PIZZA',    x:630, w:90,  col:'#f2b134', door:668, job:'pizza' },
-  { name:'STORE',    x:850, w:120, col:'#6cbf6c', door:902 },
+  { name:'HOME',     x:10,   w:70,  col:'#c9a36b', door:38 },
+  { name:'DELI',     x:200,  w:90,  col:'#e07a5f', door:238, job:'deli' },
+  { name:'CAR WASH', x:380,  w:100, col:'#4f9dd6', door:422, job:'wash' },
+  { name:'CLOTHES',  x:580,  w:90,  col:'#c77dd6', door:618, shop:true },
+  { name:'PIZZA',    x:760,  w:90,  col:'#f2b134', door:798, job:'pizza' },
+  { name:'LEMONADE', x:950,  w:90,  col:'#fff176', door:988, job:'lemon' },
+  { name:'STORE',    x:1170, w:120, col:'#6cbf6c', door:1222 },
 ];
+const doorOf = name => BUILDINGS.find(b => b.name === name).door + 7;
 function jobOpen(job) {
   if (!G.broke) return false;
   if (job === 'deli') return true;
   if (job === 'wash') return G.done.deli > 0;
-  return G.done.wash > 0;
+  if (job === 'pizza') return G.done.wash > 0;
+  return G.done.pizza > 0;
 }
 function targetDoor() {   // where the arrow on the street points
   let name;
@@ -249,32 +320,43 @@ const SCENES = {
       if (!G.fridge) say('fridge first...'); else goTo('street', 45);
     } },
   ] },
-  street: { w:1000, things: () => BUILDINGS.map(b => ({ x:b.door, w:14,
+  street: { w:STREET_W, things: () => BUILDINGS.map(b => ({ x:b.door, w:14,
     label: b.job ? (jobOpen(b.job) ? 'Work at ' + b.name : b.name + ' (closed)') : 'Enter ' + b.name, act() {
       if (b.name === 'HOME') goTo('home', 280);
       else if (b.name === 'STORE') goTo('store', 34);
+      else if (b.shop) { if (G.broke) goTo('shop', 34); else say('I need food, not clothes'); }
       else if (!G.broke) say('I need food, not a job');
       else if (!jobOpen(b.job)) say('closed :( try another job');
       else startJob(b.job);
     } })) },
   store: { w:320, things: () => [
-    { x:8, w:18, label:'Go outside', act() { goTo('street', 902); } },
+    { x:8, w:18, label:'Go outside', act() { goTo('street', doorOf('STORE')); } },
     { x:236, w:30, label:'Buy food $' + PRICE, act() {
       if (G.food) say('got it already!');
       else if (G.money < PRICE) { say('I broke :('); G.broke = true; beep(160, .3, 'sawtooth'); }
       else { G.money -= PRICE; G.food = true; say('YES :D'); beep(660); setTimeout(() => beep(990), 100); }
     } },
   ] },
+  shop: { w:460, things: () => [
+    { x:8, w:18, label:'Go outside', act() { goTo('street', doorOf('CLOTHES')); } },
+    ...ITEMS.map((it, i) => ({ x:46 + i * 36, w:24,
+      label: G.owned.includes(it.id) ? (G.wear[it.slot] === it.id ? 'Take off ' : 'Wear ') + it.name : 'Buy ' + it.name + ' $' + it.price + (it.info ? ' (' + it.info + ')' : ''),
+      act() {
+        if (G.owned.includes(it.id)) { G.wear[it.slot] = G.wear[it.slot] === it.id ? null : it.id; beep(700); return; }
+        if (G.money < it.price) { say('I broke :('); beep(160, .3, 'sawtooth'); return; }
+        G.money -= it.price; G.owned.push(it.id); G.wear[it.slot] = it.id; say('cool :D'); beep(880); setTimeout(() => beep(1175), 90);
+      } })),
+  ] },
 };
 
 function goTo(name, x) {
-  scene = name; P.x = x; P.y = GROUND; P.vy = 0; P.ground = true; car = null; fade = 1; pines = []; parts = [];
+  scene = name; P.x = x; P.y = GROUND; P.vy = 0; P.ground = true; car = null; fade = 1; pines = []; parts = []; pet.x = x - 14;
   if (name !== 'street') return;
   if (!npcs) makeNpcs();
   // nobody is standing right on the doorstep when you come out
   for (const n of npcs) {
-    if (n.kind === 'gary') { if (Math.abs(n.x - P.x) < 200) n.x = P.x > 500 ? P.x - 260 : P.x + 260; }
-    else if (Math.abs(n.x - P.x) < 60) n.x = clamp(P.x + (n.x >= P.x ? 1 : -1) * 90, 20, 980);
+    if (n.kind === 'gary') { if (Math.abs(n.x - P.x) < 200) n.x = P.x > 650 ? P.x - 260 : P.x + 260; }
+    else if (Math.abs(n.x - P.x) < 60) n.x = clamp(P.x + (n.x >= P.x ? 1 : -1) * 90, 20, STREET_W - 20);
     n.cool = 60; n.phone = 0;
   }
 }
@@ -282,10 +364,11 @@ function makeNpcs() {
   const looks = [
     { h:'#222', r:'#3c9d5b', p:'#555' }, { h:'#e8c15a', r:'#e88c2a', p:'#2d2d6b' },
     { h:'#999', r:'#2c7da0', p:'#6b4a2b' }, { h:'#b5402b', r:'#ec6fa8', p:'#333' },
+    { h:'#222', r:'#f2d13a', p:'#444' }, { h:'#7a4b2a', r:'#8fd3ff', p:'#2f55a4' },
   ];
-  npcs = [150, 370, 560, 790].map((x, i) => ({ kind:'stranger', x, min:x - 50, max:x + 50, dir:i % 2 ? 1 : -1,
+  npcs = [150, 330, 520, 700, 880, 1100].map((x, i) => ({ kind:'stranger', x, min:x - 50, max:x + 50, dir:i % 2 ? 1 : -1,
     sp:.35 + .1 * i, walk:0, cool:0, phone:0, pal:{ ...BASE, s: i === 2 ? '#c68a5a' : BASE.s, ...looks[i] } }));
-  npcs.push({ kind:'gary', x:600, min:300, max:820, dir:-1, sp:.5, walk:0, cool:0, phone:0, pal:GARY });
+  npcs.push({ kind:'gary', x:700, min:300, max:1150, dir:-1, sp:.5, walk:0, cool:0, phone:0, pal:GARY });
 }
 
 // ---------- world update ----------
@@ -300,6 +383,8 @@ function updateWorld() {
   if (pressed.jump && P.ground) { P.vy = -4.2; P.ground = false; beep(520, .06); }
   P.vy += .25; P.y += P.vy;
   if (P.y >= GROUND) { if (!P.ground) puff(P.x, GROUND - 1, '#d8c8a8', 5, .5); P.y = GROUND; P.vy = 0; P.ground = true; }
+  pet.x += (P.x - P.face * 12 - pet.x) * .08;
+  pet.hop = Math.abs(P.x - P.face * 12 - pet.x) > 2 ? Math.floor(frameN / 6) % 2 : 0;
   parts.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += .05; p.t--; }); parts = parts.filter(p => p.t > 0);
   camX = Math.round(clamp(P.x - VW / 2, 0, sc.w - VW));
   if (fridgeOpen > 0) fridgeOpen--;
@@ -312,8 +397,9 @@ function updateWorld() {
 }
 function updateStreet() {   // returns true if Steve got sent to jail
   for (const n of npcs) {
-    n.walk += .12; if (n.cool > 0) n.cool--;
-    if (n.kind === 'gary') {   // Gary throws pineapples at you from a distance
+    n.walk += .12; if (n.cool > 0) n.cool--; if (n.huh > 0) n.huh--;
+    const fooled = n.kind === 'gary' && G.wear.face === 'stache';
+    if (n.kind === 'gary' && !fooled) {   // Gary throws pineapples at you from a distance
       const d = Math.abs(P.x - n.x);
       n.throwT = (n.throwT || 120) - 1;
       if (n.throwT <= 0 && d > 70 && d < 170) {
@@ -322,11 +408,12 @@ function updateStreet() {   // returns true if Steve got sent to jail
       }
     }
     if (n.phone > 0) n.phone--;
-    else if (n.kind === 'gary' && Math.abs(P.x - n.x) < 70) { n.dir = Math.sign(P.x - n.x) || 1; n.x = clamp(n.x + n.dir * .85, 10, 990); }
+    else if (n.kind === 'gary' && !fooled && Math.abs(P.x - n.x) < 70) { n.dir = Math.sign(P.x - n.x) || 1; n.x = clamp(n.x + n.dir * .85, 10, STREET_W - 10); }
     else { n.x += n.dir * n.sp; if (n.x < n.min) n.dir = 1; if (n.x > n.max) n.dir = -1; }
     const hit = Math.abs(P.x - n.x) < 7 && P.y > GROUND - 13;
     if (!hit) continue;
-    if (n.kind === 'gary') { jail('gary'); return true; }
+    if (n.kind === 'gary') { if (fooled) continue; jail('gary'); return true; }
+    if (!n.cool && G.wear.face === 'shades' && Math.random() < .5) { n.cool = 400; n.huh = 90; continue; }
     if (!n.cool) { n.cool = 400; n.phone = 120; beep(880, .15); callPolice(); }
   }
   for (const p of pines) {
@@ -351,7 +438,7 @@ function updateStreet() {   // returns true if Steve got sent to jail
 function callPolice() {
   if (car) return;
   let x = P.x + P.face * 200;
-  if (x < 0 || x > 1000) x = P.x - P.face * 200;
+  if (x < 0 || x > STREET_W) x = P.x - P.face * 200;
   car = { x, dir: Math.sign(P.x - x), turned:false };
 }
 function jail(reason) {
@@ -416,6 +503,27 @@ function drawStore() {
   R(242, GROUND - 31, 14, 8, '#333'); R(244, GROUND - 30, 10, 3, '#7cf07c');
   R(244, GROUND - 74, 52, 14, '#fff8e0'); R(244, GROUND - 74, 52, 1, '#000'); R(244, GROUND - 61, 52, 1, '#000');
 }
+function drawShop() {
+  for (let y = 0; y < GROUND; y += 10) for (let x = 0; x < VW; x += 10) R(x, y, 10, 10, (x + y) % 20 ? '#f6e1f7' : '#efd2f0');
+  R(0, GROUND, VW, VH - GROUND, '#8a5a8f'); R(0, GROUND - 3, VW, 3, '#6b3f70');
+  ctx.save(); ctx.translate(-camX, 0);
+  R(8, GROUND - 36, 20, 36, '#4a2d1a'); R(10, GROUND - 34, 16, 34, '#9fd8ff'); R(17, GROUND - 34, 2, 34, '#4a2d1a');
+  R(430, GROUND - 60, 20, 44, '#ccc'); R(432, GROUND - 58, 16, 40, '#cfefff');   // mirror
+  ITEMS.forEach((it, i) => {
+    const x = 46 + i * 36, owned = G.owned.includes(it.id);
+    R(x, GROUND - 14, 24, 14, '#6b3f70'); R(x + 1, GROUND - 13, 22, 1, '#a873ad');
+    const cx = x + 12, top = GROUND - 30;
+    if (it.slot === 'hat') { R(cx - 5, top + 6, 10, 10, '#d9b38c'); drawHat(it.id, cx - 5, top + 6, false); }
+    else if (it.slot === 'shirt') { R(cx - 6, top + 4, 12, 10, it.col); R(cx - 8, top + 4, 3, 5, it.col); R(cx + 5, top + 4, 3, 5, it.col); }
+    else if (it.slot === 'face') { R(cx - 5, top + 2, 10, 12, '#d9b38c'); drawRows([it.id === 'shades' ? "..gggggg.." : "..kkkkkk.."], cx - 5, top + (it.id === 'shades' ? 5 : 8), { g:'#111', k:'#3a2010' }, false); }
+    else drawRows(PETS[it.id].rows, cx - 4, top + 9, PETS[it.id].pal, false);
+    if (G.wear[it.slot] === it.id) R(x, GROUND - 2, 24, 2, '#7cf07c');
+    it._owned = owned;
+  });
+  ctx.restore();
+  ITEMS.forEach((it, i) => T(it._owned ? 'OWN' : '$' + it.price, 58 + i * 36 - camX, GROUND - 10, 9, it._owned ? '#7cf07c' : '#fff', 'center'));
+  T('CLOTHES + STUFF', 230 - camX, 30, 16, '#6b3f70', 'center');
+}
 function drawStreet() {
   R(0, 0, VW, VH, '#8fd3ff');
   for (let i = 0; i < 6; i++) {
@@ -427,8 +535,8 @@ function drawStreet() {
     R(bx, by + f, 2, 1, '#333'); R(bx + 2, by + 1, 1, 1, '#333'); R(bx + 3, by + f, 2, 1, '#333');
   }
   ctx.save(); ctx.translate(-camX, 0);
-  for (let x = 0; x < 1000; x += 46) R(x, 60 + (x * 7) % 25, 40, GROUND - 60, '#a9c6db');
-  for (const x of [110, 340, 560, 780]) { R(x, GROUND - 14, 4, 14, '#6b4226'); disc(x + 2, GROUND - 24, 10, '#3f9a3f'); disc(x - 3, GROUND - 19, 6, '#4fae4a'); disc(x + 7, GROUND - 20, 6, '#358a35'); }
+  for (let x = 0; x < STREET_W; x += 46) R(x, 60 + (x * 7) % 25, 40, GROUND - 60, '#a9c6db');
+  for (const x of [110, 330, 530, 720, 900, 1110]) { R(x, GROUND - 14, 4, 14, '#6b4226'); disc(x + 2, GROUND - 24, 10, '#3f9a3f'); disc(x - 3, GROUND - 19, 6, '#4fae4a'); disc(x + 7, GROUND - 20, 6, '#358a35'); }
   for (const b of BUILDINGS) {
     const top = GROUND - 70;
     R(b.x, top, b.w, 70, b.col); R(b.x - 3, top - 4, b.w + 6, 6, '#5b3a29');
@@ -437,10 +545,10 @@ function drawStreet() {
     R(b.door - 1, GROUND - 25, 16, 25, '#3a2414'); R(b.door, GROUND - 24, 14, 24, '#6b4226'); R(b.door + 11, GROUND - 13, 2, 2, '#f2c12e');
     if (b.job && !jobOpen(b.job)) { R(b.door + 1, GROUND - 18, 12, 6, '#d33'); }
   }
-  R(0, GROUND, 1000, 8, '#b5b5b5'); for (let x = 0; x < 1000; x += 20) R(x, GROUND, 1, 8, '#999');
-  R(0, GROUND + 8, 1000, VH - GROUND - 8, '#3d3d3d'); for (let x = 0; x < 1000; x += 30) R(x, GROUND + 18, 14, 2, '#f2d13a');
-  for (const x of [190, 400, 610, 830]) { R(x, GROUND - 42, 2, 42, '#333'); R(x - 3, GROUND - 46, 8, 4, '#333'); R(x - 2, GROUND - 42, 6, 2, '#ffe9a0'); }
-  R(840, GROUND - 8, 5, 8, '#d33'); R(839, GROUND - 6, 7, 2, '#d33'); R(841, GROUND - 10, 3, 2, '#b22');
+  R(0, GROUND, STREET_W, 8, '#b5b5b5'); for (let x = 0; x < STREET_W; x += 20) R(x, GROUND, 1, 8, '#999');
+  R(0, GROUND + 8, STREET_W, VH - GROUND - 8, '#3d3d3d'); for (let x = 0; x < STREET_W; x += 30) R(x, GROUND + 18, 14, 2, '#f2d13a');
+  for (const x of [180, 360, 560, 740, 930, 1150]) { R(x, GROUND - 42, 2, 42, '#333'); R(x - 3, GROUND - 46, 8, 4, '#333'); R(x - 2, GROUND - 42, 6, 2, '#ffe9a0'); }
+  R(1160, GROUND - 8, 5, 8, '#d33'); R(1159, GROUND - 6, 7, 2, '#d33'); R(1161, GROUND - 10, 3, 2, '#b22');
   for (const p of pines) {
     const x = Math.round(p.x - 3), y = Math.round(p.y);
     R(x + 2, y - 3, 1, 3, '#3a9a2a'); R(x + 4, y - 3, 1, 3, '#3a9a2a'); R(x + 1, y, 6, 7, '#f2c12e'); R(x + 2, y + 2, 1, 1, '#a0711c'); R(x + 5, y + 4, 1, 1, '#a0711c');
@@ -448,6 +556,7 @@ function drawStreet() {
   for (const n of npcs) {
     drawPerson(n.x, GROUND, n.pal, n.phone ? (P.x > n.x ? 1 : -1) : n.dir, n.phone ? 0 : n.walk);
     if (n.kind === 'gary') pineappleHat(n.x, GROUND);
+    if (n.huh) T('?', n.x, GROUND - 28, 12, '#fff', 'center');
     if (n.phone) { R(n.x + 3, GROUND - 13, 2, 4, '#222'); R(n.x - 1, GROUND - 26, 2, 6, '#e22'); R(n.x - 1, GROUND - 19, 2, 2, '#e22'); }
   }
   if (car) {
@@ -456,10 +565,11 @@ function drawStreet() {
     R(x, y + 6, 30, 2, '#1d3d8f'); R(x + 10, y - 2, 4, 2, on ? '#ff2a2a' : '#601010'); R(x + 15, y - 2, 4, 2, on ? '#202060' : '#2a5bff');
     R(x + 3, y + 9, 7, 3, '#111'); R(x + 20, y + 9, 7, 3, '#111');
   }
-  drawPerson(P.x, P.y, STEVE, P.face, P.walk);
+  drawSteve(P.x, P.y, P.face, P.walk);
   ctx.restore();
   for (const b of BUILDINGS) {
     T(b.name, b.x + b.w / 2 - camX, GROUND - 66, 11, '#3a2414', 'center');
+    if (b.shop) T(G.broke ? 'OPEN' : 'CLOSED', b.x + b.w / 2 - camX, GROUND - 40, 9, G.broke ? '#7cf07c' : '#ff6b6b', 'center');
     if (b.job) T(jobOpen(b.job) ? 'HIRING' : 'CLOSED', b.x + b.w / 2 - camX, GROUND - 40, 9, jobOpen(b.job) ? '#7cf07c' : '#ff6b6b', 'center');
   }
   // arrow showing where to go next
@@ -471,9 +581,11 @@ function drawStreet() {
   }
 }
 function drawWorld() {
-  if (scene === 'home') { drawHome(); drawPerson(P.x, P.y, STEVE, P.face, P.walk); }
-  else if (scene === 'store') { drawStore(); drawPerson(P.x, P.y, STEVE, P.face, P.walk); T('FOOD $' + PRICE, 270, GROUND - 70, 11, '#3a2414', 'center'); }
+  if (scene === 'home') { drawHome(); drawSteve(P.x, P.y, P.face, P.walk); }
+  else if (scene === 'shop') { drawShop(); drawSteve(P.x - camX, P.y, P.face, P.walk); }
+  else if (scene === 'store') { drawStore(); drawSteve(P.x, P.y, P.face, P.walk); T('FOOD $' + PRICE, 270, GROUND - 70, 11, '#3a2414', 'center'); }
   else drawStreet();
+  drawPet();
   for (const p of parts) R(p.x - camX, p.y, 1, 1, p.c);
   const n = nearest();
   if (bubble) bubbleAt(bubble.text, P.x - camX, P.y - 18);
@@ -485,8 +597,8 @@ function drawWorld() {
 }
 
 // ---------- jobs ----------
-const JOB_NAMES = { deli:'DELI', wash:'CAR WASH', pizza:'PIZZA DELIVERY' };
-function startJob(job) { if (job === 'deli') startStack('deli'); else if (job === 'wash') startWash(); else startPizza(); }
+const JOB_NAMES = { deli:'DELI', wash:'CAR WASH', pizza:'PIZZA DELIVERY', lemon:'LEMONADE STAND' };
+function startJob(job) { ({ deli:() => startStack('deli'), wash:startWash, pizza:startPizza, lemon:startLemon })[job](); }
 function payday(job, amount, lines) { mini = null; screen = { type:'pay', job, amount, lines, t:0 }; }
 
 // --- Deli + the final sandwich: drop the swinging layer onto the stack ---
@@ -539,18 +651,22 @@ function landStack(m) {
     m.ew++; m.falling.push({ ...h, vx: off < 0 ? -1.5 : 1.5, vy:-2 }); m.msg = "EW! Gary's pineapple!"; m.msgT = 70; beep(140, .3, 'sawtooth');
     return;
   }
-  if (a > LW * .6) { m.falling.push({ ...h, vx: Math.sign(off) * 1.5, vy:0 }); m.msg = 'Oops! Try again'; beep(150, .2, 'sawtooth'); return; }
+  if (a > LW * .6) { m.falls = (m.falls || 0) + 1; m.falling.push({ ...h, vx: Math.sign(off) * 1.5, vy:0 }); m.msg = 'Oops! Try again'; beep(150, .2, 'sawtooth'); return; }
   m.stack.push({ id:h.id, x:h.x });
-  if (a < 3) { m.perfect++; if (pay) m.earned += 2; m.msg = pay ? 'PERFECT! +$2' : 'PERFECT!'; beep(880, .1); setTimeout(() => beep(1320, .1), 80); }
+  if (a < 3) { m.perfect++; if (pay) m.earned += 1; m.msg = pay ? 'PERFECT! +$1' : 'PERFECT!'; beep(880, .1); setTimeout(() => beep(1320, .1), 80); }
   else if (a < 10) { m.nice++; if (pay) m.earned += 1; m.msg = pay ? 'Nice! +$1' : 'Nice!'; beep(660); }
   else { m.msg = 'Wobbly...'; beep(330); }
   if (m.stack.length >= m.orders[m.oi].length) { m.doneT = 70; m.msg = m.kind === 'final' ? 'DONE!' : 'Sandwich done!'; }
 }
 function finishStack(m) {
-  if (m.kind === 'deli') { payday('deli', m.earned, ['Sandwiches made: 2', 'Perfect drops: ' + m.perfect]); return; }
+  if (m.kind === 'deli') {
+    const tip = m.falls ? 0 : 2;
+    payday('deli', m.earned + tip, ['Sandwiches made: 2', 'Perfect drops: ' + m.perfect, tip ? 'Nothing fell! Tip: +$2' : 'Things fell: no tip']);
+    return;
+  }
   const score = m.perfect * 2 + m.nice + m.dodged - m.ew * 3, stars = clamp(1 + Math.round(score / 20 * 4), 1, 5);
   mini = null; G.food = false;
-  screen = { type:'end', stars, stack: m.orders[0], ew:m.ew, t:0 };
+  screen = { type:'end', stars, stack: m.orders[0], ew:m.ew, secret: stars === 5 && m.ew === 0, t:0 };
 }
 function drawStack() {
   const m = mini;
@@ -681,13 +797,89 @@ function drawPizza() {
     const y = Math.round(m.py), spin = Math.floor(m.scroll / 4) % 2;
     disc(52, y - 4, 4, '#222'); disc(68, y - 4, 4, '#222'); R(52, y - 4 - spin, 1, 1, '#aaa'); R(68, y - 4 - spin, 1, 1, '#aaa');
     R(52, y - 8, 16, 2, '#2a9d8f'); R(58, y - 11, 2, 4, '#2a9d8f');
-    drawPerson(60, y - 7, STEVE, 1, 0);
+    drawSteve(60, y - 7, 1, 0);
     for (let i = 0; i < m.pizzas; i++) R(46, y - 14 - i * 3, 9, 2, i % 2 ? '#d9a066' : '#c48a50');
   }
   for (const p of m.pops) T(p.text, p.x, p.y, 11, '#fff', 'center');
   R(0, 0, VW, 13, 'rgba(0,0,0,.65)');
   T('PIZZA   Pizzas: ' + m.pizzas + '   Delivered: ' + m.delivered + '   $' + m.delivered * 2, 4, 3, 11);
   T('SPACE = jump', 316, 3, 10, '#ccc', 'right');
+}
+
+// --- Lemonade stand: hold to pour, stop right at the red line ---
+const CUP_Y = 140;
+function newCust() {
+  const looks = ['#3c9d5b', '#e88c2a', '#2c7da0', '#ec6fa8', '#f2d13a', '#9b59b6'];
+  return { x:VW + 10, h:[18, 24, 30][Math.random() * 3 | 0], target:.45 + Math.random() * .4, mood:0, walk:0,
+           pal:{ ...BASE, h:['#222', '#e8c15a', '#999', '#b5402b'][Math.random() * 4 | 0], r:looks[Math.random() * looks.length | 0] } };
+}
+function startLemon() {
+  mini = { type:'lemon', n:0, total:6, served:0, perfect:0, earned:0, cust:newCust(), fill:0, rate:.008 + G.done.lemon * .002,
+           state:'walk', pat:1, pouring:false, msg:'', msgT:0, end:0, update:updLemon, draw:drawLemon };
+}
+function judgeLemon(m, why) {
+  const c = m.cust, d = Math.abs(m.fill - c.target);
+  m.pouring = false; m.state = 'leave'; m.msgT = 60;
+  if (why === 'spill') { c.mood = -1; m.msg = 'SPILL! Too much!'; beep(150, .25, 'sawtooth'); }
+  else if (why === 'late') { c.mood = -1; m.msg = 'Too slow...'; beep(200, .2); }
+  else if (d < .04) { c.mood = 2; m.earned += 2; m.perfect++; m.served++; m.msg = 'PERFECT! +$2'; beep(990); setTimeout(() => beep(1320), 80); }
+  else if (d < .1) { c.mood = 1; m.earned += 1; m.served++; m.msg = 'Good! +$1'; beep(660); }
+  else { c.mood = -1; m.msg = m.fill < c.target ? 'Not enough!' : 'Too much!'; beep(250, .2); }
+}
+function updLemon() {
+  const m = mini, c = m.cust;
+  if (m.msgT > 0) m.msgT--;
+  if (m.end) { if (--m.end === 0) payday('lemon', m.earned, ['Customers served: ' + m.served + '/' + m.total, 'Perfect pours: ' + m.perfect]); return; }
+  c.walk += .12;
+  if (m.state === 'walk') { c.x -= 1.2; if (c.x <= 210) { c.x = 210; m.state = 'pour'; m.pat = 1; } return; }
+  if (m.state === 'pour') {
+    const hold = keys.jump || keys.act || pointer.down;
+    if (hold) {
+      m.fill += m.rate; m.pouring = true;
+      if (frameN % 6 === 0) beep(200 + m.fill * 600, .05, 'sine', .02);
+      if (m.fill >= 1) { m.fill = 1; judgeLemon(m, 'spill'); }
+    } else if (m.pouring) judgeLemon(m);
+    else if ((m.pat -= 1 / 360) <= 0) judgeLemon(m, 'late');
+    return;
+  }
+  c.x += 1.4;   // leaving
+  if (c.x > VW + 20) {
+    if (++m.n >= m.total) m.end = 40;
+    else { m.cust = newCust(); m.fill = 0; m.state = 'walk'; m.rate += .0015; }
+  }
+}
+function drawLemon() {
+  const m = mini, c = m.cust;
+  R(0, 0, VW, VH, '#9be0ff'); disc(280, 34, 12, '#ffe066');
+  R(0, 110, VW, 40, '#7cc24a'); R(0, 150, VW, 30, '#d8c08a');
+  for (let i = 0; i < 6; i++) { const x = 20 + i * 60; R(x, 96, 4, 14, '#6b4226'); disc(x + 2, 90, 8, '#3f9a3f'); }
+  drawSteve(98, 150, 1, 0);
+  drawPerson(c.x, 150, c.pal, m.state === 'leave' ? 1 : -1, m.state === 'pour' ? 0 : c.walk);
+  if (m.state === 'pour' && !m.pouring) { R(c.x - 10, 126, 20, 2, '#555'); R(c.x - 10, 126, Math.round(20 * m.pat), 2, m.pat > .3 ? '#7cf07c' : '#f44'); }
+  if (m.state === 'leave') {
+    if (c.mood > 0) drawRows([".r.r.", "rrrrr", "rrrrr", ".rrr.", "..r.."], c.x - 5, 124, { r:'#ff4d6d' }, false, 2);
+    else drawRows(["r...r", ".r.r.", "..r..", ".r.r.", "r...r"], c.x - 5, 124, { r:'#e22' }, false, 2);
+  }
+  // stand with a striped roof
+  R(82, 56, 3, 84, '#8b5a2b'); R(186, 56, 3, 84, '#8b5a2b');
+  for (let i = 0; i < 8; i++) R(76 + i * 15, 48, 15, 10, i % 2 ? '#fff' : '#ffd23f');
+  R(110, CUP_Y, 60, 10, '#c98a4b'); R(108, CUP_Y - 2, 64, 3, '#a86c35'); R(112, CUP_Y + 10, 3, 10, '#8b5a2b'); R(165, CUP_Y + 10, 3, 10, '#8b5a2b');
+  // cup with lemonade and the red target line
+  const h = c.h, fh = Math.round(m.fill * h), ty = CUP_Y - 2 - Math.round(c.target * h);
+  if (m.state !== 'walk' || c.x < VW) {
+    R(132, CUP_Y - 2 - h, 1, h, '#ddd'); R(147, CUP_Y - 2 - h, 1, h, '#ddd'); R(132, CUP_Y - 3, 16, 1, '#ddd');
+    R(133, CUP_Y - 3 - fh, 14, fh, '#fff176');
+    for (let x = 129; x < 152; x += 3) R(x, ty, 2, 1, '#e22');
+    R(152, ty - 1, 2, 3, '#e22');
+  }
+  // pitcher
+  const py = CUP_Y - 2 - h - 24;
+  R(146, py, 16, 16, '#e8f6ff'); R(148, py + 6, 12, 9, '#fff176'); R(162, py + 4, 3, 8, '#e8f6ff');
+  if (m.pouring) R(141, py + 6, 2, CUP_Y - 3 - fh - (py + 6), '#fff176');
+  if (m.msgT > 0) T(m.msg, VW / 2, 66, 14, '#e0702b', 'center');
+  R(0, 0, VW, 13, 'rgba(0,0,0,.65)');
+  T('LEMONADE   Customer ' + Math.min(m.n + 1, m.total) + '/' + m.total + '   Earned $' + m.earned, 4, 3, 11);
+  T('HOLD SPACE = pour', 316, 3, 10, '#ccc', 'right');
 }
 
 // ---------- full-screen cards ----------
@@ -703,7 +895,8 @@ function updateScreen() {
     G.money += s.amount; G.done[s.job]++; screen = null;
     goTo('street', BUILDINGS.find(b => b.job === s.job).door + 7);
     beep(990, .1); setTimeout(() => beep(1320, .15), 100);
-  } else if (s.type === 'end') resetGame(true);
+  } else if (s.type === 'end') { if (s.secret) screen = { type:'secret', t:0 }; else resetGame(true); }
+  else if (s.type === 'secret' && s.t > 500) resetGame(true);
 }
 function drawScreen() {
   const s = screen;
@@ -714,14 +907,14 @@ function drawScreen() {
     T('SANDWICH', VW / 2, 40, 30, '#ffe066', 'center');
     let y = 128; ['bread', 'tomato', 'cheese', 'lettuce', 'ham', 'bread'].forEach(id => { y -= LAY[id].h; drawLayer(id, 200, y); });
     R(168, 128, 64, 3, '#fff');
-    drawPerson(100, 130, STEVE, 1, 0, 3);
+    drawSteve(100, 130, 1, 0, 3);
     drawPerson(268, 130, GARY, -1, 0, 2); pineappleHat(268, 114);
     T('Move: < >  Jump: SPACE  Use: E  Sound: M  Pause: P', VW / 2, 140, 10, '#ccc', 'center');
     if (G.fridge) T('Saved game: $' + G.money + '   (N = new game)', VW / 2, 151, 10, '#7cf07c', 'center');
     if (frameN % 60 < 40) T(G.fridge ? 'Press SPACE or tap to continue' : 'Press SPACE or tap to start', VW / 2, 164, 12, '#fff', 'center');
   } else if (s.type === 'jail') {
     R(0, 0, VW, VH, '#3a3a44'); R(0, 120, VW, 60, '#2a2a30');
-    drawPerson(160, 120, STEVE, 1, 0, 3);
+    drawSteve(160, 120, 1, 0, 3);
     for (let x = 100; x <= 220; x += 12) R(x, 40, 3, 84, '#888');
     R(96, 40, 130, 4, '#888'); R(96, 120, 130, 4, '#888');
     T('JAIL!', VW / 2, 12, 24, '#ff6b6b', 'center');
@@ -743,7 +936,7 @@ function drawScreen() {
     T('THE PERFECT SANDWICH!', VW / 2, 10, 20, '#e0702b', 'center');
     let y = 130; s.stack.forEach(id => { y -= LAY[id].h; drawLayer(id, 200, y); });
     R(168, 130, 64, 3, '#fff'); R(172, 133, 56, 2, '#ddd');
-    drawPerson(100, 134, STEVE, 1, 0, 3);
+    drawSteve(100, 134, 1, 0, 3);
     bubbleAt(s.ew ? 'yum... (less pineapple pls)' : 'yum :D', 100, 86);
     // meanwhile, Gary finally got caught with his pineapple pizza
     drawPerson(276, 130, GARY, -1, 0, 2);
@@ -752,7 +945,20 @@ function drawScreen() {
     T('Gary got caught!', 276, 134, 8, '#3a2414', 'center');
     for (let i = 0; i < 5; i++) drawRows(STAR, 122 + i * 16, 40, { y: i < s.stars ? '#ffcc00' : '#c9b98f' }, false, 2);
     T('THE END', VW / 2, 146, 16, '#3a2414', 'center');
-    if (s.t > 40) T('SPACE to play again', VW / 2, 164, 10, '#6b4a2b', 'center');
+    if (s.t > 40) T(s.secret ? 'SPACE for... ???' : 'SPACE to play again', VW / 2, 164, 10, '#6b4a2b', 'center');
+  } else if (s.type === 'secret') {
+    // Steve finds the pineapple Gary left behind... and tries it.
+    R(0, 0, VW, VH, '#2b2238'); R(0, 150, VW, 30, '#4a3a2a');
+    R(230, 50, 50, 40, '#6b4226'); R(233, 53, 44, 34, '#1c2a4a');
+    for (let i = 0; i < 8; i++) R(236 + (i * 13) % 40, 56 + (i * 7) % 26, 1, 1, '#fff');
+    drawSteve(130, 150, 1, 0, 3);
+    if (s.t > 30) { disc(150, 118, 5, '#f2c12e'); disc(150, 118, 2, '#2b2238'); }
+    const lines = [[60, '...'], [150, '*nibble*'], [240, "it's... GOOD?!"], [340, "don't tell Gary"]];
+    const line = lines.filter(l => s.t > l[0]).pop();
+    if (line) bubbleAt(line[1], 130, 98);
+    if (s.t > 420) { drawPerson(255, 92, GARY, -1, 0, 2); pineappleHat(255, 76); R(230, 86, 50, 8, '#6b4226'); }
+    if (s.t > 450) { T('SECRET ENDING', VW / 2, 12, 20, '#ffe066', 'center'); T('PINEAPPLE TWIST', VW / 2, 30, 16, '#f2c12e', 'center'); }
+    if (s.t > 500) T('SPACE to play again', VW / 2, 164, 10, '#fff', 'center');
   }
 }
 
