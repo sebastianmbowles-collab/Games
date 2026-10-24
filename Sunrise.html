@@ -2363,28 +2363,162 @@ function drawDarts(cx) {
 
 // ---------- art: creatures ----------
 const PAL = {
-  o: '#ec7a2c', d: '#b0501c', w: '#f6ecd8', k: '#1b1210',
+  o: '#ee7c30', d: '#b04a1a', w: '#fbf2e4', k: '#2b1b16', h: '#ffaa60', e: '#140e0c',
   g: '#5a6075', G: '#383c4c', l: '#9aa0b5', y: '#ffe066',
   b: '#7a5634', r: '#d8b24a', W: '#f4ecd0', t: '#c9a77a', Y: '#e8a23a',
 };
-const BODY = [
-  '................',
-  '..........d..d..',
-  '..........oo.oo.',
-  '..........ooooo.',
-  '.w........ookooo',
-  'ww.......ooowwwk',
-  'wwo..oooooowww..',
-  '.oooooooooooww..',
-  '...ddoooooooo...',
-];
-const LEGS = {
-  stand: ['.....oo...oo....', '.....dd...dd....', '.....kk...kk....'],
-  runA: ['....oo....oo....', '...dd......dd...', '..kk........kk..'],
-  runB: ['.....oo..oo.....', '......dddd......', '......kkkk......'],
-  air: ['....oo.....oo...', '...kk.......kk..', '................'],
-  climbA: ['.....oo...oo....', '.....kk....dd...', '...........kk...'],
-  climbB: ['.....oo...oo....', '.....dd...kk....', '.....kk.........'],
+// Pip faces right. 18 wide and 13 tall; the feet sit on the bottom row.
+const FOX = {
+  stand: [
+    '............k..k..',
+    '...........dd.dd..',
+    '...........ooooo..',
+    '.ww.......ooooeoo.',
+    'wwwo......ooowwwwk',
+    'wwooo......owwww..',
+    '.ooooohhhoooowww..',
+    '..oooooooooooww...',
+    '....ddooooooodw...',
+    '.....ddooooodd....',
+    '.....do....od.....',
+    '.....kk....kk.....',
+    '.....kk....kk.....',
+  ],
+  blink: [
+    '............k..k..',
+    '...........dd.dd..',
+    '...........ooooo..',
+    '.ww.......ooooooo.',
+    'wwwo......ooowwwwk',
+    'wwooo......owwww..',
+    '.ooooohhhoooowww..',
+    '..oooooooooooww...',
+    '....ddooooooodw...',
+    '.....ddooooodd....',
+    '.....do....od.....',
+    '.....kk....kk.....',
+    '.....kk....kk.....',
+  ],
+  wag: [
+    '............k..k..',
+    'ww.........dd.dd..',
+    'wwo........ooooo..',
+    '.woo......ooooeoo.',
+    '..ooo.....ooowwwwk',
+    '...ooo.....owwww..',
+    '..oooohhhoooowww..',
+    '...ooooooooooww...',
+    '....ddooooooodw...',
+    '.....ddooooodd....',
+    '.....do....od.....',
+    '.....kk....kk.....',
+    '.....kk....kk.....',
+  ],
+  runA: [
+    '............k..k..',
+    '...........dd.dd..',
+    '...........ooooo..',
+    '.ww.......ooooeoo.',
+    'wwwo......ooowwwwk',
+    'wwooo......owwww..',
+    '.ooooohhhoooowww..',
+    '..oooooooooooww...',
+    '....ddooooooodw...',
+    '.....ddooooodd....',
+    '....dd......od....',
+    '...kk........kk...',
+    '..kk...........k..',
+  ],
+  runB: [
+    'ww.........dd.dd..',
+    'wwo........ooooo..',
+    '.woo......ooooeoo.',
+    '..ooo.....ooowwwwk',
+    '...ooo.....owwww..',
+    '..oooohhhoooowww..',
+    '...ooooooooooww...',
+    '....ddooooooodw...',
+    '.....ddooooodd....',
+    '.....dk....kd.....',
+    '......kk..kk......',
+    '..................',
+    '..................',
+  ],
+  air: [
+    '............k..k..',
+    'ww.........dd.dd..',
+    'wwo........ooooo..',
+    '.woo......ooooeoo.',
+    '..ooo.....ooowwwwk',
+    '...ooo.....owwww..',
+    '..oooohhhoooowww..',
+    '...ooooooooooww...',
+    '....ddooooooodw...',
+    '.....ddooooodd....',
+    '....dk......dk....',
+    '...kk........kk...',
+    '..................',
+  ],
+  climbA: [
+    '............k..k..',
+    '...........dd.dd..',
+    '...........ooooo..',
+    '.ww.......ooooeoo.',
+    'wwwo......ooowwwwk',
+    'wwooo......owwww..',
+    '.ooooohhhoooowww..',
+    '..oooooooooooww...',
+    '....ddooooooodw...',
+    '.....ddooooodd....',
+    '.....do.....od....',
+    '.....kk......kk...',
+    '..................',
+  ],
+  climbB: [
+    '............k..k..',
+    '...........dd.dd..',
+    '...........ooooo..',
+    '.ww.......ooooeoo.',
+    'wwwo......ooowwwwk',
+    'wwooo......owwww..',
+    '.ooooohhhoooowww..',
+    '..oooooooooooww...',
+    '....ddooooooodw...',
+    '.....ddooooodd....',
+    '......od...od.....',
+    '......kk...kk.....',
+    '..................',
+  ],
+  sit: [
+    '..................',
+    '............k..k..',
+    '...........dd.dd..',
+    '...........ooooo..',
+    '..........ooooeoo.',
+    '..........ooowwwwk',
+    '...........owwww..',
+    '..........ooowww..',
+    '........oohhoww...',
+    '.......ooooooww...',
+    '..wwwoooooooow....',
+    '.wwwooddoooodd....',
+    '......kk....kk....',
+  ],
+  sitBlink: [
+    '..................',
+    '............k..k..',
+    '...........dd.dd..',
+    '...........ooooo..',
+    '..........ooooooo.',
+    '..........ooowwwwk',
+    '...........owwww..',
+    '..........ooowww..',
+    '........oohhoww...',
+    '.......ooooooww...',
+    '..wwwoooooooow....',
+    '.wwwooddoooodd....',
+    '......kk....kk....',
+  ],
 };
 const WOLF = [
   '...........G.G..',
@@ -2427,36 +2561,15 @@ function sprite(rows, w, h, tint) {
   });
   return c;
 }
-const BLINK = rows => rows.map((r, i) => (i === 4 && r[12] === 'k' ? r.slice(0, 12) + 'o' + r.slice(13) : r));
-const WAG = rows => rows.map((r, i) => (i === 4 ? 'w' + '.' + r.slice(2) : i === 6 ? '.' + r.slice(1) : r));
-const SIT = [
-  '................',
-  '................',
-  '..........d..d..',
-  '..........oo.oo.',
-  '..........ooooo.',
-  '..........ookooo',
-  '.........ooowwwk',
-  'w......ooooww...',
-  'ww...oooooowww..',
-  'wwoooooooooww...',
-  '.ooooddoooooo...',
-  '.....kk...kk....',
-];
-LEGS.blink = LEGS.stand;
-LEGS.wag = LEGS.stand;
 const frames = {}, shadowFrames = {};
-for (const k in LEGS) {
-  const rows = BODY.map(r => r).concat(LEGS[k]);
-  if (k === 'runB') { rows.shift(); rows.splice(8, 0, '................'); }
-  frames[k] = sprite(k === 'blink' ? BLINK(rows) : k === 'wag' ? WAG(rows) : rows, 16, 12);
-  shadowFrames[k] = sprite(rows, 16, 12, '#2a2418');
+for (const k in FOX) {
+  frames[k] = sprite(FOX[k], 18, 13);
+  shadowFrames[k] = sprite(FOX[k], 18, 13, '#2a2418');
 }
-frames.sit = sprite(SIT, 16, 12);
-frames.sitBlink = sprite(SIT.map((r, i) => (i === 5 ? r.slice(0, 12) + 'o' + r.slice(13) : r)), 16, 12);
 const wolfFrames = WOLF_LEGS.map(l => sprite(WOLF.concat(l), 16, 10));
 const owlSprite = sprite(OWL, 12, 12);
 const owlShadow = sprite(OWL, 12, 12, '#2a2418');
+const foxLight = sprite(FOX.sit, 18, 13, '#fffbe8');
 
 function pipFrame(p) {
   if (p.climbing) return Math.floor(p.anim * 8) % 2 ? 'climbA' : 'climbB';
@@ -2475,7 +2588,7 @@ function drawPip(cx) {
     ctx.save();
     ctx.translate(Math.round(p.x + p.w / 2 - cx), Math.round(p.y + p.h / 2));
     ctx.rotate((0.9 - p.dying) * 9 * p.face);
-    ctx.drawImage(frames.air, -8, -6);
+    ctx.drawImage(frames.air, -9, -7);
     ctx.restore();
     return;
   }
@@ -2488,7 +2601,7 @@ function drawPip(cx) {
   ctx.translate(fx, fy);
   if (p.dig > 0) ctx.rotate(p.face * 0.35);
   ctx.scale(p.face * sx, sy);
-  ctx.drawImage(f, -8, -12);
+  ctx.drawImage(f, -9, -13);
   ctx.restore();
   if (p.grabbing) {
     ctx.fillStyle = '#f6ecd8';
@@ -2604,7 +2717,7 @@ function applyLight(cx, withPip) {
 }
 
 // ---------- HUD and text ----------
-const HEAD = ['.d...d.', '.oo.oo.', 'ooooooo', 'okoooko', '.owwwo.', '..wkw..'];
+const HEAD = ['.k...k.', '.dd.dd.', 'ooooooo', 'oeoooeo', '.owwwo.', '..wkw..'];
 const headSprite = sprite(HEAD, 7, 6);
 
 function text(str, x, y, size, color, align) {
@@ -2667,7 +2780,7 @@ function drawMuralScene(i, x, y) {
     ctx.save();
     ctx.translate(fx, fy);
     ctx.scale(face * s, s);
-    ctx.drawImage(shadowFrames.stand, -8, -12);
+    ctx.drawImage(shadowFrames.stand, -9, -13);
     ctx.restore();
   };
   ctx.fillStyle = '#b8a888';
@@ -2776,7 +2889,7 @@ function drawIntro() {
     ctx.fillRect(168, 166, 21, 10);
     ctx.save();
     ctx.translate(176, 175);
-    ctx.drawImage(frames.stand, -8, -12);
+    ctx.drawImage(frames.stand, -9, -13);
     ctx.restore();
   } else if (i === 2) {
     drawForestScene(400, 0);
@@ -2885,7 +2998,7 @@ function drawEnding() {
   ctx.save();
   ctx.translate(128, 175);
   ctx.scale(-1, 1);
-  ctx.drawImage(s === 1 ? frames.stand : frames.stand, -8, -12);
+  ctx.drawImage(frames.sit, -9, -13);
   ctx.restore();
   // the owl
   if (s >= 3 && s <= 5) {
@@ -2922,7 +3035,7 @@ function drawEnding() {
     ctx.save();
     ctx.translate(160, 96);
     ctx.scale(2, 2);
-    ctx.drawImage(sprite(BODY.concat(LEGS.stand), 16, 12, '#fffbe8'), -8, -12);
+    ctx.drawImage(foxLight, -9, -13);
     ctx.restore();
     ctx.globalAlpha = 1;
     wrap('Deep inside the Sun Stone, a small light glows. It is shaped like a fox.', 36).forEach((ln, k) => text(ln, W / 2, 142 + k * 11, 8, '#f6ecd8', 'center'));
