@@ -697,7 +697,7 @@ const LEVELS = [{
     '.........V..........',
     '.........V..........',
     '.........V..........',
-    '>...g....V.....T....',
+    'S...g....V.....T....',
     'SSSSSSSDDSSSSSSSSSSS',
     'SSSSSSSSSSSSSSSSSSSS',
     'SSSSSSSSSSSSSSSSSSSS',
@@ -705,7 +705,7 @@ const LEVELS = [{
 }, {
   name: 'The Heart of the Temple', zone: 'sanctum', code: 'tlms',
   owl: ['We are nearly there, dear fox. The Sun Stone lies beyond the great vault. I have waited a very, very long time for this day.'],
-  hints: ['The golems again! Dig, dear fox, dig.', 'Climb the bridge-vine to the top of the great wall, turning each vine above you as you go.', 'Blue beside blue beside blue. And mind the darts.', 'Read the carvings in the vault: star, leaf, moon, sun. Push the moon first. The sun must be pushed from its right side.'],
+  hints: ['The golems again! Dig, dear fox, dig.', 'Climb the bridge-vine to the top of the great wall, turning each vine above you as you go.', 'Blue beside blue beside blue. Then run! Those ceiling rocks are loose.', 'Read the carvings in the vault: star, leaf, moon, sun. Push the moon first. The sun must be pushed from its right side.'],
   screens: [[
     'SSSSSSSSSSSSSSSSSSSS',
     'S..R.....R.....R....',
@@ -734,8 +734,8 @@ const LEVELS = [{
     'SSSSSSSSSSSSSSSSSSSS',
   ], [
     'SSSSSSSSSSSSSSSSSSSS',
-    '..........1.........',
-    '....2.....22.......<',
+    '..........1..R...R..',
+    '....2.....22.......S',
     'SSSSSSSSSSSSSSSSSSSS',
     'SSSSSSSSSSSSSSSSSSSS',
     'SSSSSSSSSSSSSSSSSSSS',
@@ -840,6 +840,11 @@ function loadLevel(i) {
     }
   }
   level.slots.sort((a, b) => a.tx - b.tx);
+  // the tiles each dart flies through; Pip's respawn point is never saved inside one
+  level.dartLane = new Set();
+  for (const sh of level.shooters) {
+    for (let x = sh.tx + sh.dir; x >= 0 && x < w && !STATIC_SOLID[level.tiles[sh.ty][x]]; x += sh.dir) level.dartLane.add(sh.ty * w + x);
+  }
   // golems and wolves start out walking away from Pip, so nobody is ambushed at the start
   for (const e of enemies) e.dir = e.x > level.start.x ? 1 : -1;
   // the first solid row in each column; anything deeper is underground and gets a dark earth wall behind it
@@ -1342,7 +1347,8 @@ function pushBlocks(p, ix, dt, water) {
 function afterMove(p) {
   const fl = Math.floor((p.y + p.h + 1) / TILE);
   const lt = Math.floor(p.x / TILE), rt = Math.floor((p.x + p.w - 0.01) / TILE);
-  if (p.onGround && p.hurt <= 0 && isStaticSolid(lt, fl) && isStaticSolid(rt, fl) &&
+  const inLane = level.dartLane.has((fl - 1) * level.w + lt) || level.dartLane.has((fl - 1) * level.w + rt);
+  if (p.onGround && p.hurt <= 0 && !inLane && isStaticSolid(lt, fl) && isStaticSolid(rt, fl) &&
       !enemies.some(e => !e.dead && Math.abs(e.x - p.x) < 56 && Math.abs(e.y - p.y) < 24) &&
       tileAt(lt - 1, fl - 1) !== '^' && tileAt(rt + 1, fl - 1) !== '^' && tileAt(lt, fl - 1) !== '^' && tileAt(rt, fl - 1) !== '^') {
     p.safe = { x: p.x, y: p.y };
