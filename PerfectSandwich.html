@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Perfect Sandwich</title>
+<style>
+  :root { --bg:#fdf3e1; --ink:#3b2a1a; --accent:#e0702b; --panel:#fff8ec; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,sans-serif;
+         display:flex; flex-direction:column; align-items:center; min-height:100vh; padding:12px 16px; }
+  h1 { margin:4px 0 8px; font-size:1.6rem; }
+  #wrap { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; max-width:100%; }
+  canvas { background:#cfe8f7; border:4px solid var(--ink); border-radius:12px; max-width:100%; touch-action:manipulation; }
+  #side { width:220px; max-width:100%; display:flex; flex-direction:column; gap:10px; }
+  .card { background:var(--panel); border:3px solid var(--ink); border-radius:10px; padding:10px; }
+  .card h2 { margin:0 0 6px; font-size:1rem; }
+  #order li { padding:2px 0; }
+  #order li.done { text-decoration:line-through; opacity:.5; }
+  #order li.next { font-weight:bold; color:var(--accent); }
+  #shelf { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  #shelf button { font-size:.8rem; padding:6px 2px; border:2px solid var(--ink); border-radius:8px;
+                  background:#fff; cursor:pointer; color:var(--ink); }
+  #shelf button:hover { background:#ffe2c4; }
+  #shelf button.sel { background:var(--accent); color:#fff; }
+  #shelf button .k { display:block; font-size:.65rem; opacity:.6; }
+  .stats { font-size:.95rem; line-height:1.5; }
+  .help { font-size:.8rem; line-height:1.4; }
+</style>
+</head>
+<body>
+<h1>🥪 The Perfect Sandwich</h1>
+<div id="wrap">
+  <canvas id="c" width="420" height="600"></canvas>
+  <div id="side">
+    <div class="card"><h2>📝 Order</h2><ol id="order"></ol></div>
+    <div class="card"><h2>🧺 Pick a topping</h2><div id="shelf"></div></div>
+    <div class="card stats" id="stats"></div>
+    <div class="card help">
+      Pick the <b>next</b> thing on the order (click or keys 1–9).<br>
+      It swings above the sandwich. Press <b>Space</b> or tap the picture to drop it.<br>
+      Land it right in the middle for a <b>PERFECT!</b> If it hangs off too far, it falls and you lose a ❤️.
+    </div>
+  </div>
+</div>
+<script>
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+
+// Each ingredient: name, height in px, how to draw it
+const ING = [
+  { id:'bread',   name:'Bread',   h:22, col:'#e4b56a', crust:'#a8692a' },
+  { id:'lettuce', name:'Lettuce', h:10, col:'#7cc24a', wavy:true },
+  { id:'tomato',  name:'Tomato',  h:10, col:'#e2412f', dots:'#f7c6a3' },
+  { id:'cheese',  name:'Cheese',  h:8,  col:'#f6c533', drip:true },
+  { id:'ham',     name:'Ham',     h:9,  col:'#f19aa5' },
+  { id:'bacon',   name:'Bacon',   h:8,  col:'#b8452e', stripe:'#f2c7a6' },
+  { id:'egg',     name:'Egg',     h:10, col:'#ffffff', yolk:'#f7b500' },
+  { id:'pickle',  name:'Pickle',  h:8,  col:'#5d8a2c', dots:'#a6c96a' },
+  { id:'onion',   name:'Onion',   h:7,  col:'#d9b3e6' },
+];
+const byId = Object.fromEntries(ING.map(i => [i.id, i]));
+const CUSTOMERS = ['🐻 Bear','🤖 Robot','👽 Alien','🦖 Dino','🧙 Wizard','🐱 Cat','👨‍🚀 Astronaut','🦈 Shark'];
+
+let level, lives, score, order, stackPos, stack, falling, held, msg, msgT, combo, state, perfects;
+const PW = 180;                // width of every layer
+const PLATE_Y = H - 50;
+
+function newGame() { level = 1; lives = 3; score = 0; combo = 0; perfects = 0; newOrder(); state = 'play'; }
+
+function newOrder() {
+  const fillings = ING.filter(i => i.id !== 'bread');
+  const n = Math.min(2 + level, 9);
+  order = ['bread'];
+  for (let i = 0; i < n; i++) order.push(fillings[Math.floor(Math.random()*fillings.length)].id);
+  order.push('bread');
+  order.customer = CUSTOMERS[Math.floor(Math.random()*CUSTOMERS.length)];
+  stackPos = 0; stack = []; falling = []; held = null;
+  say(order.customer + ' wants a sandwich!');
+  renderSide();
+}
+
+function say(t) { msg = t; msgT = 120; }
+
+function topY() { return PLATE_Y - stack.reduce((s, l) => s + byId[l.id].h, 0); }
+function topX() { return stack.length ? stack[stack.length-1].x : W/2; }
+
+function pick(id) {
+  if (state !== 'play' || (held && held.dropping)) return;
+  const speed = 1.6 + level * 0.5;
+  held = { id, x: W/2, y: 70, dir: Math.random() < .5 ? 1 : -1, speed, dropping:false, vy:0 };
+  renderSide();
+}
+
+function drop() {
+  if (state === 'over' || state === 'served') { if (state === 'over') newGame(); else { level++; newOrder(); state='play'; } return; }
+  if (held && !held.dropping) held.dropping = true;
+}
+
+function land() {
+  const want = order[stackPos];
+  const off = held.x - topX();
+  if (Math.abs(off) > PW * 0.55) {          // fell off the side
+    falling.push({ ...held, vx: Math.sign(off) * 3, rot: 0 });
+    lives--; combo = 0;
+    say('Oops! It fell off! 💥');
+    held = null;
+    if (lives <= 0) { state = 'over'; }
+    renderSide(); return;
+  }
+  stack.push({ id: held.id, x: held.x });
+  if (held.id !== want) {
+    score = Math.max(0, score - 20); combo = 0;
+    say('Wrong one! They wanted ' + byId[want].name + ' 😬');
+  } else {
+    let pts = 10; const a = Math.abs(off);
+    if (a < 5)       { combo++; perfects++; pts = 50 * combo; say('PERFECT! ✨' + (combo > 1 ? ' x' + combo : '')); }
+    else if (a < 20) { combo = 0; pts = 25; say('Nice!'); }
+    else             { combo = 0; say('Wobbly...'); }
+    score += pts;
+  }
+  stackPos++;
+  held = null;
+  if (stackPos >= order.length) serve();
+  renderSide();
+}
+
+function serve() {
+  // tidiness = how lined-up the stack is, correctness = right items in order
+  let right = 0, wobble = 0;
+  stack.forEach((l, i) => { if (l.id === order[i]) right++; wobble += Math.abs(l.x - W/2); });
+  const acc = right / order.length, tidy = Math.max(0, 1 - wobble / stack.length / 60);
+  const stars = Math.max(1, Math.round((acc * 0.6 + tidy * 0.4) * 5));
+  score += stars * 20;
+  if (stars === 5) { lives = Math.min(lives + 1, 5); }
+  state = 'served';
+  served = { stars, acc, tidy };
+}
+let served = null;
+
+// ---------- drawing ----------
+function drawLayer(id, cx, y) {   // y = top of layer
+  const g = byId[id], x = cx - PW/2;
+  ctx.save();
+  if (id === 'bread') {
+    ctx.fillStyle = g.crust; round(x, y, PW, g.h, 10); ctx.fill();
+    ctx.fillStyle = g.col;   round(x+4, y+4, PW-8, g.h-8, 7); ctx.fill();
+  } else if (id === 'tomato' || id === 'pickle' || id === 'onion') {
+    const n = id === 'onion' ? 4 : 3, w = PW / n;
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = g.col; ctx.beginPath();
+      ctx.ellipse(x + w*i + w/2, y + g.h/2, w/2 + 4, g.h/2, 0, 0, Math.PI*2); ctx.fill();
+      if (g.dots) { ctx.fillStyle = g.dots; for (let d = -1; d <= 1; d++) { ctx.beginPath(); ctx.arc(x + w*i + w/2 + d*10, y + g.h/2, 2, 0, 7); ctx.fill(); } }
+      if (id === 'onion') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x + w*i + w/2, y + g.h/2, w/3, g.h/3, 0, 0, 7); ctx.stroke(); }
+    }
+  } else if (g.wavy) {
+    ctx.fillStyle = g.col; ctx.beginPath(); ctx.moveTo(x - 8, y + g.h);
+    for (let i = 0; i <= 12; i++) ctx.lineTo(x - 8 + i * (PW+16)/12, y + (i % 2 ? 0 : g.h*0.6));
+    ctx.lineTo(x + PW + 8, y + g.h); ctx.closePath(); ctx.fill();
+  } else if (id === 'egg') {
+    ctx.fillStyle = g.col; ctx.beginPath(); ctx.ellipse(cx, y + g.h/2, PW/2, g.h/2, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = g.yolk; ctx.beginPath(); ctx.ellipse(cx, y + g.h/2, 22, g.h/2 - 1, 0, 0, 7); ctx.fill();
+  } else {
+    ctx.fillStyle = g.col; round(x, y, PW, g.h, 3); ctx.fill();
+    if (g.drip) { ctx.beginPath(); ctx.moveTo(x+20,y+g.h); ctx.lineTo(x+35,y+g.h+8); ctx.lineTo(x+50,y+g.h); ctx.moveTo(x+PW-60,y+g.h); ctx.lineTo(x+PW-45,y+g.h+10); ctx.lineTo(x+PW-30,y+g.h); ctx.fill(); }
+    if (g.stripe) { ctx.strokeStyle = g.stripe; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x+4, y+g.h/2); ctx.lineTo(x+PW-4, y+g.h/2); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function round(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+
+function frame() {
+  // update
+  if (held) {
+    if (!held.dropping) {
+      held.x += held.dir * held.speed;
+      if (held.x > W - PW/2 - 10 || held.x < PW/2 + 10) held.dir *= -1;
+    } else {
+      held.vy += 0.6; held.y += held.vy;
+      if (held.y + byId[held.id].h >= topY()) { held.y = topY() - byId[held.id].h; land(); }
+    }
+  }
+  falling.forEach(f => { f.vy = (f.vy || 0) + 0.5; f.y += f.vy; f.x += f.vx; f.rot += f.vx * 0.02; });
+  falling = falling.filter(f => f.y < H + 50);
+  if (msgT > 0) msgT--;
+
+  // draw
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#c98a4b'; ctx.fillRect(0, H - 40, W, 40);          // counter
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(W/2, PLATE_Y + 6, 130, 14, 0, 0, 7); ctx.fill(); // plate
+  ctx.strokeStyle = '#ccc'; ctx.lineWidth = 2; ctx.stroke();
+
+  let y = PLATE_Y;
+  stack.forEach(l => { y -= byId[l.id].h; drawLayer(l.id, l.x, y); });
+  falling.forEach(f => { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot); ctx.translate(-f.x, -f.y); drawLayer(f.id, f.x, f.y); ctx.restore(); });
+
+  if (held) {
+    if (!held.dropping) { ctx.strokeStyle = 'rgba(0,0,0,.2)'; ctx.setLineDash([6,6]); ctx.beginPath(); ctx.moveTo(held.x, held.y+20); ctx.lineTo(held.x, topY()); ctx.stroke(); ctx.setLineDash([]); }
+    drawLayer(held.id, held.x, held.y);
+  } else if (state === 'play') {
+    ctx.fillStyle = 'rgba(59,42,26,.6)'; ctx.font = 'bold 18px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('Pick a topping from the shelf!', W/2, 80);
+  }
+
+  // customer + message
+  ctx.textAlign = 'left'; ctx.fillStyle = '#3b2a1a'; ctx.font = 'bold 16px system-ui';
+  ctx.fillText('Level ' + level + '   ' + order.customer, 12, 26);
+  ctx.textAlign = 'right'; ctx.fillText('❤️'.repeat(lives), W - 12, 26);
+  if (msgT > 0) { ctx.textAlign = 'center'; ctx.font = 'bold 24px system-ui'; ctx.globalAlpha = Math.min(1, msgT/30);
+    ctx.fillStyle = '#e0702b'; ctx.fillText(msg, W/2, 130); ctx.globalAlpha = 1; }
+
+  if (state === 'served' || state === 'over') {
+    ctx.fillStyle = 'rgba(255,248,236,.92)'; round(40, 170, W-80, 200, 16); ctx.fill();
+    ctx.strokeStyle = '#3b2a1a'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = '#3b2a1a'; ctx.textAlign = 'center';
+    if (state === 'served') {
+      ctx.font = 'bold 26px system-ui'; ctx.fillText(order.customer + ' says:', W/2, 210);
+      ctx.font = '34px system-ui'; ctx.fillText('⭐'.repeat(served.stars) + '☆'.repeat(5 - served.stars), W/2, 260);
+      ctx.font = '16px system-ui';
+      ctx.fillText('Right order: ' + Math.round(served.acc*100) + '%   Tidy: ' + Math.round(served.tidy*100) + '%', W/2, 295);
+      if (served.stars === 5) ctx.fillText('THE PERFECT SANDWICH! +1 ❤️', W/2, 320);
+      ctx.fillText('Space / tap for the next customer', W/2, 350);
+    } else {
+      ctx.font = 'bold 30px system-ui'; ctx.fillText('Kitchen closed!', W/2, 220);
+      ctx.font = '20px system-ui'; ctx.fillText('Score: ' + score + '   Level: ' + level, W/2, 265);
+      ctx.fillText('Perfect drops: ' + perfects, W/2, 295);
+      ctx.font = '16px system-ui'; ctx.fillText('Space / tap to play again', W/2, 345);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---------- side panel ----------
+const shelf = document.getElementById('shelf');
+ING.forEach((g, i) => {
+  const b = document.createElement('button');
+  b.innerHTML = g.name + '<span class="k">' + (i+1) + '</span>';
+  b.onclick = () => pick(g.id);
+  b.dataset.id = g.id; shelf.appendChild(b);
+});
+function renderSide() {
+  const ol = document.getElementById('order'); ol.innerHTML = '';
+  // order is listed top-to-bottom like a real sandwich, so reverse it
+  order.map((id, i) => ({ id, i })).reverse().forEach(({ id, i }) => {
+    const li = document.createElement('li'); li.textContent = byId[id].name;
+    if (i < stackPos) li.className = 'done'; else if (i === stackPos) li.className = 'next';
+    ol.appendChild(li);
+  });
+  ol.reversed = true;
+  [...shelf.children].forEach(b => b.classList.toggle('sel', !!held && b.dataset.id === held.id));
+  document.getElementById('stats').innerHTML = '🏆 Score: <b>' + score + '</b><br>🔥 Combo: ' + combo + '<br>✨ Perfects: ' + perfects;
+}
+
+addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); drop(); }
+  const n = parseInt(e.key); if (n >= 1 && n <= ING.length) pick(ING[n-1].id);
+});
+cv.addEventListener('pointerdown', drop);
+
+newGame();
+frame();
+</script>
+</body>
+</html>
