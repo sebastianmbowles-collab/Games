@@ -583,7 +583,7 @@ const LEVELS = [{
     '....................',
     '.................T..',
     'SSSS...........SSSSS',
-    'SSSS~~~~~~~~~~~<SSSS',
+    'SSS>~~~~~~~~~~~SSSSS',
     'SSSS~~~~~~~~~~~SSSSS',
     'SSSS~~~~~~~~~~~SSSSS',
     'SSSS~~C~~~C~~~~SSSSS',
@@ -1256,7 +1256,7 @@ function updatePip(dt) {
     if (ix && !p.grabbing) p.face = ix;
     const nearTop = tileAt(Math.floor((p.x + p.w / 2) / TILE), Math.floor((p.y + p.h / 2 - 12) / TILE)) !== '~';
     if (p.buffer > 0 && nearTop) {
-      p.vy = -JUMP * 0.9; p.buffer = 0; p.jumping = true; p.squash = 1.25;
+      p.vy = -JUMP * 0.9; p.buffer = 0; p.jumping = false; p.squash = 1.25;
       SFX.jump();
       splash(p.x + p.w / 2, p.y);
     } else if (keys.down) p.vy = approach(p.vy, 70, 500 * dt);
@@ -1291,7 +1291,13 @@ function updatePip(dt) {
   pushBlocks(p, ix, dt, false);
 
   if (p.onGround) p.coyote = 0.1; else p.coyote -= dt;
-  if (p.buffer > 0 && p.coyote > 0) {
+  // bobbing just above the water still counts as swimming, so a jump press is never lost
+  const atSurface = !p.onGround && p.vy > -80 && tileAt(Math.floor((p.x + p.w / 2) / TILE), Math.floor((p.y + p.h + 3) / TILE)) === '~';
+  if (p.buffer > 0 && atSurface) {
+    p.vy = -JUMP * 0.9; p.buffer = 0; p.jumping = false; p.squash = 1.25;
+    SFX.jump();
+    splash(p.x + p.w / 2, p.y + p.h);
+  } else if (p.buffer > 0 && p.coyote > 0) {
     p.vy = -JUMP; p.buffer = 0; p.coyote = 0; p.onGround = false; p.jumping = true; p.squash = 1.3;
     dust(p.x + p.w / 2, p.y + p.h, 4, 60);
     SFX.jump();
