@@ -25,3 +25,4 @@ standalone-build
 *.sw?
 standalone-avd
 standalone-aa
+standalone-au
