@@ -20,3 +20,9 @@ If you are developing a production application, we recommend using TypeScript wi
 `AnteUp.html` is a first-person psychological horror game, all in one file. Open it in a desktop browser (headphones recommended).
 Five acts against the Dealer (Blind Man's Bluff, the Carved Labyrinth, the Soul Scale, the Chess of Glass and Russian Roulette Backgammon), timed intermissions to explore the cellar, and four endings.
 Source lives in `src/ante-up/`; rebuild the file with `npm run build:au`.
+
+## FROSTBITE
+
+`Frostbite.html` is a hand-drawn, top-down survival game, all in one file. Open it in a browser (keyboard or touch).
+You are a masked kid in a blue robe who left a village that burned everything you made. Step 1 has a new random world every game (frozen forest, frozen lake, mountains, ice caves, hot springs), warmth / food / energy / health bars, a 10-minute day and night, gathering, fishing, cooking (cooked food spoils), three cozy camp spots, a camp that grows from tent to hut to cabin, a snow owl, sleeping (you wake up in your bed, without your items, if you die) and a map that draws itself as you explore.
+Coming next: snowmen, the Yeti, polar bears, weapons, masked traders, the five mask pieces and the Frost Spirit.

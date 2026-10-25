@@ -1,0 +1,1948 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frostbite</title>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; height:100%; background:#1d2633; overflow:hidden; }
+  canvas { display:block; width:100vw; height:100vh; touch-action:none; user-select:none; -webkit-user-select:none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+// FROSTBITE - step 1: the world, survival bars, day and night, gathering, fishing,
+// cooking, the camp (tent -> hut -> cabin), the snow owl, sleeping and the map.
+// Everything is drawn with wobbly "pencil" lines that re-draw a few times a second,
+// so the whole world looks hand-drawn and alive.
+
+const FONT = "'Gaegu','Comic Sans MS','Chalkboard SE',cursive";
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const dark = document.createElement('canvas'), dctx = dark.getContext('2d');
+let VW = 0, VH = 0, DPR = 1, ZOOM = 1;
+let touchUI = matchMedia('(pointer:coarse)').matches;
+
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  VW = innerWidth; VH = innerHeight;
+  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
+  dark.width = Math.ceil(VW / 2); dark.height = Math.ceil(VH / 2);
+  ZOOM = clamp(Math.min(VW, VH) / 380, 1, 2.3);
+  chunkCache.clear();
+}
+
+// ---------- random numbers and noise ----------
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hash2(x, y, s) {
+  let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s | 0, 982451653)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function vnoise(x, y, s) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash2(xi, yi, s), b = hash2(xi + 1, yi, s), c = hash2(xi, yi + 1, s), d = hash2(xi + 1, yi + 1, s);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function fbm(x, y, s, oct) {
+  let t = 0, amp = 1, f = 1, n = 0;
+  for (let i = 0; i < oct; i++) { t += vnoise(x * f, y * f, s + i * 17) * amp; n += amp; amp *= 0.5; f *= 2; }
+  return t / n;
+}
+
+// ---------- pencil drawing helpers ----------
+function trace(c, p, closed, smooth) {
+  const n = p.length;
+  c.beginPath();
+  if (!smooth) {
+    c.moveTo(p[0][0], p[0][1]);
+    for (let i = 1; i < n; i++) c.lineTo(p[i][0], p[i][1]);
+    if (closed) c.closePath();
+    return;
+  }
+  if (closed) {
+    c.moveTo((p[n - 1][0] + p[0][0]) / 2, (p[n - 1][1] + p[0][1]) / 2);
+    for (let i = 0; i < n; i++) {
+      const a = p[i], b = p[(i + 1) % n];
+      c.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    }
+    c.closePath();
+  } else {
+    c.moveTo(p[0][0], p[0][1]);
+    for (let i = 1; i < n - 1; i++) {
+      const a = p[i], b = p[i + 1];
+      c.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    }
+    c.lineTo(p[n - 1][0], p[n - 1][1]);
+  }
+}
+function jit(p, r, j, ox = 0, oy = 0) {
+  return p.map(q => [q[0] + ox + (r() - 0.5) * 2 * j, q[1] + oy + (r() - 0.5) * 2 * j]);
+}
+// Colour a shape like a marker (a bit outside the lines), then outline it twice with a pencil.
+function shape(c, r, p, fill, stroke, o = {}) {
+  const j = o.j ?? 1, lw = o.lw ?? 1.6, sm = o.smooth ?? true, closed = !o.open;
+  if (fill) {
+    c.fillStyle = fill;
+    trace(c, jit(p, r, j * 0.5, (r() - 0.5) * 1.4, (r() - 0.5) * 1.4), true, sm);
+    c.fill();
+  }
+  if (stroke) {
+    c.strokeStyle = stroke; c.lineWidth = lw; c.lineCap = c.lineJoin = 'round';
+    trace(c, jit(p, r, j), closed, sm); c.stroke();
+    if (o.double !== false) {
+      const ga = c.globalAlpha;
+      c.globalAlpha = ga * 0.45; c.lineWidth = lw * 0.7;
+      trace(c, jit(p, r, j * 1.3), closed, sm); c.stroke();
+      c.globalAlpha = ga;
+    }
+  }
+}
+function ell(cx, cy, rx, ry, n = 10, r = null, j = 0) {
+  const p = [];
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, k = r ? 1 + (r() - 0.5) * j : 1;
+    p.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]);
+  }
+  return p;
+}
+function line(c, r, x1, y1, x2, y2, col, lw = 1.5, j = 0.8) {
+  c.strokeStyle = col; c.lineWidth = lw; c.lineCap = 'round';
+  c.beginPath();
+  c.moveTo(x1 + (r() - 0.5) * j, y1 + (r() - 0.5) * j);
+  c.quadraticCurveTo((x1 + x2) / 2 + (r() - 0.5) * 2 * j, (y1 + y2) / 2 + (r() - 0.5) * 2 * j, x2 + (r() - 0.5) * j, y2 + (r() - 0.5) * j);
+  c.stroke();
+}
+function shadow(c, x, y, rx, ry, a = 0.18) {
+  c.fillStyle = `rgba(60,85,115,${a})`;
+  c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill();
+}
+function rrect(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+// A wobbly paper card, used for every menu and bubble.
+function paper(c, x, y, w, h, r, fill = '#f7f2e6', stroke = '#3a3631') {
+  const rr = mulberry32(boil * 31 + 7 + (w | 0));
+  const p = [];
+  const steps = Math.max(4, Math.round((w + h) / 40));
+  for (let i = 0; i < steps; i++) p.push([x + w * i / steps, y]);
+  for (let i = 0; i < steps; i++) p.push([x + w, y + h * i / steps]);
+  for (let i = 0; i < steps; i++) p.push([x + w - w * i / steps, y + h]);
+  for (let i = 0; i < steps; i++) p.push([x, y + h - h * i / steps]);
+  shape(c, rr, p, fill, stroke, { j: Math.min(2, r / 3 + 0.8), lw: 2, smooth: false });
+}
+
+// ---------- pre-drawn sprites (3 "boil" frames each) ----------
+const SPR = {}, SS = 3;
+let boil = 0;
+function mkSprite(name, w, h, ax, ay, fn) {
+  const vs = [];
+  for (let v = 0; v < 3; v++) {
+    const c = document.createElement('canvas');
+    c.width = w * SS; c.height = h * SS;
+    const g = c.getContext('2d'); g.scale(SS, SS);
+    fn(g, mulberry32(1000 + v * 77 + name.length * 13 + name.charCodeAt(0)));
+    vs.push(c);
+  }
+  SPR[name] = { vs, w, h, ax, ay };
+}
+function drawSpr(c, name, x, y, v = boil) {
+  const s = SPR[name];
+  c.drawImage(s.vs[v % 3], x - s.ax, y - s.ay, s.w, s.h);
+}
+const INK = '#2b2f36';
+function buildSprites() {
+  mkSprite('pine', 50, 76, 25, 70, (g, r) => {
+    shadow(g, 25, 70, 17, 5);
+    shape(g, r, [[22, 56], [28, 56], [28, 71], [22, 71]], '#6b4a32', '#3a281b', { smooth: false, j: 0.6 });
+    for (let i = 0; i < 3; i++) {
+      const top = 4 + i * 15, bot = 30 + i * 14, hw = 11 + i * 5, mid = top + (bot - top) * 0.5;
+      shape(g, r, [[25, top], [25 + hw, bot], [25 + hw * 0.3, bot - 2], [25 - hw * 0.3, bot - 2], [25 - hw, bot]], '#3f6b57', '#1f352b', { smooth: false, j: 1.1 });
+      shape(g, r, [[25, top + 1], [25 + hw * 0.5, mid], [25 + hw * 0.2, mid - 3], [25, mid + 1], [25 - hw * 0.25, mid - 3], [25 - hw * 0.5, mid]], '#f5f8fa', '#9fb3bf', { smooth: false, lw: 1, j: 0.7, double: false });
+    }
+  });
+  mkSprite('tree', 58, 70, 29, 66, (g, r) => {
+    shadow(g, 29, 66, 14, 4);
+    const sr = mulberry32(42);
+    const branch = (x, y, a, len, w, d) => {
+      if (d === 0) return;
+      const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len;
+      line(g, r, x, y, x2, y2, '#4b3526', w, 1);
+      if (d === 1 && sr() < 0.6) { g.fillStyle = '#f5f8fa'; g.beginPath(); g.ellipse(x2, y2 - 1, 3, 1.6, a, 0, 7); g.fill(); }
+      branch(x2, y2, a - 0.4 - sr() * 0.35, len * 0.7, w * 0.68, d - 1);
+      branch(x2, y2, a + 0.4 + sr() * 0.35, len * 0.7, w * 0.68, d - 1);
+    };
+    branch(29, 66, -Math.PI / 2, 22, 4.5, 4);
+  });
+  const bush = (berries) => (g, r) => {
+    shadow(g, 18, 25, 14, 4);
+    shape(g, r, ell(12, 17, 9, 8, 8, r, 0.2), '#5c7f6a', '#2c4335', { lw: 1.4 });
+    shape(g, r, ell(24, 17, 9, 8, 8, r, 0.2), '#557a63', '#2c4335', { lw: 1.4 });
+    shape(g, r, ell(18, 12, 10, 8, 8, r, 0.2), '#628a72', '#2c4335', { lw: 1.4 });
+    shape(g, r, [[10, 9], [16, 5], [24, 6], [27, 10], [20, 9], [14, 11]], '#f5f8fa', '#a9bcc6', { lw: 1, double: false });
+    if (berries) for (const [x, y] of [[11, 17], [17, 14], [23, 18], [26, 14], [15, 20]]) {
+      g.fillStyle = '#c8313d'; g.beginPath(); g.arc(x, y, 2.2, 0, 7); g.fill();
+      g.fillStyle = '#ffd5d8'; g.beginPath(); g.arc(x - 0.7, y - 0.7, 0.7, 0, 7); g.fill();
+    }
+  };
+  mkSprite('bush', 36, 30, 18, 25, bush(true));
+  mkSprite('bushE', 36, 30, 18, 25, bush(false));
+  mkSprite('rock', 36, 30, 18, 24, (g, r) => {
+    shadow(g, 18, 24, 15, 4);
+    shape(g, r, [[4, 22], [6, 12], [13, 6], [24, 6], [31, 12], [33, 22]], '#9ea3a8', '#4d5157', { lw: 1.6 });
+    for (let i = 0; i < 4; i++) line(g, r, 20 + i * 3, 20, 25 + i * 3, 12, '#6d7177', 0.9, 0.4);
+    shape(g, r, [[9, 11], [14, 6], [24, 6], [29, 11], [22, 10], [15, 12]], '#f5f8fa', '#a9bcc6', { lw: 1, double: false });
+  });
+  mkSprite('log', 46, 24, 23, 18, (g, r) => {
+    shadow(g, 23, 18, 19, 4);
+    shape(g, r, [[6, 7], [38, 6], [38, 17], [6, 17]], '#7a5236', '#3a281b', { lw: 1.6, smooth: false });
+    for (let i = 0; i < 3; i++) line(g, r, 10 + i * 9, 11 + i % 2 * 2, 17 + i * 9, 11 + i % 2 * 2, '#5a3c27', 0.9, 0.5);
+    shape(g, r, ell(38, 11.5, 4, 5.5, 8), '#c9a27a', '#3a281b', { lw: 1.4 });
+    g.strokeStyle = '#8a6440'; g.lineWidth = 0.8; g.beginPath(); g.ellipse(38, 11.5, 2, 3, 0, 0, 7); g.stroke();
+    shape(g, r, [[8, 7], [20, 4], [34, 5], [36, 7], [22, 8]], '#f5f8fa', '#a9bcc6', { lw: 1, double: false });
+  });
+  const crystal = (full) => (g, r) => {
+    shadow(g, 15, 34, 12, 3.5, 0.25);
+    const shards = full ? [[15, 34, 5, 28], [9, 34, 4, 17], [21, 34, 4, 20]] : [[15, 34, 4, 7], [10, 34, 3, 5], [20, 34, 3, 6]];
+    for (const [x, y, w, h] of shards)
+      shape(g, r, [[x - w, y], [x - w * 0.8, y - h * 0.7], [x, y - h], [x + w * 0.8, y - h * 0.7], [x + w, y]], '#a8e4f5', '#3d8db0', { smooth: false, lw: 1.3, j: 0.6 });
+    if (full) line(g, r, 13, 28, 14, 12, 'rgba(255,255,255,.9)', 1.2, 0.4);
+  };
+  mkSprite('crystal', 30, 38, 15, 34, crystal(true));
+  mkSprite('crystalE', 30, 38, 15, 34, crystal(false));
+  mkSprite('stick', 24, 14, 12, 9, (g, r) => {
+    line(g, r, 3, 10, 21, 5, '#6b4a32', 2.2, 0.6);
+    line(g, r, 12, 7, 16, 2, '#6b4a32', 1.4, 0.4);
+  });
+  mkSprite('moss', 32, 18, 16, 12, (g, r) => {
+    shape(g, r, ell(10, 11, 8, 4, 8, r, 0.3), '#7da35a', '#3f5e2b', { lw: 1.1 });
+    shape(g, r, ell(21, 9, 9, 5, 8, r, 0.3), '#8ab365', '#3f5e2b', { lw: 1.1 });
+    for (let i = 0; i < 5; i++) { g.fillStyle = '#c5e09a'; g.fillRect(6 + i * 5, 8 + (i % 2) * 3, 1.5, 1.5); }
+  });
+  mkSprite('peak', 96, 90, 48, 80, (g, r) => {
+    shadow(g, 48, 80, 40, 7, 0.22);
+    shape(g, r, [[4, 80], [30, 30], [46, 8], [62, 28], [92, 80]], '#8a8f96', '#3e4249', { smooth: false, lw: 2, j: 1.4 });
+    for (let i = 0; i < 8; i++) line(g, r, 52 + i * 4, 30 + i * 6, 46 + i * 6, 80, '#6a6e75', 1, 0.6);
+    shape(g, r, [[30, 30], [46, 8], [62, 28], [55, 34], [49, 27], [41, 36], [36, 30]], '#f5f8fa', '#8b9aa5', { smooth: false, lw: 1.3, j: 0.8 });
+  });
+  mkSprite('house', 86, 82, 43, 70, (g, r) => {
+    shadow(g, 43, 70, 38, 6, 0.22);
+    shape(g, r, [[64, 22], [72, 22], [72, 6], [64, 6]], '#7d6e66', '#3a3330', { smooth: false });
+    shape(g, r, [[12, 38], [74, 38], [74, 70], [12, 70]], '#8b6446', '#3a281b', { smooth: false, lw: 1.8 });
+    for (let i = 0; i < 4; i++) line(g, r, 13, 45 + i * 7, 73, 45 + i * 7, '#6a4a33', 0.9, 0.6);
+    shape(g, r, [[4, 40], [43, 12], [82, 40]], '#7a3b33', '#3a1c18', { smooth: false, lw: 1.8 });
+    shape(g, r, [[6, 38], [43, 11], [80, 38], [70, 36], [60, 31], [50, 33], [40, 28], [28, 33], [16, 35]], '#f5f8fa', '#9fb0bb', { smooth: false, lw: 1.2 });
+    shape(g, r, [[37, 52], [49, 52], [49, 70], [37, 70]], '#4a3121', '#2a1b12', { smooth: false });
+    shape(g, r, [[18, 47], [29, 47], [29, 57], [18, 57]], '#f2d27a', '#3a281b', { smooth: false, lw: 1.3 });
+    shape(g, r, [[57, 47], [68, 47], [68, 57], [57, 57]], '#f2d27a', '#3a281b', { smooth: false, lw: 1.3 });
+  });
+  mkSprite('pile', 56, 34, 28, 24, (g, r) => {
+    shadow(g, 28, 24, 24, 5, 0.25);
+    line(g, r, 8, 24, 46, 14, '#5a3c27', 4, 1);
+    line(g, r, 10, 14, 48, 24, '#6b4a32', 4, 1);
+    // the kid's drawings, toys and carvings, half burned
+    shape(g, r, [[14, 22], [24, 20], [25, 28], [15, 29]], '#efe9d8', '#3a3631', { smooth: false, lw: 1 });
+    line(g, r, 16, 24, 22, 23, '#c84a2d', 0.8, 0.3);
+    shape(g, r, ell(38, 26, 4, 3, 7), '#b08455', '#3a281b', { lw: 1 });
+    shape(g, r, [[29, 26], [33, 22], [36, 27]], '#d64545', '#3a1c18', { smooth: false, lw: 1 });
+  });
+  mkSprite('firepit', 44, 26, 22, 14, (g, r) => {
+    shadow(g, 22, 15, 19, 5, 0.25);
+    for (let i = 0; i < 9; i++) {
+      const a = i / 9 * Math.PI * 2;
+      shape(g, r, ell(22 + Math.cos(a) * 15, 13 + Math.sin(a) * 7, 4, 3, 6), '#9ea3a8', '#4d5157', { lw: 1, double: false });
+    }
+    line(g, r, 13, 16, 31, 10, '#5a3c27', 3.2, 0.6);
+    line(g, r, 13, 10, 31, 16, '#6b4a32', 3.2, 0.6);
+  });
+  mkSprite('tent', 72, 58, 36, 48, (g, r) => {
+    shadow(g, 36, 48, 32, 6, 0.22);
+    line(g, r, 4, 50, 14, 40, '#6b6b6b', 0.9, 0.4); line(g, r, 68, 50, 58, 40, '#6b6b6b', 0.9, 0.4);
+    shape(g, r, [[8, 48], [36, 6], [64, 48]], '#4f79a8', '#22395a', { smooth: false, lw: 1.8 });
+    line(g, r, 36, 6, 36, 48, '#3c628d', 1.1, 0.6);
+    shape(g, r, [[27, 48], [36, 24], [45, 48]], '#1e2d40', '#121c29', { smooth: false, lw: 1.3 });
+    shape(g, r, [[22, 26], [36, 5], [50, 26], [43, 22], [36, 25], [29, 21]], '#f5f8fa', '#9fb0bb', { smooth: false, lw: 1.1 });
+  });
+  mkSprite('hut', 84, 76, 42, 62, (g, r) => {
+    shadow(g, 42, 62, 36, 6, 0.22);
+    shape(g, r, [[12, 32], [72, 32], [72, 62], [12, 62]], '#86603f', '#3a281b', { smooth: false, lw: 1.8 });
+    for (let i = 0; i < 5; i++) line(g, r, 12, 37 + i * 5.5, 72, 37 + i * 5.5, '#5d4029', 1, 0.6);
+    shape(g, r, [[6, 34], [42, 10], [78, 34]], '#5a4030', '#2a1b12', { smooth: false, lw: 1.8 });
+    shape(g, r, [[8, 33], [42, 9], [76, 33], [64, 30], [52, 26], [42, 29], [30, 25], [18, 30]], '#f5f8fa', '#9fb0bb', { smooth: false, lw: 1.1 });
+    shape(g, r, [[35, 44], [49, 44], [49, 62], [35, 62]], '#3e2a1b', '#20150d', { smooth: false });
+    shape(g, r, [[17, 41], [27, 41], [27, 50], [17, 50]], '#f2d27a', '#3a281b', { smooth: false, lw: 1.2 });
+  });
+  mkSprite('cabin', 114, 98, 57, 80, (g, r) => {
+    shadow(g, 57, 80, 50, 8, 0.22);
+    shape(g, r, [[84, 30], [96, 30], [96, 4], [84, 4]], '#8d8780', '#3a3330', { smooth: false, lw: 1.6 });
+    for (let i = 0; i < 4; i++) line(g, r, 84, 10 + i * 6, 96, 10 + i * 6, '#5f5954', 0.8, 0.4);
+    shape(g, r, [[10, 42], [104, 42], [104, 80], [10, 80]], '#9a6b43', '#3a281b', { smooth: false, lw: 2 });
+    for (let i = 0; i < 6; i++) {
+      line(g, r, 10, 47 + i * 6, 104, 47 + i * 6, '#6b4a30', 1.1, 0.7);
+      g.fillStyle = '#c9a27a'; g.beginPath(); g.arc(10, 47 + i * 6, 2.4, 0, 7); g.arc(104, 47 + i * 6, 2.4, 0, 7); g.fill();
+    }
+    shape(g, r, [[2, 44], [57, 12], [112, 44]], '#4d3a2c', '#24170e', { smooth: false, lw: 2 });
+    shape(g, r, [[4, 43], [57, 11], [110, 43], [96, 39], [80, 33], [66, 36], [52, 31], [36, 36], [20, 37]], '#f5f8fa', '#9fb0bb', { smooth: false, lw: 1.2 });
+    shape(g, r, [[48, 56], [66, 56], [66, 80], [48, 80]], '#3e2a1b', '#20150d', { smooth: false });
+    g.fillStyle = '#d9b54a'; g.beginPath(); g.arc(62, 69, 1.5, 0, 7); g.fill();
+    for (const x of [20, 78]) {
+      shape(g, r, [[x, 52], [x + 16, 52], [x + 16, 65], [x, 65]], '#f2d27a', '#3a281b', { smooth: false, lw: 1.3 });
+      line(g, r, x + 8, 52, x + 8, 65, '#3a281b', 1, 0.3);
+    }
+    // a carved owl by the door, the kid makes things again
+    shape(g, r, ell(40, 74, 3.5, 5, 7), '#c9a27a', '#3a281b', { lw: 1 });
+  });
+}
+
+// ---------- world ----------
+const T = 32, W = 160, H = 160, CH = 16, CPX = CH * T, DAY = 600;
+const SNOW = 0, FOREST = 1, ICE = 2, ROCK = 3, PEAK = 4, CAVE = 5, VILL = 6, SPRING = 7;
+const TILE_COL = ['#eef0ee', '#dbe5e3', '#bfe0ee', '#cbc8c2', '#77757a', '#56606f', '#ddd0b8', '#8fd3c8'];
+const TILE_EDGE = [null, null, '#7fb0cb', '#99958f', '#3d3b40', '#2f3743', null, '#4f9c90'];
+const MAP_COL = ['#f1efe8', '#8fae9b', '#a9d4e6', '#b9b4ab', '#6d6a6e', '#4f586a', '#c7a77c', '#5fc0b2'];
+const BIOME = ['Snowfield', 'Frozen forest', 'Frozen lake', 'Mountains', 'Mountains', 'Ice cave', 'Your old village', 'Hot spring'];
+
+// what each thing in the world gives you
+const OT = {
+  pine: { r: 9, spr: 'pine', give: 'sticks', stock: 3, regrow: 1, verb: 'Snap off sticks' },
+  tree: { r: 8, spr: 'tree', give: 'sticks', stock: 4, regrow: 1, verb: 'Snap off sticks' },
+  bush: { r: 0, spr: 'bush', empty: 'bushE', give: 'berries', amt: 2, stock: 2, regrow: 1.5, verb: 'Pick berries' },
+  rock: { r: 11, spr: 'rock', give: 'stones', stock: 3, regrow: 2, verb: 'Dig out stones' },
+  log: { r: 10, spr: 'log', give: 'bugs', stock: 2, regrow: 1, verb: 'Look under the log' },
+  crystal: { r: 8, spr: 'crystal', empty: 'crystalE', give: 'shards', stock: 2, regrow: 3, verb: 'Chip off an ice shard', glow: true },
+  stick: { r: 0, spr: 'stick', give: 'sticks', stock: 1, regrow: 1, verb: 'Pick up stick', hideEmpty: true },
+  moss: { r: 0, spr: 'moss', give: 'bugs', stock: 2, regrow: 1, verb: 'Search the warm moss' },
+  peak: { r: 0, spr: 'peak' },
+  house: { r: 27, spr: 'house' },
+  pile: { r: 15, spr: 'pile' },
+};
+
+let seed = 0, tiles, objs = [], ogrid, vill, spots = [], springs = [], villagers = [];
+let mapBase, mapFog, mapFogCtx, explored;
+
+const tileAt = (tx, ty) => (tx < 0 || ty < 0 || tx >= W || ty >= H) ? PEAK : tiles[ty * W + tx];
+const tileAtW = (x, y) => tileAt(Math.floor(x / T), Math.floor(y / T));
+
+function addObj(type, x, y, extra) {
+  const o = Object.assign({ type, x, y, stock: OT[type].stock || 0, regrowAt: 0, shake: 0 }, extra || {});
+  objs.push(o);
+  ogrid[Math.floor(y / T) * W + Math.floor(x / T)].push(o);
+  return o;
+}
+
+function genWorld(sd) {
+  seed = sd >>> 0;
+  const R = mulberry32(seed);
+  tiles = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const nx = x / W - 0.5, ny = y / H - 0.5, d = Math.sqrt(nx * nx + ny * ny) * 2;
+    let e = (fbm(x / 26, y / 26, seed, 4) - 0.5) * 1.8 + 0.5;
+    e += Math.max(0, d - 0.9) * 2.6;
+    const m = fbm(x / 17, y / 17, seed + 101, 3), c = fbm(x / 7, y / 7, seed + 202, 2);
+    let t;
+    if (e < 0.33) t = ICE;
+    else if (e > 0.68) t = c > 0.63 ? CAVE : (e > 0.8 ? PEAK : ROCK);
+    else t = m > 0.52 ? FOREST : SNOW;
+    if (x < 2 || y < 2 || x >= W - 2 || y >= H - 2) t = PEAK;
+    tiles[y * W + x] = t;
+  }
+
+  // the old village: the first big flat place near the middle
+  const flatAround = (cx, cy, rad) => {
+    for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
+      if (dx * dx + dy * dy > rad * rad) continue;
+      const t = tileAt(cx + dx, cy + dy);
+      if (t !== SNOW && t !== FOREST) return false;
+    }
+    return true;
+  };
+  vill = null;
+  for (let r = 0; r < 60 && !vill; r++) {
+    for (let dy = -r; dy <= r && !vill; dy++) for (let dx = -r; dx <= r && !vill; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      if (flatAround(W / 2 + dx, H / 2 + dy, 5)) vill = { tx: W / 2 + dx, ty: H / 2 + dy };
+    }
+  }
+  if (!vill) vill = { tx: W / 2, ty: H / 2 };
+  for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) {
+    const d2 = dx * dx + dy * dy, i = (vill.ty + dy) * W + vill.tx + dx;
+    if (d2 <= 30) tiles[i] = VILL;
+    else if (d2 <= 64 && tiles[i] === PEAK) tiles[i] = ROCK;
+  }
+  vill.x = vill.tx * T + T / 2; vill.y = vill.ty * T + T / 2;
+
+  // which tiles can you walk to from the village?
+  const dst = new Int16Array(W * H).fill(-1), q = [vill.ty * W + vill.tx];
+  dst[q[0]] = 0;
+  for (let qi = 0; qi < q.length; qi++) {
+    const i = q[qi], x = i % W, y = (i / W) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, ni = ny * W + nx;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H || dst[ni] >= 0 || tiles[ni] === PEAK) continue;
+      dst[ni] = dst[i] + 1; q.push(ni);
+    }
+  }
+
+  // hot springs
+  springs = [];
+  const sc = [];
+  for (let i = 0; i < W * H; i++) if (dst[i] >= 14 && (tiles[i] === ROCK || tiles[i] === SNOW)) sc.push(i);
+  for (let k = 0, tries = 0; k < 5 && tries < 400 && sc.length; tries++) {
+    const i = sc[(R() * sc.length) | 0], x = i % W, y = (i / W) | 0;
+    if (springs.some(s => Math.abs(s.tx - x) + Math.abs(s.ty - y) < 18)) continue;
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ni = (y + dy) * W + x + dx;
+      if (tiles[ni] !== PEAK && tiles[ni] !== VILL) tiles[ni] = SPRING;
+    }
+    springs.push({ tx: x, ty: y, x: x * T + T / 2, y: y * T + T / 2 }); k++;
+  }
+
+  // three cozy camp spots, each in a different kind of place
+  const near = (x, y, type, rad) => {
+    for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) if (tileAt(x + dx, y + dy) === type) return true;
+    return false;
+  };
+  const countNear = (x, y, type, rad) => {
+    let n = 0;
+    for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) if (tileAt(x + dx, y + dy) === type) n++;
+    return n;
+  };
+  const cats = [
+    { name: 'Pine forest', test: (x, y, t) => t === FOREST && countNear(x, y, FOREST, 3) >= 24 },
+    { name: 'Lakeside', test: (x, y, t) => (t === SNOW || t === FOREST) && near(x, y, ICE, 3) && !near(x, y, ICE, 1) },
+    { name: 'Mountain foot', test: (x, y, t) => (t === SNOW || t === ROCK) && (near(x, y, CAVE, 6) || near(x, y, PEAK, 3)) },
+  ];
+  spots = [];
+  const farFromSpots = (x, y) => spots.every(s => Math.hypot(s.tx - x, s.ty - y) >= 20);
+  for (const cat of cats) {
+    const cand = [];
+    for (let i = 0; i < W * H; i++) {
+      if (dst[i] < 18 || dst[i] > 60) continue;
+      const x = i % W, y = (i / W) | 0;
+      if (near(x, y, PEAK, 1) || near(x, y, SPRING, 2)) continue;
+      if (cat.test(x, y, tiles[i]) && farFromSpots(x, y)) cand.push(i);
+    }
+    if (!cand.length) {
+      for (let i = 0; i < W * H; i++) {
+        const x = i % W, y = (i / W) | 0;
+        if (dst[i] >= 18 && dst[i] <= 70 && tiles[i] !== SPRING && !near(x, y, PEAK, 1) && farFromSpots(x, y)) cand.push(i);
+      }
+    }
+    if (!cand.length) continue;
+    const i = cand[(R() * cand.length) | 0], x = i % W, y = (i / W) | 0;
+    spots.push({ tx: x, ty: y, x: x * T + T / 2, y: y * T + T / 2, name: cat.name, found: false });
+  }
+
+  // fill the world with things
+  objs = []; ogrid = new Array(W * H);
+  for (let i = 0; i < W * H; i++) ogrid[i] = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const t = tiles[y * W + x];
+    if (Math.hypot(x - vill.tx, y - vill.ty) < 8.5) continue;
+    if (spots.some(s => Math.hypot(s.tx - x, s.ty - y) < 3.5)) continue;
+    const h = hash2(x, y, seed + 7);
+    const px = x * T + T / 2 + (hash2(x, y, seed + 9) - 0.5) * 18, py = y * T + T / 2 + (hash2(x, y, seed + 10) - 0.5) * 18;
+    let type = null, extra = null;
+    if (t === FOREST) type = h < 0.28 ? 'pine' : h < 0.32 ? 'tree' : h < 0.36 ? 'bush' : h < 0.39 ? 'log' : h < 0.42 ? 'stick' : null;
+    else if (t === SNOW) type = h < 0.03 ? 'pine' : h < 0.045 ? 'tree' : h < 0.07 ? 'bush' : h < 0.095 ? 'rock' : h < 0.11 ? 'stick' : null;
+    else if (t === ROCK) type = h < 0.12 ? 'rock' : h < 0.14 ? 'pine' : null;
+    else if (t === CAVE) { type = h < 0.08 ? 'crystal' : h < 0.13 ? 'rock' : null; if (type === 'rock') extra = { bugc: 0.7 }; }
+    else if (t === PEAK) {
+      // only put a mountain drawing where it would show
+      if (h < 0.35 && (tileAt(x, y + 1) !== PEAK || h < 0.12)) type = 'peak';
+    }
+    else if (t === ICE && h < 0.005) type = 'rock';
+    if (type === 'rock' && !extra) extra = { bugc: 0.3 };
+    if (type) addObj(type, px, py, extra);
+  }
+  for (const s of springs) {
+    for (let k = 0; k < 6; k++) {
+      const a = k / 6 * Math.PI * 2 + R(), rr = T * (2 + R() * 0.8);
+      const x = s.x + Math.cos(a) * rr, y = s.y + Math.sin(a) * rr, t = tileAtW(x, y);
+      if (t !== PEAK && t !== SPRING) addObj(k % 3 === 2 ? 'bush' : 'moss', x, y);
+    }
+  }
+  // village houses, the burn pile and the villagers
+  for (let k = 0; k < 5; k++) {
+    const a = k / 5 * Math.PI * 2 + 0.6;
+    addObj('house', vill.x + Math.cos(a) * T * 4.2, vill.y + Math.sin(a) * T * 3.6);
+  }
+  addObj('pile', vill.x, vill.y);
+  const lines = ["Go away, mask kid.", "Your drawings burned nicely.", "Nobody wants your toys.", "Why do you even wear that mask?", "Don't come crying back.", "That carving made a good log."];
+  villagers = [];
+  for (let k = 0; k < 4; k++) {
+    const a = k / 4 * Math.PI * 2 + 1.3, x = vill.x + Math.cos(a) * T * 2.3, y = vill.y + Math.sin(a) * T * 2.1;
+    villagers.push({ x, y, hx: x, hy: y, tx: x, ty: y, wait: R() * 3, dir: 1, walk: 0, say: null, line: k, lines, coat: ['#8a5a3c', '#6d4f7a', '#4f6d4a', '#8a3c3c'][k] });
+  }
+
+  // the map the kid draws while walking
+  mapBase = document.createElement('canvas'); mapBase.width = W; mapBase.height = H;
+  const mg = mapBase.getContext('2d'), img = mg.createImageData(W, H);
+  for (let i = 0; i < W * H; i++) {
+    const col = MAP_COL[tiles[i]], n = (hash2(i % W, (i / W) | 0, 3) - 0.5) * 16;
+    img.data[i * 4] = clamp(parseInt(col.slice(1, 3), 16) + n, 0, 255);
+    img.data[i * 4 + 1] = clamp(parseInt(col.slice(3, 5), 16) + n, 0, 255);
+    img.data[i * 4 + 2] = clamp(parseInt(col.slice(5, 7), 16) + n, 0, 255);
+    img.data[i * 4 + 3] = 255;
+  }
+  mg.putImageData(img, 0, 0);
+  for (const o of objs) if (o.type === 'pine' || o.type === 'tree') { mg.fillStyle = '#3f6b57'; mg.fillRect(o.x / T | 0, o.y / T | 0, 1, 1); }
+  mapFog = document.createElement('canvas'); mapFog.width = W; mapFog.height = H;
+  mapFogCtx = mapFog.getContext('2d');
+  mapFogCtx.fillStyle = '#efe7d3'; mapFogCtx.fillRect(0, 0, W, H);
+  explored = new Uint8Array(W * H);
+  chunkCache.clear();
+}
+
+// ---------- ground drawing in chunks ----------
+const chunkCache = new Map();
+let frameNo = 0;
+function getChunk(cx, cy) {
+  const key = cx + ',' + cy;
+  let ch = chunkCache.get(key);
+  if (!ch) {
+    ch = { cv: buildChunk(cx, cy), used: 0 };
+    chunkCache.set(key, ch);
+    if (chunkCache.size > 16) {
+      let oldK = null, oldU = Infinity;
+      for (const [k, v] of chunkCache) if (v.used < oldU && v.used !== frameNo) { oldU = v.used; oldK = k; }
+      if (oldK) chunkCache.delete(oldK);
+    }
+  }
+  ch.used = frameNo;
+  return ch.cv;
+}
+function buildChunk(cx, cy) {
+  const gs = clamp(DPR * ZOOM, 1, 2);
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(CPX * gs); c.height = Math.ceil(CPX * gs);
+  const g = c.getContext('2d');
+  g.scale(gs, gs); g.translate(-cx * CPX, -cy * CPX);
+  g.fillStyle = TILE_COL[SNOW]; g.fillRect(cx * CPX, cy * CPX, CPX, CPX);
+  const x0 = cx * CH - 1, y0 = cy * CH - 1, x1 = (cx + 1) * CH + 1, y1 = (cy + 1) * CH + 1;
+  const blobPts = (x, y) => {
+    const r = mulberry32((x * 7919 + y * 104729 + seed) | 0);
+    return ell(x * T + T / 2 + (r() - 0.5) * 6, y * T + T / 2 + (r() - 0.5) * 6, T * 0.78, T * 0.74, 7, r, 0.35);
+  };
+  for (const type of [FOREST, VILL, ICE, ROCK, CAVE, SPRING, PEAK]) {
+    const list = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (tileAt(x, y) === type) list.push(blobPts(x, y));
+    if (!list.length) continue;
+    if (TILE_EDGE[type]) {
+      g.strokeStyle = TILE_EDGE[type]; g.lineWidth = 3.2; g.lineJoin = 'round';
+      for (const p of list) { trace(g, p, true, true); g.stroke(); }
+    }
+    g.fillStyle = TILE_COL[type];
+    for (const p of list) { trace(g, p, true, true); g.fill(); }
+  }
+  // pencil details per tile
+  g.lineCap = 'round';
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const t = tileAt(x, y), r = mulberry32((x * 31337 + y * 7331 + seed * 3) | 0), h = r();
+    const bx = x * T, by = y * T;
+    if (t === SNOW && h < 0.22) {
+      line(g, r, bx + 6 + r() * 10, by + 10 + r() * 14, bx + 16 + r() * 10, by + 8 + r() * 14, '#c9d3dc', 1.2, 2);
+    } else if (t === FOREST && h < 0.5) {
+      for (let k = 0; k < 3; k++) { const px = bx + r() * T, py = by + r() * T; line(g, r, px, py, px + 3, py - 4, '#a9bdbd', 1, 0.5); }
+    } else if (t === ICE && h < 0.25) {
+      let px = bx + r() * T, py = by + r() * T;
+      g.beginPath(); g.moveTo(px, py);
+      for (let k = 0; k < 3; k++) { px += (r() - 0.5) * 22; py += (r() - 0.5) * 22; g.lineTo(px, py); }
+      g.strokeStyle = '#ffffff'; g.lineWidth = 2; g.stroke();
+      g.strokeStyle = '#8fbfd6'; g.lineWidth = 0.9; g.stroke();
+    } else if (t === ROCK) {
+      for (let k = 0; k < 3; k++) { const px = bx + r() * T, py = by + r() * T; line(g, r, px, py + 5, px + 5, py - 3, '#9d998f', 1, 0.4); }
+    } else if (t === PEAK) {
+      for (let k = 0; k < 5; k++) { const px = bx + r() * T, py = by + r() * T; line(g, r, px - 5, py + 5, px + 5, py - 5, '#58565b', 1, 0.5); line(g, r, px - 5, py - 5, px + 4, py + 4, '#636166', 0.8, 0.5); }
+    } else if (t === CAVE) {
+      for (let k = 0; k < 4; k++) { g.fillStyle = '#7d8aa0'; g.fillRect(bx + r() * T, by + r() * T, 1.6, 1.6); }
+    } else if (t === VILL && h < 0.4) {
+      for (let k = 0; k < 2; k++) { g.fillStyle = '#b8a487'; g.beginPath(); g.ellipse(bx + r() * T, by + r() * T, 2.5, 1.5, r(), 0, 7); g.fill(); }
+    } else if (t === SPRING && h < 0.6) {
+      g.strokeStyle = '#c8f0ea'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(bx + 16, by + 16, 6 + r() * 4, 3, 0, 0, 7); g.stroke();
+    }
+  }
+  return c;
+}
+
+// ---------- game state ----------
+const ITEMS = {
+  sticks: { name: 'Sticks', info: 'For the fire and for building.' },
+  stones: { name: 'Stones', info: 'For building a hut and a cabin.' },
+  shards: { name: 'Ice shards', info: 'Masked traders will want these someday...' },
+  berries: { name: 'Frost berries', food: 7 },
+  bugs: { name: 'Bugs', food: 5, cook: 'ckBugs' },
+  cod: { name: 'Ice cod', food: 14, cook: 'ckCod' },
+  perch: { name: 'Frost perch', food: 12, cook: 'ckPerch' },
+  char: { name: 'Silver char', food: 20, cook: 'ckChar' },
+  ckBugs: { name: 'Roasted bugs', food: 11, warm: 8, cooked: true },
+  ckCod: { name: 'Cooked cod', food: 30, warm: 18, cooked: true },
+  ckPerch: { name: 'Cooked perch', food: 26, warm: 16, cooked: true },
+  ckChar: { name: 'Cooked char', food: 42, warm: 24, cooked: true },
+};
+const ORDER = ['sticks', 'stones', 'shards', 'berries', 'bugs', 'cod', 'perch', 'char', 'ckBugs', 'ckCod', 'ckPerch', 'ckChar'];
+const emptyInv = () => ({ sticks: 0, stones: 0, shards: 0, berries: 0, bugs: 0, cod: 0, perch: 0, char: 0, ckBugs: [], ckCod: [], ckPerch: [], ckChar: [] });
+const count = k => Array.isArray(inv[k]) ? inv[k].length : inv[k];
+const UPGRADE = [null, { name: 'hut', sticks: 12, stones: 8 }, { name: 'cabin', sticks: 25, stones: 15 }];
+const FIRE_LIFE = [200, 260, 330];   // seconds a full fire lasts at each camp level
+const FIRE_R = [120, 150, 185];      // how far the fire's warmth reaches
+
+let state = 'title', paused = false, mapOpen = false;
+let gameTime = 0, realT = 0;
+let player, S, inv, camp, spawn, flags, owl;
+let speech = null, toasts = [], floats = [], parts = [], prints = [];
+let target = null, deathCause = '', helpT = 0;
+let cam = { x: 0, y: 0 };
+let saveT = 0, tickT = 0, lastTile = -1, lastNight = false;
+const fade = { a: 0, phase: 'none', t: 0, text: '', mid: null };
+
+function newGame() {
+  genWorld((Math.random() * 4294967296) >>> 0);
+  player = { x: vill.x, y: vill.y + 70, dir: 'down', walk: 0, moving: false, fishing: null, cool: 0, exhausted: false, act: 0, stepD: 0, foot: 0 };
+  S = { hp: 100, warm: 100, food: 85, sta: 100 };
+  inv = emptyInv();
+  camp = null; spawn = null;
+  flags = { cold: false, hungry: false, firstFish: false, spotSeen: {}, villTalk: 0 };
+  owl = { on: false, x: 0, y: 0, z: 30, flap: 0, still: 0, face: 1, hootT: 8 };
+  gameTime = DAY * 0.08;
+  speech = null; toasts = []; floats = []; parts = []; prints = [];
+  cam.x = player.x; cam.y = player.y;
+  lastTile = -1; lastNight = false;
+  reveal();
+}
+
+// ---------- saving ----------
+const SAVE_KEY = 'frostbite_save_v1';
+function packBits(a) {
+  const b = new Uint8Array(Math.ceil(a.length / 8));
+  for (let i = 0; i < a.length; i++) if (a[i]) b[i >> 3] |= 1 << (i & 7);
+  let s = '';
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}
+function unpackBits(str, n) {
+  const s = atob(str), a = new Uint8Array(n);
+  for (let i = 0; i < n; i++) a[i] = (s.charCodeAt(i >> 3) >> (i & 7)) & 1;
+  return a;
+}
+function saveGame() {
+  if (state !== 'play' && state !== 'dead') return;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      v: 1, seed, gameTime, p: { x: player.x, y: player.y }, S, inv, camp, spawn, flags, owl: owl.on,
+      ex: packBits(explored), spots: spots.map(s => s.found ? 1 : 0),
+      ob: objs.map(o => o.stock + (o.regrowAt ? ',' + Math.round(o.regrowAt) : '')).join(';'),
+    }));
+  } catch (e) { /* saving is a bonus, the game still works without it */ }
+}
+function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+function loadGame() {
+  let d;
+  try { d = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
+  if (!d || d.v !== 1) return false;
+  newGame();
+  genWorld(d.seed);
+  gameTime = d.gameTime; player.x = d.p.x; player.y = d.p.y;
+  Object.assign(S, d.S); inv = Object.assign(emptyInv(), d.inv);
+  camp = d.camp; spawn = d.spawn; flags = Object.assign(flags, d.flags);
+  owl.on = d.owl; owl.x = player.x; owl.y = player.y;
+  explored = unpackBits(d.ex, W * H);
+  for (let i = 0; i < W * H; i++) if (explored[i]) mapFogCtx.clearRect(i % W, (i / W) | 0, 1, 1);
+  (d.spots || []).forEach((f, i) => { if (spots[i]) spots[i].found = !!f; });
+  const ob = (d.ob || '').split(';');
+  if (ob.length === objs.length) ob.forEach((s, i) => { const [st, rg] = s.split(','); objs[i].stock = +st; objs[i].regrowAt = rg ? +rg : 0; });
+  cam.x = player.x; cam.y = player.y;
+  lastNight = dayFrac() > 0.62;
+  return true;
+}
+
+// ---------- time of day ----------
+const dayFrac = () => (gameTime % DAY) / DAY;
+const dayNum = () => Math.floor(gameTime / DAY) + 1;
+function darkness(t) {
+  if (t < 0.06) return lerp(0.8, 0, t / 0.06);
+  if (t < 0.55) return 0;
+  if (t < 0.66) return lerp(0, 0.8, (t - 0.55) / 0.11);
+  return 0.8;
+}
+const isNight = () => dayFrac() >= 0.6 || dayFrac() < 0.03;
+
+// ---------- talking and messages ----------
+function say(text, dur = 3.2) { speech = { text, t: dur }; }
+function toast(text) { toasts.push({ text, t: 3 }); if (toasts.length > 3) toasts.shift(); }
+function floatText(text, x, y, col = '#2b2f36') { floats.push({ text, x, y, t: 1.4, col }); }
+
+// ---------- audio ----------
+let AC = null, master, musicBus, windGain, windFilt, noiseBuf, droneGain, muted = false, nextNote = 0;
+try { muted = localStorage.getItem('frostbite_muted') === '1'; } catch (e) {}
+function audioInit() {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  master = AC.createGain(); master.gain.value = muted ? 0 : 0.8; master.connect(AC.destination);
+  const dl = AC.createDelay(); dl.delayTime.value = 0.37;
+  const fb = AC.createGain(); fb.gain.value = 0.38;
+  const wet = AC.createGain(); wet.gain.value = 0.35;
+  dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(master);
+  musicBus = AC.createGain(); musicBus.gain.value = 0.45; musicBus.connect(master); musicBus.connect(dl);
+  const len = AC.sampleRate * 2, buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
+  let b = 0;
+  for (let i = 0; i < len; i++) { b = (b + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = b * 3.5; }
+  const src = AC.createBufferSource(); src.buffer = buf; src.loop = true;
+  windFilt = AC.createBiquadFilter(); windFilt.type = 'bandpass'; windFilt.frequency.value = 500; windFilt.Q.value = 0.7;
+  windGain = AC.createGain(); windGain.gain.value = 0;
+  src.connect(windFilt); windFilt.connect(windGain); windGain.connect(master); src.start();
+  noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  const drone = AC.createOscillator(); drone.type = 'sine'; drone.frequency.value = 55;
+  const drone2 = AC.createOscillator(); drone2.type = 'triangle'; drone2.frequency.value = 82.4;
+  droneGain = AC.createGain(); droneGain.gain.value = 0;
+  drone.connect(droneGain); drone2.connect(droneGain); droneGain.connect(musicBus); drone.start(); drone2.start();
+  nextNote = AC.currentTime + 1;
+}
+function setMuted(m) {
+  muted = m;
+  try { localStorage.setItem('frostbite_muted', m ? '1' : '0'); } catch (e) {}
+  if (master) master.gain.setTargetAtTime(m ? 0 : 0.8, AC.currentTime, 0.05);
+}
+function pianoNote(freq, when, vol = 0.18, dur = 2.8) {
+  if (!AC) return;
+  const o1 = AC.createOscillator(), o2 = AC.createOscillator(), g = AC.createGain(), f = AC.createBiquadFilter();
+  o1.type = 'triangle'; o1.frequency.value = freq; o2.type = 'sine'; o2.frequency.value = freq * 2;
+  const g2 = AC.createGain(); g2.gain.value = 0.3;
+  f.type = 'lowpass'; f.frequency.value = 2200;
+  g.gain.setValueAtTime(0, when); g.gain.linearRampToValueAtTime(vol, when + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0008, when + dur);
+  o1.connect(g); o2.connect(g2); g2.connect(g); g.connect(f); f.connect(musicBus);
+  o1.start(when); o2.start(when); o1.stop(when + dur + 0.1); o2.stop(when + dur + 0.1);
+}
+function noise(dur, freq, vol, type = 'bandpass', when = 0) {
+  if (!AC) return;
+  const t0 = when || AC.currentTime;
+  const s = AC.createBufferSource(); s.buffer = noiseBuf;
+  const f = AC.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  const g = AC.createGain(); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t0, Math.random() * 0.5); s.stop(t0 + dur + 0.05);
+}
+function tone(f0, f1, dur, vol, type = 'sine', when = 0) {
+  if (!AC) return;
+  const t0 = when || AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const sfx = {
+  pick: () => { noise(0.08, 1800, 0.25); tone(500, 700, 0.08, 0.05, 'triangle'); },
+  eat: () => { for (let i = 0; i < 3; i++) noise(0.06, 900, 0.22, 'bandpass', AC && AC.currentTime + i * 0.11); },
+  splash: () => { noise(0.4, 700, 0.3, 'lowpass'); tone(300, 900, 0.25, 0.08); },
+  sizzle: () => noise(0.9, 4000, 0.18, 'highpass'),
+  build: () => { for (let i = 0; i < 4; i++) noise(0.07, 300, 0.4, 'lowpass', AC && AC.currentTime + i * 0.15); },
+  ui: () => tone(660, 880, 0.08, 0.06, 'triangle'),
+  hoot: () => { if (!AC) return; const t = AC.currentTime; tone(420, 360, 0.35, 0.09, 'sine', t); tone(400, 340, 0.45, 0.09, 'sine', t + 0.45); },
+  crackle: (v) => noise(0.03, 2500, 0.12 * v, 'highpass'),
+};
+const DAY_NOTES = [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25];
+const NIGHT_NOTES = [110, 130.81, 146.83, 155.56, 164.81, 196, 207.65, 233.08];
+function updateAudio(dt) {
+  if (!AC) return;
+  const now = AC.currentTime;
+  const playing = state === 'play' || state === 'dead';
+  const night = playing ? darkness(dayFrac()) / 0.8 : 0;
+  let windAmt = 0.04;
+  if (playing) {
+    const t = tileAtW(player.x, player.y);
+    windAmt = 0.035 + 0.04 * windNow() + (t === ROCK || t === PEAK ? 0.05 : 0) - (t === CAVE ? 0.03 : 0);
+  }
+  windGain.gain.setTargetAtTime(Math.max(0, windAmt), now, 0.5);
+  windFilt.frequency.setTargetAtTime(380 + 300 * Math.sin(realT * 0.3) + 200 * Math.sin(realT * 0.71), now, 0.4);
+  droneGain.gain.setTargetAtTime(night * 0.05, now, 1);
+  if (now > nextNote - 0.1) {
+    if (night > 0.5) {
+      const n = NIGHT_NOTES[(Math.random() * NIGHT_NOTES.length) | 0];
+      pianoNote(n, nextNote, 0.12, 4);
+      if (Math.random() < 0.35) pianoNote(n * 1.0595, nextNote + 0.02, 0.06, 3);
+      nextNote += 3 + Math.random() * 3;
+    } else {
+      const n = DAY_NOTES[(Math.random() * DAY_NOTES.length) | 0];
+      pianoNote(n, nextNote, 0.16);
+      if (Math.random() < 0.3) pianoNote(DAY_NOTES[Math.max(0, DAY_NOTES.indexOf(n) - 2)] / 2, nextNote, 0.1, 3.5);
+      nextNote += 1.4 + Math.random() * 2.2;
+    }
+    if (nextNote < now) nextNote = now + 0.5;
+  }
+  if (playing && camp && camp.fuel > 0) {
+    const d = dist(player.x, player.y, camp.fx, camp.fy);
+    if (d < 260 && Math.random() < dt * 7) sfx.crackle(1 - d / 260);
+  }
+}
+const windNow = () => 0.5 + 0.35 * Math.sin(gameTime / 37) + 0.15 * Math.sin(gameTime / 11.3);
+
+// ---------- input ----------
+const keys = {};
+const hold = { run: false };
+let joy = null;
+let hits = [];
+addEventListener('keydown', e => {
+  audioInit();
+  if (e.repeat && !/Arrow|Key[WASD]/.test(e.code)) return;
+  keys[e.code] = true;
+  onKey(e.code);
+  if (/Arrow|Space/.test(e.code)) e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; hold.run = false; joy = null; });
+
+function onKey(code) {
+  if (state === 'title') { if (code === 'Enter' || code === 'Space') { if (hasSave()) continueGame(); else startNew(); } else if (code === 'KeyN') startNew(); return; }
+  if (state === 'story') { if (code === 'Escape') beginPlay(); else storyNext(); return; }
+  if (state === 'dead') { if (code === 'KeyE' || code === 'Space' || code === 'Enter') respawn(); return; }
+  if (fade.phase !== 'none') return;
+  if (code === 'Escape' || code === 'KeyP') { if (mapOpen) mapOpen = false; else paused = !paused; sfx.ui(); return; }
+  if (paused) { if (code === 'KeyM' && false) return; return; }
+  if (code === 'KeyM' || code === 'Tab') { mapOpen = !mapOpen; sfx.ui(); return; }
+  if (mapOpen) return;
+  helpT = Math.min(helpT, 0.6);
+  if (code === 'KeyE' || code === 'Space') act();
+  else if (code === 'KeyQ') eatBest();
+  else if (code === 'KeyC') cook();
+  else if (code === 'KeyZ') sleep();
+  else if (/^Digit[1-9]$/.test(code)) {
+    const list = ORDER.filter(k => count(k) > 0), k = list[+code.slice(5) - 1];
+    if (k) useItem(k);
+  }
+}
+
+cv.addEventListener('pointerdown', e => {
+  audioInit();
+  if (e.pointerType === 'touch') touchUI = true;
+  const x = e.clientX, y = e.clientY;
+  for (let i = hits.length - 1; i >= 0; i--) {
+    const h = hits[i];
+    const inside = h.r ? dist(x, y, h.x, h.y) <= h.r : (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h);
+    if (!inside) continue;
+    if (h.hold) { hold[h.hold] = e.pointerId; }
+    else h.fn();
+    e.preventDefault();
+    return;
+  }
+  if (state === 'story') { storyNext(); return; }
+  if (state === 'dead') { respawn(); return; }
+  if (state === 'play' && !paused && !mapOpen && e.pointerType !== 'mouse' && x < VW * 0.62) {
+    joy = { id: e.pointerId, ox: x, oy: y, x, y };
+  }
+});
+cv.addEventListener('pointermove', e => { if (joy && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; } });
+const endPointer = e => {
+  if (joy && e.pointerId === joy.id) joy = null;
+  for (const k in hold) if (hold[k] === e.pointerId) hold[k] = false;
+};
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('contextmenu', e => e.preventDefault());
+
+// ---------- actions ----------
+function findTarget() {
+  let best = null, bd = 44;
+  const px = player.x, py = player.y;
+  if (camp) {
+    const df = dist(px, py, camp.fx, camp.fy);
+    if (df < 52 && df < bd) { best = { kind: 'fire' }; bd = df; }
+    const dt = dist(px, py, camp.tx, camp.ty - 6);
+    if (dt < 44 + camp.level * 12 && dt - 10 < bd) { best = { kind: 'tent' }; bd = dt - 10; }
+  }
+  const tx = Math.floor(px / T), ty = Math.floor(py / T);
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const list = ogrid[(ty + j) * W + tx + i];
+    if (!list) continue;
+    for (const o of list) {
+      if (!OT[o.type].give || o.stock <= 0) continue;
+      const d = dist(px, py, o.x, o.y);
+      if (d < bd) { best = { kind: 'obj', o }; bd = d; }
+    }
+  }
+  for (const v of villagers) { const d = dist(px, py, v.x, v.y); if (d < 40 && d < bd) { best = { kind: 'villager', v }; bd = d; } }
+  if (!camp) for (const s of spots) { const d = dist(px, py, s.x, s.y); if (d < 56 && d < bd + 20) { best = { kind: 'spot', s }; bd = d; } }
+  if (tileAtW(px, py) === ICE && (!best || (best.kind === 'obj' && bd > 24))) best = { kind: 'fish' };
+  return best;
+}
+function verbFor(tg) {
+  if (!tg) return '';
+  switch (tg.kind) {
+    case 'obj': return OT[tg.o.type].verb;
+    case 'fire':
+      if (camp.fuel > 0) return inv.sticks > 0 ? 'Add a stick to the fire' : 'Fire needs sticks';
+      return inv.sticks >= 2 ? 'Light the fire (2 sticks)' : 'Need 2 sticks to light it';
+    case 'tent': {
+      const up = UPGRADE[camp.level + 1];
+      if (!up) return 'Admire your cabin';
+      return `Build a ${up.name} (${up.sticks} sticks, ${up.stones} stones)`;
+    }
+    case 'spot': return 'Set up camp here';
+    case 'villager': return 'Talk';
+    case 'fish': return player.fishing ? 'Fishing...' : 'Fish through the ice';
+  }
+  return '';
+}
+function act() {
+  if (state !== 'play' || paused || mapOpen || fade.phase !== 'none' || player.cool > 0) return;
+  const tg = target;
+  if (!tg) { say(['Nothing here.', 'Hmm.', '...'][(Math.random() * 3) | 0], 1.2); return; }
+  player.cool = 0.3; player.act = 0.25;
+  if (tg.kind === 'obj') gather(tg.o);
+  else if (tg.kind === 'fire') {
+    if (camp.fuel > 0) {
+      if (inv.sticks > 0) { inv.sticks--; camp.fuel = Math.min(100, camp.fuel + 30); sfx.pick(); burstSparks(camp.fx, camp.fy - 6, 10); floatText('-1 stick', player.x, player.y - 46); }
+      else say('I need to find sticks. Trees have them.');
+    } else if (inv.sticks >= 2) {
+      inv.sticks -= 2; camp.fuel = 45; sfx.pick(); burstSparks(camp.fx, camp.fy - 6, 16); say('Warm again.');
+    } else say('I need 2 sticks to light it.');
+  } else if (tg.kind === 'tent') upgradeCamp();
+  else if (tg.kind === 'spot') makeCamp(tg.s);
+  else if (tg.kind === 'villager') {
+    const v = tg.v;
+    v.say = { text: v.lines[(v.line++) % v.lines.length], t: 2.8 };
+    flags.villTalk++;
+    if (flags.villTalk === 2) setTimeout(() => say("...I should go find my own place."), 1800);
+  } else if (tg.kind === 'fish') {
+    if (!player.fishing) { player.fishing = { t: 0, need: 3 + Math.random() * 3 }; say('Cutting a little hole... now I wait.', 2); }
+  }
+}
+function gather(o) {
+  const d = OT[o.type];
+  if (o.stock <= 0) return;
+  o.stock--; o.shake = 0.3;
+  const amt = d.amt || 1;
+  inv[d.give] += amt;
+  let msg = `+${amt} ${ITEMS[d.give].name.toLowerCase()}`;
+  if (o.type === 'rock' && Math.random() < (o.bugc || 0.3)) { inv.bugs++; msg += ', +1 bug'; }
+  if (o.type === 'log') { inv.sticks++; msg += ', +1 stick'; }
+  floatText(msg, o.x, o.y - 40);
+  if (o.stock <= 0) o.regrowAt = gameTime + d.regrow * DAY;
+  sfx.pick();
+  if (d.give === 'shards' && !flags.shard) { flags.shard = true; say("Shiny. I bet someone would trade for these."); }
+}
+function useItem(k) {
+  const it = ITEMS[k];
+  if (it.food) eat(k);
+  else toast(`${it.name}: ${it.info}`);
+}
+function eat(k) {
+  const it = ITEMS[k];
+  if (count(k) <= 0) return;
+  if (S.food > 96 && !(it.warm && S.warm < 90)) { say("I'm full."); return; }
+  if (Array.isArray(inv[k])) inv[k].shift(); else inv[k]--;
+  S.food = Math.min(100, S.food + it.food);
+  if (it.warm) S.warm = Math.min(100, S.warm + it.warm);
+  S.hp = Math.min(100, S.hp + (it.cooked ? 6 : 2));
+  floatText(`+${it.food} food${it.warm ? `, +${it.warm} warm` : ''}`, player.x, player.y - 46, '#8a5a1c');
+  sfx.eat();
+  if (it.cooked) say(['Warm and yummy.', 'So much better cooked.', 'Mmm.'][(Math.random() * 3) | 0], 1.6);
+  else if (k === 'bugs') say(['Crunchy...', 'Better cooked, probably.'][(Math.random() * 2) | 0], 1.6);
+}
+function eatBest() {
+  let best = null, bestScore = -1;
+  for (const k of ORDER) {
+    const it = ITEMS[k];
+    if (!it.food || count(k) <= 0) continue;
+    // cooked food first (it spoils), then the most filling raw food
+    const score = it.cooked ? 1000 - inv[k][0] / DAY : it.food;
+    if (score > bestScore) { bestScore = score; best = k; }
+  }
+  if (best) eat(best); else say('I have no food. Fish, bugs, berries...');
+}
+function cook() {
+  if (state !== 'play' || paused || mapOpen) return;
+  if (!camp || dist(player.x, player.y, camp.fx, camp.fy) > 60) { say('I need to be at my campfire to cook.'); return; }
+  if (camp.fuel <= 0) { say('The fire is out.'); return; }
+  let n = 0;
+  for (const k of ['bugs', 'cod', 'perch', 'char']) {
+    while (inv[k] > 0) { inv[k]--; inv[ITEMS[k].cook].push(gameTime + 3 * DAY); n++; }
+  }
+  if (!n) { say('Nothing to cook. Berries are fine raw.'); return; }
+  sfx.sizzle(); burstSparks(camp.fx, camp.fy - 8, 12);
+  floatText(`Cooked ${n} thing${n > 1 ? 's' : ''}!`, camp.fx, camp.fy - 40, '#8a5a1c');
+  if (!flags.cooked) { flags.cooked = true; toast('Cooked food fills you up more and warms you, but it spoils in 3 days.'); }
+}
+function makeCamp(s) {
+  camp = { x: s.x, y: s.y, level: 0, fuel: 60, tx: s.x, ty: s.y - 26, fx: s.x + 4, fy: s.y + 30, name: s.name };
+  // clear things that would sit on top of the camp
+  for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) {
+    const list = ogrid[(s.ty + j) * W + s.tx + i];
+    if (list) for (const o of list) if (dist(o.x, o.y, s.x, s.y) < 70 && OT[o.type].r) o.stock = 0, o.gone = true;
+  }
+  sfx.build();
+  burstSparks(camp.fx, camp.fy, 14);
+  say('This is my place now. Nobody will burn anything here.', 4);
+  owl.on = true; owl.x = camp.tx + 30; owl.y = camp.ty - 10; owl.z = 60;
+  setTimeout(() => { if (state === 'play') { sfx.hoot(); toast('A snow owl lands on your tent. It decides to stay with you.'); } }, 2500);
+  saveGame();
+}
+function upgradeCamp() {
+  const up = UPGRADE[camp.level + 1];
+  if (!up) { say('My cabin. My carvings. My home.'); return; }
+  if (inv.sticks < up.sticks || inv.stones < up.stones) {
+    say(`A ${up.name} needs ${up.sticks} sticks and ${up.stones} stones. I have ${inv.sticks} and ${inv.stones}.`, 3.5);
+    return;
+  }
+  inv.sticks -= up.sticks; inv.stones -= up.stones;
+  camp.level++;
+  sfx.build();
+  for (let i = 0; i < 20; i++) parts.push({ x: camp.tx + (Math.random() - 0.5) * 70, y: camp.ty - Math.random() * 40, vx: (Math.random() - 0.5) * 40, vy: -20 - Math.random() * 30, t: 1, kind: 'dust' });
+  say(camp.level === 1 ? 'A real hut! The fire lasts longer now.' : "A cabin. I even carved a little owl for the door.", 4);
+  saveGame();
+}
+function sleep() {
+  if (state !== 'play' || paused || mapOpen || fade.phase !== 'none') return;
+  if (!camp || dist(player.x, player.y, camp.tx, camp.ty) > 70 + camp.level * 12) { say('I can only sleep at my camp.'); return; }
+  spawn = { x: camp.tx, y: camp.ty + 18 };
+  if (!isNight()) { say("I'm not sleepy. But this is my bed now. If something happens, I'll wake up here.", 4); saveGame(); return; }
+  if (camp.fuel <= 0) { say("It's too cold to sleep. I have to light the fire first."); return; }
+  fadeTo('Zzz...', () => {
+    gameTime = (Math.floor(gameTime / DAY) + (dayFrac() > 0.5 ? 1 : 0)) * DAY + DAY * 0.07;
+    S.food = Math.max(5, S.food - 22);
+    S.warm = Math.max(S.warm, 80);
+    S.hp = Math.min(100, S.hp + 30 + camp.level * 15);
+    S.sta = 100;
+    camp.fuel = Math.max(15, camp.fuel - 35);
+    player.x = spawn.x; player.y = spawn.y;
+    lastNight = false;
+    say(`Morning. Day ${dayNum()}. I made it.`);
+    saveGame();
+  });
+}
+function fadeTo(text, mid) { fade.phase = 'out'; fade.t = 0; fade.text = text; fade.mid = mid; }
+function die(cause) {
+  deathCause = cause;
+  state = 'dead';
+  player.fishing = null;
+  inv = emptyInv();
+  saveGame();
+}
+function respawn() {
+  if (state !== 'dead') return;
+  state = 'play';
+  const sp = spawn || { x: vill.x, y: vill.y + 70 };
+  player.x = sp.x; player.y = sp.y;
+  S.hp = 70; S.warm = 70; S.food = Math.max(S.food, 55); S.sta = 100;
+  gameTime = (Math.floor(gameTime / DAY) + 1) * DAY + DAY * 0.06;
+  lastNight = false;
+  cam.x = player.x; cam.y = player.y;
+  say(spawn ? 'I woke up in my bed... everything I carried is gone.' : 'I woke up back in the village. My bag is empty.', 4);
+  saveGame();
+}
+function burstSparks(x, y, n) {
+  for (let i = 0; i < n; i++) parts.push({ x, y, vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 60, t: 0.6 + Math.random() * 0.6, kind: 'spark' });
+}
+
+// ---------- the map the kid draws ----------
+function reveal() {
+  const tx = Math.floor(player.x / T), ty = Math.floor(player.y / T), R = 7;
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+    if (dx * dx + dy * dy > R * R) continue;
+    const x = tx + dx, y = ty + dy;
+    if (x < 0 || y < 0 || x >= W || y >= H) continue;
+    const i = y * W + x;
+    if (!explored[i]) { explored[i] = 1; mapFogCtx.clearRect(x, y, 1, 1); }
+  }
+}
+
+// ---------- collisions ----------
+function blocked(x, y) {
+  const r = 9;
+  if (tileAtW(x - r, y) === PEAK || tileAtW(x + r, y) === PEAK || tileAtW(x, y - 5) === PEAK || tileAtW(x, y + 4) === PEAK) return true;
+  const tx = Math.floor(x / T), ty = Math.floor(y / T);
+  for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) {
+    const list = ogrid[(ty + j) * W + tx + i];
+    if (!list) continue;
+    for (const o of list) {
+      const orr = OT[o.type].r;
+      if (!orr || o.gone) continue;
+      const dx = x - o.x, dy = (y - o.y) * 1.3;
+      if (dx * dx + dy * dy < (orr + r) * (orr + r)) return true;
+    }
+  }
+  if (camp) {
+    const tr = [20, 28, 40][camp.level];
+    if (dist(x, (y - (camp.ty - 6)) * 1.4 + (camp.ty - 6), camp.tx, camp.ty - 6) < tr + r) return true;
+    if (dist(x, y, camp.fx, camp.fy) < 11 + r) return true;
+  }
+  return false;
+}
+
+// ---------- update ----------
+function update(dt) {
+  realT += dt;
+  boil = Math.floor(realT * 5) % 3;
+  if (fade.phase !== 'none') {
+    fade.t += dt;
+    if (fade.phase === 'out') { fade.a = Math.min(1, fade.t / 0.8); if (fade.t >= 0.8) { fade.phase = 'hold'; fade.t = 0; if (fade.mid) fade.mid(); } }
+    else if (fade.phase === 'hold') { if (fade.t >= 1.2) { fade.phase = 'in'; fade.t = 0; } }
+    else { fade.a = Math.max(0, 1 - fade.t / 0.8); if (fade.t >= 0.8) { fade.phase = 'none'; fade.a = 0; } }
+  }
+  if (state === 'title' || state === 'story') updateSnow(dt, 0, 0);
+  if (state === 'play' && !paused && !mapOpen && fade.phase !== 'hold') gameUpdate(dt);
+  updateAudio(dt);
+}
+
+function gameUpdate(dt) {
+  gameTime += dt;
+  const t = dayFrac();
+  // input
+  let mx = 0, my = 0;
+  if (keys.KeyA || keys.ArrowLeft) mx -= 1;
+  if (keys.KeyD || keys.ArrowRight) mx += 1;
+  if (keys.KeyW || keys.ArrowUp) my -= 1;
+  if (keys.KeyS || keys.ArrowDown) my += 1;
+  if (joy) {
+    const dx = joy.x - joy.ox, dy = joy.y - joy.oy, l = Math.hypot(dx, dy);
+    if (l > 8) { const k = Math.min(1, l / 50); mx = dx / l * k; my = dy / l * k; }
+  }
+  const ml = Math.hypot(mx, my);
+  if (ml > 1) { mx /= ml; my /= ml; }
+  const moving = ml > 0.1;
+  if (fade.phase !== 'none') { mx = my = 0; }
+  if (S.sta <= 0) player.exhausted = true;
+  if (player.exhausted && S.sta > 30) player.exhausted = false;
+  const wantRun = keys.ShiftLeft || keys.ShiftRight || hold.run;
+  const running = moving && wantRun && !player.exhausted;
+  const speed = (running ? 165 : player.exhausted ? 70 : 95);
+  if (moving && player.fishing) { player.fishing = null; say('Oops, scared the fish away.', 1.2); }
+  player.moving = moving && fade.phase === 'none';
+  if (player.moving) {
+    const vx = mx * speed * dt, vy = my * speed * dt;
+    const ox = player.x, oy = player.y;
+    if (!blocked(player.x + vx, player.y)) player.x += vx;
+    if (!blocked(player.x, player.y + vy)) player.y += vy;
+    const moved = dist(ox, oy, player.x, player.y);
+    player.walk += moved * 0.16;
+    player.stepD += moved;
+    if (player.stepD > 13) {
+      player.stepD = 0; player.foot ^= 1;
+      const a = Math.atan2(my, mx), side = player.foot ? 1 : -1;
+      const tl = tileAtW(player.x, player.y);
+      if (tl !== CAVE && tl !== SPRING) prints.push({ x: player.x + Math.cos(a + Math.PI / 2) * 3 * side, y: player.y + Math.sin(a + Math.PI / 2) * 3 * side, a, t: 40 });
+      if (prints.length > 140) prints.shift();
+    }
+    if (Math.abs(mx) > Math.abs(my)) player.dir = mx < 0 ? 'left' : 'right';
+    else player.dir = my < 0 ? 'up' : 'down';
+  }
+  player.cool = Math.max(0, player.cool - dt);
+  player.act = Math.max(0, player.act - dt);
+  const k = 1 - Math.exp(-dt * 6);
+  cam.x = lerp(cam.x, player.x, k); cam.y = lerp(cam.y, player.y - 10, k);
+
+  // survival
+  const tile = tileAtW(player.x, player.y);
+  const night = darkness(t) / 0.8;
+  const biomeMul = { [SNOW]: 1, [FOREST]: 0.85, [ICE]: 1.25, [ROCK]: 1.35, [PEAK]: 1.35, [CAVE]: 0.6, [VILL]: 0.9, [SPRING]: 0 }[tile];
+  let warmRate = -0.62 * (1 + night * 0.75) * biomeMul * (1 + windNow() * 0.3);
+  if (running) warmRate *= 0.8;
+  let heat = 0, nearFire = false;
+  if (camp && camp.fuel > 0) {
+    const d = dist(player.x, player.y, camp.fx, camp.fy), R = FIRE_R[camp.level] * (0.55 + 0.45 * camp.fuel / 100);
+    if (d < R) { heat += 9 * (1 - d / R * 0.6); nearFire = true; }
+    if (dist(player.x, player.y, camp.tx, camp.ty) < 50) heat += 2 + camp.level * 1.5;
+  }
+  const dv = dist(player.x, player.y, vill.x, vill.y);
+  if (dv < 110) { heat += 7 * (1 - dv / 110 * 0.6); nearFire = true; }
+  if (tile === SPRING) heat += 7;
+  S.warm = clamp(S.warm + (warmRate + heat) * dt, 0, 100);
+  S.food = clamp(S.food - (running ? 0.5 : 0.33) * dt, 0, 100);
+  const cold = S.warm < 30, hungry = S.food < 30;
+  if (running) S.sta = clamp(S.sta - 22 * dt * (cold ? 1.5 : 1) * (hungry ? 1.5 : 1), 0, 100);
+  else S.sta = clamp(S.sta + 16 * dt * (cold ? 0.5 : 1) * (hungry ? 0.5 : 1), 0, 100);
+  if (S.warm <= 0) { S.hp -= 2.5 * dt; deathCause = 'cold'; }
+  if (S.food <= 0) { S.hp -= 1.5 * dt; if (S.warm > 0) deathCause = 'hunger'; }
+  if (S.warm > 40 && S.food > 40) S.hp = Math.min(100, S.hp + 0.6 * dt);
+  if (S.hp <= 0) { S.hp = 0; die(deathCause || 'cold'); return; }
+
+  // the kid talks about how they feel
+  if (S.warm < 25 && !flags.cold) { flags.cold = true; say(nearFire ? 'Warming up...' : "So cold... I need a fire, or a hot spring."); }
+  if (S.warm > 50) flags.cold = false;
+  if (S.food < 25 && !flags.hungry) { flags.hungry = true; say('My tummy hurts. I need food. (Q to eat)'); }
+  if (S.food > 50) flags.hungry = false;
+  const nowNight = t >= 0.62;
+  if (nowNight && !lastNight) {
+    say(camp ? "It's getting dark. Something big walks around at night. I'd better stay by my fire." : "It's getting dark... I need a fire. The village one is the only one I know.", 4.5);
+    if (owl.on) sfx.hoot();
+  }
+  lastNight = nowNight;
+  if (!camp) for (const s of spots) if (!flags.spotSeen[s.name] && dist(player.x, player.y, s.x, s.y) < T * 6) {
+    flags.spotSeen[s.name] = true; s.found = true;
+    say(`This place feels cozy... (${s.name})`);
+  }
+
+  // fishing
+  if (player.fishing) {
+    player.fishing.t += dt;
+    if (player.fishing.t >= player.fishing.need) {
+      const r = Math.random(), kind = r < 0.6 ? 'cod' : r < 0.9 ? 'perch' : 'char';
+      inv[kind]++;
+      floatText(`+1 ${ITEMS[kind].name.toLowerCase()}!`, player.x, player.y - 46, '#2a6a8a');
+      sfx.splash();
+      for (let i = 0; i < 8; i++) parts.push({ x: player.fishing.hx, y: player.fishing.hy, vx: (Math.random() - 0.5) * 50, vy: -30 - Math.random() * 40, t: 0.6, kind: 'drop' });
+      if (!flags.firstFish) { flags.firstFish = true; say(kind === 'char' ? 'A rare silver char! Lucky!' : 'A fish! Cooking it at my fire would be best.'); }
+      else if (kind === 'char') say('A silver char! Those are rare.');
+      player.fishing = null;
+    }
+  }
+
+  // camp fire
+  if (camp && camp.fuel > 0) {
+    camp.fuel = Math.max(0, camp.fuel - 100 / FIRE_LIFE[camp.level] * dt);
+    if (camp.fuel <= 0 && dist(player.x, player.y, camp.fx, camp.fy) < 400) say('The fire went out! I need 2 sticks to light it again.');
+    if (Math.random() < dt * (2 + camp.fuel / 20)) parts.push({ x: camp.fx + (Math.random() - 0.5) * 8, y: camp.fy - 10, vx: (Math.random() - 0.5) * 12, vy: -30 - Math.random() * 30, t: 0.8 + Math.random() * 0.6, kind: 'spark' });
+    if (camp.level === 2 && Math.random() < dt * 4) parts.push({ x: camp.tx + 33, y: camp.ty - 78, vx: 6 + windNow() * 10, vy: -14, t: 2.5, kind: 'smoke' });
+  }
+  if (Math.random() < dt * 5) parts.push({ x: vill.x + (Math.random() - 0.5) * 16, y: vill.y - 14, vx: (Math.random() - 0.5) * 14, vy: -35 - Math.random() * 30, t: 0.9, kind: 'spark' });
+  for (const s of springs) if (Math.random() < dt * 3 && dist(s.x, s.y, cam.x, cam.y) < 700)
+    parts.push({ x: s.x + (Math.random() - 0.5) * 60, y: s.y + (Math.random() - 0.5) * 40, vx: 4, vy: -12, t: 2.2, kind: 'steam' });
+
+  // world ticks once a second
+  tickT += dt;
+  if (tickT >= 1) {
+    tickT = 0;
+    for (const o of objs) if (o.stock <= 0 && o.regrowAt && gameTime >= o.regrowAt && !o.gone) { o.stock = OT[o.type].stock; o.regrowAt = 0; }
+    let spoiled = 0;
+    for (const k of ['ckBugs', 'ckCod', 'ckPerch', 'ckChar']) while (inv[k].length && inv[k][0] <= gameTime) { inv[k].shift(); spoiled++; }
+    if (spoiled) say(`Ew. ${spoiled} cooked thing${spoiled > 1 ? 's' : ''} went bad.`);
+  }
+  const ti = Math.floor(player.y / T) * W + Math.floor(player.x / T);
+  if (ti !== lastTile) { lastTile = ti; reveal(); }
+
+  // the owl
+  if (owl.on) {
+    owl.flap += dt * 14;
+    const side = player.dir === 'left' ? 1 : -1;
+    const tx = player.x + side * 22, ty = player.y + 6;
+    owl.still = player.moving ? 0 : owl.still + dt;
+    const d = dist(owl.x, owl.y, tx, ty);
+    const flying = d > 30 || owl.still < 1.2;
+    const sp = Math.min(1, dt * (d > 200 ? 3 : 2.2));
+    owl.x = lerp(owl.x, tx, sp); owl.y = lerp(owl.y, ty, sp);
+    owl.z = lerp(owl.z, flying ? 30 : 0, Math.min(1, dt * 3));
+    if (Math.abs(tx - owl.x) > 2) owl.face = tx > owl.x ? 1 : -1;
+    owl.hootT -= dt;
+    if (owl.hootT <= 0) { owl.hootT = 25 + Math.random() * 30; if (night > 0.5) sfx.hoot(); }
+  }
+  // villagers wander a little
+  for (const v of villagers) {
+    v.wait -= dt;
+    if (v.wait <= 0) { v.tx = v.hx + (Math.random() - 0.5) * 60; v.ty = v.hy + (Math.random() - 0.5) * 50; v.wait = 2 + Math.random() * 4; }
+    const dx = v.tx - v.x, dy = v.ty - v.y, l = Math.hypot(dx, dy);
+    if (l > 2) { v.x += dx / l * 30 * dt; v.y += dy / l * 30 * dt; v.walk += dt * 5; if (Math.abs(dx) > 1) v.dir = dx > 0 ? 1 : -1; }
+    if (v.say) { v.say.t -= dt; if (v.say.t <= 0) v.say = null; }
+  }
+
+  // particles, footprints, texts
+  for (const p of parts) { p.t -= dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.kind === 'drop' || p.kind === 'dust') p.vy += 120 * dt; }
+  parts = parts.filter(p => p.t > 0);
+  if (parts.length > 400) parts.splice(0, parts.length - 400);
+  for (const f of prints) f.t -= dt;
+  while (prints.length && prints[0].t <= 0) prints.shift();
+  for (const f of floats) { f.t -= dt; f.y -= 22 * dt; }
+  floats = floats.filter(f => f.t > 0);
+  for (const tt of toasts) tt.t -= dt;
+  toasts = toasts.filter(tt => tt.t > 0);
+  if (speech) { speech.t -= dt; if (speech.t <= 0) speech = null; }
+  for (const o of objs) if (o.shake > 0) o.shake -= dt;
+  if (helpT > 0) helpT -= dt;
+  updateSnow(dt, player.moving ? mx * speed : 0, player.moving ? my * speed : 0);
+
+  target = fade.phase === 'none' ? findTarget() : null;
+  saveT += dt;
+  if (saveT > 20) { saveT = 0; saveGame(); }
+}
+
+// ---------- snow ----------
+const flakes = [];
+for (let i = 0; i < 150; i++) flakes.push({ x: Math.random(), y: Math.random(), z: 0.3 + Math.random() * 0.7, ph: Math.random() * 7 });
+function updateSnow(dt, pvx, pvy) {
+  const wind = state === 'play' ? windNow() : 0.5;
+  for (const f of flakes) {
+    f.ph += dt;
+    f.x += ((wind * 60 + Math.sin(f.ph) * 12) * f.z - pvx * f.z * 0.5) * dt / Math.max(1, VW);
+    f.y += ((24 + f.z * 34) - pvy * f.z * 0.5) * dt / Math.max(1, VH);
+    f.x = (f.x % 1 + 1) % 1; f.y = (f.y % 1 + 1) % 1;
+  }
+}
+function drawSnow(c, amount = 1) {
+  const n = Math.floor(flakes.length * amount);
+  c.fillStyle = '#ffffff'; c.strokeStyle = 'rgba(110,130,155,.55)'; c.lineWidth = 0.8;
+  for (let i = 0; i < n; i++) {
+    const f = flakes[i], r = 1 + f.z * 2;
+    c.beginPath(); c.arc(f.x * VW, f.y * VH, r, 0, 7); c.fill(); c.stroke();
+  }
+}
+
+// ---------- drawing characters ----------
+function drawKid(c, x, y, dir, walk, moving, opts = {}) {
+  const r = mulberry32(boil * 977 + 5);
+  const bob = moving ? -Math.abs(Math.sin(walk)) * 2 : 0;
+  shadow(c, x, y, 11, 4, 0.22);
+  const step = moving ? Math.sin(walk) * 3 : 0;
+  shape(c, r, ell(x - 4, y - 1 + step * 0.4, 3, 2, 6), '#2a2f3a', null);
+  shape(c, r, ell(x + 4, y - 1 - step * 0.4, 3, 2, 6), '#2a2f3a', null);
+  y += bob;
+  // robe
+  shape(c, r, [[x - 7, y - 22], [x + 7, y - 22], [x + 11, y - 3], [x + 4, y - 1], [x - 4, y - 1], [x - 11, y - 3]], '#3b6db3', '#1f3c66', { lw: 1.6, j: 0.7 });
+  line(c, r, x - 9, y - 6, x + 9, y - 6, '#2a5390', 1, 0.5);
+  // sleeves / arms
+  const sw = moving ? Math.sin(walk) * 2.5 : 0;
+  if (dir !== 'left') shape(c, r, ell(x + 9, y - 14 - sw, 3.4, 5, 6), '#3462a3', '#1f3c66', { lw: 1.2, double: false });
+  if (dir !== 'right') shape(c, r, ell(x - 9, y - 14 + sw, 3.4, 5, 6), '#3462a3', '#1f3c66', { lw: 1.2, double: false });
+  if (opts.rod) {
+    const hx = dir === 'left' ? x - 10 : x + 10;
+    line(c, r, hx, y - 12, opts.rod[0], opts.rod[1] - 12, '#6b4a32', 1.6, 0.4);
+    c.strokeStyle = 'rgba(40,40,40,.7)'; c.lineWidth = 0.7; c.beginPath(); c.moveTo(opts.rod[0], opts.rod[1] - 12); c.lineTo(opts.rod[0], opts.rod[1]); c.stroke();
+  }
+  // hood
+  const hx = dir === 'left' ? 1.5 : dir === 'right' ? -1.5 : 0;
+  shape(c, r, [[x + hx, y - 43], [x + 9 + hx * 0.4, y - 34], [x + 10, y - 24], [x, y - 20], [x - 10, y - 24], [x - 9 + hx * 0.4, y - 34]], '#3b6db3', '#1f3c66', { lw: 1.6, j: 0.6 });
+  if (dir === 'up') {
+    line(c, r, x, y - 42, x, y - 23, '#2a5390', 1, 0.4);
+  } else {
+    // the mask
+    const mx = dir === 'left' ? x - 3 : dir === 'right' ? x + 3 : x;
+    const rx = dir === 'down' ? 6 : 4.6;
+    shape(c, r, ell(mx, y - 30, rx, 7, 9), '#f6f2e8', '#4a4640', { lw: 1.2, j: 0.4 });
+    c.fillStyle = '#1c1f26';
+    const eyes = dir === 'down' ? [-2.4, 2.4] : [dir === 'left' ? -1.6 : 1.6];
+    for (const ex of eyes) { c.beginPath(); c.ellipse(mx + ex, y - 31, 1.1, 1.9, 0, 0, 7); c.fill(); }
+    line(c, r, mx - 2, y - 26, mx + 2, y - 26, '#b8b0a2', 0.8, 0.3);
+  }
+}
+function drawOwl(c, o) {
+  const r = mulberry32(boil * 131 + 9);
+  shadow(c, o.x, o.y, 7 - o.z * 0.08, 2.5, 0.2);
+  const y = o.y - o.z - 2;
+  if (o.z > 3) {
+    const f = Math.sin(o.flap) * 7;
+    shape(c, r, [[o.x - 4, y - 10], [o.x - 15, y - 13 - f], [o.x - 9, y - 6]], '#f4f4f0', '#6b7078', { smooth: false, lw: 1.1, j: 0.5 });
+    shape(c, r, [[o.x + 4, y - 10], [o.x + 15, y - 13 - f], [o.x + 9, y - 6]], '#f4f4f0', '#6b7078', { smooth: false, lw: 1.1, j: 0.5 });
+  }
+  shape(c, r, ell(o.x, y - 8, 6.5, 8, 9), '#fbfbf8', '#6b7078', { lw: 1.2, j: 0.5 });
+  c.fillStyle = '#3d424a';
+  for (const [dx, dy] of [[-2, -5], [2, -3], [-1, -1], [3, -7]]) c.fillRect(o.x + dx, y + dy - 2, 1.2, 1);
+  for (const ex of [-2.4, 2.4]) {
+    c.fillStyle = '#f2c230'; c.beginPath(); c.arc(o.x + ex + o.face * 0.6, y - 12, 1.8, 0, 7); c.fill();
+    c.fillStyle = '#111'; c.beginPath(); c.arc(o.x + ex + o.face * 0.9, y - 12, 0.8, 0, 7); c.fill();
+  }
+  c.fillStyle = '#d98a2b'; c.beginPath(); c.moveTo(o.x - 1 + o.face, y - 10.5); c.lineTo(o.x + 1 + o.face, y - 10.5); c.lineTo(o.x + o.face, y - 8.5); c.fill();
+}
+function drawVillager(c, v) {
+  const r = mulberry32(boil * 51 + v.line);
+  const moving = Math.hypot(v.tx - v.x, v.ty - v.y) > 2;
+  shadow(c, v.x, v.y, 11, 4, 0.2);
+  const b = moving ? -Math.abs(Math.sin(v.walk)) * 2 : 0, y = v.y + b;
+  shape(c, r, [[v.x - 8, y - 24], [v.x + 8, y - 24], [v.x + 11, y - 2], [v.x - 11, y - 2]], v.coat, '#2a1b12', { lw: 1.5, j: 0.6 });
+  shape(c, r, ell(v.x, y - 31, 7, 7.5, 9), '#e9c9a6', '#5a4030', { lw: 1.3, j: 0.4 });
+  shape(c, r, [[v.x - 8, y - 33], [v.x - 5, y - 41], [v.x + 5, y - 41], [v.x + 8, y - 33]], '#4a3a33', '#1e1612', { smooth: false, lw: 1.2 });
+  c.fillStyle = '#222';
+  c.fillRect(v.x - 3 + v.dir, y - 31, 1.6, 1.6); c.fillRect(v.x + 2 + v.dir, y - 31, 1.6, 1.6);
+  line(c, r, v.x - 2.5 + v.dir, y - 27, v.x + 2.5 + v.dir, y - 28, '#7a3b33', 1, 0.3);
+}
+function drawFlame(c, x, y, size, t) {
+  const r = mulberry32(boil * 7 + 3);
+  const cols = ['#e8572a', '#f59a2b', '#ffd85a'];
+  for (let i = 0; i < 3; i++) {
+    const bw = size * 0.55 * (1 - i * 0.25), h = size * (1.25 + 0.25 * Math.sin(t * 9 + i * 2)) * (1 - i * 0.22);
+    const sway = Math.sin(t * 5 + i) * size * 0.12;
+    shape(c, r, [[x - bw, y], [x - bw * 0.6, y - h * 0.45], [x + sway, y - h], [x + bw * 0.6, y - h * 0.5], [x + bw, y]], cols[i], i === 0 ? '#9a2e15' : null, { lw: 1.2, j: size * 0.06 });
+  }
+}
+
+// ---------- world rendering ----------
+function worldTransform() {
+  ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, DPR * (VW / 2 - cam.x * ZOOM), DPR * (VH / 2 - cam.y * ZOOM));
+}
+const toScreen = (x, y) => [(x - cam.x) * ZOOM + VW / 2, (y - cam.y) * ZOOM + VH / 2];
+
+function drawWorld() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#5a585e'; ctx.fillRect(0, 0, VW, VH);
+  worldTransform();
+  const hw = VW / 2 / ZOOM, hh = VH / 2 / ZOOM;
+  const x0 = cam.x - hw, x1 = cam.x + hw, y0 = cam.y - hh, y1 = cam.y + hh;
+  for (let cy = Math.floor(y0 / CPX); cy <= Math.floor(y1 / CPX); cy++) for (let cx = Math.floor(x0 / CPX); cx <= Math.floor(x1 / CPX); cx++) {
+    if (cx < 0 || cy < 0 || cx * CPX >= W * T || cy * CPX >= H * T) continue;
+    ctx.drawImage(getChunk(cx, cy), cx * CPX, cy * CPX, CPX + 0.7, CPX + 0.7);
+  }
+  // footprints
+  ctx.fillStyle = '#b9c4cf';
+  for (const f of prints) {
+    if (f.x < x0 - 10 || f.x > x1 + 10 || f.y < y0 - 10 || f.y > y1 + 10) continue;
+    ctx.globalAlpha = Math.min(1, f.t / 10) * 0.8;
+    ctx.beginPath(); ctx.ellipse(f.x, f.y, 2.6, 1.6, f.a, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // cozy spot markers
+  if (!camp) for (const s of spots) {
+    if (s.x < x0 - 60 || s.x > x1 + 60 || s.y < y0 - 60 || s.y > y1 + 60) continue;
+    const r = mulberry32(boil * 3 + 11);
+    ctx.setLineDash([5, 6]);
+    shape(ctx, r, ell(s.x, s.y, 34, 20, 12), 'rgba(255,214,120,.18)', '#c59a3a', { lw: 1.6, j: 1, double: false });
+    ctx.setLineDash([]);
+    const tw = 0.5 + 0.5 * Math.sin(realT * 3);
+    drawStar(ctx, s.x, s.y - 4, 6 + tw * 2, '#f2c230', '#8a6a1c');
+  }
+  // fishing hole
+  if (player.fishing) {
+    const d = { down: [0, 18], up: [0, -14], left: [-20, 2], right: [20, 2] }[player.dir];
+    player.fishing.hx = player.x + d[0]; player.fishing.hy = player.y + d[1];
+    const r = mulberry32(boil + 2);
+    shape(ctx, r, ell(player.fishing.hx, player.fishing.hy, 7, 4, 9), '#2f5d7a', '#1a3446', { lw: 1.2 });
+  }
+
+  // everything that stands up, sorted so things in front cover things behind
+  const list = [];
+  const tx0 = Math.floor(x0 / T) - 2, tx1 = Math.floor(x1 / T) + 2, ty0 = Math.floor(y0 / T) - 1, ty1 = Math.floor(y1 / T) + 4;
+  for (let ty = Math.max(0, ty0); ty <= Math.min(H - 1, ty1); ty++) for (let tx = Math.max(0, tx0); tx <= Math.min(W - 1, tx1); tx++) {
+    for (const o of ogrid[ty * W + tx]) if (!o.gone) list.push({ y: o.y, o });
+  }
+  list.push({ y: player.y, kid: true });
+  if (owl.on) list.push({ y: owl.y + 1, owl: true });
+  for (const v of villagers) if (v.x > x0 - 40 && v.x < x1 + 40 && v.y > y0 - 40 && v.y < y1 + 60) list.push({ y: v.y, v });
+  if (camp) { list.push({ y: camp.ty, tent: true }); list.push({ y: camp.fy, fire: true }); }
+  list.sort((a, b) => a.y - b.y);
+  for (const it of list) {
+    if (it.kid) {
+      const rod = player.fishing ? [player.fishing.hx, player.fishing.hy] : null;
+      drawKid(ctx, player.x, player.y, player.dir, player.walk, player.moving, { rod });
+      if (player.fishing && player.fishing.need - player.fishing.t < 0.7) bubbleWorld('!', player.fishing.hx, player.fishing.hy - 16);
+    } else if (it.owl) drawOwl(ctx, owl);
+    else if (it.v) drawVillager(ctx, it.v);
+    else if (it.tent) drawSpr(ctx, ['tent', 'hut', 'cabin'][camp.level], camp.tx, camp.ty);
+    else if (it.fire) {
+      drawSpr(ctx, 'firepit', camp.fx, camp.fy);
+      if (camp.fuel > 0) drawFlame(ctx, camp.fx, camp.fy - 3, 6 + camp.fuel * 0.11, realT);
+      else { ctx.fillStyle = '#7a7a7a'; for (let i = 0; i < 4; i++) ctx.fillRect(camp.fx - 6 + i * 4, camp.fy - 3, 2, 1.5); }
+    } else {
+      const o = it.o, d = OT[o.type];
+      let name = d.spr;
+      if (o.stock <= 0 && d.give) { if (d.hideEmpty) continue; if (d.empty) name = d.empty; }
+      const sx = o.shake > 0 ? Math.sin(o.shake * 60) * 2 : 0;
+      drawSpr(ctx, name, o.x + sx, o.y);
+      if (o.type === 'pile') drawFlame(ctx, o.x, o.y - 8, 15, realT + 1.3);
+    }
+  }
+  // particles
+  for (const p of parts) {
+    if (p.kind === 'spark') { ctx.fillStyle = p.t > 0.4 ? '#ffd85a' : '#e8572a'; ctx.fillRect(p.x - 1, p.y - 1, 2, 2); }
+    else if (p.kind === 'steam' || p.kind === 'smoke') {
+      ctx.globalAlpha = Math.min(1, p.t / 1.2) * (p.kind === 'smoke' ? 0.35 : 0.45);
+      ctx.fillStyle = p.kind === 'smoke' ? '#8a8a90' : '#ffffff';
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4 + (2.5 - p.t) * 3, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+    } else if (p.kind === 'drop') { ctx.fillStyle = '#6fb0d4'; ctx.fillRect(p.x - 1, p.y - 1, 2, 2.5); }
+    else if (p.kind === 'dust') { ctx.globalAlpha = p.t; ctx.fillStyle = '#c9b89a'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+  }
+
+  // night and cave darkness, with holes of light
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const t = dayFrac();
+  let dk = darkness(t);
+  const onCave = tileAtW(player.x, player.y) === CAVE;
+  if (onCave) dk = Math.max(dk, 0.5);
+  if (t > 0.5 && t < 0.66) {
+    ctx.fillStyle = `rgba(255,140,60,${0.12 * Math.sin((t - 0.5) / 0.16 * Math.PI)})`;
+    ctx.fillRect(0, 0, VW, VH);
+  }
+  if (dk > 0.01) {
+    const s = 0.5;
+    dctx.setTransform(1, 0, 0, 1, 0, 0);
+    dctx.globalCompositeOperation = 'source-over';
+    dctx.clearRect(0, 0, dark.width, dark.height);
+    dctx.fillStyle = `rgba(12,18,44,${dk})`; dctx.fillRect(0, 0, dark.width, dark.height);
+    dctx.globalCompositeOperation = 'destination-out';
+    const lights = [];
+    const flick = 1 + Math.sin(realT * 13) * 0.03 + Math.sin(realT * 7.3) * 0.03;
+    if (camp && camp.fuel > 0) lights.push([camp.fx, camp.fy - 10, (70 + camp.fuel * 1.3 + camp.level * 20) * flick]);
+    if (camp && camp.level > 0) lights.push([camp.tx, camp.ty - 20, 55]);
+    lights.push([vill.x, vill.y - 8, 150 * flick]);
+    for (const h of objs) if (h.type === 'house' && Math.abs(h.x - cam.x) < hw + 100 && Math.abs(h.y - cam.y) < hh + 100) lights.push([h.x, h.y - 18, 50]);
+    lights.push([player.x, player.y - 16, 52]);
+    for (let ty = Math.max(0, ty0); ty <= Math.min(H - 1, ty1); ty++) for (let tx = Math.max(0, tx0); tx <= Math.min(W - 1, tx1); tx++)
+      for (const o of ogrid[ty * W + tx]) if (o.type === 'crystal' && o.stock > 0) lights.push([o.x, o.y - 14, 42]);
+    for (const [lx, ly, lr] of lights) {
+      const [sx, sy] = toScreen(lx, ly), rr = lr * ZOOM;
+      if (sx < -rr || sy < -rr || sx > VW + rr || sy > VH + rr) continue;
+      const g = dctx.createRadialGradient(sx * s, sy * s, 0, sx * s, sy * s, rr * s);
+      g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.55, 'rgba(0,0,0,.75)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      dctx.fillStyle = g; dctx.beginPath(); dctx.arc(sx * s, sy * s, rr * s, 0, 7); dctx.fill();
+    }
+    ctx.drawImage(dark, 0, 0, VW, VH);
+    // warm glow around fires
+    ctx.globalCompositeOperation = 'lighter';
+    const glow = (lx, ly, lr, a) => {
+      const [sx, sy] = toScreen(lx, ly), rr = lr * ZOOM;
+      const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, rr);
+      g.addColorStop(0, `rgba(255,150,60,${a * dk})`); g.addColorStop(1, 'rgba(255,150,60,0)');
+      ctx.fillStyle = g; ctx.fillRect(sx - rr, sy - rr, rr * 2, rr * 2);
+    };
+    if (camp && camp.fuel > 0) glow(camp.fx, camp.fy - 10, 90 + camp.fuel, 0.35);
+    glow(vill.x, vill.y - 8, 120, 0.3);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  drawSnow(ctx, onCave ? 0.15 : 1);
+  // paper vignette
+  const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.35, VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
+  vg.addColorStop(0, 'rgba(60,50,40,0)'); vg.addColorStop(1, 'rgba(60,50,40,.28)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
+
+  // floating texts and speech
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of floats) {
+    const [sx, sy] = toScreen(f.x, f.y);
+    ctx.globalAlpha = Math.min(1, f.t * 1.5);
+    ctx.font = `700 ${18}px ${FONT}`;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeText(f.text, sx, sy);
+    ctx.fillStyle = f.col; ctx.fillText(f.text, sx, sy);
+  }
+  ctx.globalAlpha = 1;
+  for (const v of villagers) if (v.say) speechBubble(v.say.text, v.x, v.y - 48, '#f3e3df');
+  if (speech) speechBubble(speech.text, player.x, player.y - 52);
+}
+function drawStar(c, x, y, r, fill, stroke) {
+  const p = [];
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; p.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]); }
+  shape(c, mulberry32(boil + 77), p, fill, stroke, { smooth: false, lw: 1.2, j: 0.5, double: false });
+}
+function bubbleWorld(text, x, y) {
+  ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const [sx, sy] = toScreen(x, y);
+  ctx.font = `700 24px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.strokeText(text, sx, sy); ctx.fillStyle = '#c8313d'; ctx.fillText(text, sx, sy);
+  ctx.restore();
+}
+function wrap(text, maxW) {
+  const words = text.split(' '), lines = [];
+  let cur = '';
+  for (const w of words) {
+    const tst = cur ? cur + ' ' + w : w;
+    if (ctx.measureText(tst).width > maxW && cur) { lines.push(cur); cur = w; } else cur = tst;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+function speechBubble(text, wx, wy, fill = '#fbf7ec') {
+  let [sx, sy] = toScreen(wx, wy);
+  ctx.font = `700 19px ${FONT}`;
+  const lines = wrap(text, Math.min(260, VW - 60));
+  const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 22, h = lines.length * 21 + 12;
+  let bx = clamp(sx - w / 2, 8, VW - w - 8), by = sy - h - 8;
+  if (by < 8) by = 8;
+  paper(ctx, bx, by, w, h, 6, fill);
+  ctx.fillStyle = fill; ctx.strokeStyle = '#3a3631'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(clamp(sx, bx + 12, bx + w - 12) - 6, by + h - 1); ctx.lineTo(clamp(sx, bx + 10, bx + w - 10), by + h + 9); ctx.lineTo(clamp(sx, bx + 12, bx + w - 12) + 6, by + h - 1); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  lines.forEach((l, i) => ctx.fillText(l, bx + w / 2, by + 7 + i * 21));
+}
+
+// ---------- HUD ----------
+function bar(x, y, w, label, v, col, warn) {
+  ctx.font = `700 18px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(247,242,230,.9)'; ctx.strokeText(label, x, y + 8);
+  ctx.fillStyle = '#2b2f36'; ctx.fillText(label, x, y + 8);
+  const bx = x + 66, bw = w - 66;
+  const r = mulberry32(boil * 13 + y);
+  shape(ctx, r, [[bx, y], [bx + bw, y], [bx + bw, y + 16], [bx, y + 16]], '#f7f2e6', null, { smooth: false, j: 0.6 });
+  const fw = bw * v / 100;
+  if (fw > 1) {
+    const flash = warn && Math.sin(realT * 10) > 0;
+    shape(ctx, r, [[bx + 2, y + 2], [bx + fw - 2, y + 2], [bx + fw - 2, y + 14], [bx + 2, y + 14]], flash ? '#ffffff' : col, null, { smooth: false, j: 0.6 });
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
+    for (let i = 8; i < fw - 4; i += 7) { ctx.beginPath(); ctx.moveTo(bx + i, y + 13); ctx.lineTo(bx + i + 5, y + 3); ctx.stroke(); }
+  }
+  shape(ctx, r, [[bx, y], [bx + bw, y], [bx + bw, y + 16], [bx, y + 16]], null, '#2b2f36', { smooth: false, lw: 1.8, j: 0.8 });
+}
+function drawIcon(c, k, x, y, s) {
+  const r = mulberry32(boil * 5 + k.length);
+  const fish = (col, cooked) => {
+    shape(c, r, [[x - s * 0.38, y], [x - s * 0.1, y - s * 0.2], [x + s * 0.2, y - s * 0.12], [x + s * 0.3, y], [x + s * 0.2, y + s * 0.12], [x - s * 0.1, y + s * 0.2]], col, '#2b2f36', { lw: 1.3, j: 0.4 });
+    shape(c, r, [[x + s * 0.28, y], [x + s * 0.42, y - s * 0.16], [x + s * 0.42, y + s * 0.16]], col, '#2b2f36', { smooth: false, lw: 1.2, j: 0.3 });
+    c.fillStyle = '#111'; c.beginPath(); c.arc(x - s * 0.22, y - s * 0.04, 1.4, 0, 7); c.fill();
+    if (cooked) for (let i = 0; i < 3; i++) line(c, r, x - s * 0.12 + i * s * 0.12, y - s * 0.14, x - s * 0.2 + i * s * 0.12, y + s * 0.14, '#5a3014', 1.4, 0.3);
+  };
+  switch (k) {
+    case 'sticks': line(c, r, x - s * 0.35, y + s * 0.25, x + s * 0.35, y - s * 0.25, '#6b4a32', s * 0.12, 0.6); line(c, r, x - s * 0.3, y - s * 0.2, x + s * 0.3, y + s * 0.28, '#7d5a3c', s * 0.1, 0.6); break;
+    case 'stones': shape(c, r, ell(x - 3, y + 3, s * 0.24, s * 0.18, 8), '#a2a6ab', '#4d5157', { lw: 1.3, j: 0.5 }); shape(c, r, ell(x + 5, y - 3, s * 0.2, s * 0.15, 8), '#8f949a', '#4d5157', { lw: 1.3, j: 0.5 }); break;
+    case 'shards': shape(c, r, [[x, y - s * 0.4], [x + s * 0.22, y], [x, y + s * 0.4], [x - s * 0.22, y]], '#a8e4f5', '#3d8db0', { smooth: false, lw: 1.4, j: 0.4 }); break;
+    case 'berries': for (const [dx, dy] of [[-5, 3], [4, 4], [0, -4]]) { c.fillStyle = '#c8313d'; c.beginPath(); c.arc(x + dx, y + dy, s * 0.15, 0, 7); c.fill(); c.strokeStyle = '#5a1018'; c.lineWidth = 1; c.stroke(); } break;
+    case 'bugs': case 'ckBugs': {
+      const col = k === 'bugs' ? '#3a3f2a' : '#8a5a2a';
+      for (let i = -1; i <= 1; i++) { line(c, r, x - s * 0.3, y + i * 4, x + s * 0.3, y + i * 4 + 1, '#222', 1, 0.3); }
+      shape(c, r, ell(x, y, s * 0.18, s * 0.28, 8), col, '#111', { lw: 1.3, j: 0.3 });
+      break;
+    }
+    case 'cod': fish('#8fa3b5'); break;
+    case 'perch': fish('#c9b04a'); break;
+    case 'char': fish('#e09a8e'); break;
+    case 'ckCod': case 'ckPerch': case 'ckChar': fish('#c08a4e', true); break;
+  }
+}
+function hudButton(x, y, r, label, fn, opts = {}) {
+  const pressed = opts.hold && hold[opts.hold];
+  const rr = mulberry32(boil * 19 + (x | 0));
+  shape(ctx, rr, ell(x, y, r, r, 12), pressed ? '#d8e7f2' : (opts.fill || 'rgba(247,242,230,.92)'), '#2b2f36', { lw: 2, j: 0.8 });
+  ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${opts.size || Math.round(r * 0.55)}px ${FONT}`;
+  ctx.fillText(label, x, y + 1);
+  if (opts.sub) { ctx.font = `700 13px ${FONT}`; ctx.fillText(opts.sub, x, y + r * 0.5); }
+  hits.push(opts.hold ? { x, y, r, hold: opts.hold } : { x, y, r, fn });
+}
+function goalText() {
+  if (!camp) return `Find a cozy spot to make camp. The stars on your map${touchUI ? '' : ' (M)'} show where.`;
+  if (camp.fuel <= 0) return 'Your fire is out! Bring 2 sticks to light it.';
+  if (camp.level === 0) return 'Keep the fire burning. Collect 12 sticks and 8 stones to build a hut.';
+  if (camp.level === 1) return 'Collect 25 sticks and 15 stones to turn your hut into a cabin.';
+  return 'Your cabin is done. Explore the frozen world. (Enemies and mask pieces come in step 2.)';
+}
+function drawHUD() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const small = VW < 520;
+  const bw = small ? 190 : 230;
+  bar(14, 14, bw, 'Health', S.hp, '#d9534f', S.hp < 25);
+  const wc = S.warm > 50 ? '#f08a3c' : S.warm > 25 ? '#9fb7d6' : '#5b8fd1';
+  bar(14, 38, bw, 'Warmth', S.warm, wc, S.warm < 20);
+  bar(14, 62, bw, 'Food', S.food, '#c98b3b', S.food < 20);
+  bar(14, 86, bw, 'Energy', S.sta, player.exhausted ? '#a8a8a8' : '#7bbf5a', false);
+  // goal
+  ctx.font = `700 17px ${FONT}`;
+  const gl = wrap(goalText(), small ? VW - 90 : 330);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  gl.forEach((l, i) => { ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(247,242,230,.9)'; ctx.strokeText(l, 14, 112 + i * 19); ctx.fillStyle = '#2b2f36'; ctx.fillText(l, 14, 112 + i * 19); });
+
+  // clock
+  const cx = VW - 42, cy = 42, t = dayFrac();
+  const r = mulberry32(boil * 3 + 1);
+  shape(ctx, r, ell(cx, cy, 26, 26, 14), t < 0.6 ? '#cfe6f5' : '#1f2a4a', '#2b2f36', { lw: 2, j: 0.8 });
+  const a = -Math.PI / 2 + t * Math.PI * 2;
+  ctx.fillStyle = t < 0.6 ? '#f2c230' : '#e8ecf5';
+  ctx.beginPath(); ctx.arc(cx + Math.cos(a) * 15, cy + Math.sin(a) * 15, 6, 0, 7); ctx.fill();
+  ctx.font = `700 18px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(247,242,230,.9)'; ctx.strokeText(`Day ${dayNum()}`, cx, cy + 30);
+  ctx.fillStyle = '#2b2f36'; ctx.fillText(`Day ${dayNum()}`, cx, cy + 30);
+  hudButton(VW - 104, 34, 20, 'II', () => { paused = true; sfx.ui(); }, { size: 18 });
+  hudButton(VW - 104, 82, 20, 'Map', () => { mapOpen = true; sfx.ui(); }, { size: 15 });
+  hudButton(VW - 150, 34, 20, muted ? 'x' : '♪', () => setMuted(!muted), { size: 18 });
+
+  // where am I
+  const tl = tileAtW(player.x, player.y);
+  ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'right';
+  const place = camp && dist(player.x, player.y, camp.x, camp.y) < 150 ? 'Your camp' : BIOME[tl];
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(247,242,230,.9)'; ctx.strokeText(place, VW - 14, 104);
+  ctx.fillStyle = '#4a4f58'; ctx.fillText(place, VW - 14, 104);
+
+  // inventory slots
+  const list = ORDER.filter(k => count(k) > 0);
+  const ss = touchUI ? 46 : 50, gap = 6;
+  const areaW = touchUI ? VW - 210 : VW - 40;
+  const perRow = Math.max(1, Math.floor((areaW + gap) / (ss + gap)));
+  const rows = Math.ceil(list.length / perRow);
+  list.forEach((k, i) => {
+    const row = Math.floor(i / perRow), col = i % perRow;
+    const inRow = Math.min(perRow, list.length - row * perRow);
+    const x = touchUI ? 12 + col * (ss + gap) : VW / 2 - (inRow * (ss + gap) - gap) / 2 + col * (ss + gap);
+    const y = VH - 12 - ss - (rows - 1 - row) * (ss + gap);
+    const rr = mulberry32(boil * 7 + i);
+    shape(ctx, rr, [[x, y], [x + ss, y], [x + ss, y + ss], [x, y + ss]], 'rgba(247,242,230,.92)', '#2b2f36', { smooth: false, lw: 1.8, j: 0.8 });
+    drawIcon(ctx, k, x + ss / 2, y + ss / 2 - 4, ss * 0.62);
+    ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    let cnt = String(count(k)), col2 = '#2b2f36';
+    if (ITEMS[k].cooked && inv[k][0] - gameTime < DAY) col2 = '#c8313d';
+    ctx.fillStyle = col2; ctx.fillText(cnt, x + ss - 4, y + ss - 1);
+    if (!touchUI && i < 9) { ctx.textAlign = 'left'; ctx.fillStyle = '#8a8a8a'; ctx.font = `700 13px ${FONT}`; ctx.fillText(String(i + 1), x + 4, y + 15); }
+    hits.push({ x, y, w: ss, h: ss, fn: () => useItem(k) });
+  });
+
+  // prompts
+  const verb = verbFor(target);
+  const extra = [];
+  const nearFire = camp && dist(player.x, player.y, camp.fx, camp.fy) < 60 && camp.fuel > 0 && ['bugs', 'cod', 'perch', 'char'].some(k => inv[k] > 0);
+  const nearBed = camp && dist(player.x, player.y, camp.tx, camp.ty) < 70 + camp.level * 12;
+  if (!touchUI) {
+    const parts = [];
+    if (verb) parts.push(`[E] ${verb}`);
+    if (nearFire) parts.push('[C] Cook');
+    if (nearBed) parts.push('[Z] Sleep');
+    if (parts.length) {
+      const txt = parts.join('     ');
+      ctx.font = `700 20px ${FONT}`;
+      const w = ctx.measureText(txt).width + 30, y = VH - 12 - (rows ? rows * (ss + gap) : 0) - 44;
+      paper(ctx, VW / 2 - w / 2, y, w, 34, 6);
+      ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, VW / 2, y + 18);
+    }
+  } else {
+    const bx = VW - 72, by = VH - 92;
+    hudButton(bx, by, 40, 'E', act, { sub: verb ? shortVerb(verb) : '', size: 26 });
+    hudButton(bx - 92, by + 34, 30, 'Run', null, { hold: 'run', size: 17 });
+    hudButton(bx - 8, by - 92, 28, 'Eat', eatBest, { size: 17 });
+    if (nearFire) hudButton(bx - 84, by - 50, 28, 'Cook', cook, { size: 16 });
+    else if (nearBed) hudButton(bx - 84, by - 50, 28, 'Sleep', sleep, { size: 15 });
+    if (verb) {
+      ctx.font = `700 18px ${FONT}`;
+      const w = ctx.measureText(verb).width + 26, x = clamp(VW / 2 - w / 2, 8, VW - w - 8), y = VH * 0.62;
+      paper(ctx, x, y, w, 30, 6);
+      ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(verb, x + w / 2, y + 16);
+    }
+    if (joy) {
+      const rr = mulberry32(boil + 4);
+      shape(ctx, rr, ell(joy.ox, joy.oy, 50, 50, 14), 'rgba(247,242,230,.25)', 'rgba(43,47,54,.6)', { lw: 2 });
+      const dx = joy.x - joy.ox, dy = joy.y - joy.oy, l = Math.hypot(dx, dy), k = l > 50 ? 50 / l : 1;
+      shape(ctx, rr, ell(joy.ox + dx * k, joy.oy + dy * k, 20, 20, 10), 'rgba(247,242,230,.85)', '#2b2f36', { lw: 2 });
+    }
+  }
+  // toasts
+  toasts.forEach((tt, i) => {
+    ctx.font = `700 18px ${FONT}`;
+    const lines = wrap(tt.text, Math.min(460, VW - 60));
+    const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 28, h = lines.length * 20 + 14;
+    const y = (small ? 170 : 14) + i * (h + 8);
+    ctx.globalAlpha = Math.min(1, tt.t * 2);
+    paper(ctx, VW / 2 - w / 2, y, w, h, 6, '#fff8dc');
+    ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    lines.forEach((l, j) => ctx.fillText(l, VW / 2, y + 8 + j * 20));
+    ctx.globalAlpha = 1;
+  });
+  // controls help at the start
+  if (helpT > 0) {
+    ctx.globalAlpha = Math.min(1, helpT);
+    const lines = touchUI
+      ? ['Drag on the left side to walk', 'Hold Run to run (uses energy)', 'E: use / pick up / fish on ice', 'Eat, Cook and Sleep buttons', 'Tap an item to eat it']
+      : ['WASD or arrows: walk     Shift: run', 'E: use, pick up, fish on ice', 'Q: eat     C: cook at your fire', 'Z: sleep at camp     M: map', '1-9: use an item     Esc: pause'];
+    ctx.font = `700 19px ${FONT}`;
+    const w = Math.min(VW - 30, 380), h = lines.length * 24 + 50, x = VW / 2 - w / 2, y = VH / 2 - h / 2 - 60;
+    paper(ctx, x, y, w, h, 8);
+    ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.font = `700 24px ${FONT}`; ctx.fillText('How to play', VW / 2, y + 10);
+    ctx.font = `700 18px ${FONT}`;
+    lines.forEach((l, i) => ctx.fillText(l, VW / 2, y + 42 + i * 24));
+    ctx.globalAlpha = 1;
+  }
+}
+function shortVerb(v) {
+  const w = v.split(' ');
+  return w.length > 2 ? w.slice(0, 2).join(' ') : v;
+}
+
+// ---------- map screen ----------
+function drawMap() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = 'rgba(20,24,34,.55)'; ctx.fillRect(0, 0, VW, VH);
+  const s = Math.min(VW - 30, VH - 90), x = VW / 2 - s / 2, y = VH / 2 - s / 2 + 18;
+  paper(ctx, x - 12, y - 46, s + 24, s + 60, 10, '#efe7d3');
+  ctx.fillStyle = '#2b2f36'; ctx.font = `700 26px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('My Map', VW / 2, y - 24);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(mapBase, x, y, s, s);
+  ctx.drawImage(mapFog, x, y, s, s);
+  const k = s / (W * T);
+  const r = mulberry32(boil + 50);
+  // village
+  const [vx, vy] = [x + vill.x * k, y + vill.y * k];
+  shape(ctx, r, [[vx - 7, vy + 6], [vx - 7, vy - 2], [vx, vy - 9], [vx + 7, vy - 2], [vx + 7, vy + 6]], '#8b6446', '#2b2f36', { smooth: false, lw: 1.4, j: 0.5 });
+  label('old village', vx, vy + 16);
+  for (const sp of springs) if (explored[sp.ty * W + sp.tx]) label('hot spring', x + sp.x * k, y + sp.y * k + 12, 13);
+  if (!camp) for (const sp of spots) {
+    drawStar(ctx, x + sp.x * k, y + sp.y * k, 9, '#f2c230', '#8a6a1c');
+    label(sp.found ? sp.name : 'cozy?', x + sp.x * k, y + sp.y * k + 16);
+  } else {
+    const cx = x + camp.x * k, cy = y + camp.y * k;
+    shape(ctx, r, [[cx - 8, cy + 6], [cx, cy - 9], [cx + 8, cy + 6]], '#4f79a8', '#22395a', { smooth: false, lw: 1.4, j: 0.4 });
+    label('my camp', cx, cy + 16);
+  }
+  const px = x + player.x * k, py = y + player.y * k;
+  shape(ctx, r, ell(px, py, 5, 5, 8), '#3b6db3', '#1f3c66', { lw: 1.6 });
+  ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#6b6457'; ctx.textAlign = 'center';
+  ctx.fillText(touchUI ? 'tap to close' : 'M or Esc to close', VW / 2, y + s + 2 + 6);
+  hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => { mapOpen = false; } });
+}
+function label(text, x, y, size = 15) {
+  ctx.font = `700 ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(239,231,211,.95)'; ctx.strokeText(text, x, y);
+  ctx.fillStyle = '#2b2f36'; ctx.fillText(text, x, y);
+}
+
+// ---------- menus ----------
+function menuButton(cx, y, w, text, fn) {
+  const x = cx - w / 2, h = 50;
+  paper(ctx, x, y, w, h, 8, '#f7f2e6');
+  ctx.fillStyle = '#2b2f36'; ctx.font = `700 26px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, cx, y + h / 2 + 1);
+  hits.push({ x, y, w, h, fn: () => { sfx.ui(); fn(); } });
+}
+function drawPause() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = 'rgba(20,24,34,.6)'; ctx.fillRect(0, 0, VW, VH);
+  const w = Math.min(VW - 30, 420), h = 430, x = VW / 2 - w / 2, y = Math.max(10, VH / 2 - h / 2);
+  paper(ctx, x, y, w, h, 10);
+  ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.font = `700 34px ${FONT}`; ctx.fillText('Paused', VW / 2, y + 14);
+  ctx.font = `700 17px ${FONT}`;
+  const lines = touchUI
+    ? ['Drag left side: walk. Hold Run: run.', 'E: use things, fish on the ice.', 'Eat / Cook / Sleep buttons.', 'Tap an item to eat it.']
+    : ['WASD / arrows: walk. Shift: run.', 'E: use things, fish on the ice.', 'Q: eat. C: cook. Z: sleep. M: map.', '1-9: use an item.'];
+  lines.forEach((l, i) => ctx.fillText(l, VW / 2, y + 62 + i * 21));
+  ctx.fillStyle = '#6b6457';
+  ctx.fillText('Step 1 of Frostbite. Coming next: enemies,', VW / 2, y + 156);
+  ctx.fillText('mask pieces, traders, and the Frost Spirit.', VW / 2, y + 177);
+  menuButton(VW / 2, y + 212, 240, 'Resume', () => { paused = false; });
+  menuButton(VW / 2, y + 272, 240, muted ? 'Sound: off' : 'Sound: on', () => setMuted(!muted));
+  menuButton(VW / 2, y + 332, 240, confirmNew ? 'Really? Tap again' : 'New world', () => {
+    if (!confirmNew) { confirmNew = true; setTimeout(() => confirmNew = false, 3000); return; }
+    confirmNew = false; paused = false; startNew();
+  });
+}
+let confirmNew = false;
+function drawDead() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = 'rgba(14,18,30,.72)'; ctx.fillRect(0, 0, VW, VH);
+  const w = Math.min(VW - 30, 440), h = 230, x = VW / 2 - w / 2, y = VH / 2 - h / 2;
+  paper(ctx, x, y, w, h, 10);
+  ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.font = `700 38px ${FONT}`;
+  ctx.fillText(deathCause === 'hunger' ? 'You starved.' : 'You froze.', VW / 2, y + 18);
+  ctx.font = `700 19px ${FONT}`;
+  const tip = deathCause === 'hunger' ? 'Tip: fish on the frozen lake and cook it at your fire.' : 'Tip: stay near fire at night, and keep sticks for it.';
+  wrap('Everything you were carrying is gone, for good.', w - 40).forEach((l, i) => ctx.fillText(l, VW / 2, y + 74 + i * 22));
+  ctx.fillStyle = '#6b6457';
+  wrap(tip, w - 40).forEach((l, i) => ctx.fillText(l, VW / 2, y + 122 + i * 22));
+  menuButton(VW / 2, y + h - 64, 240, spawn ? 'Wake up in bed' : 'Wake up', respawn);
+}
+
+// ---------- title and story ----------
+let storyI = 0;
+const STORY = [
+  'In a village at the edge of the snow lived a kid in a blue robe and a blue hood, who always wore a mask.',
+  'The kid made things. Drawings. Little wooden carvings. Toys.',
+  'Every winter, the village took them... and burned them for fire. And laughed.',
+  'So one cold morning, the kid packed a small bag, and left to find a cozy place of their own.',
+];
+function startNew() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  newGame();
+  state = 'story'; storyI = 0;
+}
+function continueGame() {
+  if (loadGame()) { state = 'play'; helpT = 0; say("Back again. Let's keep going."); }
+  else startNew();
+}
+function storyNext() { sfx.ui(); storyI++; if (storyI >= STORY.length) beginPlay(); }
+function beginPlay() {
+  state = 'play'; helpT = 9;
+  say("I'm never going back. I'll find somewhere cozy. Somewhere they can't burn my things.", 5);
+  saveGame();
+}
+function drawTitle() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#eef0ee'; ctx.fillRect(0, 0, VW, VH);
+  const s = Math.min(VW / 700, VH / 520) * 1.25;
+  ctx.save();
+  ctx.translate(VW / 2, VH * 0.62); ctx.scale(s, s);
+  drawSpr(ctx, 'peak', -220, -40); drawSpr(ctx, 'peak', 200, -50); drawSpr(ctx, 'peak', -120, -70); drawSpr(ctx, 'peak', 90, -80);
+  drawSpr(ctx, 'pine', -260, 40); drawSpr(ctx, 'pine', -200, 60); drawSpr(ctx, 'pine', 230, 50); drawSpr(ctx, 'pine', 280, 70); drawSpr(ctx, 'tree', 160, 66);
+  const wx = Math.sin(realT * 0.4) * 30;
+  drawKid(ctx, wx, 70, wx > Math.sin((realT - 0.05) * 0.4) * 30 ? 'right' : 'left', realT * 6, true);
+  ctx.restore();
+  drawSnow(ctx);
+  const ts = clamp(VW / 9, 44, 110);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${ts}px ${FONT}`;
+  const ty = VH * 0.2;
+  ctx.lineWidth = 8; ctx.strokeStyle = '#1f3c66'; ctx.strokeText('FROSTBITE', VW / 2 + 2, ty + 3);
+  ctx.fillStyle = '#7fc2e6'; ctx.fillText('FROSTBITE', VW / 2, ty);
+  ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff'; ctx.strokeText('FROSTBITE', VW / 2 - 1, ty - 2);
+  ctx.font = `700 ${Math.round(ts * 0.26)}px ${FONT}`; ctx.fillStyle = '#4a4f58';
+  ctx.fillText('a hand-drawn survival story', VW / 2, ty + ts * 0.62);
+  const by = VH * 0.2 + ts * 0.95;
+  if (hasSave()) { menuButton(VW / 2, by, 240, 'Continue', continueGame); menuButton(VW / 2, by + 62, 240, 'New game', startNew); }
+  else menuButton(VW / 2, by, 240, 'New game', startNew);
+  ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#6b6457';
+  ctx.fillText('Step 1: survive, explore, and make a camp', VW / 2, VH - 22);
+}
+function drawStory() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#2a3242'; ctx.fillRect(0, 0, VW, VH);
+  const w = Math.min(VW - 30, 620), h = Math.min(VH - 40, 460), x = VW / 2 - w / 2, y = VH / 2 - h / 2;
+  paper(ctx, x, y, w, h, 10, '#f3ecda');
+  // a little picture for each page
+  ctx.save();
+  const pic = Math.min(1.6, (h - 170) / 120, w / 300);
+  ctx.translate(VW / 2, y + 30 + 100 * pic); ctx.scale(pic, pic);
+  if (storyI === 0) { drawSpr(ctx, 'house', -70, 0); drawSpr(ctx, 'house', 70, -6); drawKid(ctx, 0, 10, 'down', 0, false); }
+  else if (storyI === 1) {
+    const r = mulberry32(boil + 1);
+    shape(ctx, r, [[-90, -50], [-30, -54], [-28, 6], [-92, 8]], '#fbf7ec', '#3a3631', { smooth: false, lw: 1.6 });
+    drawStar(ctx, -60, -26, 12, '#f2c230', '#8a6a1c');
+    line(ctx, r, -84, -2, -36, -4, '#4f79a8', 2, 1);
+    shape(ctx, r, ell(10, -10, 14, 18, 10), '#c9a27a', '#3a281b', { lw: 1.6 });
+    for (const ex of [-5, 5]) { ctx.fillStyle = '#3a281b'; ctx.beginPath(); ctx.arc(10 + ex, -16, 2.4, 0, 7); ctx.fill(); }
+    shape(ctx, r, [[60, 0], [80, -38], [100, 0]], '#d64545', '#3a1c18', { smooth: false, lw: 1.6 });
+    line(ctx, r, 80, 0, 80, 10, '#3a1c18', 2, 0.5);
+  } else if (storyI === 2) { drawSpr(ctx, 'pile', 0, 10); drawFlame(ctx, 0, 0, 30, realT); drawVillager(ctx, { x: -70, y: 10, tx: -70, ty: 10, walk: 0, dir: 1, line: 0, coat: '#8a5a3c' }); drawVillager(ctx, { x: 70, y: 12, tx: 70, ty: 12, walk: 0, dir: -1, line: 1, coat: '#6d4f7a' }); }
+  else { ctx.fillStyle = '#b9c4cf'; for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.ellipse(-100 + i * 14, 14 + (i % 2) * 6, 3, 2, 0, 0, 7); ctx.fill(); } drawKid(ctx, 20, 14, 'right', realT * 6, true); drawSpr(ctx, 'pine', 110, 14); }
+  ctx.restore();
+  ctx.fillStyle = '#2b2f36'; ctx.font = `700 ${VW < 500 ? 21 : 25}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  wrap(STORY[storyI], w - 50).forEach((l, i) => ctx.fillText(l, VW / 2, y + h - 140 + i * 28));
+  ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#7a7266';
+  ctx.fillText(`${storyI + 1} / ${STORY.length}   ${touchUI ? 'tap' : 'click or press a key'} to continue`, VW / 2, y + h - 26);
+  drawSnow(ctx, 0.5);
+}
+function drawFade() {
+  if (fade.a <= 0) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = `rgba(10,12,22,${fade.a})`; ctx.fillRect(0, 0, VW, VH);
+  if (fade.phase === 'hold' || fade.a > 0.8) {
+    ctx.fillStyle = `rgba(240,240,240,${fade.a})`; ctx.font = `700 40px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(fade.text, VW / 2, VH / 2);
+  }
+}
+
+// ---------- main loop ----------
+function render() {
+  frameNo++;
+  hits = [];
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  if (state === 'title') { drawTitle(); return; }
+  if (state === 'story') { drawStory(); return; }
+  drawWorld();
+  drawHUD();
+  if (mapOpen) drawMap();
+  if (paused) { hits = []; drawPause(); }
+  if (state === 'dead') { hits = []; drawDead(); }
+  drawFade();
+}
+let last = performance.now();
+function frame(now) {
+  const dt = clamp((now - last) / 1000, 0, 0.05);
+  last = now;
+  try { update(dt); render(); }
+  catch (err) { console.error(err); }
+  requestAnimationFrame(frame);
+}
+resize();
+addEventListener('resize', resize);
+buildSprites();
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') { saveGame(); paused = true; } });
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
