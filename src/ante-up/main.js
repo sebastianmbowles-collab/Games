@@ -30,6 +30,8 @@ startLoop(dt => {
 });
 
 boot();
+window.__booted = true;
+document.getElementById('boot')?.remove();
 
 // handy for testing and screenshots
 window.__AU = {

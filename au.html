@@ -110,9 +110,9 @@ html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;user-select:
 #screen .sub{font:20px var(--fell);color:var(--dim);margin-top:18px;font-style:italic}
 #screen .menu{display:flex;flex-direction:column;gap:10px;margin-top:34px;min-width:280px}
 #screen .menu .btn{font-size:22px}
-#screen .wake{font:28px var(--fell);color:var(--bone);cursor:pointer;animation:pulse 2.6s infinite;margin-top:10px}
+#screen .wake{font:40px var(--scare);color:#fff2dc;letter-spacing:3px;text-shadow:0 0 18px rgba(255,170,80,.45);cursor:pointer;animation:pulse 2.6s infinite;margin-top:10px}
 #screen .row{display:flex;gap:8px;justify-content:center;margin-top:24px;flex-wrap:wrap}
-#screen .note{font:15px var(--body);color:#6d6252;margin-top:28px;max-width:640px;line-height:1.5}
+#screen .note{font:16px var(--body);color:#a39276;margin-top:28px;max-width:640px;line-height:1.5}
 .diffbtn.on{border-color:var(--amber);color:var(--amber)}
 .card{font:22px/1.5 var(--fell);max-width:760px;padding:0 20px;color:var(--bone);white-space:pre-line}
 .actcard{animation:fadein 2.4s ease}
@@ -135,6 +135,34 @@ html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;user-select:
 </style>
 </head>
 <body>
+<div id="boot" style="position:fixed;inset:0;z-index:50;background:#000;color:#e9dcc3;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font:22px Georgia,serif;padding:20px">
+  <div style="font-size:44px;letter-spacing:6px">ANTE &spades; UP</div>
+  <div id="bootMsg" style="margin-top:18px;color:#9c8c72">Lighting the candle&hellip;</div>
+  <div style="margin-top:40px;font-size:15px;color:#6d6252;max-width:520px">If this screen never changes, the file was opened somewhere that can't run games (like a phone's file preview). Open it in Chrome, Edge, Firefox or Safari on a computer.</div>
+  <noscript><div style="margin-top:18px;color:#ff8c70">This game needs JavaScript turned on.</div></noscript>
+</div>
+<script>
+// shows problems on screen instead of a black page
+(function () {
+  var shown = false;
+  function fail(msg) {
+    if (shown) return; shown = true;
+    var b = document.getElementById('boot'), m = document.getElementById('bootMsg');
+    if (!b || !m) return;
+    b.style.display = 'flex';
+    m.style.color = '#ff8c70';
+    m.innerHTML = 'Something went wrong while starting the game.<br><br><small style="color:#9c8c72">' + String(msg).replace(/</g, '&lt;') + '</small><br><br><small style="color:#9c8c72">It needs a computer browser (Chrome, Edge, Firefox or Safari). Phone file viewers can\'t run it.</small>';
+  }
+  window.__bootFail = fail;
+  window.addEventListener('error', function (e) { if (!window.__booted) fail(e.message || 'script error'); });
+  window.addEventListener('unhandledrejection', function (e) { if (!window.__booted) fail((e.reason && e.reason.message) || e.reason); });
+  try {
+    var c = document.createElement('canvas');
+    if (!(c.getContext('webgl2') || c.getContext('webgl'))) fail('Your browser has 3D graphics (WebGL) turned off or not available.');
+  } catch (e) { fail(e.message); }
+  setTimeout(function () { if (!window.__booted && !shown) { var m = document.getElementById('bootMsg'); if (m) m.innerHTML = 'Still lighting the candle&hellip; slow computers can take up to a minute.'; } }, 12000);
+})();
+</script>
 <canvas id="gl"></canvas>
 <div id="ui">
   <div id="meters">
