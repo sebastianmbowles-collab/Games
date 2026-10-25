@@ -1293,41 +1293,97 @@ function drawSnow(c, amount = 1) {
 }
 
 // ---------- drawing characters ----------
+// The kid: blue robe they sewed themselves, blue hood, a mask, mittens, boots and the small bag they left with.
+const KID_SCALE = 0.8;
 function drawKid(c, x, y, dir, walk, moving, opts = {}) {
   const r = mulberry32(boil * 977 + 5);
+  const K = KID_SCALE;
+  c.save();
+  c.translate(x, y); c.scale(K, K);
   const bob = moving ? -Math.abs(Math.sin(walk)) * 2 : 0;
-  shadow(c, x, y, 11, 4, 0.22);
   const step = moving ? Math.sin(walk) * 3 : 0;
-  shape(c, r, ell(x - 4, y - 1 + step * 0.4, 3, 2, 6), '#2a2f3a', null);
-  shape(c, r, ell(x + 4, y - 1 - step * 0.4, 3, 2, 6), '#2a2f3a', null);
-  y += bob;
+  const side = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+  shadow(c, 0, 0, 12, 4, 0.22);
+  // boots
+  for (const [bx, s] of [[-4.5, 1], [4.5, -1]]) {
+    const by = -1 + step * 0.4 * s;
+    shape(c, r, [[bx - 3.6, by - 3], [bx + 3.2, by - 3], [bx + 3.8 + side, by + 1.2], [bx - 3.6 + side, by + 1.4]], '#5e4030', '#2a1b12', { lw: 1.1, j: 0.3 });
+    line(c, r, bx - 2, by - 2, bx + 1.6, by - 2, '#c9a27a', 0.7, 0.2);
+  }
+  c.translate(0, bob);
+  const satchel = () => {
+    const sx = dir === 'up' ? -3 : dir === 'right' ? -7 : dir === 'left' ? 6 : -9;
+    shape(c, r, [[sx - 5, -14], [sx + 4, -14], [sx + 4.5, -6], [sx - 5.5, -6]], '#8a5f3c', '#3a281b', { lw: 1.1, j: 0.3 });
+    line(c, r, sx - 5, -11.5, sx + 4, -11.5, '#5d3f27', 0.9, 0.2);
+    c.fillStyle = '#d9b54a'; c.fillRect(sx - 0.8, -11.6, 1.6, 1.8);
+  };
+  if (dir === 'right') satchel();
   // robe
-  shape(c, r, [[x - 7, y - 22], [x + 7, y - 22], [x + 11, y - 3], [x + 4, y - 1], [x - 4, y - 1], [x - 11, y - 3]], '#3b6db3', '#1f3c66', { lw: 1.6, j: 0.7 });
-  line(c, r, x - 9, y - 6, x + 9, y - 6, '#2a5390', 1, 0.5);
-  // sleeves / arms
+  const robe = [[-7, -22], [7, -22], [11.5, -3], [5, -1], [-5, -1], [-11.5, -3]];
+  shape(c, r, robe, '#3b6db3', '#1f3c66', { lw: 1.5, j: 0.4 });
+  // hem band with stitches
+  shape(c, r, [[-11, -6.5], [11, -6.5], [11.5, -3], [5, -1], [-5, -1], [-11.5, -3]], '#2c5596', null, { j: 0.3 });
+  c.strokeStyle = '#e8eef6'; c.lineWidth = 0.8; c.setLineDash([1.6, 1.8]);
+  c.beginPath(); c.moveTo(-10.5, -5.2); c.lineTo(10.5, -5.2); c.stroke(); c.setLineDash([]);
+  // fold lines
+  line(c, r, -3, -19, -5, -8, '#2a5390', 0.8, 0.3);
+  line(c, r, 3.5, -19, 5.5, -8, '#2a5390', 0.8, 0.3);
+  // a patch sewn on with big stitches
+  if (dir !== 'left') {
+    const px = dir === 'up' ? 2 : 3.5;
+    shape(c, r, [[px, -15.5], [px + 5, -15.5], [px + 5, -10.5], [px, -10.5]], '#5d8ccc', '#1f3c66', { smooth: false, lw: 0.8, j: 0.25, double: false });
+    c.strokeStyle = '#f2f2f2'; c.lineWidth = 0.6;
+    for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(px - 0.6, -15 + i * 2); c.lineTo(px + 0.6, -14.2 + i * 2); c.stroke(); }
+  }
+  // bag strap across the chest
+  if (dir === 'down') line(c, r, 6, -21, -8, -12, '#6b4a32', 1.6, 0.3);
+  else if (dir === 'up') line(c, r, -6, -21, 4, -13, '#6b4a32', 1.6, 0.3);
+  else line(c, r, side * 2, -21, -side * 1, -13, '#6b4a32', 1.6, 0.3);
+  if (dir !== 'right') satchel();
+  // sleeves and mittens
   const sw = moving ? Math.sin(walk) * 2.5 : 0;
-  if (dir !== 'left') shape(c, r, ell(x + 9, y - 14 - sw, 3.4, 5, 6), '#3462a3', '#1f3c66', { lw: 1.2, double: false });
-  if (dir !== 'right') shape(c, r, ell(x - 9, y - 14 + sw, 3.4, 5, 6), '#3462a3', '#1f3c66', { lw: 1.2, double: false });
+  for (const s of [-1, 1]) {
+    if ((s === -1 && dir === 'right') || (s === 1 && dir === 'left')) continue;
+    const ax = s * 9.5, ay = -14 + sw * s;
+    shape(c, r, [[ax - 3.2, ay - 6], [ax + 3.2, ay - 6], [ax + 3.6, ay + 2.5], [ax - 3.6, ay + 2.5]], '#3462a3', '#1f3c66', { lw: 1, j: 0.3, double: false });
+    shape(c, r, ell(ax, ay + 4.6, 2.8, 2.6, 7), '#efe6d2', '#6b6457', { lw: 0.9, j: 0.2, double: false });
+  }
   if (opts.rod) {
-    const hx = dir === 'left' ? x - 10 : x + 10;
-    line(c, r, hx, y - 12, opts.rod[0], opts.rod[1] - 12, '#6b4a32', 1.6, 0.4);
-    c.strokeStyle = 'rgba(40,40,40,.7)'; c.lineWidth = 0.7; c.beginPath(); c.moveTo(opts.rod[0], opts.rod[1] - 12); c.lineTo(opts.rod[0], opts.rod[1]); c.stroke();
+    const hx = dir === 'left' ? -10 : 10;
+    const rx = (opts.rod[0] - x) / K, ry = (opts.rod[1] - y) / K - bob;
+    line(c, r, hx, -9, rx, ry - 14, '#6b4a32', 1.6, 0.3);
+    c.strokeStyle = 'rgba(40,40,40,.7)'; c.lineWidth = 0.7;
+    c.beginPath(); c.moveTo(rx, ry - 14); c.lineTo(rx, ry); c.stroke();
   }
   // hood
-  const hx = dir === 'left' ? 1.5 : dir === 'right' ? -1.5 : 0;
-  shape(c, r, [[x + hx, y - 43], [x + 9 + hx * 0.4, y - 34], [x + 10, y - 24], [x, y - 20], [x - 10, y - 24], [x - 9 + hx * 0.4, y - 34]], '#3b6db3', '#1f3c66', { lw: 1.6, j: 0.6 });
+  const hx = -side * 1.5;
+  shape(c, r, [[hx, -44], [9 + hx * 0.4, -35], [10.5, -25], [0, -20.5], [-10.5, -25], [-9 + hx * 0.4, -35]], '#3b6db3', '#1f3c66', { lw: 1.5, j: 0.35 });
+  line(c, r, -8, -24, 8, -24, '#2a5390', 0.8, 0.2);
   if (dir === 'up') {
-    line(c, r, x, y - 42, x, y - 23, '#2a5390', 1, 0.4);
+    line(c, r, 0, -43, 0, -23, '#2a5390', 0.9, 0.2);
+    c.strokeStyle = '#e8eef6'; c.lineWidth = 0.6; c.setLineDash([1.4, 1.6]);
+    c.beginPath(); c.moveTo(1.4, -41); c.lineTo(1.4, -25); c.stroke(); c.setLineDash([]);
   } else {
+    const mx = side * 3, rx = dir === 'down' ? 6 : 4.6;
+    // shadow inside the hood around the face
+    shape(c, r, ell(mx, -30.5, rx + 1.8, 8.4, 10), '#1a2f52', null, { j: 0.2 });
     // the mask
-    const mx = dir === 'left' ? x - 3 : dir === 'right' ? x + 3 : x;
-    const rx = dir === 'down' ? 6 : 4.6;
-    shape(c, r, ell(mx, y - 30, rx, 7, 9), '#f6f2e8', '#4a4640', { lw: 1.2, j: 0.4 });
+    shape(c, r, ell(mx, -30, rx, 7, 10), '#f6f2e8', '#4a4640', { lw: 1, j: 0.25, double: false });
     c.fillStyle = '#1c1f26';
-    const eyes = dir === 'down' ? [-2.4, 2.4] : [dir === 'left' ? -1.6 : 1.6];
-    for (const ex of eyes) { c.beginPath(); c.ellipse(mx + ex, y - 31, 1.1, 1.9, 0, 0, 7); c.fill(); }
-    line(c, r, mx - 2, y - 26, mx + 2, y - 26, '#b8b0a2', 0.8, 0.3);
+    const eyes = dir === 'down' ? [-2.4, 2.4] : [side * 1.6];
+    for (const ex of eyes) {
+      c.beginPath(); c.ellipse(mx + ex, -31.4, 1.05, 1.8, 0, 0, 7); c.fill();
+      // painted tear marks
+      c.strokeStyle = '#5b8fd1'; c.lineWidth = 0.8;
+      c.beginPath(); c.moveTo(mx + ex, -29); c.quadraticCurveTo(mx + ex + 0.4, -27.5, mx + ex - 0.2, -26); c.stroke();
+    }
+    // a little crack and the string ties
+    c.strokeStyle = '#8a8378'; c.lineWidth = 0.55;
+    c.beginPath(); c.moveTo(mx + rx * 0.55, -36); c.lineTo(mx + rx * 0.3, -34); c.lineTo(mx + rx * 0.45, -32.5); c.stroke();
+    if (dir === 'down') { line(c, r, -rx, -31, -rx - 2.4, -32, '#d8cdb8', 0.7, 0.2); line(c, r, rx, -31, rx + 2.4, -32, '#d8cdb8', 0.7, 0.2); }
+    else line(c, r, mx - side * rx, -31, mx - side * (rx + 3), -32, '#d8cdb8', 0.7, 0.2);
   }
+  c.restore();
 }
 function drawOwl(c, o) {
   const r = mulberry32(boil * 131 + 9);
@@ -1517,7 +1573,7 @@ function drawWorld() {
   }
   ctx.globalAlpha = 1;
   for (const v of villagers) if (v.say) speechBubble(v.say.text, v.x, v.y - 48, '#f3e3df');
-  if (speech) speechBubble(speech.text, player.x, player.y - 52);
+  if (speech) speechBubble(speech.text, player.x, player.y - 44);
 }
 function drawStar(c, x, y, r, fill, stroke) {
   const p = [];
