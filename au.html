@@ -5,12 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ANTE UP: HOUSE RULES</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Special+Elite&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Eater&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Special+Elite&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&display=swap" rel="stylesheet">
 <style>
+/* drop the real Frank Knows file at src/ante-up/fonts/FrankKnows.ttf and it is used first */
 :root{
   --ink:#e9dcc3; --dim:#9c8c72; --amber:#ffb45a; --blood:#b3261e; --bone:#f4ead6;
   --paper:#d9c7a1; --paperInk:#2b1d10; --bg:#030203; --line:rgba(233,220,195,.18);
   --fell:'IM Fell English','Cormorant Garamond',Georgia,serif;
+  --scare:'Frank Knows','Eater','IM Fell English',Georgia,serif;
   --sc:'IM Fell English SC','IM Fell English',Georgia,serif;
   --type:'Special Elite','Courier New',monospace;
   --body:'Cormorant Garamond',Georgia,serif;
@@ -52,7 +54,7 @@ html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;user-select:
 #ring{position:absolute;width:54px;height:54px;transform:translate(-50%,-50%);display:none}
 
 #dlg{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);width:min(860px,92vw);text-align:center;display:none}
-#dlg .who{font:14px var(--sc);letter-spacing:4px;color:var(--dim);margin-bottom:4px}
+#dlg .who{font:17px var(--scare);letter-spacing:3px;color:var(--dim);margin-bottom:4px}
 #dlg .txt{font:25px/1.35 var(--fell);color:var(--bone);text-shadow:0 0 6px #000,0 0 18px #000,0 2px 2px #000}
 #dlg.dealer .txt{color:#f6f1ff;letter-spacing:.5px}
 #dlg.dealer .who{color:#cfc8ff}
@@ -71,7 +73,7 @@ html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;user-select:
 
 #panel{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);pointer-events:auto}
 .sheet{width:min(820px,94vw);max-height:86vh;overflow:auto;background:linear-gradient(#1a120c,#0f0a07);border:1px solid rgba(233,220,195,.25);padding:22px 28px;box-shadow:0 0 60px #000}
-.sheet h2{font:30px var(--fell);margin:0 0 4px;color:var(--bone)}
+.sheet h2{font:32px var(--scare);letter-spacing:1px;margin:0 0 4px;color:var(--bone)}
 .sheet h3{font:20px var(--fell);margin:18px 0 6px;color:var(--amber)}
 .sheet p,.sheet li{font:19px/1.45 var(--body)}
 .sheet .tabs{display:flex;gap:6px;margin-bottom:14px}
@@ -103,8 +105,8 @@ html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;user-select:
 
 #screen{position:absolute;inset:0;display:none;pointer-events:auto;align-items:center;justify-content:center;flex-direction:column;background:#000;text-align:center}
 #screen.clear{background:transparent}
-#screen h1{font:clamp(40px,7vw,88px) var(--fell);margin:0;color:var(--bone);letter-spacing:6px;text-shadow:0 0 24px rgba(255,170,80,.35)}
-#screen h1 em{display:block;font:clamp(16px,2.2vw,26px) var(--sc);letter-spacing:12px;color:var(--amber);font-style:normal;margin-top:6px}
+#screen h1{font:clamp(44px,8vw,104px) var(--scare);margin:0;color:var(--bone);letter-spacing:4px;text-shadow:0 0 24px rgba(255,170,80,.35)}
+#screen h1 em{display:block;font:clamp(18px,2.6vw,30px) var(--scare);letter-spacing:12px;color:var(--amber);font-style:normal;margin-top:6px}
 #screen .sub{font:20px var(--fell);color:var(--dim);margin-top:18px;font-style:italic}
 #screen .menu{display:flex;flex-direction:column;gap:10px;margin-top:34px;min-width:280px}
 #screen .menu .btn{font-size:22px}
@@ -115,11 +117,11 @@ html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;user-select:
 .card{font:22px/1.5 var(--fell);max-width:760px;padding:0 20px;color:var(--bone);white-space:pre-line}
 .actcard{animation:fadein 2.4s ease}
 .actcard .n{font:18px var(--sc);letter-spacing:10px;color:var(--amber)}
-.actcard .t{font:clamp(34px,6vw,70px) var(--fell);letter-spacing:4px;margin-top:6px}
+.actcard .t{font:clamp(34px,6vw,72px) var(--scare);letter-spacing:3px;margin-top:6px}
 @keyframes fadein{from{opacity:0}}
 .gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;width:min(1000px,94vw);margin-top:20px}
 .gal div{border:1px solid var(--line);padding:16px;text-align:left;background:rgba(255,255,255,.02)}
-.gal b{font:22px var(--fell);display:block}
+.gal b{font:24px var(--scare);display:block;letter-spacing:1px}
 .gal i{font:16px var(--body);color:var(--dim)}
 .gal .got b{color:var(--amber)}
 .set{display:grid;grid-template-columns:200px 1fr;gap:12px 18px;align-items:center;text-align:left;font:18px var(--fell)}

@@ -58,8 +58,8 @@ function titleMenu() {
   meters(false);
   C.input = false;
   const save = hasSave() ? (() => { try { return JSON.parse(localStorage.getItem('anteup.save.v1')); } catch { return null; } })() : null;
-  const s = screen(`<h1>ANTE UP<em>HOUSE RULES</em></h1>
-    <div class="sub">The house always wins.</div>
+  const s = screen(`<h1>ANTE &spades; UP<em>HOUSE RULES</em></h1>
+    <div class="sub">You don't just play the game. You live the consequences.</div>
     <div class="menu">
       ${save ? `<button class="btn" data-a="cont">Continue<small>${save.name}, Act ${save.act}: ${TITLES[save.act]} (${DIFF[save.diff]?.label})</small></button>` : ''}
       <button class="btn" data-a="new">New Game</button>
