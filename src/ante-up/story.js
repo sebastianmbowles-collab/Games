@@ -143,17 +143,18 @@ async function opening(diff) {
   C.fx.black = 1;
   dealer.hide(true);
   ambientOff();
-  await wait(1.2);
+  await wait(0.8);
   A.ambient(1);
   A.I.breath(A.aNow() + 0.05, 2.6, 0.6);
-  await wait(2.2);
-  for (let i = 0; i < 5; i++) { A.sfx('step', 0.5); await wait(0.55); if (i === 2) A.sfx('drag'); }
-  await wait(0.8);
+  say('you', 'Darkness. You can hear someone breathing. Slow. Heavy.', { auto: 2.2 });
+  await wait(2.6);
+  say('you', 'Footsteps, dragging across wet stone. Coming closer.', { auto: 2 });
+  for (let i = 0; i < 5; i++) { A.sfx('step', 0.5); await wait(0.5); if (i === 2) A.sfx('drag'); }
   A.I.breath(A.aNow() + 0.05, 2.2, 0.8);
-  await wait(1.6);
+  await wait(0.6);
   A.sfx('shackle');
   C.fx.red = 0.3;
-  await wait(1.6);
+  await say('you', 'Something cold and iron snaps shut around your ankle.', { auto: 1.8 });
   const name = await ask('Before you open your eyes, a voice inside your head asks: <i>what do they call you?</i>', { placeholder: 'your name', ok: 'Answer' });
   newRun(name, diff);
   await wait(0.6);
