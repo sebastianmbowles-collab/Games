@@ -578,9 +578,9 @@ let S = null;
 function defaultSave() {
   return {
     v: 1, name: 'Player', avatar: 0, coins: 150, gems: 20, selected: 'shelly', mode: 'showdown',
-    brawlers: Object.fromEntries(['shelly', 'nita', 'colt', 'bull', 'primo', 'poco', 'brock', 'jessie', 'dynamike', 'spike'].map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [] }])),
+    brawlers: Object.fromEntries(['shelly', 'nita', 'colt', 'bull', 'primo', 'poco', 'brock', 'jessie', 'dynamike', 'spike', 'rosa', 'piper', 'frank', 'mortis', 'leon', 'crow'].map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [], skins: [], skin: '' }])),
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
-    stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
+    stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto' },
     lastGift: '', boxesOpened: 0, seenHelp: false,
   };
@@ -677,11 +677,54 @@ const BR_LIST = [
     gadget: { name: 'Popping Pincushion', desc: 'Shoots 12 needles in every direction.' },
     star: { name: 'Fertilize', desc: 'Heals 600 health per second while standing in his own Stick Around!' },
     hyper: { name: 'Thorn Garden', desc: 'Hypercharged Super makes a bigger, nastier field.' } },
+  { id: 'rosa', name: 'Rosa', rarity: 'Rare', role: 'Tank', bg: '#4ac040', bg2: '#2a6a2a', hp: 5400, speed: 165, reload: 1.4, superCost: 3000,
+    blurb: 'Rosa is a boxing botanist. Her plant shield lets her punch through anything.',
+    attack: { kind: 'punch', name: 'Hands of Stone', desc: '3 wide punches that hit everyone in front of her.', shots: 3, interval: 0.1, range: 3.2, dmg: 460, speed: 900, r: 16, color: '#7aff6a', sfx: 'punch' },
+    super: { kind: 'rshield', name: 'Strong Stuff', desc: 'A shield of plants that blocks 70% of damage for 3.5 seconds.', dur: 3.5, sfx: 'super' },
+    gadget: { name: 'Grow Light', desc: 'Instantly heals 1,000 health.' },
+    star: { name: 'Plant Life', desc: 'Heals 300 health per second while in a bush.' },
+    hyper: { name: 'Thorny Gloves', desc: 'Hypercharged shield lasts 6 seconds.' } },
+  { id: 'piper', name: 'Piper', rarity: 'Epic', role: 'Marksman', bg: '#ff9ac8', bg2: '#a03a70', hp: 2400, speed: 150, reload: 2.3, superCost: 3200,
+    blurb: 'Piper is a sharpshooter. The farther her bullet flies, the more it hurts.',
+    attack: { kind: 'snipe', name: 'Gunbrella', desc: 'A long shot that does more damage the farther it travels.', range: 10.5, dmg: 600, distBonus: 1200, speed: 1200, r: 7, color: '#ffe0f0', sfx: 'pistol' },
+    super: { kind: 'pjump', name: 'Poppin', desc: 'Jumps far away and leaves 4 grenades behind.', range: 7, grenades: 4, dmg: 800, splash: 1.0, dur: 0.6, sfx: 'super' },
+    gadget: { name: 'Auto Aimer', desc: 'Knocks back and hurts enemies close to her.' },
+    star: { name: 'Ambush', desc: 'Shots fired from inside a bush deal 800 extra damage.' },
+    hyper: { name: 'Snappy Sniping', desc: 'Hypercharged Poppin drops 7 grenades.' } },
+  { id: 'frank', name: 'Frank', rarity: 'Epic', role: 'Tank', bg: '#8ab070', bg2: '#4a3020', hp: 7000, speed: 150, reload: 1.6, superCost: 3600,
+    blurb: 'Frank winds up his huge hammer, then flattens everything in front of him.',
+    attack: { kind: 'frank', name: 'Hammer Hit', desc: 'Winds up, then sends a wide shockwave forward.', range: 5, dmg: 1300, speed: 800, r: 26, color: '#ffe9a0', wind: 0.45, sfx: 'punch' },
+    super: { kind: 'fsuper', name: 'Stunning Blow', desc: 'A giant hammer blow that stuns enemies and breaks walls.', range: 5.5, dmg: 1400, speed: 800, r: 34, color: '#fff3a6', stun: 1.6, wind: 0.55, breakWalls: true, sfx: 'super' },
+    gadget: { name: 'Active Noise Canceling', desc: 'Cannot be stunned, slowed or knocked back for 3 seconds.' },
+    star: { name: 'Sponge', desc: 'Frank has 1,000 more health.' },
+    hyper: { name: 'Big Hammer', desc: 'Hypercharged Stunning Blow reaches 30% farther.' } },
+  { id: 'mortis', name: 'Mortis', rarity: 'Mythic', role: 'Assassin', bg: '#7a3ab0', bg2: '#2a1a3a', hp: 3800, speed: 180, reload: 2.4, superCost: 3300,
+    blurb: 'Mortis dashes in with his shovel and heals himself with a swarm of bats.',
+    attack: { kind: 'mdash', name: 'Shovel Swing', desc: 'Dashes forward, hitting everyone in his way.', range: 3, dmg: 900, sfx: 'punch' },
+    super: { kind: 'bats', name: 'Life Blood', desc: 'A swarm of bats that hurts every enemy it passes and heals Mortis.', range: 9, dmg: 1000, speed: 700, r: 30, color: '#e04060', lifesteal: 1, sfx: 'super' },
+    gadget: { name: 'Combo Spinner', desc: 'Spins his shovel, hitting everyone close for 700.' },
+    star: { name: 'Creature of the Night', desc: 'Life Blood heals 50% more.' },
+    hyper: { name: 'Bat Storm', desc: 'Hypercharged bats are bigger and stronger.' } },
+  { id: 'leon', name: 'Leon', rarity: 'Legendary', role: 'Assassin', bg: '#58c840', bg2: '#1a5a2a', hp: 3200, speed: 165, reload: 1.9, superCost: 3000,
+    blurb: 'Leon vanishes in a puff of smoke and sneaks up on enemies.',
+    attack: { kind: 'spread', name: 'Spinner Blades', desc: 'Throws 4 spinning blades in a fan.', pellets: 4, spread: 0.32, range: 8.5, dmg: 460, speed: 900, r: 8, color: '#b0ff80', sfx: 'throw' },
+    super: { kind: 'invis', name: 'Smoke Bomb', desc: 'Turns invisible to enemies for 6 seconds. Attacking reveals him.', dur: 6, sfx: 'super' },
+    gadget: { name: 'Smoke Trails', desc: 'Runs 50% faster for 3 seconds.' },
+    star: { name: 'Invisiheal', desc: 'Heals 1,000 health per second while invisible.' },
+    hyper: { name: 'Ninja Smoke', desc: 'Hypercharged Smoke Bomb lasts 9 seconds.' } },
+  { id: 'crow', name: 'Crow', rarity: 'Legendary', role: 'Assassin', bg: '#5a3a8a', bg2: '#1a1a2a', hp: 2400, speed: 180, reload: 1.3, superCost: 3200,
+    blurb: 'Crow throws poisoned daggers. Poisoned enemies keep taking damage.',
+    attack: { kind: 'spread', name: 'Switchblade', desc: 'Throws 3 poison daggers. Poison keeps hurting for 4 seconds.', pellets: 3, spread: 0.3, range: 9, dmg: 320, speed: 950, r: 7, color: '#9aff5a', poison: true, sfx: 'pistol' },
+    super: { kind: 'crowleap', name: 'Swoop', desc: 'Leaps through the air, throwing a ring of poison daggers on takeoff and landing.', range: 8, radius: 0, dmg: 0, knock: 0, dur: 0.75, ring: 14, ringDmg: 320, sfx: 'super' },
+    gadget: { name: 'Defense Booster', desc: 'Takes 40% less damage for 3 seconds.' },
+    star: { name: 'Extra Toxic', desc: 'Poison deals 50% more damage.' },
+    hyper: { name: 'Toxic Swoop', desc: 'Hypercharged Swoop throws 24 daggers.' } },
 ];
 const BR = Object.fromEntries(BR_LIST.map(b => [b.id, b]));
 const UNLOCK = {
   bull: { coins: 150, road: 25 }, primo: { coins: 200, road: 75 }, poco: { coins: 250, pass: 4 }, brock: { coins: 300, road: 150 },
   jessie: { coins: 400, pass: 10 }, dynamike: { coins: 450, road: 300 }, spike: { gems: 120, road: 500 },
+  rosa: { coins: 350, road: 120 }, piper: { coins: 600, road: 400 }, frank: { coins: 600, pass: 20 }, mortis: { gems: 150, road: 650 }, leon: { gems: 200, road: 800 }, crow: { gems: 200, pass: 25 },
 };
 const GADGET_LVL = 7, STAR_LVL = 9, HYPER_LVL = 11;
 // Gears: unlock slot 1 at Power 8 and slot 2 at Power 10, buy each gear with coins, equip up to the slot count.
@@ -693,7 +736,12 @@ const GEARS = [
   { id: 'damage', name: 'Damage', desc: 'Deal 15% more damage while below half health.', col: '#ff4659' },
   { id: 'gadget', name: 'Gadget Cooldown', desc: 'Your gadget recharges 40% faster.', col: '#c050ff' },
 ];
-const GEAR_COST = 120, GEAR_SLOT_LVL = [8, 10];
+const GEAR_COST = 300, GEAR_SLOT_LVL = [8, 10];
+const SKINS = [
+  { id: 'night', name: 'Night', price: { gems: 30 } },
+  { id: 'candy', name: 'Candy', price: { gems: 30 } },
+  { id: 'gold', name: 'Golden', price: { coins: 800 } },
+];
 const gearSlots = lvl => GEAR_SLOT_LVL.filter(l => lvl >= l).length;
 const RARITY_COL = { Starting: '#9ad0ff', Rare: '#5ad84a', 'Super Rare': '#3a8aff', Epic: '#c050ff', Mythic: '#ff4a6a', Legendary: '#ffe040' };
 const brawlerRank = tro => Math.min(35, 1 + Math.floor(tro / 20));
@@ -853,6 +901,157 @@ const MAPS = {
     '..C...BB...',
     '......BB...',
   ] },
+  dune: { name: 'Dune Drift', mode: 'showdown', theme: 'desert', kind: 'quad', rows: [
+    'S......BB......S',
+    '..##...BB...P...',
+    '..#.........##..',
+    '......WW.....#..',
+    'BB..P.WW........',
+    'BB.......BBB....',
+    '...##....BBB..P.',
+    '...#............',
+    '.......C..##....',
+    'P......C..#...BB',
+    '..BB..........BB',
+    '..BB..##..P.....',
+    '......#.........',
+    '.##.......BBB...',
+    '..#..P....BBB...',
+    '.........##....P',
+  ] },
+  mineshaft: { name: 'Minecart Madness', mode: 'gemgrab', theme: 'canyon', kind: 'half', rows: [
+    'BB....2...2',
+    'BB.........',
+    '...........',
+    '.##..BB....',
+    '..#..BB...#',
+    '..........#',
+    'WW...C.....',
+    'WW...C...BB',
+    '.........BB',
+    '...##......',
+    '...#....C..',
+    '........C..',
+    'BBB........',
+    'BBB...##...',
+    '......#....',
+    '..C.......B',
+    '..C.......M',
+  ] },
+  pinball: { name: 'Pinball Park', mode: 'brawlball', theme: 'meadow', kind: 'half', rows: [
+    '########ggg',
+    '...........',
+    '......2...2',
+    '..BB.......',
+    '..BB...C...',
+    '.......C...',
+    '.##.......#',
+    '.#........#',
+    '.....BB....',
+    '.....BB....',
+    'WW.........',
+    'WW...##....',
+    '.........BB',
+    '..C......BB',
+    '..C........',
+    '......#....',
+    '......#...O',
+  ] },
+  safezone: { name: 'Safe Zone', mode: 'heist', theme: 'desert', kind: 'half', rows: [
+    '...........',
+    '......2...2',
+    '.B.........',
+    '.B.....##.H',
+    '.......#...',
+    '...........',
+    'BB...WW....',
+    'BB...WW...C',
+    '..........C',
+    '..##.......',
+    '...#...BB..',
+    '.......BB..',
+    'C..........',
+    'C....##....',
+    '.....#...BB',
+    '.........BB',
+    '...BB......',
+  ] },
+  shootstar: { name: 'Shooting Star', mode: 'bounty', theme: 'desert', kind: 'half', rows: [
+    '...........',
+    '......2...2',
+    '...........',
+    '.WW...##...',
+    '.WW...#....',
+    '...........',
+    'BBB.....BBB',
+    'BBB.....BBB',
+    '....C......',
+    '....C...##.',
+    '.........#.',
+    '..##.......',
+    '..#....BB..',
+    '.......BB..',
+    'BB.........',
+    'BB...##....',
+    '..........B',
+  ] },
+  ringfire: { name: 'Ring of Fire', mode: 'hotzone', theme: 'meadow', kind: 'half', rows: [
+    '...........',
+    '......2...2',
+    '..BB.......',
+    '..BB...##..',
+    '.......#...',
+    '##.........',
+    '....C...BBB',
+    '....C...BBB',
+    '...........',
+    '.##...WW...',
+    '..#...WW...',
+    '...........',
+    'BB......#..',
+    'BB......#..',
+    '...........',
+    '....BB.....',
+    '....BB....Z',
+  ] },
+  gulch: { name: 'Goldarm Gulch', mode: 'knockout', theme: 'canyon', kind: 'half', rows: [
+    '...........',
+    '......2...2',
+    '...........',
+    '..##...BB..',
+    '..#....BB..',
+    '...........',
+    'BB....##...',
+    'BB.........',
+    '.....C...WW',
+    '.....C...WW',
+    '..B........',
+    '..B...##...',
+    '..........#',
+    '.##.......#',
+    '...........',
+    '.....BB....',
+    '.....BB....',
+  ] },
+  factory: { name: 'Factory Rush', mode: 'siege', theme: 'stadium', kind: 'half', rows: [
+    '...........',
+    '......2...2',
+    '...........',
+    '..##......H',
+    '..#........',
+    '.......##..',
+    'BB.........',
+    'BB...C.....',
+    '.....C...BB',
+    '.........BB',
+    '..##.......',
+    '...#...WW..',
+    '.......WW..',
+    'BB.........',
+    'BB....#....',
+    '......#....',
+    '..........M',
+  ] },
 };
 const TILE = { FLOOR: 0, WALL: 1, WATER: 2, BUSH: 3, CRATE: 4, BOX: 5, GOAL: 6 };
 const THEMES = {
@@ -897,20 +1096,26 @@ function buildMap(key) {
 
 // ---------------- modes ----------------
 const MODES = {
-  showdown: { name: 'Showdown', tag: 'Solo · 6 brawlers', color: '#5fbf2f', color2: '#2f8a1c', maps: ['cactus', 'lily'], team: false,
+  showdown: { name: 'Showdown', tag: 'Solo · 6 brawlers', color: '#5fbf2f', color2: '#2f8a1c', maps: ['cactus', 'lily', 'dune'], team: false,
     desc: 'Every brawler for themselves. Break power boxes for power cubes, stay out of the poison and be the last one standing. Top 2 counts as a win.' },
-  gemgrab: { name: 'Gem Grab', tag: '3 vs 3', color: '#a54bff', color2: '#6a1fc9', maps: ['oasis'], team: true,
+  gemgrab: { name: 'Gem Grab', tag: '3 vs 3', color: '#a54bff', color2: '#6a1fc9', maps: ['oasis', 'mineshaft'], team: true,
     desc: 'Collect gems from the mine. Hold 10 or more and the lead for 15 seconds to win. Defeated brawlers drop their gems!' },
-  brawlball: { name: 'Brawl Ball', tag: '3 vs 3', color: '#2f8fff', color2: '#1a55c9', maps: ['stadium'], team: true,
+  brawlball: { name: 'Brawl Ball', tag: '3 vs 3', color: '#2f8fff', color2: '#1a55c9', maps: ['stadium', 'pinball'], team: true,
     desc: 'Grab the ball and kick it into the enemy goal at the top. First to 2 goals wins. Attack passes, Super shoots.' },
-  heist: { name: 'Heist', tag: '3 vs 3', color: '#ff5a4a', color2: '#c92a2a', maps: ['vault'], team: true,
+  heist: { name: 'Heist', tag: '3 vs 3', color: '#ff5a4a', color2: '#c92a2a', maps: ['vault', 'safezone'], team: true,
     desc: 'Break open the enemy safe before they break yours. When time runs out, the safe with more health wins.' },
-  bounty: { name: 'Bounty', tag: '3 vs 3', color: '#2fc0d8', color2: '#1a7a9a', maps: ['starpark'], team: true,
+  bounty: { name: 'Bounty', tag: '3 vs 3', color: '#2fc0d8', color2: '#1a7a9a', maps: ['starpark', 'shootstar'], team: true,
     desc: 'Defeat enemies to collect the stars over their heads. Every KO in a row makes your own bounty bigger. Most stars after 2 minutes wins.' },
-  hotzone: { name: 'Hot Zone', tag: '3 vs 3', color: '#ff8a1f', color2: '#c94a0a', maps: ['hotring'], team: true,
+  hotzone: { name: 'Hot Zone', tag: '3 vs 3', color: '#ff8a1f', color2: '#c94a0a', maps: ['hotring', 'ringfire'], team: true,
     desc: 'Stand in the zone to fill your team’s meter. If both teams are inside, nobody scores. First to 100% wins.' },
-  knockout: { name: 'Knockout', tag: '3 vs 3 · best of 3', color: '#ff4a8a', color2: '#a01a4a', maps: ['rockyring'], team: true,
+  knockout: { name: 'Knockout', tag: '3 vs 3 · best of 3', color: '#ff4a8a', color2: '#a01a4a', maps: ['rockyring', 'gulch'], team: true,
     desc: 'No respawns! Knock out the whole enemy team to win a round. Poison closes in if a round drags on. Win 2 rounds to win.' },
+  duo: { name: 'Duo Showdown', tag: '3 teams of 2', color: '#3fbf9a', color2: '#1f8a6a', maps: ['cactus', 'lily', 'dune'], team: false,
+    desc: 'Team up with a partner. If you fall, you come back as long as your partner is still alive. Be the last team standing!' },
+  wipeout: { name: 'Wipeout', tag: '3 vs 3', color: '#e8503a', color2: '#9a2a1a', maps: ['starpark', 'shootstar'], team: true,
+    desc: 'Pure fighting. The first team to 10 knockouts wins, or the team with more knockouts when 2 minutes are up.' },
+  siege: { name: 'Siege', tag: '3 vs 3', color: '#7a8aa8', color2: '#3a4a6a', maps: ['factory'], team: true,
+    desc: 'Grab bolts from the middle. Every 40 seconds the team with more bolts builds a giant robot that marches on the enemy IKE turret. Destroy their IKE to win!' },
 };
 
 // ---------------- progression tables ----------------
@@ -929,6 +1134,7 @@ const QUEST_TEMPLATES = [
   { k: 'zone', text: n => `Spend ${n} seconds in the Hot Zone`, n: [30, 50], round: 5, coins: 70, xp: 70 },
   { k: 'rounds', text: n => `Win ${n} Knockout rounds`, n: [2, 3], coins: 70, xp: 70, gems: 5 },
   { k: 'matches', text: n => `Play ${n} matches`, n: [3, 4], coins: 50, xp: 50 },
+  { k: 'bolts', text: n => `Collect ${n} bolts in Siege`, n: [5, 8], coins: 70, xp: 70, gems: 5 },
 ];
 const PASS_TIERS = 30, PASS_XP = 100;
 const PASS_REWARDS = Array.from({ length: PASS_TIERS }, (_, i) => {
@@ -936,15 +1142,17 @@ const PASS_REWARDS = Array.from({ length: PASS_TIERS }, (_, i) => {
   if (tier === 4) return { brawler: 'poco' };
   if (tier === 10) return { brawler: 'jessie' };
   if (tier === 15) return { coins: 400 };
+  if (tier === 20) return { brawler: 'frank' };
+  if (tier === 25) return { brawler: 'crow' };
   if (tier === 30) return { gems: 80 };
   if (tier % 5 === 0) return { gems: 10 + tier };
   if (tier % 2 === 0) return { gems: 5 + Math.floor(tier / 6) * 2 };
   return { coins: 40 + tier * 10 };
 });
 const ROAD = [
-  { t: 10, coins: 100 }, { t: 25, brawler: 'bull' }, { t: 50, gems: 20 }, { t: 75, brawler: 'primo' }, { t: 100, coins: 250 },
-  { t: 150, brawler: 'brock' }, { t: 200, gems: 30 }, { t: 300, brawler: 'dynamike' }, { t: 400, coins: 500 }, { t: 500, brawler: 'spike' },
-  { t: 650, gems: 60 }, { t: 800, coins: 800 }, { t: 1000, gems: 100 },
+  { t: 10, coins: 100 }, { t: 25, brawler: 'bull' }, { t: 50, gems: 20 }, { t: 75, brawler: 'primo' }, { t: 100, coins: 250 }, { t: 120, brawler: 'rosa' },
+  { t: 150, brawler: 'brock' }, { t: 200, gems: 30 }, { t: 300, brawler: 'dynamike' }, { t: 400, brawler: 'piper' }, { t: 450, coins: 500 }, { t: 500, brawler: 'spike' },
+  { t: 650, brawler: 'mortis' }, { t: 700, gems: 60 }, { t: 800, brawler: 'leon' }, { t: 900, coins: 800 }, { t: 1000, gems: 100 },
 ];
 const STAR_DROPS = [
   { name: 'Rare', col: '#5ad84a', w: 50, rewards: [{ coins: 30 }, { coins: 40 }, { gems: 2 }] },
@@ -1095,9 +1303,9 @@ const SPR = {
     '.kkNNNNNNNNNNkk.',
     'kccNccNccNccNcck',
     '.kkkkkkkkkkkkkk.',
-    '...kYYYYYYYYk...',
-    '...kgkgYpYgkgk..',
-    '...kYggYYYggYk..',
+    '...kYpYYYYpYk...',
+    '...kgkkYYkkgk...',
+    '...kgwkYYwkgk...',
     '...kYYYYkYYYk...',
     '...kYkwkwkwkYk..',
     '....kkrrrkkk....',
@@ -1180,6 +1388,133 @@ const SPR = {
   skull: { pal: {}, rows: ['.kkkkk.', 'kwwwwwk', 'kwkwkwk', 'kwkwkwk', 'kwwkwwk', '.kwwwk.', '.kwkwk.', '..kkk..'] },
   box: { pal: { p: '#b45bff', P: '#7a2bd0', y: '#ffd23a' }, rows: ['.kkkkkkkkk.', 'kpppkykpppk', 'kpppkykpppk', 'kkkkkkkkkkk', 'kPPPkykPPPk', 'kPPPkykPPPk', 'kPPPkykPPPk', 'kPPPkykPPPk', 'kkkkkkkkkkk'] },
   safe: { pal: { a: '#c9cfe0', A: '#8a91aa', t: '#2f9bff' }, rows: null },
+  leon: { pal: { h: '#58c840', H: '#3a8a2a', y: '#ffe040', b: '#2a5ab0', s: '#f8c890' }, weapon: null, rows: [
+    '....kkkkkk......',
+    '...khhyhhyhk....',
+    '..khhkyhhkyhhk..',
+    '..khhhhhhhhhhk..',
+    '..khHssssssHhk..',
+    '..khskksskkshk..',
+    '..khsssmmsshk...',
+    '...khhhhhhhhk...',
+    '..khhhhHHhhhhk..',
+    '.kshhhhHHhhhhsk.',
+    '.kskhhhhhhhhksk.',
+    '..kkhhhhhhhhkk..',
+    '...kbbbbbbbbk...',
+    '...kbbbbbbbbk...',
+    '...kssk..kssk...',
+    '...kkkk..kkkk...'] },
+  crow: { pal: { K: '#2a2a3a', P: '#5a3a8a', y: '#ffc020', r: '#ff3030', g: '#8a90a8' }, weapon: null, rows: [
+    '.....kk..kk.....',
+    '....kPPkkPPk....',
+    '...kKKKKKKKKk...',
+    '..kKKrrKKrrKKk..',
+    '..kKKrkKKkrKKk..',
+    '..kKKKyyyyKKKk..',
+    '...kKKKyyKKKk...',
+    '...kKKKKKKKKk...',
+    '.kPkKKggggKKkPk.',
+    'kPPkKKggggKKkPPk',
+    'kPPPkKKKKKKkPPPk',
+    '.kkkkKKKKKKkkkk.',
+    '....kKKKKKKk....',
+    '.....kKKKKk.....',
+    '.....kyk.kyk....',
+    '....kyyk.kyyk...'] },
+  mortis: { pal: { p: '#7a3ab0', s: '#e8e0f0', r: '#c02040', K: '#1a1a2a', w: '#ffffff' }, weapon: 'shovel', rows: [
+    '....kkkkkkk.....',
+    '...kpppppppk....',
+    '..kpppppppppk...',
+    '..kpsssssssk....',
+    '..kskksskkssk...',
+    '..ksrksskrssk...',
+    '..ksssswwssssk..',
+    '.kkkksssssskkkk.',
+    'kKrrkkkkkkkkrrKk',
+    'kKrkKwwwwKKkrKk.',
+    'kKrkKKwwKKKkrKk.',
+    'kKKkKKKKKKKkKKk.',
+    '.kkkKKKKKKKkkk..',
+    '....kKKKKKk.....',
+    '....kKKk.kKKk...',
+    '....kkkk.kkkk...'] },
+  piper: { pal: { y: '#f8e8a0', p: '#ff9ac8', P: '#e05090', b: '#4a6ad8', s: '#f8c890' }, weapon: 'umbrella', rows: [
+    '......kkkk......',
+    '.....kyyyyk.....',
+    '....kkyyyykk....',
+    '...kyyyyyyyyk...',
+    '..kyybyyyyyyyk..',
+    '..kyssssssssyk..',
+    '..kyskksskksyk..',
+    '..kyssssssssyk..',
+    '...kssspsssk....',
+    '....kkppppkk....',
+    '...kpppwwpppk...',
+    '..kspppppppppsk.',
+    '..kPPPPPPPPPPk..',
+    '.kPPPPPPPPPPPPk.',
+    '....kssk.kssk...',
+    '....kkkk.kkkk...'] },
+  frank: { pal: { G: '#8ab070', g: '#5a7a4a', n: '#6a4a2a', N: '#4a3020', y: '#c0c0d0' }, weapon: 'hammer', rows: [
+    '................',
+    '....kkkkkkkk....',
+    '...kGGGGGGGGk...',
+    '..kGGGkGGkGGGk..',
+    '.kyGGGGGGGGGGyk.',
+    '..kGkkGGGGkkGk..',
+    '..kGGGGggGGGGk..',
+    '..kGkwkwkwkwGk..',
+    '...kkGGGGGGkk...',
+    '.kknnnnnnnnnnkk.',
+    'kGGnnnnNNnnnnGGk',
+    'kGGnnnnNNnnnnGGk',
+    '.kknnnnnnnnnnkk.',
+    '...knnnnnnnnk...',
+    '...kNNNk.kNNNk..',
+    '...kkkkk.kkkkk..'] },
+  rosa: { pal: { H: '#e0c890', h: '#c0a060', D: '#9a6040', g: '#4ac040', p: '#8a4ab0', b: '#3a4a8a' }, weapon: null, rows: [
+    '.....kkkkkk.....',
+    '....kHHHHHHk....',
+    '..kkHHHHHHHHkk..',
+    '.khhhhhhhhhhhhk.',
+    '..kkDDDDDDDDkk..',
+    '...kDkkDDkkDk...',
+    '...kDDDDDDDDk...',
+    '....kDDmmDDk....',
+    '.....kkkkkk.....',
+    '.kk.kppppppk.kk.',
+    'kggkkppppppkkggk',
+    'kggkDppppppDkggk',
+    '.kk.kbbbbbbk.kk.',
+    '....kbbbbbbk....',
+    '....kDDk.kDDk...',
+    '....kkkk.kkkk...'] },
+  robot: { pal: { g: '#8a90a8', r: '#ff3030', y: '#ffd23a' }, weapon: null, rows: [
+    '....kkkkkkkk....',
+    '...kggggggggk...',
+    '...kgrrggrrgk...',
+    '...kggggggggk...',
+    '...kgkkkkkkgk...',
+    '....kkkkkkkk....',
+    '.kkkggggggggkkk.',
+    'kggkgyyyyyygkggk',
+    'kggkggggggggkggk',
+    'kggkgyyyyyygkggk',
+    '.kkkggggggggkkk.',
+    '....kggggggk....',
+    '...kggk..kggk...',
+    '...kggk..kggk...',
+    '..kkkkk..kkkkk..',
+    '................'] },
+  bolt: { pal: { y: '#c0c8d8' }, weapon: null, rows: [
+    '..kkk..',
+    '.kyyyk.',
+    'kyykyyk',
+    'kykkkyk',
+    'kyykyyk',
+    '.kyyyk.',
+    '..kkk..'] },
 };
 const WEAPONS = {
   shotgun: { pal: { n: '#8a4b23', g: '#9aa0b8' }, rows: ['kkkkkkkkkk.', 'knnngggggkk', 'kkkkkkkkkk.'], ox: 9, oy: 10 },
@@ -1187,6 +1522,9 @@ const WEAPONS = {
   double: { pal: { n: '#8a4a23', g: '#6a7088' }, rows: ['kkkkkkkkkk', 'knnggggggk', 'knnggggggk', 'kkkkkkkkkk'], ox: 11, oy: 9 },
   blaster: { pal: { y: '#ffcf3a', c: '#5ef0ff' }, rows: ['kkkkkkkk.', 'kyyyyyyck', 'kyykkkkk.', 'kkk......'], ox: 10, oy: 10 },
   launcher: { pal: { g: '#b0b8c8', r: '#c02040' }, rows: ['kkkkkkk', 'kgrgrgk', 'kgggggk', 'kgrgrgk', 'kkkkkkk'], ox: 10, oy: 1 },
+  shovel: { pal: { n: '#8a5a2a', g: '#b0b8c8' }, rows: ['kkkkkkkk..', 'knnnnnnggk', 'kkkkkkkggk', '.......kk.'], ox: 10, oy: 9 },
+  umbrella: { pal: { p: '#ff9ac8', n: '#6a3a1e', g: '#c0c8d8' }, rows: ['..kkkk.....', '.kppppkkkkk', 'kppppppgggk', '.kppppkkkkk', '..kkkk.....'], ox: 9, oy: 8 },
+  hammer: { pal: { y: '#c0c0d0', n: '#6a4a2a' }, rows: ['kkkkk', 'kyyyk', 'kyyyk', 'kkkkk', '.knk.', '.knk.', '.knk.', '.kkk.'], ox: 13, oy: 3 },
   dynamite: { pal: { r: '#d83030', y: '#ffe040' }, rows: ['.y.', 'kkk', 'krk', 'krk', 'kkk'], ox: 12, oy: 9 },
 };
 (function finishSprites() {
@@ -1211,15 +1549,26 @@ function walkRows(rows, side) {
   for (let i = 0; i < r.length; i++) if (side === 0 ? i < half : i >= half) r[i] = '.';
   out[n] = r.join(''); return out;
 }
-function getSpr(name) {
-  if (SPRC[name]) return SPRC[name];
-  const d = SPR[name]; const pal = d.pal;
+const SKIN_THEMES = { gold: ['#5a3a08', '#a87010', '#e0a820', '#ffe070'], night: ['#141432', '#2a2a6a', '#5a4ab0', '#9a8ae8'], candy: ['#a02868', '#e05aa0', '#7ae8c8', '#fff0a0'] };
+function skinPal(pal, theme) {
+  const T_ = SKIN_THEMES[theme], out = {};
+  for (const [k, hex] of Object.entries(pal)) {
+    if ('sSkwm'.includes(k) || !/^#[0-9a-f]{6}$/i.test(hex)) { out[k] = hex; continue; }
+    const v = parseInt(hex.slice(1), 16), l = (0.3 * (v >> 16 & 255) + 0.59 * (v >> 8 & 255) + 0.11 * (v & 255)) / 255;
+    out[k] = T_[clamp(Math.floor(l * 4.2), 0, 3)];
+  }
+  return out;
+}
+function getSpr(name, skin = '') {
+  const key = skin ? name + '|' + skin : name;
+  if (SPRC[key]) return SPRC[key];
+  const d = SPR[name]; const pal = skin ? skinPal(d.pal, skin) : d.pal;
   const frames = [d.rows, walkRows(d.rows, 0), d.rows, walkRows(d.rows, 1)];
   const S_ = { w: d.rows[0].length, h: d.rows.length, n: [], f: [], white: compileRows(d.rows, pal, '#ffffff'), whiteF: null, sil: {} };
   for (const fr of frames) { const c = compileRows(fr, pal); S_.n.push(c); S_.f.push(flipCanvas(c)); }
   S_.whiteF = flipCanvas(S_.white);
   if (d.weapon) { const W = WEAPONS[d.weapon]; const wc = compileRows(W.rows, W.pal); S_.weapon = { n: wc, f: flipCanvas(wc), ox: W.ox, oy: W.oy, w: W.rows[0].length }; }
-  SPRC[name] = S_; return S_;
+  SPRC[key] = S_; return S_;
 }
 function silhouette(name, col) {
   const S_ = getSpr(name); if (S_.sil[col]) return S_.sil[col];
@@ -1330,18 +1679,24 @@ function makeBrawler(id, team, pos, o) {
 function startBattle(modeKey) {
   const mode = MODES[modeKey]; const mapKey = pick(mode.maps); const map = buildMap(mapKey);
   const pid = S.selected, plvl = S.brawlers[pid].level, tro = totalTrophies();
-  const skill = clamp(tro / 450, 0, 1);
+  const skill = clamp(0.5 + tro / 500, 0, 1);
   const bl = () => clamp(plvl + randi(-1, 1), 1, MAX_LEVEL);
   G = {
     mode: modeKey, map, theme: THEMES[map.theme], time: 0, brawlers: [], projs: [], parts: [], areas: [], turrets: [], pickups: [], safes: [], ball: null, feed: [],
     intro: 2.4, introBeep: 4, over: null, endT: 0, paused: false, shake: 0, cam: { x: 0, y: 0 }, hurtFlash: 0, goalPause: 0, mapVer: 0, player: null,
-    stats: { kills: 0, damage: 0, gems: 0, goals: 0, safeDmg: 0, cubes: 0, supers: 0, gadgets: 0, stars: 0, zone: 0, rounds: 0 }, score: { 1: 0, 2: 0 },
-    timeLeft: modeKey === 'showdown' || modeKey === 'knockout' ? Infinity : modeKey === 'bounty' || modeKey === 'hotzone' ? 120 : 150, gemCd: null, mineT: 4, poison: null, goalSets: null, playerBrawler: pid,
-    pets: [], stars: { 1: 0, 2: 0 }, zone: null, rounds: { 1: 0, 2: 0 }, roundNo: 1, afterPause: null,
+    stats: { kills: 0, damage: 0, gems: 0, goals: 0, safeDmg: 0, cubes: 0, supers: 0, gadgets: 0, stars: 0, zone: 0, rounds: 0, bolts: 0 }, score: { 1: 0, 2: 0 },
+    timeLeft: isSD(modeKey) || modeKey === 'knockout' ? Infinity : ['bounty', 'hotzone', 'wipeout'].includes(modeKey) ? 120 : modeKey === 'siege' ? 180 : 150, gemCd: null, mineT: 4, poison: null, goalSets: null, playerBrawler: pid,
+    pets: [], stars: { 1: 0, 2: 0 }, zone: null, rounds: { 1: 0, 2: 0 }, roundNo: 1, afterPause: null, kos: { 1: 0, 2: 0 }, bolts: { 1: 0, 2: 0 }, siegeT: 40, robotNo: 0,
   };
   const names = shuffle(BOT_NAMES.slice());
   const others = shuffle(BR_LIST.map(b => b.id).filter(i => i !== pid));
-  if (modeKey === 'showdown') {
+  if (modeKey === 'duo') {
+    const sp = shuffle(map.spawns.slice()).slice(0, 3), off = (p, k) => freeSpotOn(map, p.x + k * T, p.y);
+    G.player = addBrawler(pid, 1, off(sp[0], -0.5), { player: true, level: plvl, name: S.name, gears: myGears() });
+    addBrawler(others[0], 1, off(sp[0], 0.5), { level: bl(), name: names[0], skill, slot: 0 });
+    for (let t = 2; t <= 3; t++) for (let k = 0; k < 2; k++) addBrawler(others[(t - 1) * 2 + k - 1], t, off(sp[t - 1], k ? 0.5 : -0.5), { level: bl(), name: names[t * 2 + k], skill, slot: k });
+    G.poison = { delay: 20, inset: 0, t: 0, max: Math.min(map.w, map.h) * T / 2 - 2.6 * T, speed: 6 };
+  } else if (modeKey === 'showdown') {
     const sp = shuffle(map.spawns.slice());
     G.player = addBrawler(pid, 1, sp[0], { player: true, level: plvl, name: S.name, gears: myGears() });
     for (let i = 0; i < 5; i++) addBrawler(others[i % others.length], i + 2, sp[i + 1], { level: bl(), name: names[i], skill, slot: i });
@@ -1355,6 +1710,7 @@ function startBattle(modeKey) {
     for (let i = 0; i < 3; i++) addBrawler(reds[i], 2, red[i], { level: bl(), name: names[2 + i], skill, slot: i });
     if (modeKey === 'hotzone') G.zone = { x: map.zone.x, y: map.zone.y, r: 2.3 * T, p: { 1: 0, 2: 0 } };
     if (modeKey === 'knockout') G.poison = { delay: 40, inset: 0, t: 0, max: Math.min(map.w, map.h) * T / 2 - 2.8 * T, speed: 10 };
+    if (modeKey === 'siege') for (const s of map.safes) G.safes.push({ kind: 'safe', ike: true, team: s.team, x: s.x, y: s.y, cy: s.y - 6, r: 34, hp: 14000, maxHp: 14000, flash: 0, cd: 0, dmgMult: 1, cubes: 0 });
     if (modeKey === 'heist') for (const s of map.safes) G.safes.push({ kind: 'safe', team: s.team, x: s.x, y: s.y, cy: s.y - 6, r: 34, hp: 20000, maxHp: 20000, flash: 0 });
     if (modeKey === 'brawlball') {
       G.ball = { x: map.ball.x, y: map.ball.y, vx: 0, vy: 0, r: 12, holder: null, noPickT: 0, noPickBy: null, lastTouch: null, spin: 0, breakWalls: false };
@@ -1363,19 +1719,24 @@ function startBattle(modeKey) {
   }
   const p = G.player; G.cam.x = p.x; G.cam.y = p.y;
 }
+const isSD = m => m === 'showdown' || m === 'duo';
+function freeSpotOn(map, x, y) { const tx = Math.floor(x / T), ty = Math.floor(y / T), t = map.t[ty * map.w + tx]; return t === TILE.WALL || t === TILE.WATER || t === TILE.CRATE || t === TILE.BOX ? { x: Math.floor(x / T) * T + T / 2 + (x < map.w * T / 2 ? T : -T), y } : { x, y }; }
 function myGears() { const st = S.brawlers[S.selected]; return (st.equipped || []).filter(g => (st.gears || []).includes(g)).slice(0, gearSlots(st.level)); }
 function botGears(lvl) { return shuffle(GEARS.map(g => g.id)).slice(0, gearSlots(lvl)); }
 function addBrawler(id, team, pos, o) {
-  if (!o.player && !o.gears) o.gears = botGears(o.level || 1); const b = makeBrawler(id, team, pos, o); b.spawn = { x: pos.x, y: pos.y }; G.brawlers.push(b); return b; }
+  if (!o.player && !o.gears) o.gears = botGears(o.level || 1);
+  const b = makeBrawler(id, team, pos, o);
+  b.skin = o.player ? (S.brawlers[id].skin || '') : (Math.random() < 0.3 ? pick(SKINS).id : '');
+  if (b.star && id === 'frank') { b.hpMax += 1000; b.hp += 1000; b.baseHp += 1000; } b.spawn = { x: pos.x, y: pos.y }; G.brawlers.push(b); return b; }
 const enemiesOf = team => G.brawlers.filter(b => b.alive && b.team !== team);
 
 // ---------------- abilities ----------------
-function canAct(b) { return b.alive && !b.dash && !b.leap && b.stunT <= 0 && G.intro <= 0 && !G.over && G.goalPause <= 0; }
+function canAct(b) { return b.alive && !b.dash && !b.leap && b.stunT <= 0 && !(b.windT > 0) && G.intro <= 0 && !G.over && G.goalPause <= 0; }
 function doAttack(b, ang, aimDist) {
   if (!canAct(b)) return false;
   if (G.ball && G.ball.holder === b) { if (b.cd > 0) return false; kickBall(b, ang, false); b.cd = 0.45; return true; }
   if (b.cd > 0 || b.ammo < 1 || b.burst) return false;
-  b.ammo -= 1; b.cd = 0.32; b.atkT = 0; b.revealT = 1.2; b.atkAnim = 1; b.aim = ang;
+  b.ammo -= 1; b.cd = 0.32; b.atkT = 0; b.revealT = 1.2; b.atkAnim = 1; b.aim = ang; b.invisT = 0;
   fireAbility(b, b.def.attack, ang, aimDist, false);
   return true;
 }
@@ -1412,6 +1773,19 @@ function fireAbility(b, A, ang, aimDist, isSuper) {
       break;
     }
     case 'pet': { const d = clamp(aimDist || 2.5 * T, T, A.range * T); lob(b, ang, d, A, 'pet'); break; }
+    case 'invis': b.invisT = A.dur; puff(b.x, b.y, 14, '#c0c8c0'); Sound.play('throw', vol(b)); break;
+    case 'rshield': b.guardT = A.dur; b.guardMul = 0.3; ringFx(b.x, b.y, 40, '#4ac040', 0.4, 6); burst(b.x, b.y, '#4ac040', 14, 160, 5, 0.5); break;
+    case 'mdash': b.dash = { ang, left: A.range * T, speed: 1100, hit: new Set(), A: { dmg: A.dmg, knock: 0 }, noBreak: true, attack: true }; Sound.play('punch', vol(b)); break;
+    case 'snipe': { const p = spawnProj(b, ang, A, { kind: 'bullet' }); p.distBonus = A.distBonus * dmgNow(b); if (b.star && b.id === 'piper' && b.inBush) p.dmg += 800 * b.dmgMult; Sound.play('pistol', vol(b)); muzzle(b, ang); break; }
+    case 'bats': spawnProj(b, ang, A, { kind: 'wave', pierce: true, isSuper: true }).lifesteal = (A.lifesteal || 1) * (b.star && b.id === 'mortis' ? 1.5 : 1); Sound.play('orb', vol(b)); break;
+    case 'frank': case 'fsuper': b.windT = A.wind; b.windA = A; b.windAng = ang; b.windSuper = isSuper; break;
+    case 'crowleap': case 'pjump': {
+      const d = clamp(aimDist || A.range * T * 0.8, 1.5 * T, A.range * T);
+      const tx = clamp(b.x + Math.cos(ang) * d, T * 0.6, G.map.w * T - T * 0.6), ty = clamp(b.y + Math.sin(ang) * d, T * 0.6, G.map.h * T - T * 0.6);
+      if (A.kind === 'pjump') { for (let i = 0; i < A.grenades; i++) { const p = lob(b, ang + Math.PI, rand(0.5, 1.5) * T, A, 'boom'); p.tx = b.x + rand(-1.2, 1.2) * T; p.ty = b.y + rand(-1.2, 1.2) * T; p.t = -0.15 - i * 0.05; p.dmg = A.dmg * dmgNow(b); p.rad = A.splash * T; p.isSuper = true; } }
+      else daggerRing(b, b.x, b.y, A);
+      b.leap = { sx: b.x, sy: b.y, tx, ty, t: 0, dur: A.dur, A, gadget: A.kind === 'pjump', ring: A.kind === 'crowleap' }; break;
+    }
     case 'heal': {
       const R = A.radius * T; for (const o of G.brawlers) if (o.alive && o.team === b.team && dist(o.x, o.y, b.x, b.y) < R) heal(o, A.heal * b.dmgMult);
       ringFx(b.x, b.y, R, '#7dff6a', 0.6, 8); burst(b.x, b.y, '#7dff6a', 24, 260, 5, 0.6); Sound.play('gem', vol(b)); break;
@@ -1476,6 +1850,7 @@ function updateLeap(b, dt) {
     if (!L.gadget) breakTilesCircle(b.x, b.y, T * 1.05);
     const sp = freeSpot(b.x, b.y, b.r); b.x = sp.x; b.y = sp.y;
     if (L.gadget) { puff(b.x, b.y, 8, '#f5e2c0'); return; }
+    if (L.ring) daggerRing(b, b.x, b.y, L.A);
     for (const tg of targetsFor(b.team)) {
       const d = dist(b.x, b.y, tg.x, tg.cy ?? tg.y);
       if (d < R + (tg.r || 0)) {
@@ -1490,7 +1865,7 @@ function updateLeap(b, dt) {
 function updateDash(b, dt) {
   const D = b.dash, step = D.speed * dt;
   const nx = b.x + Math.cos(D.ang) * step, ny = b.y + Math.sin(D.ang) * step;
-  if (!D.gadget) breakTilesCircle(nx, ny, b.r + 3);
+  if (!D.gadget && !D.noBreak) breakTilesCircle(nx, ny, b.r + 3);
   const ox = b.x, oy = b.y; moveCircle(b, nx - b.x, ny - b.y, b.r);
   const moved = dist(ox, oy, b.x, b.y); D.left -= step; b.moving = true; b.walk += dt * 22; b.aim = D.ang;
   if (Math.random() < 0.7) G.parts.push({ type: 'smoke', x: b.x + rand(-10, 10), y: b.y + 14, vx: rand(-20, 20), vy: rand(-30, 0), life: 0.5, max: 0.5, size: rand(8, 13), color: '#f5e2c0', drag: 2 });
@@ -1499,8 +1874,8 @@ function updateDash(b, dt) {
     if (D.hit.has(tg)) continue;
     const d = dist(b.x, b.y, tg.x, tg.cy ?? tg.y);
     if (d < b.r + (tg.r || 19) + 6) {
-      D.hit.add(tg); damage(tg, D.A.dmg * dmgNow(b), b, { isSuper: true });
-      if (tg.kind === 'brawler') { const side = angDiff(D.ang, Math.atan2(tg.y - b.y, tg.x - b.x)) > 0 ? 1 : -1; const ka = D.ang + side * 0.9; tg.kx = Math.cos(ka) * D.A.knock * 2; tg.ky = Math.sin(ka) * D.A.knock * 2; tg.stunT = 0.25; }
+      D.hit.add(tg); damage(tg, D.A.dmg * dmgNow(b), b, { isSuper: !D.attack });
+      if (tg.kind === 'brawler' && D.A.knock) { const side = angDiff(D.ang, Math.atan2(tg.y - b.y, tg.x - b.x)) > 0 ? 1 : -1; const ka = D.ang + side * 0.9; tg.kx = Math.cos(ka) * D.A.knock * 2; tg.ky = Math.sin(ka) * D.A.knock * 2; tg.stunT = 0.25; }
       else if (tg.kind === 'safe') stop = true;
       burst(tg.x, tg.y, '#ffd35a', 10, 200, 5, 0.35); Sound.play('punch', vol(b)); shake(b.isPlayer ? 6 : 2);
     }
@@ -1545,6 +1920,7 @@ function damage(tg, amount, src, o = {}) {
   if (tg.kind === 'brawler') {
     if (!tg.alive || tg.shieldT > 0 || tg.leap) return;
     if (tg.hyperT > 0) amount *= 0.85;
+    if (tg.guardT > 0) amount *= tg.guardMul;
     if (tg.shield > 0) { const a = Math.min(tg.shield, amount); tg.shield -= a; amount -= a; if (tg.shield <= 0) burst(tg.x, tg.y - 10, '#9ab0ff', 8, 160, 4, 0.3); }
     if (src && src.gears && src.gears.has('vision')) tg.revealT = Math.max(tg.revealT, 2);
     tg.hp -= amount; tg.hurtT = 0; tg.flash = 0.12; tg.revealT = Math.max(tg.revealT, 0.6);
@@ -1581,15 +1957,24 @@ function killBrawler(b, killer) {
   G.feed.unshift({ killer: killer && killer.kind === 'brawler' ? killer : null, victim: b, t: 4.5 }); G.feed.length = Math.min(G.feed.length, 4);
   if (G.ball && G.ball.holder === b) dropBall();
   if (G.mode === 'gemgrab' && b.gems > 0) { for (let i = 0; i < b.gems; i++) spawnPickup('gem', b.x, b.y, true); b.gems = 0; }
+  if (G.mode === 'wipeout' && killer && killer.kind === 'brawler' && killer.team !== b.team) G.kos[killer.team]++;
   if (G.mode === 'showdown') {
     const n = Math.max(1, b.cubes); for (let i = 0; i < n; i++) spawnPickup('cube', b.x, b.y, true);
     b.rank = G.brawlers.filter(x => x.alive).length + 1;
+  } else if (G.mode === 'duo') {
+    const n = Math.max(1, Math.ceil(b.cubes / 2)); for (let i = 0; i < n; i++) spawnPickup('cube', b.x, b.y, true);
+    b.cubes = Math.floor(b.cubes / 2);
+    const mate = G.brawlers.find(x => x !== b && x.team === b.team && x.alive);
+    if (mate) b.respawnT = 7;
+    else { const teams = new Set(G.brawlers.filter(x => x.alive).map(x => x.team)); const rank = teams.size + 1; for (const x of G.brawlers) if (x.team === b.team) { x.rank = rank; x.respawnT = 0; } }
   } else if (G.mode === 'knockout') b.respawnT = 0;
   else b.respawnT = 3.5;
 }
 function respawn(b) {
-  const sp = G.map.teamSpawns[b.team][b.slot % 3];
-  b.x = sp.x; b.y = sp.y; b.hp = b.hpMax; b.alive = true; b.ammo = 3; b.reloadP = 0; b.shieldT = 2; b.kx = b.ky = 0; b.slowT = 0; b.hurtT = 9; b.atkT = 9; b.burnT = 0; b.spinT = 0; b.hyperT = 0; b.stunT = 0;
+  let sp;
+  if (G.mode === 'duo') { const mate = G.brawlers.find(x => x !== b && x.team === b.team && x.alive); if (!mate) { b.respawnT = 0; return; } sp = freeSpot(mate.x + rand(-1, 1) * T, mate.y + rand(-1, 1) * T, b.r); }
+  else sp = G.map.teamSpawns[b.team][b.slot % 3];
+  b.x = sp.x; b.y = sp.y; b.hp = b.hpMax; b.alive = true; b.ammo = 3; b.reloadP = 0; b.shieldT = 2; b.kx = b.ky = 0; b.slowT = 0; b.hurtT = 9; b.atkT = 9; b.burnT = 0; b.spinT = 0; b.hyperT = 0; b.stunT = 0; b.invisT = 0; b.guardT = 0; b.windT = 0;
   b.aim = b.team === 2 ? Math.PI / 2 : -Math.PI / 2; puff(b.x, b.y, 8, '#bfe6ff');
   if (b.ai) b.ai.path = null;
 }
@@ -1608,7 +1993,7 @@ function updateBrawler(b, dt) {
   if (b.dash) updateDash(b, dt);
   else {
     let mx = b.mx, my = b.my; const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
-    let sp = b.def.speed * (b.slowT > 0 ? 0.55 : 1) * (G.ball && G.ball.holder === b ? 0.93 : 1) * (b.star && b.id === 'colt' ? 1.1 : 1) * (b.hyperT > 0 ? 1.25 : 1) * (b.inBush && b.gears.has('speed') ? 1.15 : 1);
+    let sp = b.def.speed * (b.slowT > 0 ? 0.55 : 1) * (G.ball && G.ball.holder === b ? 0.93 : 1) * (b.star && b.id === 'colt' ? 1.1 : 1) * (b.hyperT > 0 ? 1.25 : 1) * (b.inBush && b.gears.has('speed') ? 1.15 : 1) * (b.boostT > 0 ? 1.5 : 1);
     if (b.stunT > 0 || G.intro > 0 || G.goalPause > 0 || G.over) sp = 0;
     const ox = b.x, oy = b.y;
     moveCircle(b, mx * sp * dt + b.kx * dt, my * sp * dt + b.ky * dt, b.r);
@@ -1671,9 +2056,15 @@ function projHit(p, tg) {
   if (p.kind === 'rocket') return;
   const turretShot = p.owner.kind === 'turret';
   const src = turretShot ? p.owner.owner : p.owner;
-  damage(tg, p.dmg, src, { isSuper: p.isSuper, noCharge: turretShot });
+  const dmg = p.dmg + (p.distBonus ? p.distBonus * clamp(p.traveled / p.range, 0, 1) : 0);
+  damage(tg, dmg, src, { isSuper: p.isSuper, noCharge: turretShot });
+  if (tg.kind === 'brawler') {
+    if (p.A && p.A.poison && src && src.kind === 'brawler') { tg.burnT = 4; tg.burnDps = 100 * src.dmgMult * (src.star && src.id === 'crow' ? 1.5 : 1); tg.burnSrc = src; tg.poisoned = true; }
+    if (p.stun) tg.stunT = Math.max(tg.stunT, p.stun);
+  }
+  if (p.lifesteal && src && src.alive) heal(src, dmg * 0.6 * p.lifesteal);
   if (tg.kind === 'brawler' && src && src.star) {
-    if (src.id === 'primo' && p.kind === 'punch') { tg.burnT = 4; tg.burnDps = 150 * src.dmgMult; tg.burnSrc = src; }
+    if (src.id === 'primo' && p.kind === 'punch') { tg.burnT = 4; tg.burnDps = 150 * src.dmgMult; tg.burnSrc = src; tg.poisoned = false; }
     if (src.id === 'shelly' && p.isSuper) tg.slowT = Math.max(tg.slowT, 1.5);
   }
   if (p.knock && tg.kind === 'brawler') { tg.kx = Math.cos(p.ang) * p.knock * 2.2; tg.ky = Math.sin(p.ang) * p.knock * 2.2; tg.stunT = Math.max(tg.stunT, 0.15); }
@@ -1728,7 +2119,8 @@ function updatePickups(dt) {
     for (const b of G.brawlers) { if (!b.alive || b.leap) continue; const d = dist(b.x, b.y, p.x, p.y); if (d < b.r + 14 && d < bd) { bd = d; taker = b; } }
     if (!taker) continue;
     p.taken = true;
-    if (p.type === 'gem') { taker.gems++; if (taker.isPlayer) { G.stats.gems++; } Sound.play('gem', vol(taker)); burst(p.x, p.y, '#e6a2ff', 6, 120, 4, 0.3); }
+    if (p.type === 'bolt') { G.bolts[taker.team]++; if (taker.isPlayer) G.stats.bolts++; Sound.play('coin', vol(taker)); burst(p.x, p.y, '#c0c8d8', 6, 120, 4, 0.3); }
+    else if (p.type === 'gem') { taker.gems++; if (taker.isPlayer) { G.stats.gems++; } Sound.play('gem', vol(taker)); burst(p.x, p.y, '#e6a2ff', 6, 120, 4, 0.3); }
     else { taker.cubes++; const add = taker.baseHp * 0.1; taker.hpMax += add; taker.hp += add; if (taker.isPlayer) { G.stats.cubes++; textFx(taker.x, taker.y - 50, '+POWER', '#9dff6b', 22); } Sound.play('cube', vol(taker)); burst(p.x, p.y, '#9dff6b', 8, 140, 4, 0.35); }
   }
   G.pickups = G.pickups.filter(p => !p.taken);
@@ -1799,7 +2191,9 @@ function resetBallRound() {
 function visibleTo(team, e) {
   if (e.kind !== 'brawler') return true;
   if (!e.alive) return false;
-  if (e.team === team || !e.inBush || e.revealT > 0) return true;
+  if (e.team === team) return true;
+  if (e.invisT > 0) { const R1 = (1.6 * T) ** 2; for (const o of G.brawlers) if (o.alive && o.team === team && (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < R1) return true; return false; }
+  if (!e.inBush || e.revealT > 0) return true;
   const R = (2.3 * T) ** 2;
   for (const o of G.brawlers) if (o.alive && o.team === team && (o.x - e.x) ** 2 + (o.y - e.y) ** 2 < R) return true;
   return false;
@@ -1811,7 +2205,28 @@ function updateMode(dt) {
   const m = G.mode;
   if (G.timeLeft !== Infinity) G.timeLeft -= dt;
   if (G.poison) { G.poison.t += dt; G.poison.inset = G.poison.t > G.poison.delay ? Math.min(G.poison.max, G.poison.inset + G.poison.speed * dt) : 0; }
-  if (m === 'showdown') {
+  if (m === 'duo') {
+    const teams = new Set(G.brawlers.filter(b => b.alive).map(b => b.team));
+    if (!teams.has(G.player.team)) endMatch(G.player.rank === 1 ? 'win' : G.player.rank === 2 ? 'draw' : 'lose', G.player.rank);
+    else if (teams.size === 1) { for (const b of G.brawlers) if (b.team === G.player.team) b.rank = 1; endMatch('win', 1); }
+  } else if (m === 'wipeout') {
+    if (G.kos[1] >= 10) endMatch('win'); else if (G.kos[2] >= 10) endMatch('lose');
+    else if (G.timeLeft <= 0) endMatch(G.kos[1] > G.kos[2] ? 'win' : G.kos[2] > G.kos[1] ? 'lose' : 'draw');
+  } else if (m === 'siege') {
+    G.mineT -= dt;
+    if (G.mineT <= 0) { G.mineT = 3.5; spawnPickup('bolt', G.map.mine.x, G.map.mine.y, true); }
+    G.siegeT -= dt;
+    if (G.siegeT <= 0) {
+      G.siegeT = 40; const w = G.bolts[1] > G.bolts[2] ? 1 : G.bolts[2] > G.bolts[1] ? 2 : 0;
+      if (w) { G.robotNo++; const owner = G.brawlers.find(b => b.team === w); const own = G.safes.find(s => s.team === w); const home = { x: own.x, y: own.y + (w === 1 ? -2.5 : 2.5) * T }; spawnPet(owner, home.x, home.y, { hp: 9000 + G.robotNo * 2000, petDmg: 1200, petRate: 0.8, petSpeed: 95 }); G.pets[G.pets.length - 1].id = 'robot'; G.pets[G.pets.length - 1].robot = true; G.pets[G.pets.length - 1].r = 26;
+        G.bigText = { text: w === 1 ? 'YOUR ROBOT IS COMING!' : 'ENEMY ROBOT INCOMING!', color: w === 1 ? '#7cc4ff' : '#ff8a96', t: 2 }; Sound.play('goal'); }
+      G.bolts = { 1: 0, 2: 0 };
+    }
+    for (const s of G.safes) if (s.ike && s.hp > 0) ikeShoot(s, dt);
+    const mine = G.safes.find(s => s.team === 1), theirs = G.safes.find(s => s.team === 2);
+    if (theirs.hp <= 0) endMatch('win'); else if (mine.hp <= 0) endMatch('lose');
+    else if (G.timeLeft <= 0) { const a = mine.hp / mine.maxHp, b = theirs.hp / theirs.maxHp; endMatch(a > b + 0.001 ? 'win' : b > a + 0.001 ? 'lose' : 'draw'); }
+  } else if (m === 'showdown') {
     const alive = G.brawlers.filter(b => b.alive);
     if (!G.player.alive) endMatch(G.player.rank <= 2 ? 'win' : 'lose', G.player.rank);
     else if (alive.length === 1) { G.player.rank = 1; endMatch('win', 1); }
@@ -1854,7 +2269,7 @@ const teamGems = team => G.brawlers.reduce((a, b) => a + (b.team === team && b.a
 function endMatch(result, rank) {
   if (G.over) return;
   G.over = { result, rank: rank || 0 }; G.endT = 2.2;
-  const txt = G.mode === 'showdown' ? (rank === 1 ? 'VICTORY!' : `#${rank}`) : result === 'win' ? 'VICTORY!' : result === 'lose' ? 'DEFEAT' : 'DRAW';
+  const txt = isSD(G.mode) ? (rank === 1 ? 'VICTORY!' : `#${rank}`) : result === 'win' ? 'VICTORY!' : result === 'lose' ? 'DEFEAT' : 'DRAW';
   G.bigText = { text: txt, color: result === 'win' ? '#ffd23a' : result === 'lose' ? '#ff6a6a' : '#c9d2ff', t: 3 };
   for (const b of G.brawlers) { b.mx = b.my = 0; }
 }
@@ -1914,6 +2329,12 @@ function superStats(b) {
     case 'rain': A.radius *= 1.3; A.rockets += 4; break;
     case 'barrel': A.radius *= 1.5; break;
     case 'turret': A.hpMult = 2; break;
+    case 'invis': A.dur = 9; break;
+    case 'crowleap': A.ring = 24; break;
+    case 'bats': A.r *= 1.4; A.dmg *= 1.2; break;
+    case 'pjump': A.grenades = 7; break;
+    case 'fsuper': A.range *= 1.3; break;
+    case 'rshield': A.dur = 6; break;
   }
   return A;
 }
@@ -1948,10 +2369,35 @@ function waveHeal(p) {
     if (dist(a.x, a.y, p.x, p.y) < a.r + p.r) { p.healSet.add(a); heal(a, 400 * src.dmgMult); }
   }
 }
+function daggerRing(b, x, y, A) {
+  for (let i = 0; i < A.ring; i++) spawnProj(b, i / A.ring * Math.PI * 2, b.def.attack, { x, y, kind: 'pellet', speed: 700, r: 7, color: '#9aff5a', range: 3.5 * T, dmg: A.ringDmg, isSuper: true });
+  burst(x, y, '#9aff5a', 10, 180, 4, 0.4);
+}
+function ikeShoot(s, dt) {
+  s.cd -= dt; if (s.cd > 0) return;
+  let best = null, bd = 7.5 * T;
+  for (const e of targetsFor(s.team)) { if (e.kind === 'safe') continue; if (e.kind === 'brawler' && !visibleTo(s.team, e)) continue; const d = dist(s.x, s.cy, e.x, e.y); if (d < bd && losClear(s.x, s.cy, e.x, e.y)) { bd = d; best = e; } }
+  if (!best) return;
+  s.cd = 0.55; const a = Math.atan2(best.y - s.cy, best.x - s.x);
+  spawnProj(s, a, { speed: 950, r: 7, range: 8 * T, dmg: 450, color: '#ff6a5a' }, { x: s.x + Math.cos(a) * 30, y: s.cy + Math.sin(a) * 30, kind: 'tshot' });
+  Sound.play('turretShot', volAt(s.x, s.y));
+}
 function updateStatus(b, dt) {
+  b.invisT = Math.max(0, (b.invisT || 0) - dt); b.guardT = Math.max(0, (b.guardT || 0) - dt); b.boostT = Math.max(0, (b.boostT || 0) - dt); b.unstopT = Math.max(0, (b.unstopT || 0) - dt);
+  if (b.unstopT > 0) { b.stunT = 0; b.slowT = 0; b.kx = 0; b.ky = 0; }
+  if (b.invisT > 0 && b.star && b.id === 'leon') heal(b, 1000 * dt, true);
+  if (b.star && b.id === 'rosa' && b.inBush) heal(b, 300 * dt, true);
+  if (b.windT > 0) {
+    b.windT -= dt; b.mx = b.my = 0; b.atkAnim = 1;
+    if (b.windT <= 0) {
+      const A = b.windA; spawnProj(b, b.windAng, A, { kind: 'wave', pierce: true, isSuper: b.windSuper }).stun = A.stun || 0;
+      if (A.breakWalls) breakTilesCircle(b.x + Math.cos(b.windAng) * T, b.y + Math.sin(b.windAng) * T, T * 0.8);
+      Sound.play('explode', vol(b) * 0.7); shake(b.isPlayer ? 6 : 2); burst(b.x + Math.cos(b.windAng) * 30, b.y + Math.sin(b.windAng) * 30, '#ffe9a0', 10, 200, 5, 0.3);
+    }
+  }
   if (b.burnT > 0) {
     b.burnT -= dt; b.burnTick -= dt;
-    if (Math.random() < dt * 10) G.parts.push({ type: 'p', x: b.x + rand(-10, 10), y: b.y - rand(0, 20), vx: 0, vy: -50, life: 0.4, max: 0.4, size: 4, color: pick(['#ff8a1f', '#ffd23a']), grav: 0, drag: 0 });
+    if (Math.random() < dt * 10) G.parts.push({ type: 'p', x: b.x + rand(-10, 10), y: b.y - rand(0, 20), vx: 0, vy: -50, life: 0.4, max: 0.4, size: 4, color: b.poisoned ? pick(['#9aff5a', '#4ac040']) : pick(['#ff8a1f', '#ffd23a']), grav: 0, drag: 0 });
     if (b.burnTick <= 0) { b.burnTick = 0.5; damage(b, b.burnDps * 0.5, b.burnSrc, { noCharge: true }); }
   }
   if (b.spinT > 0) {
@@ -1994,6 +2440,12 @@ function doGadget(b) {
       b.leap = { sx: b.x, sy: b.y, tx, ty, t: 0, dur: 0.5, A: { radius: 0, dmg: 0, knock: 0 }, gadget: true }; break;
     }
     case 'dynamike': b.spinT = 1.5; b.spinTick = 0; break;
+    case 'leon': b.boostT = 3; puff(b.x, b.y, 6, '#c0c8c0'); break;
+    case 'crow': b.guardT = 3; b.guardMul = 0.6; break;
+    case 'mortis': for (const tg of targetsFor(b.team)) if (dist(b.x, b.y, tg.x, tg.cy ?? tg.y) < 1.8 * T) damage(tg, 700 * b.dmgMult, b, { noCharge: true }); ringFx(b.x, b.y, 1.8 * T, '#c02040', 0.35, 6); break;
+    case 'piper': for (const tg of targetsFor(b.team)) { const d = dist(b.x, b.y, tg.x, tg.y); if (tg.kind === 'brawler' && d < 2.5 * T && d > 1) { damage(tg, 400 * b.dmgMult, b, { noCharge: true }); tg.kx = (tg.x - b.x) / d * 700; tg.ky = (tg.y - b.y) / d * 700; } } ringFx(b.x, b.y, 2.5 * T, '#ff9ac8', 0.35, 6); break;
+    case 'frank': b.unstopT = 3; ringFx(b.x, b.y, 40, '#c0c0d0', 0.4, 5); break;
+    case 'rosa': heal(b, 1000 * b.dmgMult); break;
   }
   if (!ok) { if (b.isPlayer) { Sound.play('error'); textFx(b.x, b.y - 60, b.id === 'primo' ? 'NO ONE CLOSE' : 'NEED YOUR PET', '#ffffff', 12, 0.9); } return false; }
   b.gadgets--; b.gadgetCd = 4 * (b.gears.has('gadget') ? 0.6 : 1); b.revealT = 1; b.atkT = 0;
@@ -2023,17 +2475,18 @@ function updatePets(dt) {
     pt.cd -= dt; pt.flash -= dt; pt.ai.flowT -= dt;
     let tgt = null, bd = 9 * T;
     for (const e of targetsFor(pt.team)) { if (e.kind === 'brawler' && !visibleTo(pt.team, e)) continue; const d = dist(pt.x, pt.y, e.x, e.cy ?? e.y); if (d < bd) { bd = d; tgt = e; } }
+    if (pt.robot) { const ike = G.safes.find(s => s.team !== pt.team && s.hp > 0); if (ike && !(tgt && tgt.kind === 'brawler' && bd < 2.2 * T)) { tgt = ike; bd = dist(pt.x, pt.y, ike.x, ike.cy); } }
     let gx = null, gy = null;
     if (tgt) { gx = tgt.x; gy = tgt.cy ?? tgt.y; }
     else if (pt.owner.alive && dist(pt.x, pt.y, pt.owner.x, pt.owner.y) > 2 * T) { gx = pt.owner.x; gy = pt.owner.y; }
     const ox = pt.x, oy = pt.y;
-    if (gx !== null && !(tgt && bd < pt.r + (tgt.r || 19) + 8) && G.intro <= 0 && G.goalPause <= 0 && !G.over) {
+    if (gx !== null && !(tgt && bd < pt.r + (tgt.r || 19) + (pt.robot ? 30 : 8)) && G.intro <= 0 && G.goalPause <= 0 && !G.over) {
       const [mx, my] = pathDir(pt, gx, gy);
       moveCircle(pt, mx * pt.speed * dt, my * pt.speed * dt, pt.r);
       pt.aim = Math.atan2(my, mx);
     }
     pt.vx = (pt.x - ox) / dt; pt.vy = (pt.y - oy) / dt; pt.moving = Math.hypot(pt.vx, pt.vy) > 20; if (pt.moving) pt.walk += dt * 10;
-    if (tgt && bd < pt.r + (tgt.r || 19) + 14 && pt.cd <= 0) {
+    if (tgt && bd < pt.r + (tgt.r || 19) + (pt.robot ? 40 : 14) && pt.cd <= 0) {
       pt.cd = pt.rate; pt.aim = Math.atan2((tgt.cy ?? tgt.y) - pt.y, tgt.x - pt.x); pt.swipe = 0.2;
       damage(tgt, pt.dmg, pt.owner, { noCharge: true, fromPet: true });
       if (pt.owner.star && pt.owner.id === 'nita' && pt.owner.alive) heal(pt.owner, 500, true);
@@ -2057,7 +2510,7 @@ function resetRound() {
 // Bots: flow-field pathfinding plus a small objective/combat brain
 // ===================================================================
 function makeAI(skill, slot) {
-  return { skill, err: lerp(0.22, 0.06, skill), think: rand(0, 0.3), strafeDir: Math.random() < 0.5 ? 1 : -1, strafeT: rand(0.5, 1.5), fireT: rand(0.4, 0.9),
+  return { skill, err: lerp(0.16, 0.04, skill), think: rand(0, 0.3), strafeDir: Math.random() < 0.5 ? 1 : -1, strafeT: rand(0.5, 1.5), fireT: rand(0.4, 0.9),
     target: null, goal: null, goalFirst: false, structTarget: null, flow: null, flowGoal: -1, flowVer: -1, flowT: 0, stuckT: 0, unstick: 0, ux: 0, uy: 0, lx: 0, ly: 0,
     slot, wander: null, wanderT: 0, superT: 0, want: 0, path: null };
 }
@@ -2110,10 +2563,10 @@ const teamHome = team => { const s = G.map.teamSpawns[team]; return { x: s.reduc
 
 function aiDecide(b) {
   const ai = b.ai, A = b.def.attack, range = attackRange(b);
-  ai.want = A.kind === 'punch' ? range * 0.55 : b.id === 'bull' ? range * 0.5 : b.id === 'shelly' ? range * 0.55 : range * 0.72;
+  ai.want = A.kind === 'punch' || A.kind === 'mdash' ? range * 0.55 : b.id === 'frank' ? range * 0.6 : b.id === 'bull' ? range * 0.5 : b.id === 'shelly' ? range * 0.55 : range * 0.72;
   // choose a target among visible enemies
   let tgt = null, best = 1e9;
-  const aggro = G.mode !== 'showdown' ? 10.5 * T : b.hurtT < 3 ? 10 * T : G.time < 25 ? 5 * T : 8 * T;
+  const aggro = !isSD(G.mode) ? 10.5 * T : b.hurtT < 3 ? 10 * T : G.time < 25 ? 5 * T : 8 * T;
   for (const e of G.brawlers) {
     if (!e.alive || e.team === b.team || e.leap || !visibleTo(b.team, e)) continue;
     const d = dist(b.x, b.y, e.x, e.y); if (d > aggro) continue;
@@ -2130,7 +2583,8 @@ function aiDecide(b) {
     const W = G.map.w * T, H = G.map.h * T, ins = G.poison.inset, margin = 1.6 * T;
     if (G.poison.t > G.poison.delay - 3 && (b.x < ins + margin || b.y < ins + margin || b.x > W - ins - margin || b.y > H - ins - margin)) { ai.goal = { x: W / 2, y: H / 2 }; ai.goalFirst = true; return; }
   }
-  if (m === 'showdown') {
+  if (m === 'duo' && !tgt) { const mate = G.brawlers.find(x => x !== b && x.team === b.team && x.alive); if (mate && dist(b.x, b.y, mate.x, mate.y) > 5 * T) { ai.goal = { x: mate.x, y: mate.y }; return; } }
+  if (isSD(m)) {
     const W = G.map.w * T, H = G.map.h * T, ins = G.poison.inset;
     const alive = G.brawlers.filter(x => x.alive).length;
     if (tgt && lowHp && alive > 2 && dist(b.x, b.y, tgt.x, tgt.y) < 6 * T) { const a = Math.atan2(b.y - tgt.y, b.x - tgt.x); ai.goal = clampToZone(b.x + Math.cos(a) * 5 * T, b.y + Math.sin(a) * 5 * T); ai.goalFirst = true; return; }
@@ -2195,7 +2649,18 @@ function aiDecide(b) {
     if (ds > range * 0.85 || !losClear(b.x, b.y, es.x, es.cy)) { const dir = b.team === 1 ? 1 : -1; ai.goal = { x: es.x + (ai.slot - 1) * 1.5 * T, y: es.y + dir * Math.min(range * 0.7, 4 * T) }; ai.goalFirst = !close; }
     if (!close && ds < range) ai.target = null;
   }
-  if (m === 'bounty' || m === 'knockout') {
+  if (m === 'siege') {
+    const es = G.safes.find(s => s.team !== b.team), robot = G.pets.find(p => p.robot);
+    if (robot && robot.team === b.team && !tgt) { ai.goal = { x: robot.x, y: robot.y }; return; }
+    if (robot && robot.team !== b.team && dist(b.x, b.y, robot.x, robot.y) < 10 * T) { ai.target = robot; return; }
+    let bolt = null, bd = 9 * T; for (const p of G.pickups) { if (p.type !== 'bolt') continue; const d = dist(b.x, b.y, p.x, p.y); if (d < bd) { bd = d; bolt = p; } }
+    if (bolt && !(tgt && dist(b.x, b.y, tgt.x, tgt.y) < 4 * T)) { ai.goal = { x: bolt.x, y: bolt.y }; ai.goalFirst = true; return; }
+    if (tgt) return;
+    ai.goal = { x: G.map.mine.x + (ai.slot - 1) * 2 * T, y: G.map.mine.y + (b.team === 1 ? 1.5 : -1.5) * T };
+    if (es && dist(b.x, b.y, es.x, es.cy) < range) ai.structTarget = es;
+    return;
+  }
+  if (m === 'bounty' || m === 'knockout' || m === 'wipeout') {
     const home = teamHome(b.team), foe = teamHome(b.team === 1 ? 2 : 1);
     if (lowHp && tgt) { ai.goal = home; ai.goalFirst = true; return; }
     if (tgt) return;
@@ -2221,7 +2686,12 @@ function aiWantsSuper(b, tg, d, los) {
     case 'area': return d < b.def.super.range * T * 0.95 && (isB || tg.kind === 'safe');
     case 'dash': return isB && los && d < 6.5 * T || (tg.kind === 'safe' && d < 7 * T && los);
     case 'turret': return d < 9 * T;
-    case 'leap': return (isB || tg.kind === 'safe') && d < b.def.super.range * T * 0.95 && d > 1.5 * T;
+    case 'leap': case 'crowleap': return (isB || tg.kind === 'safe') && d < b.def.super.range * T * 0.95 && d > 1.5 * T;
+    case 'invis': return isB && d < 8 * T;
+    case 'bats': return los && d < 7 * T;
+    case 'pjump': return isB && d < 3 * T;
+    case 'fsuper': return los && d < 5 * T;
+    case 'rshield': return isB && d < 4 * T;
   }
   return false;
 }
@@ -2280,10 +2750,10 @@ function aiUpdate(b, dt) {
     b.aim = ang;
     const los = shootAt.kind === 'tile' ? losClear(b.x, b.y, tx, ty, true) : losClear(b.x, b.y, tx, ty);
     const reach = range * 0.95 + (shootAt.r || 19) * 0.6;
-    if (d <= reach && los && ai.fireT <= 0 && b.ammo >= 1) { if (doAttack(b, ang, d)) ai.fireT = rand(0.18, 0.5) + (1 - ai.skill) * 0.3; }
+    if (d <= reach && los && ai.fireT <= 0 && b.ammo >= 1) { if (doAttack(b, ang, d)) ai.fireT = rand(0.12, 0.35) + (1 - ai.skill) * 0.2; }
     if (b.charge >= 1 && ai.superT <= 0 && shootAt.kind !== 'tile' && aiWantsSuper(b, shootAt, d, los)) {
       const sk = b.def.super.kind;
-      const sa = sk === 'turret' ? ang : Math.atan2(ty - b.y, tx - b.x);
+      const sa = sk === 'turret' ? ang : sk === 'pjump' ? Math.atan2(b.y - ty, b.x - tx) : Math.atan2(ty - b.y, tx - b.x);
       if (doSuper(b, sa, sk === 'turret' ? Math.min(d * 0.4, 2.5 * T) : d)) ai.superT = 1.2;
     }
   } else if (b.moving) b.aim = Math.atan2(my, mx);
@@ -2304,6 +2774,11 @@ function aiExtras(b, tgt) {
     case 'primo': use = tgt && tgt.kind === 'brawler' && d < 2 * T; break;
     case 'nita': { const pt = G.pets.find(q => q.owner === b); use = pt && targetsFor(b.team).some(e => e.kind === 'brawler' && dist(pt.x, pt.y, e.x, e.y) < 2.2 * T); break; }
     case 'poco': use = G.brawlers.some(o => o.alive && o.team === b.team && o.hp < o.hpMax * 0.5 && dist(o.x, o.y, b.x, b.y) < 4.5 * T); break;
+    case 'leon': use = tgt && d > 4 * T && d < 9 * T; break;
+    case 'crow': case 'rosa': use = tgt && b.hp < b.hpMax * 0.5; break;
+    case 'mortis': use = tgt && d < 1.7 * T; break;
+    case 'piper': use = tgt && d < 2.3 * T; break;
+    case 'frank': use = tgt && d < 4 * T && b.hp < b.hpMax * 0.7; break;
     case 'brock': use = tgt && d < 2.5 * T && b.hp < b.hpMax * 0.5; if (use) { const a = Math.atan2(b.y - tgt.y, b.x - tgt.x); b.mx = Math.cos(a); b.my = Math.sin(a); } break;
   }
   if (use && doGadget(b)) ai.gadT = rand(3, 6); else ai.gadT = 0.5;
@@ -2408,7 +2883,7 @@ function autoAim(p, range, isSup) {
     const ey = e.cy ?? e.y, d = dist(p.x, p.y, e.x, ey) - (e.kind === 'safe' ? 30 : 0);
     if (d < bd) { bd = d; best = e; }
   }
-  if (!best && G.mode === 'showdown') {
+  if (!best && isSD(G.mode)) {
     const m = G.map; const tx0 = Math.floor(p.x / T), ty0 = Math.floor(p.y / T), R = Math.ceil(range / T);
     for (let y = ty0 - R; y <= ty0 + R; y++) for (let x = tx0 - R; x <= tx0 + R; x++) { if (!inMap(x, y) || m.t[y * m.w + x] !== TILE.BOX) continue; const cx = x * T + T / 2, cy = y * T + T / 2, d = dist(p.x, p.y, cx, cy); if (d < bd) { bd = d; best = { x: cx, y: cy }; } }
   }
@@ -2484,7 +2959,7 @@ function drawBall(c, b) { drawSpr(c, 'ball', b.x, b.y, 3); }
 function drawCoinIcon(c, x, y, r) { drawSpr(c, 'coin', x, y, Math.max(1, Math.round(r / 4))); }
 function drawModeIcon(c, mode, x, y, s) {
   const k = Math.max(2, Math.round(s * 3));
-  const map = { showdown: 'skull', gemgrab: 'gem', brawlball: 'ball', heist: 'safeIcon', bounty: 'star', hotzone: 'fire', knockout: 'trophy' };
+  const map = { showdown: 'skull', duo: 'skull', gemgrab: 'gem', brawlball: 'ball', heist: 'safeIcon', bounty: 'star', hotzone: 'fire', knockout: 'trophy', wipeout: 'skull', siege: 'bolt' };
   const n = map[mode];
   if (n === 'safeIcon') { c.fillStyle = INK; c.fillRect(x - 6 * k, y - 6 * k, 12 * k, 12 * k); c.fillStyle = '#c9cfe0'; c.fillRect(x - 5 * k, y - 5 * k, 10 * k, 10 * k); c.fillStyle = '#ff4659'; c.fillRect(x - 5 * k, y - 5 * k, 10 * k, 3 * k); c.fillStyle = '#8a91aa'; c.fillRect(x - 2 * k, y, 4 * k, 4 * k); return; }
   if (n === 'fire') { const P = [[0, -5], [-1, -3], [1, -3], [-2, -1], [0, -1], [2, -1], [-3, 1], [-1, 1], [1, 1], [3, 1], [-3, 3], [-1, 3], [1, 3], [3, 3], [-2, 5], [0, 5], [2, 5]]; for (const [dx, dy] of P) { c.fillStyle = dy > 1 ? '#ffe040' : '#ff6a1f'; c.fillRect(x + dx * k - k, y + dy * k - k, 2 * k, 2 * k); } return; }
@@ -2553,12 +3028,12 @@ function buildGround() {
       }
     }
     // mode markings
-    if (G.mode !== 'showdown') for (const team of [1, 2]) for (const sp of m.teamSpawns[team]) { x.fillStyle = team === 1 ? 'rgba(47,155,255,.4)' : 'rgba(255,70,89,.4)'; x.fillRect(A3(sp.x) - 6, A3(sp.y) - 1, 12, 6); }
+    if (!isSD(G.mode)) for (const team of [1, 2]) for (const sp of m.teamSpawns[team]) { x.fillStyle = team === 1 ? 'rgba(47,155,255,.4)' : 'rgba(255,70,89,.4)'; x.fillRect(A3(sp.x) - 6, A3(sp.y) - 1, 12, 6); }
     if (G.mode === 'brawlball') {
       x.fillStyle = 'rgba(255,255,255,.6)'; x.fillRect(16, H / 2, W - 32, 1);
       for (let a = 0; a < 64; a++) { const an = a / 64 * Math.PI * 2; x.fillRect(Math.round(W / 2 + Math.cos(an) * 34), Math.round(H / 2 + Math.sin(an) * 34), 1, 1); }
     }
-    if (G.mode === 'gemgrab') { const cx = A3(m.mine.x), cy = A3(m.mine.y); x.fillStyle = INK; x.fillRect(cx - 10, cy - 5, 20, 12); x.fillStyle = '#5a3a2a'; x.fillRect(cx - 9, cy - 4, 18, 10); x.fillStyle = '#2a1a14'; x.fillRect(cx - 6, cy - 2, 12, 6); }
+    if (G.mode === 'gemgrab' || G.mode === 'siege') { const cx = A3(m.mine.x), cy = A3(m.mine.y); x.fillStyle = INK; x.fillRect(cx - 10, cy - 5, 20, 12); x.fillStyle = '#5a3a2a'; x.fillRect(cx - 9, cy - 4, 18, 10); x.fillStyle = '#2a1a14'; x.fillRect(cx - 6, cy - 2, 12, 6); }
     x.fillStyle = INK; x.fillRect(-1, -1, W + 2, 1); x.fillRect(-1, H, W + 2, 1); x.fillRect(-1, 0, 1, H); x.fillRect(W, 0, 1, H);
   }));
   const dp = makeTile(2, 2, x => { x.fillStyle = '#ffffff'; x.fillRect(0, 0, 1, 1); x.fillRect(1, 1, 1, 1); });
@@ -2571,7 +3046,7 @@ const teamCol = b => b.isPlayer ? '#4fd145' : (b.team === G.player.team ? '#2f9b
 function pixRing(x, y, col) { lx.fillStyle = 'rgba(13,11,30,.35)'; lx.fillRect(x - 6, y + 4, 12, 3); lx.fillStyle = col; lx.fillRect(x - 5, y + 3, 10, 1); lx.fillRect(x - 7, y + 4, 2, 2); lx.fillRect(x + 5, y + 4, 2, 2); lx.fillRect(x - 5, y + 6, 10, 1); }
 function pixBar(x, y, w, frac, col, h = 2) { lx.fillStyle = INK; lx.fillRect(x - w / 2 - 1, y - 1, w + 2, h + 2); lx.fillStyle = '#3a2a4a'; lx.fillRect(x - w / 2, y, w, h); lx.fillStyle = col; lx.fillRect(x - w / 2, y, Math.round(w * clamp(frac, 0, 1)), h); }
 function drawChar(name, cx, cy, face, frame, o = {}) {
-  const S_ = getSpr(name), w = S_.w, h = S_.h, px = cx - (w >> 1), py = cy - h + 5;
+  const S_ = getSpr(name, o.skin || ''), w = S_.w, h = S_.h, px = cx - (w >> 1), py = cy - h + 5;
   const flip = face < 0;
   if (o.glow) { const g = silhouette(name, o.glow)[flip ? 'f' : 'n']; for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) lx.drawImage(g, px + dx, py + dy); }
   const img = o.flash ? (flip ? S_.whiteF : S_.white) : (flip ? S_.f : S_.n)[frame];
@@ -2626,9 +3101,9 @@ function render() {
   for (const it of list) {
     if (it.k === 0) { const px = it.tx * 16, py = it.ty * 16; if (it.tt === TILE.WALL) lx.drawImage(T_.wall, px, py - 4); else if (it.tt === TILE.CRATE) { lx.drawImage(T_.crate, px, py - 2); if (m.hp[it.ty * m.w + it.tx] < 800) { lx.fillStyle = INK; lx.fillRect(px + 5, py + 2, 1, 4); lx.fillRect(px + 6, py + 5, 2, 1); } } else { lx.drawImage(T_.box, px, py - 3); if (m.hp[it.ty * m.w + it.tx] < 1800) { lx.fillStyle = INK; lx.fillRect(px + 2, py, 1, 3); lx.fillRect(px + 12, py + 8, 2, 1); } } }
     else if (it.k === 1) drawBrawlerPix(it.b, t);
-    else if (it.k === 2) { const p = it.p, bob = Math.round(Math.sin(t * 4 + p.x) * 1.5); lx.fillStyle = 'rgba(13,11,30,.3)'; lx.fillRect(A3(p.x) - 3, A3(p.y) + 3, 6, 2); const S_ = getSpr(p.type === 'gem' ? 'gem' : 'cube'); lx.drawImage(S_.n[0], A3(p.x) - (S_.w >> 1), A3(p.y) - S_.h + bob); }
+    else if (it.k === 2) { const p = it.p, bob = Math.round(Math.sin(t * 4 + p.x) * 1.5); lx.fillStyle = 'rgba(13,11,30,.3)'; lx.fillRect(A3(p.x) - 3, A3(p.y) + 3, 6, 2); const S_ = getSpr(p.type === 'gem' ? 'gem' : p.type === 'bolt' ? 'bolt' : 'cube'); lx.drawImage(S_.n[0], A3(p.x) - (S_.w >> 1), A3(p.y) - S_.h + bob); }
     else if (it.k === 3) { const tr = it.tr; const nm = tr.team === G.player.team ? 'scrappy' : 'scrappyR'; pixRing(A3(tr.x), A3(tr.y) + 2, tr.team === G.player.team ? '#2f9bff' : '#ff4659'); drawChar(nm, A3(tr.x), A3(tr.y) + 3, Math.cos(tr.ang) < 0 ? -1 : 1, 0, { flash: tr.flash > 0 }); }
-    else if (it.k === 7) { const pt = it.pt; pixRing(A3(pt.x), A3(pt.y) + 2, pt.team === G.player.team ? '#2f9bff' : '#ff4659'); drawChar('bruce', A3(pt.x), A3(pt.y) + 2 - (pt.swipe > 0 ? 1 : 0), Math.cos(pt.aim) < 0 ? -1 : 1, pt.moving ? Math.floor(pt.walk) % 4 : 0, { flash: pt.flash > 0 }); }
+    else if (it.k === 7) { const pt = it.pt; pixRing(A3(pt.x), A3(pt.y) + 2, pt.team === G.player.team ? '#2f9bff' : '#ff4659'); drawChar(pt.id, A3(pt.x), A3(pt.y) + 2 - (pt.swipe > 0 ? 1 : 0), Math.cos(pt.aim) < 0 ? -1 : 1, pt.moving ? Math.floor(pt.walk) % 4 : 0, { flash: pt.flash > 0 }); }
     else if (it.k === 4) drawSafePix(it.s);
     else if (it.k === 5) { const B = G.ball; if (!B.holder || isVisibleToPlayer(B.holder)) { lx.fillStyle = 'rgba(13,11,30,.3)'; lx.fillRect(A3(B.x) - 3, A3(B.y) + 2, 6, 2); const S_ = getSpr('ball'); lx.drawImage(S_.n[0], A3(B.x) - 3, A3(B.y) - 5); } }
     else if (it.k === 6) { const g = it.g, k = g.life / g.max; lx.globalAlpha = k * 0.8; drawChar(g.id, A3(g.x), A3(g.y) - Math.round((1 - k) * 10), 1, 0, { flash: true }); lx.globalAlpha = 1; }
@@ -2650,7 +3125,7 @@ function render() {
     pixBar(bx, by, 16, b.hp / b.hpMax, teamCol(b), 2);
     if (b.shield > 0) { lx.fillStyle = '#9ab0ff'; lx.fillRect(bx - 8, by - 2, Math.max(1, Math.round(16 * b.shield / b.shieldMax)), 1); }
     if (b.isPlayer) for (let i = 0; i < 3; i++) { const f = i < b.ammo ? 1 : i === b.ammo ? b.reloadP : 0; lx.fillStyle = INK; lx.fillRect(bx - 8 + i * 6 - 1, by + 3, 6, 3); lx.fillStyle = '#3a2a4a'; lx.fillRect(bx - 8 + i * 6, by + 4, 4, 1); if (f > 0) { lx.fillStyle = i < b.ammo ? '#ff9a1f' : '#a86a2a'; lx.fillRect(bx - 8 + i * 6, by + 4, Math.max(1, Math.round(4 * f)), 1); } }
-    if (G.mode === 'showdown' && b.cubes > 0) { lx.drawImage(getSpr('cube').n[0], bx - 17, by - 3); }
+    if (isSD(G.mode) && b.cubes > 0) { lx.drawImage(getSpr('cube').n[0], bx - 17, by - 3); }
     if (G.mode === 'gemgrab' && b.gems > 0) lx.drawImage(getSpr('gem').n[0], bx - 3, by - 13);
     if (G.mode === 'bounty') lx.drawImage(getSpr('star').n[0], bx - 3, by - 12);
   }
@@ -2679,10 +3154,10 @@ function drawBrawlerPix(b, t) {
   if (b.leap) { lx.fillStyle = 'rgba(13,11,30,.35)'; lx.fillRect(A3(b.leap.tx) - 6, A3(b.leap.ty) + 4, 12, 3); }
   pixRing(x, y, teamCol(b));
   const frame = b.moving ? Math.floor(b.walk / 1.6) % 4 : 0, bob = b.moving && frame % 2 ? -1 : 0;
-  const alpha = b.inBush && ally && b.revealT <= 0 ? 0.55 : 1;
+  const alpha = b.invisT > 0 ? (ally ? 0.4 : 0.65) : b.inBush && ally && b.revealT <= 0 ? 0.55 : 1;
   lx.globalAlpha = alpha;
-  const glow = b.hyperT > 0 ? (Math.floor(t * 10) % 2 ? '#ff6af0' : '#c050ff') : b.charge >= 1 ? (Math.floor(t * 6) % 2 ? '#ffe040' : '#ffb000') : null;
-  drawChar(b.id, x, y + bob - z, Math.cos(b.aim) < -0.1 ? -1 : 1, frame, { flash: b.flash > 0, glow, recoil: b.atkAnim > 0.5 ? 1 : 0 });
+  const glow = b.guardT > 0 ? (Math.floor(t * 8) % 2 ? '#7aff6a' : '#3a9a2a') : b.hyperT > 0 ? (Math.floor(t * 10) % 2 ? '#ff6af0' : '#c050ff') : b.charge >= 1 ? (Math.floor(t * 6) % 2 ? '#ffe040' : '#ffb000') : null;
+  drawChar(b.id, x, y + bob - z, Math.cos(b.aim) < -0.1 ? -1 : 1, frame, { flash: b.flash > 0, glow, recoil: b.atkAnim > 0.5 ? 1 : 0, skin: b.skin });
   lx.globalAlpha = 1;
   if (b.shieldT > 0 && Math.floor(t * 10) % 2) { lx.fillStyle = 'rgba(191,230,255,.5)'; lx.fillRect(x - 9, y - 13 - z, 18, 18); }
   if (b.burnT > 0 && Math.floor(t * 8) % 2) { lx.fillStyle = '#ff8a1f'; lx.fillRect(x - 3, y - 15 - z, 2, 2); lx.fillRect(x + 2, y - 13 - z, 2, 2); }
@@ -2699,6 +3174,7 @@ function drawSafePix(s) {
   lx.fillStyle = col; lx.fillRect(x - 11 + j, y - 13, 22, 3);
   lx.fillStyle = dk; lx.fillRect(x - 11 + j, y + 1, 22, 7);
   lx.fillStyle = '#8a91aa'; lx.fillRect(x - 3 + j, y - 8, 6, 6); lx.fillStyle = INK; lx.fillRect(x + j, y - 7, 1, 3);
+  if (s.ike) { lx.fillStyle = INK; lx.fillRect(x - 4 + j, y - 20, 8, 7); lx.fillStyle = col; lx.fillRect(x - 3 + j, y - 19, 6, 5); lx.fillStyle = '#ffe040'; lx.fillRect(x - 1 + j, y - 18, 2, 2); }
   const dmg = 1 - s.hp / s.maxHp; lx.fillStyle = INK;
   if (dmg > 0.3) { lx.fillRect(x - 9 + j, y - 12, 1, 3); lx.fillRect(x - 8 + j, y - 9, 1, 2); }
   if (dmg > 0.6) { lx.fillRect(x + 7 + j, y - 11, 1, 4); lx.fillRect(x + 6 + j, y - 7, 1, 2); }
@@ -2798,7 +3274,20 @@ function drawHUD(c) {
   else if (p.alive && p.hp < p.hpMax * 0.3 && Math.floor(G.time * 4) % 2) { c.fillStyle = 'rgba(255,30,30,.35)'; c.fillRect(0, 0, VW, 6); c.fillRect(0, VH - 6, VW, 6); c.fillRect(0, 0, 6, VH); c.fillRect(VW - 6, 0, 6, VH); }
   const m = G.mode, timer = G.timeLeft !== Infinity ? mmss(G.timeLeft) : '';
   const twoSide = (l, r, lc, rc) => { panel(c, cx - 150, top, 300, 50); txt(c, l, cx - 95, top + 26, 18, lc); txt(c, r, cx + 95, top + 26, 18, rc); if (timer) txt(c, timer, cx, top + 26, 12, '#fff'); };
-  if (m === 'showdown') {
+  if (m === 'duo') {
+    const teams = new Set(G.brawlers.filter(b => b.alive).map(b => b.team)).size;
+    panel(c, cx - 110, top, 220, 50); txt(c, 'TEAMS LEFT', cx, top + 15, 9, '#c9d2ff'); txt(c, teams, cx, top + 35, 16, '#fff');
+    if (G.poison.inset > 0) txt(c, 'POISON IS CLOSING IN!', cx, top + 70, 9, '#d6a8ff');
+  } else if (m === 'wipeout') {
+    twoSide(G.kos[1], G.kos[2], '#7cc4ff', '#ff8a96'); txt(c, 'FIRST TO 10 KOs', cx, top + 66, 8, '#fff');
+  } else if (m === 'siege') {
+    const a = G.safes.find(s => s.team === 1), b = G.safes.find(s => s.team === 2);
+    panel(c, cx - 200, top, 400, 62); txt(c, 'YOUR IKE', cx - 130, top + 12, 8, '#bfe2ff'); hudBar(c, cx - 185, top + 22, 110, 9, a.hp / a.maxHp, '#2f9bff');
+    txt(c, 'ENEMY IKE', cx + 130, top + 12, 8, '#ffc2c8'); hudBar(c, cx + 75, top + 22, 110, 9, b.hp / b.maxHp, '#ff4659');
+    txt(c, timer, cx, top + 20, 11, '#fff');
+    drawSpr(c, 'bolt', cx - 150, top + 46, 2); txt(c, G.bolts[1], cx - 128, top + 47, 10, '#7cc4ff', 'left'); drawSpr(c, 'bolt', cx + 150, top + 46, 2); txt(c, G.bolts[2], cx + 128, top + 47, 10, '#ff8a96', 'right');
+    txt(c, 'ROBOT IN ' + Math.ceil(G.siegeT), cx, top + 46, 8, '#ffe040');
+  } else if (m === 'showdown') {
     panel(c, cx - 110, top, 220, 50); txt(c, 'BRAWLERS LEFT', cx, top + 15, 9, '#c9d2ff'); txt(c, G.brawlers.filter(b => b.alive).length, cx, top + 35, 16, '#fff');
     if (G.poison.inset > 0) txt(c, 'POISON IS CLOSING IN!', cx, top + 70, 9, '#d6a8ff');
     else if (G.poison.t > G.poison.delay - 6) txt(c, `POISON IN ${Math.ceil(G.poison.delay - G.poison.t)}`, cx, top + 70, 9, '#d6a8ff');
@@ -2838,11 +3327,12 @@ function drawHUD(c) {
     c.globalAlpha = 1; fy += 30;
   }
   if (G.ball) pointer(c, G.ball.x, G.ball.y, '#ffffff');
-  if (G.mode === 'heist') { const es = G.safes.find(s => s.team === 2); if (es.hp > 0) pointer(c, es.x, es.y, '#ff4659'); }
+  if (G.mode === 'heist' || G.mode === 'siege') { const es = G.safes.find(s => s.team === 2); if (es.hp > 0) pointer(c, es.x, es.y, '#ff4659'); }
+  for (const pt of G.pets) if (pt.robot) pointer(c, pt.x, pt.y, pt.team === 1 ? '#2f9bff' : '#ff4659');
   if (G.mode === 'gemgrab') pointer(c, G.map.mine.x, G.map.mine.y, '#c063ff');
   if (G.zone) pointer(c, G.zone.x, G.zone.y, '#ffd23a');
   if (showTouch()) drawTouch(c); else drawDesktopHud(c);
-  if (!p.alive && G.mode !== 'showdown' && !G.over && p.respawnT > 0) { panel(c, cx - 130, VH / 2 - 36, 260, 72); txt(c, 'RESPAWNING IN', cx, VH / 2 - 12, 10, '#c9d2ff'); txt(c, Math.ceil(p.respawnT), cx, VH / 2 + 14, 18, '#fff'); }
+  if (!p.alive && !G.over && p.respawnT > 0) { panel(c, cx - 130, VH / 2 - 36, 260, 72); txt(c, 'RESPAWNING IN', cx, VH / 2 - 12, 10, '#c9d2ff'); txt(c, Math.ceil(p.respawnT), cx, VH / 2 + 14, 18, '#fff'); }
   if (!p.alive && G.mode === 'knockout' && !G.over && G.goalPause <= 0) { panel(c, cx - 150, VH / 2 - 26, 300, 52); txt(c, 'KNOCKED OUT!', cx, VH / 2 - 6, 12, '#ff8a96'); txt(c, 'WATCH YOUR TEAM', cx, VH / 2 + 14, 8, '#c9d2ff'); }
   if (G.intro > 0) { const n = Math.ceil(G.intro / 0.6); const s = n >= 4 ? MODES[G.mode].name.toUpperCase() : n > 0 ? String(n) : ''; if (s) txt(c, s, cx, VH * 0.4, n >= 4 ? 26 : 48, '#ffe040', 'center', 8); }
   else if (G.intro > -0.7 && !G.over && G.goalPause <= 0) txt(c, 'BRAWL!', cx, VH * 0.4, 44, '#ffffff', 'center', 8);
@@ -2901,7 +3391,7 @@ function drawPortrait(cv, id, opts = {}) {
   const band = Math.max(4, Math.round(h / 16));
   for (let y = 0; y < h * 0.7; y += band) { c.fillStyle = (y / band) % 2 ? d.bg : shade(d.bg, 1.1); c.fillRect(0, y, w, band); }
   c.fillStyle = 'rgba(0,0,0,.25)'; for (let y = 0; y < h; y += 4) c.fillRect(0, y, w, 1);
-  const S_ = getSpr(id), sc = Math.max(1, Math.floor(Math.min(w / (S_.w + 4), h / (S_.h + 4)) * (opts.scale ? Math.min(1, opts.scale / 2.3) : 1)));
+  const S_ = getSpr(id, opts.skin || ''), sc = Math.max(1, Math.floor(Math.min(w / (S_.w + 4), h / (S_.h + 4)) * (opts.scale ? Math.min(1, opts.scale / 2.3) : 1)));
   const flip = opts.ang !== undefined && opts.ang > 1.5;
   const px = Math.round((w - S_.w * sc) / 2), py = Math.round(h - S_.h * sc - sc * 2);
   c.fillStyle = 'rgba(13,11,30,.4)'; c.fillRect(px + 2 * sc, h - 3 * sc, (S_.w - 4) * sc, 2 * sc);
@@ -2970,7 +3460,7 @@ function renderFeatured(dt) {
   const sc = Math.max(2, Math.min(Math.round(12 * DPR), Math.floor(Math.min(h / 30, w / 26)))), cx = Math.round(w / 2), base = Math.round(h * 0.74);
   x.fillStyle = INK; x.fillRect(cx - 11 * sc, base, 22 * sc, 4 * sc); x.fillStyle = '#1e3aa8'; x.fillRect(cx - 10 * sc, base + sc, 20 * sc, 2 * sc); x.fillStyle = '#5d9bff'; x.fillRect(cx - 10 * sc, base + sc, 20 * sc, Math.max(1, sc / 2));
   for (let i = 0; i < 6; i++) { const a = feat.t * 0.8 + i * 1.05; if (Math.floor(feat.t * 4 + i) % 3 === 0) continue; x.fillStyle = '#fff6b0'; x.fillRect(Math.round(cx + Math.cos(a) * 12 * sc), Math.round(base - 9 * sc + Math.sin(a) * 6 * sc), sc, sc); }
-  const S_ = getSpr(S.selected), frame = Math.floor(feat.t * 3) % 4, bob = frame % 2 ? -sc : 0, flip = Math.sin(feat.t * 0.5) < -0.6;
+  const S_ = getSpr(S.selected, S.brawlers[S.selected].skin || ''), frame = Math.floor(feat.t * 3) % 4, bob = frame % 2 ? -sc : 0, flip = Math.sin(feat.t * 0.5) < -0.6;
   const px = cx - S_.w * sc / 2, py = base - S_.h * sc + sc + bob;
   x.drawImage((flip ? S_.f : S_.n)[frame], px, py, S_.w * sc, S_.h * sc);
   if (S_.weapon) { const W = S_.weapon, r = feat.atk > 0.5 ? sc : 0; x.drawImage(flip ? W.f : W.n, flip ? px + (S_.w - W.ox - W.w) * sc + r : px + W.ox * sc - r, py + W.oy * sc, W.w * sc, W.n.height * sc); if (feat.atk > 0.7) { x.fillStyle = '#fff3a6'; x.fillRect(flip ? px + (S_.w - W.ox - W.w) * sc - 3 * sc : px + (W.ox + W.w) * sc, py + W.oy * sc, 2 * sc, 2 * sc); } }
@@ -3003,7 +3493,7 @@ function renderBrawlers() {
     const st = S.brawlers[d.id];
     const el = document.createElement('button'); el.className = 'card' + (st.owned ? '' : ' locked') + (S.selected === d.id ? ' sel' : '');
     el.innerHTML = `<canvas width="240" height="240"></canvas>${st.owned ? '' : `<span class="lock">${unlockText(d.id)}</span>`}<span class="cinfo"><span class="cname stroke-sm">${d.name}</span><span class="csub"><span style="color:${RARITY_COL[d.rarity]}">${d.rarity}</span><span>Rank ${brawlerRank(st.trophies)}</span></span><span class="csub"><span>${d.role}</span><span>${st.owned ? 'Power ' + st.level : 'Locked'}</span></span><span class="csub"><span class="trophy-line">${icon('trophy')} ${st.trophies}</span>${S.selected === d.id ? '<span>Selected</span>' : ''}</span></span>`;
-    drawPortrait(el.querySelector('canvas'), d.id);
+    drawPortrait(el.querySelector('canvas'), d.id, { skin: st.owned ? st.skin : '' });
     el.onclick = () => { App.detailId = d.id; show('detail'); };
     g.appendChild(el);
   }
@@ -3046,11 +3536,12 @@ function renderDetail() {
       <div class="ability"><span class="aic" style="background:#ff4659">A</span><div><b>${d.attack.name}</b><p>${d.attack.desc} <br><span style="color:#8a6b3a">Damage ${atkNumbers(d.attack, m)}</span></p></div></div>
       <div class="ability"><span class="aic" style="background:#ffc824">S</span><div><b>Super: ${d.super.name}</b><p>${d.super.desc} <br><span style="color:#8a6b3a">Damage ${atkNumbers(d.super, m)}</span></p></div></div>
       ${[['G', '#4fd145', 'Gadget', d.gadget, GADGET_LVL], ['★', '#ffe040', 'Star Power', d.star, STAR_LVL], ['H', '#c050ff', 'Hypercharge', d.hyper, HYPER_LVL]].map(([ic, col, label, ab, lvl]) => `<div class="ability" style="opacity:${st.level >= lvl ? 1 : 0.55}"><span class="aic" style="background:${col}">${ic}</span><div><b>${label}: ${ab.name}</b><p>${ab.desc} <br><span style="color:#8a6b3a">${st.level >= lvl ? 'Unlocked' : 'Unlocks at Power ' + lvl}</span></p></div></div>`).join('')}
+      <div id="skinBox" style="margin-top:14px"></div>
       <div id="gearBox" style="margin-top:14px"></div>
       <div class="row" style="margin-top:14px" id="dBtns"></div>
     </div>`;
-  drawPortrait(body.querySelector('canvas'), id, { scale: 2.5 });
-  renderGears(id, st);
+  drawPortrait(body.querySelector('canvas'), id, { scale: 2.5, skin: st.skin });
+  renderGears(id, st); renderSkins(id, st);
   const btns = $('#dBtns');
   const mk = (label, cls, fn, dis) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.innerHTML = label; b.onclick = fn; if (dis) b.disabled = true; btns.appendChild(b); return b; };
   if (st.owned) {
@@ -3065,6 +3556,23 @@ function renderDetail() {
     if (u.coins) mk(`Unlock · ${icon('coin')} ${u.coins}`, 'green', () => buyBrawler(id, 'coins', u.coins));
     if (u.gems) mk(`Unlock · ${icon('gem')} ${u.gems}`, 'purple', () => buyBrawler(id, 'gems', u.gems));
     const info = document.createElement('p'); info.style.cssText = 'width:100%;margin:0;color:#8a6b3a'; info.textContent = [u.road ? `Free at ${u.road} total trophies on the Trophy Road.` : '', u.pass ? `Free at Brawl Pass tier ${u.pass}.` : ''].join(' '); btns.appendChild(info);
+  }
+}
+function renderSkins(id, st) {
+  st.skins = st.skins || []; const box = $('#skinBox');
+  box.innerHTML = `<b style="font-family:var(--display);font-size:12px;color:var(--ink)">Skins</b><div id="skinList" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"></div>`;
+  for (const sk of [{ id: '', name: 'Classic', price: null }, ...SKINS]) {
+    const owned = !sk.id || st.skins.includes(sk.id), on = (st.skin || '') === sk.id;
+    const el = document.createElement('div'); el.className = 'stat'; el.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;width:116px';
+    el.innerHTML = `<canvas width="96" height="96" style="width:72px;height:72px"></canvas><b style="font-size:9px">${sk.name}</b>`;
+    drawPortrait(el.querySelector('canvas'), id, { skin: sk.id });
+    const b = document.createElement('button'); b.className = 'btn small ' + (on ? 'grey' : owned ? 'green' : 'purple'); b.style.fontSize = '8px';
+    if (!st.owned) { b.textContent = 'Locked'; b.disabled = true; }
+    else if (on) { b.textContent = 'Using'; b.disabled = true; }
+    else if (owned) { b.textContent = 'Use'; b.onclick = () => { st.skin = sk.id; save(); renderDetail(); }; }
+    else { const cur = sk.price.gems ? 'gems' : 'coins', price = sk.price[cur]; b.innerHTML = `${icon(cur === 'gems' ? 'gem' : 'coin')} ${price}`;
+      b.onclick = () => { if (S[cur] < price) { Sound.play('error'); toast(`You need ${price - S[cur]} more ${cur}.`); return; } S[cur] -= price; st.skins.push(sk.id); st.skin = sk.id; save(); Sound.play('buy'); toast(`${sk.name} ${BR[id].name} unlocked!`); updateWallet(); renderDetail(); }; }
+    el.appendChild(b); $('#skinList').appendChild(el);
   }
 }
 function renderGears(id, st) {
@@ -3241,13 +3749,14 @@ function quitMatch() {
   $('#ov-pause').hidden = true;
   if (!G) return show('menu');
   G.paused = false; G.quit = true;
-  const rank = G.mode === 'showdown' ? G.brawlers.filter(b => b.alive).length : 0;
+  const rank = G.mode === 'showdown' ? G.brawlers.filter(b => b.alive).length : G.mode === 'duo' ? new Set(G.brawlers.filter(b => b.alive).map(b => b.team)).size : 0;
   endMatch('lose', rank); G.resultShown = true; finishMatch();
 }
 function finishMatch() {
   const g = G, res = g.over.result, pid = g.playerBrawler, bs = S.brawlers[pid];
   let tro, coins, xp; const rank = g.over.rank;
-  if (g.mode === 'showdown') { const i = clamp(rank, 1, 6) - 1; tro = [10, 7, 4, 1, -2, -4][i]; coins = [45, 35, 25, 15, 10, 5][i]; xp = [50, 40, 30, 20, 15, 10][i]; }
+  if (g.mode === 'duo') { const i = clamp(rank, 1, 3) - 1; tro = [9, 3, -3][i]; coins = [45, 25, 10][i]; xp = [50, 30, 15][i]; }
+  else if (g.mode === 'showdown') { const i = clamp(rank, 1, 6) - 1; tro = [10, 7, 4, 1, -2, -4][i]; coins = [45, 35, 25, 15, 10, 5][i]; xp = [50, 40, 30, 20, 15, 10][i]; }
   else { tro = res === 'win' ? 8 : res === 'draw' ? 0 : -4; coins = res === 'win' ? 40 : res === 'draw' ? 20 : 10; xp = res === 'win' ? 40 : res === 'draw' ? 25 : 15; }
   if (g.quit) { coins = 0; xp = 0; tro = Math.min(tro, -2); }
   coins += g.quit ? 0 : g.stats.kills * 3;
@@ -3256,14 +3765,14 @@ function finishMatch() {
   const win = res === 'win', st = S.stats, gs = g.stats;
   st.matches++; if (win) { st.wins++; st.modeWins[g.mode] = (st.modeWins[g.mode] || 0) + 1; }
   st.kills += gs.kills; st.damage += Math.round(gs.damage); st.goals += gs.goals; st.gems += gs.gems; st.supers += gs.supers; st.gadgets += gs.gadgets; st.stars += gs.stars;
-  const add = { wins: win ? 1 : 0, kills: gs.kills, damage: Math.round(gs.damage), supers: gs.supers, gems: gs.gems, goals: gs.goals, safeDmg: Math.round(gs.safeDmg), cubes: gs.cubes, matches: 1, gadgets: gs.gadgets, stars: gs.stars, zone: Math.round(gs.zone), rounds: gs.rounds };
+  const add = { wins: win ? 1 : 0, kills: gs.kills, damage: Math.round(gs.damage), supers: gs.supers, gems: gs.gems, goals: gs.goals, safeDmg: Math.round(gs.safeDmg), cubes: gs.cubes, matches: 1, gadgets: gs.gadgets, stars: gs.stars, zone: Math.round(gs.zone), rounds: gs.rounds, bolts: gs.bolts };
   const finished = [];
   for (const q of S.quests) { const was = q.p >= q.n; q.p = Math.min(q.n, q.p + (add[q.k] || 0)); if (!was && q.p >= q.n) finished.push(questText(q)); }
   save();
-  const banner = g.mode === 'showdown' ? (rank === 1 ? 'VICTORY!' : `RANK #${rank}`) : res === 'win' ? 'VICTORY!' : res === 'lose' ? 'DEFEAT' : 'DRAW';
-  const sub = g.quit ? 'You left the match' : g.mode === 'showdown' ? (win ? `${rank === 1 ? 'Last brawler standing!' : 'Top 2 finish. That counts as a win!'}` : 'Knocked out. Better luck next time!') :
-    { gemgrab: () => `Gems: ${teamGems(1)} vs ${teamGems(2)}`, brawlball: () => `Score: ${g.score[1]} - ${g.score[2]}`, heist: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `Safes: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; }, bounty: () => `Stars: ${g.stars[1]} vs ${g.stars[2]}`, hotzone: () => `Zone: ${Math.floor(g.zone.p[1])}% vs ${Math.floor(g.zone.p[2])}%`, knockout: () => `Rounds: ${g.rounds[1]} - ${g.rounds[2]}` }[g.mode]();
-  const extra = { showdown: `Cubes ${gs.cubes}`, gemgrab: `Gems ${gs.gems}`, brawlball: `Goals ${gs.goals}`, heist: `Safe damage ${fmt(gs.safeDmg)}`, bounty: `Stars ${gs.stars}`, hotzone: `Zone time ${Math.round(gs.zone)}s`, knockout: `Rounds won ${gs.rounds}` }[g.mode];
+  const banner = isSD(g.mode) ? (rank === 1 ? 'VICTORY!' : `RANK #${rank}`) : res === 'win' ? 'VICTORY!' : res === 'lose' ? 'DEFEAT' : 'DRAW';
+  const sub = g.quit ? 'You left the match' : g.mode === 'duo' ? (rank === 1 ? 'Last team standing!' : `Your team finished #${rank} of 3.`) : g.mode === 'showdown' ? (win ? `${rank === 1 ? 'Last brawler standing!' : 'Top 2 finish. That counts as a win!'}` : 'Knocked out. Better luck next time!') :
+    { gemgrab: () => `Gems: ${teamGems(1)} vs ${teamGems(2)}`, brawlball: () => `Score: ${g.score[1]} - ${g.score[2]}`, heist: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `Safes: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; }, bounty: () => `Stars: ${g.stars[1]} vs ${g.stars[2]}`, hotzone: () => `Zone: ${Math.floor(g.zone.p[1])}% vs ${Math.floor(g.zone.p[2])}%`, knockout: () => `Rounds: ${g.rounds[1]} - ${g.rounds[2]}`, wipeout: () => `KOs: ${g.kos[1]} vs ${g.kos[2]}`, siege: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `IKE: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; } }[g.mode]();
+  const extra = { showdown: `Cubes ${gs.cubes}`, duo: `Cubes ${gs.cubes}`, wipeout: `KOs ${gs.kills}`, siege: `Bolts ${gs.bolts}`, gemgrab: `Gems ${gs.gems}`, brawlball: `Goals ${gs.goals}`, heist: `Safe damage ${fmt(gs.safeDmg)}`, bounty: `Stars ${gs.stars}`, hotzone: `Zone time ${Math.round(gs.zone)}s`, knockout: `Rounds won ${gs.rounds}` }[g.mode];
   const cls = win ? 'win' : res === 'draw' ? 'draw' : 'lose';
   $('#resultBody').innerHTML = `
     <p class="result-banner stroke ${cls}">${banner}</p>
