@@ -371,6 +371,7 @@ const OT = {
   pile: { r: 15, spr: 'pile' },
 };
 
+let houseList = [], shaking = [];
 let seed = 0, tiles, objs = [], ogrid, vill, spots = [], springs = [], villagers = [];
 let mapBase, mapFog, mapFogCtx, explored;
 
@@ -559,6 +560,7 @@ function genWorld(sd) {
     addObj('house', vill.x + Math.cos(a) * T * 4.2, vill.y + Math.sin(a) * T * 3.6);
   }
   addObj('pile', vill.x, vill.y);
+  houseList = objs.filter(o => o.type === 'house');
   villagers = [];
   for (let k = 0; k < 4; k++) {
     const a = k / 4 * Math.PI * 2 + 1.3, x = vill.x + Math.cos(a) * T * 2.3, y = vill.y + Math.sin(a) * T * 2.1;
@@ -939,7 +941,17 @@ function updateAudio(dt) {
   }
   windGain.gain.setTargetAtTime(Math.max(0, windAmt), now, 0.5);
   windFilt.frequency.setTargetAtTime(380 + 300 * Math.sin(realT * 0.3) + 200 * Math.sin(realT * 0.71), now, 0.4);
-  droneGain.gain.setTargetAtTime(night * 0.05, now, 1);
+  // big boss music while a guardian or the Frost Spirit is fighting you
+  const bossOn = state === 'play' && (arena || enemies.some(e => e.type === 'boss' && e.hp > 0 && dist(e.x, e.y, player.x, player.y) < 650));
+  droneGain.gain.setTargetAtTime(bossOn ? 0 : night * 0.05, now, 1);
+  if (bossOn) {
+    if (beatNext < now) beatNext = now + 0.05;
+    const fast = arena && arena.spirit.phase === 3 ? 0.17 : arena ? 0.19 : 0.21;
+    while (beatNext < now + 0.2) { bossStep(beatNext, beatStep++); beatNext += fast; }
+    nextNote = now + 2.5;
+    return;
+  }
+  beatStep = 0;
   if (now > nextNote - 0.1) {
     if (night > 0.5) {
       const n = NIGHT_NOTES[(Math.random() * NIGHT_NOTES.length) | 0];
@@ -958,6 +970,22 @@ function updateAudio(dt) {
     const d = dist(player.x, player.y, camp.fx, camp.fy);
     if (d < 260 && Math.random() < dt * 7) sfx.crackle(1 - d / 260);
   }
+}
+let beatNext = 0, beatStep = 0;
+const BOSS_BASS = [73.42, 73.42, 87.31, 73.42, 65.41, 65.41, 77.78, 82.41];
+const BOSS_LEAD = [293.66, 349.23, 440, 392, 349.23, 329.63, 293.66, 261.63];
+function bossStep(t, i) {
+  // a pulsing bass line, drums, and a piano melody on top
+  const bass = BOSS_BASS[(i >> 1) % BOSS_BASS.length];
+  const o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain();
+  o.type = 'sawtooth'; o.frequency.value = bass;
+  f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(220, t + 0.16);
+  g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  o.connect(f); f.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.2);
+  if (i % 4 === 0) tone(120, 40, 0.18, 0.35, 'sine', t);
+  if (i % 8 === 4) noise(0.12, 1800, 0.22, 'bandpass', t);
+  if (i % 2 === 1) noise(0.03, 7000, 0.05, 'highpass', t);
+  if (i % 4 === 0) pianoNote(BOSS_LEAD[(i >> 2) % BOSS_LEAD.length] * (arena && arena.spirit.phase > 1 ? 1.5 : 1), t, 0.1, 1.2);
 }
 const windNow = () => 0.5 + 0.35 * Math.sin(gameTime / 37) + 0.15 * Math.sin(gameTime / 11.3);
 
@@ -1162,7 +1190,7 @@ function singeRobe() {
 function gather(o) {
   const d = OT[o.type];
   if (o.stock <= 0) return;
-  o.stock--; o.shake = 0.3;
+  o.stock--; o.shake = 0.3; shaking.push(o);
   const amt = d.amt || 1;
   inv[d.give] += amt;
   let msg = `+${amt} ${ITEMS[d.give].name.toLowerCase()}`;
@@ -1579,7 +1607,8 @@ function gameUpdate(dt) {
   for (const tt of toasts) tt.t -= dt;
   toasts = toasts.filter(tt => tt.t > 0);
   if (speech) { speech.t -= dt; if (speech.t <= 0) speech = null; }
-  for (const o of objs) if (o.shake > 0) o.shake -= dt;
+  for (const o of shaking) o.shake -= dt;
+  shaking = shaking.filter(o => o.shake > 0);
   if (helpT > 0) helpT -= dt;
   updateSnow(dt, player.moving ? mx * speed : 0, player.moving ? my * speed : 0);
 
@@ -3415,7 +3444,7 @@ function drawWorld() {
     if (camp && camp.fuel > 0) lights.push([camp.fx, camp.fy - 10, (70 + camp.fuel * 1.3 + camp.level * 20) * flick]);
     if (camp && camp.level > 0) lights.push([camp.tx, camp.ty - 20, 55]);
     lights.push([vill.x, vill.y - 8, 150 * flick]);
-    for (const h of objs) if (h.type === 'house' && Math.abs(h.x - cam.x) < hw + 100 && Math.abs(h.y - cam.y) < hh + 100) lights.push([h.x, h.y - 18, 50]);
+    for (const h of houseList) if (Math.abs(h.x - cam.x) < hw + 100 && Math.abs(h.y - cam.y) < hh + 100) lights.push([h.x, h.y - 18, 50]);
     lights.push([player.x, player.y - 16, player.torch > 0 ? 140 * flick : piecesN() >= 3 ? 105 : 52]);
     if (flags.castle) lights.push([castle.x, castle.y - 40, 110]);
     for (const sh of shrines) if (!(flags.taken || [])[sh.i]) lights.push([sh.x, sh.y - 30, 60]);
