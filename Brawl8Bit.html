@@ -90,7 +90,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:
 .tile:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
 .tile .ico{width:34px;height:34px}
 .tile.t-shop{background:#ff7a2f} .tile.t-br{background:#24b6ff} .tile.t-q{background:#4fd145}
-.tile.t-pass{background:#b45bff} .tile.t-road{background:#ffb12a}
+.tile.t-pass{background:#b45bff} .tile.t-road{background:#ffb12a} .tile.t-ranked{background:#e04a6a} .tile.t-club{background:#3a8ad8}
 .badge{position:absolute;top:-8px;right:-8px;background:var(--red);border:3px solid var(--ink);border-radius:999px;
   min-width:28px;height:28px;display:grid;place-items:center;font-size:15px;padding:0 6px}
 .stage{grid-area:stage;position:relative;min-height:0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
@@ -275,6 +275,11 @@ input[type=text]{font-size:13px}
 .bar>i{background:repeating-linear-gradient(90deg,#ffe36b 0 6px,#ffb200 6px 8px)}
 .bar.green>i{background:repeating-linear-gradient(90deg,#9dff6b 0 6px,#3fbf2a 6px 8px)}
 .bar.purple>i{background:repeating-linear-gradient(90deg,#e6a2ff 0 6px,#a23cf0 6px 8px)}
+
+.chat{background:#1a1a3a;border:4px solid var(--ink);height:300px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;touch-action:pan-y}
+.msg{font-size:9px;line-height:1.7;color:#fff;max-width:85%}
+.msg b{color:#ffe040} .msg.me{align-self:flex-end;text-align:right} .msg.me b{color:#7cc4ff}
+.rankbadge{width:120px;height:120px;border:4px solid var(--ink);display:grid;place-items:center;font-family:var(--display);font-size:14px;text-align:center;color:#1a1a3a;box-shadow:0 4px 0 var(--ink)}
 </style>
 </head>
 <body>
@@ -304,6 +309,8 @@ input[type=text]{font-size:13px}
       <button class="tile t-br" data-go="brawlers"><span class="ico" data-icon="brawlers"></span>Brawlers</button>
       <button class="tile t-q" data-go="quests"><span class="ico" data-icon="quest"></span>Quests<span class="badge" id="questBadge" hidden>0</span></button>
       <button class="tile t-pass" data-go="pass"><span class="ico" data-icon="pass"></span>Brawl Pass<span class="badge" id="passBadge" hidden>0</span></button>
+      <button class="tile t-ranked" data-go="ranked"><span class="ico" data-icon="trophy"></span>Ranked</button>
+      <button class="tile t-club" data-go="club"><span class="ico" data-icon="brawlers"></span>Club<span class="badge" id="clubBadge" hidden>!</span></button>
       <button class="tile t-road" data-go="road"><span class="ico" data-icon="trophy"></span>Trophy Road<span class="badge" id="roadBadge" hidden>0</span></button>
     </nav>
     <section class="stage">
@@ -363,6 +370,16 @@ input[type=text]{font-size:13px}
   <div class="scroll"><div class="wrap" id="passBody"></div></div>
 </div>
 
+<!-- RANKED -->
+<div id="scr-ranked" class="screen sub" hidden>
+  <header class="subbar"><button class="iconbtn back" aria-label="Back" data-icon="back"></button><h2 class="stroke">Ranked</h2><div class="wallet mini"></div></header>
+  <div class="scroll"><div class="wrap" id="rankedBody"></div></div>
+</div>
+<!-- CLUB -->
+<div id="scr-club" class="screen sub" hidden>
+  <header class="subbar"><button class="iconbtn back" aria-label="Back" data-icon="back"></button><h2 class="stroke">Club</h2><div class="wallet mini"></div></header>
+  <div class="scroll"><div class="wrap" id="clubBody"></div></div>
+</div>
 <!-- PROFILE -->
 <div id="scr-profile" class="screen sub" hidden>
   <header class="subbar"><button class="iconbtn back" aria-label="Back" data-icon="back"></button><h2 class="stroke">Profile</h2><div class="wallet mini"></div></header>
@@ -578,11 +595,12 @@ let S = null;
 function defaultSave() {
   return {
     v: 1, name: 'Player', avatar: 0, coins: 150, gems: 20, selected: 'shelly', mode: 'showdown',
-    brawlers: Object.fromEntries(['shelly', 'nita', 'colt', 'bull', 'primo', 'poco', 'brock', 'jessie', 'dynamike', 'spike', 'rosa', 'piper', 'frank', 'mortis', 'leon', 'crow'].map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [], skins: [], skin: '' }])),
+    brawlers: Object.fromEntries(['shelly', 'nita', 'colt', 'bull', 'primo', 'poco', 'brock', 'jessie', 'dynamike', 'spike', 'rosa', 'piper', 'frank', 'mortis', 'leon', 'crow', 'edgar', 'bibi', 'max', 'tick', 'barley', 'sprout', 'eightbit', 'emz', 'gene'].map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [], skins: [], skin: '', mastery: 0 }])),
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
     stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto' },
-    lastGift: '', boxesOpened: 0, seenHelp: false,
+    lastGift: '', boxesOpened: 0, seenHelp: false, ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
+    club: { name: 'Pixel Pals', members: [], chat: [], claimed: [] },
   };
 }
 function deepMerge(base, over) {
@@ -719,12 +737,76 @@ const BR_LIST = [
     gadget: { name: 'Defense Booster', desc: 'Takes 40% less damage for 3 seconds.' },
     star: { name: 'Extra Toxic', desc: 'Poison deals 50% more damage.' },
     hyper: { name: 'Toxic Swoop', desc: 'Hypercharged Swoop throws 24 daggers.' } },
+  { id: 'edgar', name: 'Edgar', rarity: 'Epic', role: 'Assassin', bg: '#4a2a3a', bg2: '#1a0a1a', hp: 3600, speed: 180, reload: 0.9, superCost: 2600,
+    blurb: 'Edgar jumps over walls and heals himself with every punch.',
+    attack: { kind: 'punch', name: 'Fisticuffs', desc: 'Two quick punches. Each hit heals Edgar for 25% of the damage.', shots: 2, interval: 0.12, range: 2.3, dmg: 520, speed: 900, r: 14, color: '#ff5a6a', drain: 0.25, sfx: 'punch' },
+    super: { kind: 'leap', name: 'Vault', desc: 'Jumps a long way over walls and lands on enemies.', range: 7, radius: 1.2, dmg: 300, knock: 100, dur: 0.6, sfx: 'super' },
+    gadget: { name: 'Let’s Fly', desc: 'Instantly charges half of his Super.' },
+    star: { name: 'Hard Landing', desc: 'Vault deals 900 extra damage where he lands.' },
+    hyper: { name: 'Sky High', desc: 'Hypercharged Vault jumps farther and hits a bigger area.' } },
+  { id: 'bibi', name: 'Bibi', rarity: 'Epic', role: 'Tank', bg: '#ff7ab8', bg2: '#8a2a5a', hp: 4600, speed: 180, reload: 1.2, superCost: 3000,
+    blurb: 'Bibi swings her bat for huge hits and spits a bubble that bounces across the map.',
+    attack: { kind: 'punch', name: 'Batting Stance', desc: 'A wide swing of her bat that knocks enemies back.', shots: 1, interval: 0.1, range: 2.8, dmg: 1200, speed: 900, r: 28, color: '#ffd36a', knock: 180, sfx: 'punch' },
+    super: { kind: 'wave', name: 'Spitball', desc: 'A big bubble of gum that rolls through every enemy in its path.', range: 11, dmg: 1000, speed: 520, r: 18, color: '#ff7ab8', sfx: 'super' },
+    gadget: { name: 'Vitamin Booster', desc: 'Instantly heals 1,200 health.' },
+    star: { name: 'Home Run', desc: 'Her bat knocks enemies twice as far.' },
+    hyper: { name: 'Bubble Trouble', desc: 'Hypercharged Spitball is bigger and stronger.' } },
+  { id: 'max', name: 'Max', rarity: 'Mythic', role: 'Support', bg: '#ffc020', bg2: '#c04a10', hp: 3300, speed: 200, reload: 1.3, superCost: 3400,
+    blurb: 'Max is the fastest brawler of all, and her Super makes the whole team zoom.',
+    attack: { kind: 'burst', name: 'Pew Pew Pew!', desc: 'Fires 4 quick shots in a line.', shots: 4, interval: 0.08, range: 8.5, dmg: 330, speed: 1000, r: 6, jitter: 0.03, color: '#ffe066', sfx: 'pistol' },
+    super: { kind: 'teamboost', name: 'Let’s Go!', desc: 'Max and every teammate nearby run 50% faster for 4 seconds.', radius: 6, dur: 4, sfx: 'super' },
+    gadget: { name: 'Phase Shifter', desc: 'Cannot be hurt for 1.2 seconds.' },
+    star: { name: 'Super Charged', desc: 'Her Super slowly charges while she runs.' },
+    hyper: { name: 'Turbo', desc: 'Hypercharged speed boost lasts 6 seconds.' } },
+  { id: 'tick', name: 'Tick', rarity: 'Super Rare', role: 'Artillery', bg: '#6a7088', bg2: '#2a2e3a', hp: 2200, speed: 150, reload: 1.8, superCost: 2600,
+    blurb: 'Tick lobs little mines over walls, and his head runs after enemies and explodes.',
+    attack: { kind: 'dyna', name: 'Minimines', desc: 'Throws 3 mines over walls that explode where they land.', range: 7.5, dmg: 520, splash: 1.0, count: 3, sfx: 'throw' },
+    super: { kind: 'pet', name: 'Headfirst', desc: 'Throws his head, which chases the nearest enemy and explodes.', range: 5, hp: 2000, petDmg: 1800, petRate: 1, petSpeed: 220, kamikaze: true, sfx: 'super' },
+    gadget: { name: 'Backup Mine', desc: 'Drops a mine at his feet that explodes after a second.' },
+    star: { name: 'Well Oiled', desc: 'Heals 50% faster when out of combat.' },
+    hyper: { name: 'Big Head', desc: 'Hypercharged head is tougher and explodes harder.' } },
+  { id: 'barley', name: 'Barley', rarity: 'Rare', role: 'Artillery', bg: '#b0b8c8', bg2: '#4a4a6a', hp: 2400, speed: 150, reload: 1.6, superCost: 2700,
+    blurb: 'Barley throws bottles over walls that leave burning puddles behind.',
+    attack: { kind: 'bottle', name: 'Undiluted', desc: 'A bottle that leaves a damaging puddle for 1.6 seconds.', range: 7.5, radius: 1.1, life: 1.6, tick: 0.4, dmg: 340, sfx: 'throw' },
+    super: { kind: 'barrage', name: 'Last Call', desc: 'Throws 5 bottles at once, covering a big area in puddles.', range: 8, count: 5, radius: 1.2, life: 2.5, tick: 0.4, dmg: 360, sfx: 'throw' },
+    gadget: { name: 'Sticky Syrup Mixer', desc: 'Pours a puddle at his feet that slows enemies.' },
+    star: { name: 'Medical Use', desc: 'Heals 300 health every time he throws a bottle.' },
+    hyper: { name: 'Happy Hour', desc: 'Hypercharged Last Call throws 8 bottles.' } },
+  { id: 'sprout', name: 'Sprout', rarity: 'Mythic', role: 'Artillery', bg: '#5ad040', bg2: '#2a6a8a', hp: 2800, speed: 150, reload: 1.7, superCost: 3000,
+    blurb: 'Sprout throws bouncing seed bombs and grows hedges that block the path.',
+    attack: { kind: 'seed', name: 'Seed Bomb', desc: 'A seed bomb that explodes where it lands, even behind walls.', range: 7.5, dmg: 1000, splash: 1.2, sfx: 'throw' },
+    super: { kind: 'hedge', name: 'Hedge', desc: 'Grows a wall of hedges that blocks enemies and shots for 8 seconds.', range: 6.5, len: 3, life: 8, sfx: 'super' },
+    gadget: { name: 'Garden Mulcher', desc: 'Instantly heals 1,000 health.' },
+    star: { name: 'Overgrowth', desc: 'Seed Bomb explodes in a bigger area.' },
+    hyper: { name: 'Big Hedge', desc: 'Hypercharged Hedge is 5 tiles long.' } },
+  { id: 'eightbit', name: '8-Bit', rarity: 'Epic', role: 'Damage Dealer', bg: '#7a4ad8', bg2: '#2a1a5a', hp: 5000, speed: 120, reload: 1.5, superCost: 3600,
+    blurb: '8-Bit is a slow arcade machine with big damage and a booster that powers up his team.',
+    attack: { kind: 'burst', name: 'Blaster Beams', desc: 'Fires 6 long-range laser beams.', shots: 6, interval: 0.06, range: 9.5, dmg: 340, speed: 1100, r: 6, jitter: 0.03, color: '#ff4a6a', sfx: 'pistol' },
+    super: { kind: 'booster', name: 'Damage Booster', desc: 'Places a booster that makes teammates near it deal 30% more damage.', range: 3, radius: 4.5, life: 12, sfx: 'super' },
+    gadget: { name: 'Cheat Cartridge', desc: 'Teleports to his Damage Booster.' },
+    star: { name: 'Boosted Booster', desc: 'The booster reaches farther.' },
+    hyper: { name: 'Extra Credits', desc: 'Hypercharged booster reaches much farther.' } },
+  { id: 'emz', name: 'Emz', rarity: 'Epic', role: 'Controller', bg: '#8a3ad8', bg2: '#3a1a6a', hp: 3600, speed: 150, reload: 1.6, superCost: 3000,
+    blurb: 'Emz sprays a slow cloud of hairspray and surrounds herself with a toxic aura.',
+    attack: { kind: 'wave', name: 'Spray', desc: 'A slow cloud of hairspray that hurts everyone it passes.', range: 5.5, dmg: 720, speed: 380, r: 30, color: '#d0a0ff', sfx: 'orb' },
+    super: { kind: 'aura', name: 'Toxic Aura', desc: 'A cloud around her that slows and hurts nearby enemies for 5 seconds.', radius: 3, life: 5, tick: 0.5, dmg: 300, sfx: 'super' },
+    gadget: { name: 'Friendzoner', desc: 'Pushes away and hurts every enemy close to her.' },
+    star: { name: 'Hype', desc: 'Heals 300 for every enemy hurt by her aura.' },
+    hyper: { name: 'Super Hype', desc: 'Hypercharged aura is bigger.' } },
+  { id: 'gene', name: 'Gene', rarity: 'Mythic', role: 'Support', bg: '#3a8ad8', bg2: '#1a2a6a', hp: 3600, speed: 150, reload: 1.7, superCost: 3200,
+    blurb: 'Gene is a genie whose magic hand pulls enemies right to him.',
+    attack: { kind: 'bomb', name: 'Smoke Blast', desc: 'A long-range smoke ball that splits into 6 puffs.', range: 9, dmg: 1000, speed: 700, r: 11, spikes: 6, spikeRange: 2.4, spikeDmg: 340, color: '#d0a0ff', sfx: 'throw' },
+    super: { kind: 'grab', name: 'Magic Hand', desc: 'A magic hand that grabs the first enemy it touches and pulls them to Gene.', range: 10, speed: 900, r: 14, dmg: 0, sfx: 'super' },
+    gadget: { name: 'Lamp Blowout', desc: 'Pushes away and hurts every enemy close to him.' },
+    star: { name: 'Magic Puffs', desc: 'Heals himself and teammates near him for 250 per second.' },
+    hyper: { name: 'Long Arm', desc: 'Hypercharged Magic Hand reaches farther.' } },
 ];
 const BR = Object.fromEntries(BR_LIST.map(b => [b.id, b]));
 const UNLOCK = {
   bull: { coins: 150, road: 25 }, primo: { coins: 200, road: 75 }, poco: { coins: 250, pass: 4 }, brock: { coins: 300, road: 150 },
   jessie: { coins: 400, pass: 10 }, dynamike: { coins: 450, road: 300 }, spike: { gems: 120, road: 500 },
   rosa: { coins: 350, road: 120 }, piper: { coins: 600, road: 400 }, frank: { coins: 600, pass: 20 }, mortis: { gems: 150, road: 650 }, leon: { gems: 200, road: 800 }, crow: { gems: 200, pass: 25 },
+  barley: { coins: 300, road: 180 }, eightbit: { coins: 500, road: 850 }, tick: { coins: 450, road: 1000 }, edgar: { coins: 600, road: 950 }, bibi: { coins: 600, road: 1100 }, emz: { coins: 500, road: 1200 }, max: { gems: 150, road: 1300 }, gene: { gems: 150, road: 1400 }, sprout: { gems: 150, pass: 28 },
 };
 const GADGET_LVL = 7, STAR_LVL = 9, HYPER_LVL = 11;
 // Gears: unlock slot 1 at Power 8 and slot 2 at Power 10, buy each gear with coins, equip up to the slot count.
@@ -748,6 +830,42 @@ const SKINS = [
   { id: 'royal', name: 'Royal', price: { gems: 80 } },
   { id: 'gold', name: 'Golden', price: { coins: 800 } },
 ];
+// hand-made special skins: palette swaps on top of each sprite
+const SPECIAL_SKINS = {
+  shelly: [{ id: 'bandita', name: 'Bandita', pal: { p: '#2a1a1a', P: '#1a0a0a', y: '#e03030', v: '#3a2a20', b: '#5a3a2a' }, price: { gems: 80 } }, { id: 'witch', name: 'Witch', pal: { p: '#3aa040', P: '#2a7030', v: '#2a1a3a', y: '#9a3ad8' }, price: { gems: 80 } }],
+  colt: [{ id: 'rockstar', name: 'Rockstar', pal: { r: '#ffd030', R: '#d0a010', c: '#1a1a1a', v: '#e03030', l: '#1a1a2a' }, price: { gems: 80 } }, { id: 'outlaw', name: 'Outlaw', pal: { r: '#6a3a1a', R: '#4a2a10', v: '#3a2a1a', c: '#e8d8b0' }, price: { gems: 60 } }],
+  nita: [{ id: 'panda', name: 'Panda', pal: { h: '#f0f0f0', H: '#c0c0c0', n: '#1a1a1a' }, price: { gems: 80 } }, { id: 'shiba', name: 'Shiba', pal: { h: '#e08a3a', H: '#b0602a' }, price: { gems: 60 } }],
+  bull: [{ id: 'viking', name: 'Viking', pal: { K: '#ffd030', v: '#6a3a1a', w: '#a0a0b0' }, price: { gems: 80 } }],
+  primo: [{ id: 'elrey', name: 'El Rey', pal: { m: '#ffd030', B: '#ffd030', r: '#a020c0', y: '#e03030' }, price: { gems: 100 } }, { id: 'elbrown', name: 'El Brown', pal: { m: '#8a5a3a', B: '#8a5a3a' }, price: { gems: 60 } }],
+  poco: [{ id: 'rojo', name: 'Mariachi Rojo', pal: { N: '#a01a1a', n: '#a01a1a', P: '#ffd030' }, price: { gems: 80 } }],
+  brock: [{ id: 'hotrod', name: 'Hot Rod', pal: { K: '#e03030', v: '#1a1a1a', w: '#ffd030' }, price: { gems: 80 } }],
+  jessie: [{ id: 'summer', name: 'Summer', pal: { B: '#ff8ac0', c: '#ffd030', o: '#ffd030', O: '#e0a010' }, price: { gems: 80 } }],
+  dynamike: [{ id: 'santa', name: 'Santa', pal: { y: '#e03030', Y: '#a01a1a', b: '#e03030' }, price: { gems: 80 } }],
+  spike: [{ id: 'sakura', name: 'Sakura', pal: { g: '#ff9ac8', G: '#d06090', d: '#8a2a5a', r: '#ffffff', v: '#ffd030' }, price: { gems: 120 } }],
+  leon: [{ id: 'shark', name: 'Shark', pal: { h: '#3a8ad8', o: '#e8eef8', b: '#1a4a8a' }, price: { gems: 120 } }],
+  crow: [{ id: 'phoenix', name: 'Phoenix', pal: { K: '#e04020', G: '#ffd030', B: '#ff8a1f', r: '#8a1a1a' }, price: { gems: 120 } }],
+  mortis: [{ id: 'rockabilly', name: 'Rockabilly', pal: { p: '#1a1a1a', P: '#3a3a3a', m: '#e03030' }, price: { gems: 100 } }],
+  piper: [{ id: 'pink', name: 'Pink', pal: { b: '#ff9ac8', B: '#e05090', p: '#ffffff', y: '#8a5a3a' }, price: { gems: 80 } }],
+  frank: [{ id: 'dj', name: 'DJ', pal: { v: '#e03030', m: '#ffd030', H: '#1a1a1a' }, price: { gems: 80 } }],
+  rosa: [{ id: 'cactus', name: 'Cactus', pal: { P: '#5ad040', p: '#3aa040', g: '#ff7ab8' }, price: { gems: 80 } }],
+  edgar: [{ id: 'pinkedgar', name: 'Pink', pal: { K: '#ff7ab8', r: '#3a8ad8', R: '#1a4a8a' }, price: { gems: 80 } }],
+  eightbit: [{ id: 'classic8', name: 'Classic', pal: { p: '#3a8ad8', P: '#1a4a8a', g: '#ffd030' }, price: { gems: 80 } }],
+  gene: [{ id: 'goldgene', name: 'Gold', pal: { b: '#ffd030', B: '#c09010', y: '#3a8ad8' }, price: { gems: 100 } }],
+  max: [{ id: 'maxneon', name: 'Neon', pal: { y: '#5ef0ff', Y: '#2ab0d0', r: '#ff4ab0' }, price: { gems: 80 } }],
+};
+const skinName = (id, sk) => !sk ? 'Classic' : ((SPECIAL_SKINS[id] || []).find(x => x.id === sk) || SKINS.find(x => x.id === sk) || { name: sk }).name;
+// mastery
+const MASTERY = [0, 250, 600, 1100, 1800, 2700, 3900, 5400, 7200, 9500, 12500];
+const MASTERY_NAMES = ['No Mastery', 'Bronze I', 'Bronze II', 'Bronze III', 'Silver I', 'Silver II', 'Silver III', 'Gold I', 'Gold II', 'Gold III', 'Master'];
+const masteryLvl = pts => { let l = 0; for (let i = 0; i < MASTERY.length; i++) if (pts >= MASTERY[i]) l = i; return l; };
+// ranked
+const RANKS = [['Bronze I', 0], ['Bronze II', 100], ['Bronze III', 200], ['Silver I', 300], ['Silver II', 400], ['Silver III', 500], ['Gold I', 600], ['Gold II', 700], ['Gold III', 800],
+  ['Diamond I', 900], ['Diamond II', 1000], ['Diamond III', 1100], ['Mythic I', 1200], ['Mythic II', 1300], ['Mythic III', 1400], ['Legendary I', 1500], ['Legendary II', 1600], ['Legendary III', 1700], ['Masters', 1800]];
+const RANK_COL = { Bronze: '#c87a3a', Silver: '#c0c8d8', Gold: '#ffd030', Diamond: '#5ad8ff', Mythic: '#e04ad8', Legendary: '#ff4a4a', Masters: '#ffe88a' };
+const rankIdx = pts => { let r = 0; RANKS.forEach(([, p], i) => { if (pts >= p) r = i; }); return r; };
+const RANKED_MODES = ['gemgrab', 'brawlball', 'heist', 'bounty', 'hotzone', 'knockout'];
+// club
+const CLUB_GOALS = [{ t: 4000, coins: 150 }, { t: 6000, gems: 15 }, { t: 9000, coins: 300 }, { t: 13000, gems: 30 }, { t: 18000, coins: 600 }];
 const gearSlots = lvl => GEAR_SLOT_LVL.filter(l => lvl >= l).length;
 const RARITY_COL = { Starting: '#9ad0ff', Rare: '#5ad84a', 'Super Rare': '#3a8aff', Epic: '#c050ff', Mythic: '#ff4a6a', Legendary: '#ffe040' };
 const brawlerRank = tro => Math.min(35, 1 + Math.floor(tro / 20));
@@ -1150,15 +1268,16 @@ const PASS_REWARDS = Array.from({ length: PASS_TIERS }, (_, i) => {
   if (tier === 15) return { coins: 400 };
   if (tier === 20) return { brawler: 'frank' };
   if (tier === 25) return { brawler: 'crow' };
+  if (tier === 28) return { brawler: 'sprout' };
   if (tier === 30) return { gems: 80 };
   if (tier % 5 === 0) return { gems: 10 + tier };
   if (tier % 2 === 0) return { gems: 5 + Math.floor(tier / 6) * 2 };
   return { coins: 40 + tier * 10 };
 });
 const ROAD = [
-  { t: 10, coins: 100 }, { t: 25, brawler: 'bull' }, { t: 50, gems: 20 }, { t: 75, brawler: 'primo' }, { t: 100, coins: 250 }, { t: 120, brawler: 'rosa' },
+  { t: 10, coins: 100 }, { t: 25, brawler: 'bull' }, { t: 50, gems: 20 }, { t: 75, brawler: 'primo' }, { t: 100, coins: 250 }, { t: 120, brawler: 'rosa' }, { t: 180, brawler: 'barley' },
   { t: 150, brawler: 'brock' }, { t: 200, gems: 30 }, { t: 300, brawler: 'dynamike' }, { t: 400, brawler: 'piper' }, { t: 450, coins: 500 }, { t: 500, brawler: 'spike' },
-  { t: 650, brawler: 'mortis' }, { t: 700, gems: 60 }, { t: 800, brawler: 'leon' }, { t: 900, coins: 800 }, { t: 1000, gems: 100 },
+  { t: 650, brawler: 'mortis' }, { t: 700, gems: 60 }, { t: 800, brawler: 'leon' }, { t: 850, brawler: 'eightbit' }, { t: 900, coins: 800 }, { t: 950, brawler: 'edgar' }, { t: 1000, brawler: 'tick' }, { t: 1100, brawler: 'bibi' }, { t: 1200, brawler: 'emz' }, { t: 1300, brawler: 'max' }, { t: 1400, brawler: 'gene' }, { t: 1500, gems: 100 },
 ];
 const STAR_DROPS = [
   { name: 'Rare', col: '#5ad84a', w: 50, rewards: [{ coins: 30 }, { coins: 40 }, { gems: 2 }] },
@@ -1521,6 +1640,159 @@ const SPR = {
     'kyykyyk',
     '.kyyyk.',
     '..kkk..'] },
+  edgar: { pal: { K: '#1a1a2a', s: '#f0d0c0', r: '#a01a2a', R: '#6a0a1a', j: '#2a2a3a', g: '#6a6a7a' }, weapon: null, rows: [
+    '....kkkkkkk.....',
+    '...kKKKKKKKk....',
+    '..kKKKKKKKKKk...',
+    '..kKKKKKKssKk...',
+    '..kKKKKKskssk...',
+    '..kKKKKsssssk...',
+    '..krrrrrrrrrk...',
+    '...kRrrrrrrRk...',
+    '...kjjrrrjjjk...',
+    '..kjjjrRrjjjjk..',
+    '.ksjjjrRrjjjjsk.',
+    '.ksjjjjrjjjjjsk.',
+    '..kjjjjjjjjjjk..',
+    '...kggggggggk...',
+    '...kggk..kggk...',
+    '...kkkk..kkkk...'] },
+  bibi: { pal: { K: '#2a1a3a', s: '#f0c090', p: '#ff7ab8', j: '#e8e0f0', y: '#ffd030', P: '#c03a8a' }, weapon: 'bat', rows: [
+    '......kkk.......',
+    '.....kpppk......',
+    '....kppwppk.....',
+    '.....kpppkk.....',
+    '....kKKKKKKk....',
+    '...kKKKKKKKKk...',
+    '...kKsssssKKk...',
+    '...kskksskkKk...',
+    '...ksssmsssk....',
+    '....kkjjjjkk....',
+    '...kjjyyyyjjk...',
+    '..ksjjyyyyjjsk..',
+    '...kPPPPPPPPk...',
+    '...kPPPkkPPPk...',
+    '...kssk..kssk...',
+    '...kkkk..kkkk...'] },
+  max: { pal: { K: '#1a1a2a', D: '#8a5a3a', r: '#e03040', y: '#ffc020', Y: '#e08a10', b: '#3a4a9a' }, weapon: 'blaster', rows: [
+    '....kkkkkkk.....',
+    '...kKKKKKKKk....',
+    '..kKKKKKKKKKk...',
+    '..krrrrrrrrrk...',
+    '..kDDDDDDDDDk...',
+    '..kDkkDDDkkDk...',
+    '..kDDDDDDDDDk...',
+    '...kDDmmmDDk....',
+    '....kkkkkkk.....',
+    '...kyyyYyyyk....',
+    '..kDyyyYyyyDk...',
+    '..kDyyyYyyyDk...',
+    '...kbbbbbbbk....',
+    '...kbbbkbbbk....',
+    '...kbbk.kbbk....',
+    '...kkkk.kkkk....'] },
+  tick: { pal: { g: '#6a7088', G: '#3a4058', r: '#ff3030', y: '#ffd030' }, weapon: null, rows: [
+    '......k..k......',
+    '.....ky.ky......',
+    '.....kkkkkk.....',
+    '....kggggggk....',
+    '...kggggggggk...',
+    '..kggkkggkkggk..',
+    '..kggkrggkrggk..',
+    '..kggggggggggk..',
+    '..kgGGGGGGGGgk..',
+    '..kggggwwggggk..',
+    '...kggggggggk...',
+    '....kGGGGGGk....',
+    '.....kkkkkk.....',
+    '.....kg..gk.....',
+    '....kgk..kgk....',
+    '....kk....kk....'] },
+  barley: { pal: { g: '#b0b8c8', G: '#7a8098', K: '#2a2a3a', r: '#e03040', b: '#3a3a5a', y: '#ffd030' }, weapon: null, rows: [
+    '.....kkkkkk.....',
+    '....kggggggk....',
+    '...kggggggggk...',
+    '...kgkyggkygk...',
+    '...kggggggggk...',
+    '..kKKKKggKKKKk..',
+    '...kggggggggk...',
+    '....kkkkkkkk....',
+    '...kbwwrrwwbk...',
+    '..kgbwwwwwwbgk..',
+    '..kgbwwwwwwbgk..',
+    '...kbbbbbbbbk...',
+    '....kGGGGGGk....',
+    '.....kkGGkk.....',
+    '......kggk......',
+    '......kkkk......'] },
+  sprout: { pal: { l: '#5ad040', L: '#2a8a2a', w: '#e8eef8', b: '#4a8ad8' }, weapon: null, rows: [
+    '.....kk..kk.....',
+    '....klLkkLlk....',
+    '.....kkllkk.....',
+    '.......kk.......',
+    '....kkkkkkkk....',
+    '...kwwwwwwwwk...',
+    '..kwwkkwwkkwwk..',
+    '..kwwkkwwkkwwk..',
+    '..kwwwwwwwwwwk..',
+    '..kbbbbbbbbbbk..',
+    '..kwwwwmmwwwwk..',
+    '...kwwwwwwwwk...',
+    '....kwwwwwwk....',
+    '.....kbbbbk.....',
+    '....kbk..kbk....',
+    '....kk....kk....'] },
+  eightbit: { pal: { p: '#7a4ad8', P: '#4a2a9a', s: '#1a1a3a', g: '#5aff7a', r: '#ff4a6a', y: '#ffd030', c: '#aab0c8' }, weapon: null, rows: [
+    '...kkkkkkkkkk...',
+    '..kppppppppppk..',
+    '..kpkkkkkkkkpk..',
+    '..kpksgssgskpk..',
+    '..kpksggggskpk..',
+    '..kpkkkkkkkkpk..',
+    'kcckpppppppkcck.',
+    'kcckppyprpppkcck',
+    '.kkkkppppppkkkk.',
+    '....kPPPPPPPPk..',
+    '....kPPPPPPPPk..',
+    '.....kPPPPPPk...',
+    '......kkkkkk....',
+    '.....kccccccck..',
+    '....kcccccccccck',
+    '.....kkkkkkkkkk.'] },
+  emz: { pal: { P: '#8a3ad8', s: '#c8e0b0', p: '#ff6ab0', K: '#2a2a3a', y: '#ffd030' }, weapon: 'spray', rows: [
+    '....kkkkkkk.....',
+    '...kPPPPPPPk....',
+    '..kPPPPPPPPPk...',
+    '..kPPPPPPPPPk...',
+    '..kPPsssssPPk...',
+    '..kPskkskksPk...',
+    '..kPsssssssPk...',
+    '..kPPsssmssPPk..',
+    '..kPPkkkkkkPPk..',
+    '..kPkppppppkPk..',
+    '...ksppppppsk...',
+    '...ksppppppsk...',
+    '...kKKKKKKKKk...',
+    '..kKKKKKKKKKKk..',
+    '....kssk.kssk...',
+    '....kkkk.kkkk...'] },
+  gene: { pal: { b: '#3a8ad8', B: '#2a5aa8', y: '#ffd030', Y: '#e09a10', r: '#e03040', p: '#8a3ad8' }, weapon: 'lamp', rows: [
+    '.....kkkkkk.....',
+    '....kyyyyyyk....',
+    '...kyyyrryyyk...',
+    '...kyyyyyyyyk...',
+    '...kbbbbbbbbk...',
+    '...kbkkbbkkbk...',
+    '...kbkwbbkwbk...',
+    '..kYYYYbbYYYYk..',
+    '...kbbbbbbbbk...',
+    '..kbpppppppbbk..',
+    '.kbbpppyppppbbk.',
+    '.kbkpppppppkbk..',
+    '...kBBBBBBBk....',
+    '....kBBBBBk.....',
+    '.....kBBBk......',
+    '......kkk.......'] },
 };
 const WEAPONS = {
   shotgun: { pal: { n: '#8a4b23', g: '#9aa0b8' }, rows: ['kkkkkkkkkk.', 'knnngggggkk', 'kkkkkkkkkk.'], ox: 9, oy: 10 },
@@ -1532,6 +1804,9 @@ const WEAPONS = {
   umbrella: { pal: { p: '#ff8ac0', n: '#8a4a23', g: '#e05090' }, rows: ['..kkkk.....', '.kppppkkkkk', 'kppppppgggk', '.kppppkkkkk', '..kkkk.....'], ox: 9, oy: 8 },
   hammer: { pal: { g: '#a0a8b8', n: '#6a4a2a' }, rows: ['.kkk.', 'kgggk', 'kgkgk', 'kgggk', 'kgggk', 'kkkkk', '.knk.', '.knk.', '.knk.', '.kkk.'], ox: 13, oy: 2 },
   dagger: { pal: { g: '#9aff5a', n: '#5a3a8a' }, rows: ['kkkkkkk.', 'knngggk.', 'kkkkkkkk'], ox: 11, oy: 10 },
+  bat: { pal: { y: '#e0b060', n: '#6a3a1a' }, rows: ['kkkkkkkk..', 'knnyyyyyyk', 'kkkkkkkk..'], ox: 10, oy: 9 },
+  spray: { pal: { y: '#ffd030', w: '#ffffff' }, rows: ['.kk..', 'kwwk.', 'kyyk.', 'kyyk.', 'kkkk.'], ox: 12, oy: 8 },
+  lamp: { pal: { y: '#ffd030' }, rows: ['..kk...', '.kyyk..', 'kyyyykk', '.kkkk..'], ox: 11, oy: 10 },
   dynamite: { pal: { r: '#d83030', y: '#ffe040' }, rows: ['.y.', 'kkk', 'krk', 'krk', 'kkk'], ox: 12, oy: 9 },
 };
 (function finishSprites() {
@@ -1571,7 +1846,8 @@ function skinPal(pal, theme) {
 function getSpr(name, skin = '') {
   const key = skin ? name + '|' + skin : name;
   if (SPRC[key]) return SPRC[key];
-  const d = SPR[name]; const pal = skin ? skinPal(d.pal, skin) : d.pal;
+  const d = SPR[name]; const spc = skin && typeof SPECIAL_SKINS !== 'undefined' && (SPECIAL_SKINS[name] || []).find(x => x.id === skin);
+  const pal = spc ? { ...d.pal, ...spc.pal } : skin ? skinPal(d.pal, skin) : d.pal;
   const frames = [d.rows, walkRows(d.rows, 0), d.rows, walkRows(d.rows, 1)];
   const S_ = { w: d.rows[0].length, h: d.rows.length, n: [], f: [], white: compileRows(d.rows, pal, '#ffffff'), whiteF: null, sil: {} };
   for (const fr of frames) { const c = compileRows(fr, pal); S_.n.push(c); S_.f.push(flipCanvas(c)); }
@@ -1688,10 +1964,11 @@ function makeBrawler(id, team, pos, o) {
 function startBattle(modeKey) {
   const mode = MODES[modeKey]; const mapKey = pick(mode.maps); const map = buildMap(mapKey);
   const pid = S.selected, plvl = S.brawlers[pid].level, tro = totalTrophies();
-  const skill = clamp(0.5 + tro / 500, 0, 1);
-  const bl = () => clamp(plvl + randi(-1, 1), 1, MAX_LEVEL);
+  const rk = rankedNext ? rankIdx(S.ranked.pts) : -1;
+  const skill = rk >= 0 ? clamp(0.65 + rk / 25, 0, 1) : clamp(0.5 + tro / 500, 0, 1);
+  const bl = () => rk >= 0 ? clamp(plvl + Math.floor(rk / 6) + randi(0, 1), 1, MAX_LEVEL) : clamp(plvl + randi(-1, 1), 1, MAX_LEVEL);
   G = {
-    mode: modeKey, map, theme: THEMES[map.theme], time: 0, brawlers: [], projs: [], parts: [], areas: [], turrets: [], pickups: [], safes: [], ball: null, feed: [],
+    ranked: rk >= 0, mode: modeKey, map, theme: THEMES[map.theme], time: 0, brawlers: [], projs: [], parts: [], areas: [], turrets: [], pickups: [], safes: [], ball: null, feed: [],
     intro: 2.4, introBeep: 4, over: null, endT: 0, paused: false, shake: 0, cam: { x: 0, y: 0 }, hurtFlash: 0, goalPause: 0, mapVer: 0, player: null,
     stats: { kills: 0, damage: 0, gems: 0, goals: 0, safeDmg: 0, cubes: 0, supers: 0, gadgets: 0, stars: 0, zone: 0, rounds: 0, bolts: 0 }, score: { 1: 0, 2: 0 },
     timeLeft: isSD(modeKey) || modeKey === 'knockout' ? Infinity : ['bounty', 'hotzone', 'wipeout'].includes(modeKey) ? 120 : modeKey === 'siege' ? 180 : 150, gemCd: null, mineT: 4, poison: null, goalSets: null, playerBrawler: pid,
@@ -1735,7 +2012,7 @@ function botGears(lvl) { return shuffle(GEARS.map(g => g.id)).slice(0, gearSlots
 function addBrawler(id, team, pos, o) {
   if (!o.player && !o.gears) o.gears = botGears(o.level || 1);
   const b = makeBrawler(id, team, pos, o);
-  b.skin = o.player ? (S.brawlers[id].skin || '') : (Math.random() < 0.3 ? pick(SKINS).id : '');
+  b.skin = o.player ? (S.brawlers[id].skin || '') : (Math.random() < 0.35 ? pick([...SKINS, ...(SPECIAL_SKINS[id] || []), ...(SPECIAL_SKINS[id] || [])]).id : '');
   if (b.star && id === 'frank') { b.hpMax += 1000; b.hp += 1000; b.baseHp += 1000; } b.spawn = { x: pos.x, y: pos.y }; G.brawlers.push(b); return b; }
 const enemiesOf = team => G.brawlers.filter(b => b.alive && b.team !== team);
 
@@ -1772,7 +2049,7 @@ function fireAbility(b, A, ang, aimDist, isSuper) {
     case 'rocket': spawnProj(b, ang, A, { kind: 'rocket' }); Sound.play('throw', vol(b)); muzzle(b, ang); break;
     case 'dyna': {
       const d = clamp(aimDist || A.range * T * 0.8, 1.5 * T, A.range * T), px = -Math.sin(ang), py = Math.cos(ang);
-      for (const k of [-1, 1]) { const p = lob(b, ang, d, A, 'boom'); p.tx += px * k * 0.35 * T; p.ty += py * k * 0.35 * T; p.dmg = A.dmg * dmgNow(b); p.rad = A.splash * T; }
+      const n = A.count || 2; for (let i = 0; i < n; i++) { const k = n === 1 ? 0 : (i / (n - 1) - 0.5) * 2; const p = lob(b, ang, d, A, 'boom'); p.tx += px * k * 0.4 * T; p.ty += py * k * 0.4 * T; p.dmg = A.dmg * dmgNow(b); p.rad = A.splash * T; }
       Sound.play('throw', vol(b)); break;
     }
     case 'barrel': { const d = clamp(aimDist || A.range * T * 0.8, 1.5 * T, A.range * T); const p = lob(b, ang, d, A, 'boom'); p.dmg = A.dmg * dmgNow(b); p.rad = A.radius * T; p.knock = A.knock; p.breakWalls = true; p.big = true; p.isSuper = true; Sound.play('throw', vol(b)); break; }
@@ -1782,6 +2059,26 @@ function fireAbility(b, A, ang, aimDist, isSuper) {
       break;
     }
     case 'pet': { const d = clamp(aimDist || 2.5 * T, T, A.range * T); lob(b, ang, d, A, 'pet'); break; }
+    case 'seed': { const d = clamp(aimDist || A.range * T * 0.8, 1.5 * T, A.range * T); const p = lob(b, ang, d, A, 'boom'); p.dmg = A.dmg * dmgNow(b); p.rad = A.splash * T * (b.star && b.id === 'sprout' ? 1.4 : 1); p.seed = true; Sound.play('throw', vol(b)); break; }
+    case 'bottle': { const d = clamp(aimDist || A.range * T * 0.8, 1.5 * T, A.range * T); const p = lob(b, ang, d, A, 'area'); p.attack = true; if (b.star && b.id === 'barley') heal(b, 300 * b.dmgMult, true); Sound.play('throw', vol(b)); break; }
+    case 'barrage': { const d = clamp(aimDist || A.range * T * 0.8, 1.5 * T, A.range * T), cx = b.x + Math.cos(ang) * d, cy = b.y + Math.sin(ang) * d;
+      for (let i = 0; i < A.count; i++) { const a2 = i / A.count * Math.PI * 2, r2 = i ? 1.6 * T : 0; const p = lob(b, ang, d, A, 'area'); p.tx = clamp(cx + Math.cos(a2) * r2, T * 0.5, G.map.w * T - T * 0.5); p.ty = clamp(cy + Math.sin(a2) * r2, T * 0.5, G.map.h * T - T * 0.5); p.t = -i * 0.06; }
+      Sound.play('throw', vol(b)); break; }
+    case 'teamboost': for (const o of G.brawlers) if (o.alive && o.team === b.team && dist(o.x, o.y, b.x, b.y) < A.radius * T) { o.boostT = A.dur; ringFx(o.x, o.y, 30, '#ffd030', 0.4, 4); } ringFx(b.x, b.y, A.radius * T, '#ffd030', 0.5, 6); break;
+    case 'booster': { const sp = freeSpot(b.x + Math.cos(ang) * A.range * T * 0.6, b.y + Math.sin(ang) * A.range * T * 0.6, 14); G.boosters = (G.boosters || []).filter(q => q.owner !== b); G.boosters.push({ x: sp.x, y: sp.y, team: b.team, owner: b, r: A.radius * T * (b.star && b.id === 'eightbit' ? 1.3 : 1), life: A.life }); puff(sp.x, sp.y, 8, '#ff7ab8'); break; }
+    case 'aura': G.areas.push({ x: b.x, y: b.y, r: A.radius * T, team: b.team, owner: b, life: A.life, t: 0, tick: 0, dmg: A.dmg * dmgNow(b), A, follow: b, aura: true }); ringFx(b.x, b.y, A.radius * T, '#d0a0ff', 0.4, 6); break;
+    case 'grab': spawnProj(b, ang, A, { kind: 'grab', isSuper: true }); Sound.play('orb', vol(b)); break;
+    case 'hedge': {
+      const d = clamp(aimDist || A.range * T * 0.6, 1.5 * T, A.range * T), cx = b.x + Math.cos(ang) * d, cy = b.y + Math.sin(ang) * d, px = -Math.sin(ang), py = Math.cos(ang);
+      G.tempWalls = G.tempWalls || [];
+      for (let i = 0; i < A.len; i++) {
+        const k = i - (A.len - 1) / 2, tx = Math.floor((cx + px * k * T) / T), ty = Math.floor((cy + py * k * T) / T); if (!inMap(tx, ty)) continue;
+        const ix = ty * G.map.w + tx, t = G.map.t[ix]; if (t !== TILE.FLOOR && t !== TILE.BUSH) continue;
+        if (G.brawlers.some(o => o.alive && Math.floor(o.x / T) === tx && Math.floor(o.y / T) === ty)) continue;
+        G.tempWalls.push({ i: ix, prev: t, life: A.life }); G.map.t[ix] = TILE.WALL; burst(tx * T + T / 2, ty * T + T / 2, '#5ad040', 8, 140, 4, 0.4);
+      }
+      G.mapVer++; Sound.play('crate', vol(b)); break;
+    }
     case 'invis': b.invisT = A.dur; puff(b.x, b.y, 14, '#c0c8c0'); Sound.play('throw', vol(b)); break;
     case 'rshield': b.guardT = A.dur; b.guardMul = 0.3; ringFx(b.x, b.y, 40, '#4ac040', 0.4, 6); burst(b.x, b.y, '#4ac040', 14, 160, 5, 0.5); break;
     case 'mdash': b.dash = { ang, left: A.range * T, speed: 1100, hit: new Set(), A: { dmg: A.dmg, knock: 0 }, noBreak: true, attack: true }; Sound.play('punch', vol(b)); break;
@@ -1831,7 +2128,7 @@ function landLob(p) {
   if (p.what === 'boom') { explode(p.tx, p.ty, p.rad, p.dmg, b, { breakWalls: p.breakWalls, knock: p.knock, isSuper: p.isSuper, big: p.big }); return; }
   if (p.what === 'pet') { spawnPet(b, p.tx, p.ty, A); return; }
   if (p.what === 'area') {
-    G.areas.push({ x: p.tx, y: p.ty, r: A.radius * T, team: b.team, owner: b, life: A.life, t: 0, tick: 0, dmg: A.dmg * dmgNow(b), A });
+    G.areas.push({ x: p.tx, y: p.ty, r: A.radius * T, team: b.team, owner: b, life: A.life, t: 0, tick: 0, dmg: A.dmg * dmgNow(b), A, attack: p.attack, puddle: A.kind === 'bottle' || A.kind === 'barrage' });
     burst(p.tx, p.ty, '#9be862', 14, 200, 5, 0.45); Sound.play('crate', volAt(p.tx, p.ty));
   } else {
     for (let i = G.turrets.length - 1; i >= 0; i--) if (G.turrets[i].owner === b) { puff(G.turrets[i].x, G.turrets[i].y, 8); G.turrets.splice(i, 1); }
@@ -1863,7 +2160,7 @@ function updateLeap(b, dt) {
     for (const tg of targetsFor(b.team)) {
       const d = dist(b.x, b.y, tg.x, tg.cy ?? tg.y);
       if (d < R + (tg.r || 0)) {
-        damage(tg, L.A.dmg * dmgNow(b), b, { isSuper: true });
+        damage(tg, (L.A.dmg + (b.star && b.id === 'edgar' ? 900 : 0)) * dmgNow(b), b, { isSuper: true });
         if (tg.kind === 'brawler' && d > 1) { tg.kx = (tg.x - b.x) / d * L.A.knock * 2; tg.ky = (tg.y - b.y) / d * L.A.knock * 2; tg.stunT = 0.3; }
       }
     }
@@ -1996,7 +2293,8 @@ function updateBrawler(b, dt) {
   b.atkAnim = Math.max(0, b.atkAnim - dt * 4);
   if (b.ammo < 3) { b.reloadP += dt / b.def.reload * (b.star && b.id === 'bull' && b.hp < b.hpMax * 0.6 ? 2 : 1); if (b.reloadP >= 1) { b.ammo++; b.reloadP = b.ammo < 3 ? b.reloadP - 1 : 0; } }
   if (b.shieldMax && b.shield < b.shieldMax && b.hurtT > 10) { b.shield = b.shieldMax; if (isVisibleToPlayer(b)) ringFx(b.x, b.y, 30, '#9ab0ff', 0.4, 4); }
-  if (b.hurtT > 3 && b.atkT > 3 && b.hp < b.hpMax) { b.hp = Math.min(b.hpMax, b.hp + b.hpMax * 0.13 * (b.gears.has('health') ? 1.5 : 1) * dt); if (Math.random() < dt * 4 && isVisibleToPlayer(b)) G.parts.push({ type: 'p', x: b.x + rand(-14, 14), y: b.y - rand(0, 30), vx: 0, vy: -40, life: 0.6, max: 0.6, size: 4, color: '#7dff6a', grav: 0, drag: 0 }); }
+  if (b.star && b.id === 'max' && b.moving && b.charge < 1) b.charge = Math.min(1, b.charge + dt * 0.03);
+  if (b.hurtT > 3 && b.atkT > 3 && b.hp < b.hpMax) { b.hp = Math.min(b.hpMax, b.hp + b.hpMax * 0.13 * (b.gears.has('health') ? 1.5 : 1) * (b.star && b.id === 'tick' ? 1.5 : 1) * dt); if (Math.random() < dt * 4 && isVisibleToPlayer(b)) G.parts.push({ type: 'p', x: b.x + rand(-14, 14), y: b.y - rand(0, 30), vx: 0, vy: -40, life: 0.6, max: 0.6, size: 4, color: '#7dff6a', grav: 0, drag: 0 }); }
   if (b.burst) { const B = b.burst; B.t -= dt; while (B.t <= 0 && B.left > 0) { fireBurstShot(b, B); B.left--; B.t += B.interval; } if (B.left <= 0) b.burst = null; }
   if (b.leap) { updateLeap(b, dt); return; }
   if (b.dash) updateDash(b, dt);
@@ -2072,11 +2370,13 @@ function projHit(p, tg) {
     if (p.stun) tg.stunT = Math.max(tg.stunT, p.stun);
   }
   if (p.lifesteal && src && src.alive) heal(src, dmg * 0.6 * p.lifesteal);
+  if (p.A && p.A.drain && src && src.alive) heal(src, dmg * p.A.drain, true);
+  if (p.kind === 'grab' && tg.kind === 'brawler' && src) { const sp = freeSpot(src.x + Math.cos(p.ang) * 1.3 * T, src.y + Math.sin(p.ang) * 1.3 * T, tg.r); tg.x = sp.x; tg.y = sp.y; tg.stunT = Math.max(tg.stunT, 0.5); puff(tg.x, tg.y, 8, '#d0a0ff'); Sound.play('punch', vol(tg)); }
   if (tg.kind === 'brawler' && src && src.star) {
     if (src.id === 'primo' && p.kind === 'punch') { tg.burnT = 4; tg.burnDps = 150 * src.dmgMult; tg.burnSrc = src; tg.poisoned = false; }
     if (src.id === 'shelly' && p.isSuper) tg.slowT = Math.max(tg.slowT, 1.5);
   }
-  if (p.knock && tg.kind === 'brawler') { tg.kx = Math.cos(p.ang) * p.knock * 2.2; tg.ky = Math.sin(p.ang) * p.knock * 2.2; tg.stunT = Math.max(tg.stunT, 0.15); }
+  if (p.knock && tg.kind === 'brawler') { const hr = p.owner.star && p.owner.id === 'bibi' ? 2 : 1; tg.kx = Math.cos(p.ang) * p.knock * 2.2 * hr; tg.ky = Math.sin(p.ang) * p.knock * 2.2 * hr; tg.stunT = Math.max(tg.stunT, 0.15); }
   burst(p.x, p.y, p.color, 5, 150, 4, 0.25);
   if (p.bounces > 0) {
     const chain = (p.chain || []).concat([tg]); let best = null, bd = (p.A.bounceRange || 3) * T;
@@ -2096,10 +2396,11 @@ function endProj(p, tg) {
 function updateAreas(dt) {
   for (const a of G.areas) {
     a.t += dt; a.tick -= dt;
+    if (a.follow) { if (!a.follow.alive) { a.t = a.life; continue; } a.x = a.follow.x; a.y = a.follow.y; }
     const inside = G.brawlers.filter(b => b.alive && b.team !== a.team && !b.leap && dist(a.x, a.y, b.x, b.y) < a.r + b.r * 0.5);
-    for (const b of inside) b.slowT = Math.max(b.slowT, 0.25);
+    if (!a.puddle) for (const b of inside) b.slowT = Math.max(b.slowT, 0.25);
     const ow = a.owner; if (ow.star && ow.id === 'spike' && ow.alive && dist(a.x, a.y, ow.x, ow.y) < a.r) heal(ow, 600 * dt, true);
-    if (a.tick <= 0) { a.tick = a.A.tick; for (const b of inside) damage(b, a.dmg, a.owner, { isSuper: true }); }
+    if (a.tick <= 0) { a.tick = a.A.tick; for (const b of inside) damage(b, a.dmg, a.owner, { isSuper: !a.attack }); if (a.aura && ow.star && ow.id === 'emz' && ow.alive) heal(ow, 300 * inside.length, true); }
   }
   G.areas = G.areas.filter(a => a.t < a.life);
 }
@@ -2307,6 +2608,8 @@ function stepBattle(dt) {
   for (const b of G.brawlers) updateBrawler(b, dt);
   separateBrawlers();
   for (const s of G.safes) s.flash -= dt;
+  if (G.tempWalls) { let ch = false; for (const w of G.tempWalls) { w.life -= dt; if (w.life <= 0 && G.map.t[w.i] === TILE.WALL) { G.map.t[w.i] = w.prev; ch = true; } } G.tempWalls = G.tempWalls.filter(w => w.life > 0); if (ch) G.mapVer++; }
+  if (G.boosters) { for (const q of G.boosters) q.life -= dt; G.boosters = G.boosters.filter(q => q.life > 0); }
   updateProjs(dt); updateAreas(dt); updateTurrets(dt); updatePets(dt); updatePickups(dt);
   if (G.ball && G.goalPause <= 0 && !G.over) updateBall(dt);
   if (!G.over && G.intro <= 0 && G.goalPause <= 0) updateMode(dt);
@@ -2321,7 +2624,8 @@ function stepBattle(dt) {
 // Brawl Stars mechanics: gadgets, star powers, hypercharge, pets,
 // explosions, healing, burning and knockout rounds
 // ===================================================================
-const dmgNow = b => (b.dmgMult || 1) * cubeMult(b) * (b.hyperT > 0 ? 1.15 : 1) * (b.gears && b.gears.has('damage') && b.hp < b.hpMax * 0.5 ? 1.15 : 1);
+const boosted = b => G && G.boosters && b.kind === 'brawler' && G.boosters.some(q => q.team === b.team && dist(q.x, q.y, b.x, b.y) < q.r);
+const dmgNow = b => (b.dmgMult || 1) * cubeMult(b) * (b.hyperT > 0 ? 1.15 : 1) * (boosted(b) ? 1.3 : 1) * (b.gears && b.gears.has('damage') && b.hp < b.hpMax * 0.5 ? 1.15 : 1);
 function superStats(b) {
   const A = { ...b.def.super, isSuper: true }, hy = b.hyperT > 0;
   if (b.star && b.id === 'brock') A.rockets = 13;
@@ -2344,6 +2648,13 @@ function superStats(b) {
     case 'pjump': A.grenades = 7; break;
     case 'fsuper': A.range *= 1.3; break;
     case 'rshield': A.dur = 6; break;
+    case 'teamboost': A.dur = 6; break;
+    case 'barrage': A.count = 8; break;
+    case 'hedge': A.len = 5; break;
+    case 'booster': A.radius *= 1.4; break;
+    case 'aura': A.radius *= 1.35; break;
+    case 'grab': A.range *= 1.3; break;
+    case 'wave': A.r *= 1.3; A.dmg *= 1.2; break;
   }
   return A;
 }
@@ -2396,6 +2707,7 @@ function updateStatus(b, dt) {
   if (b.unstopT > 0) { b.stunT = 0; b.slowT = 0; b.kx = 0; b.ky = 0; }
   if (b.invisT > 0 && b.star && b.id === 'leon') heal(b, 1000 * dt, true);
   if (b.star && b.id === 'rosa' && b.inBush) heal(b, 300 * dt, true);
+  if (b.star && b.id === 'gene') for (const o of G.brawlers) if (o.alive && o.team === b.team && dist(o.x, o.y, b.x, b.y) < 3 * T) heal(o, 250 * dt, true);
   if (b.windT > 0) {
     b.windT -= dt; b.mx = b.my = 0; b.atkAnim = 1;
     if (b.windT <= 0) {
@@ -2455,8 +2767,16 @@ function doGadget(b) {
     case 'piper': for (const tg of targetsFor(b.team)) { const d = dist(b.x, b.y, tg.x, tg.y); if (tg.kind === 'brawler' && d < 2.5 * T && d > 1) { damage(tg, 400 * b.dmgMult, b, { noCharge: true }); tg.kx = (tg.x - b.x) / d * 700; tg.ky = (tg.y - b.y) / d * 700; } } ringFx(b.x, b.y, 2.5 * T, '#ff9ac8', 0.35, 6); break;
     case 'frank': b.unstopT = 3; ringFx(b.x, b.y, 40, '#c0c0d0', 0.4, 5); break;
     case 'rosa': heal(b, 1000 * b.dmgMult); break;
+    case 'edgar': b.charge = Math.min(1, b.charge + 0.5); break;
+    case 'bibi': heal(b, 1200 * b.dmgMult); break;
+    case 'max': b.shieldT = 1.2; ringFx(b.x, b.y, 30, '#bfe6ff', 0.4, 5); break;
+    case 'tick': { const p = lob(b, b.aim, 1, b.def.attack, 'boom'); p.tx = b.x; p.ty = b.y; p.t = -0.6; p.dmg = 800 * dmgNow(b); p.rad = 1.3 * T; break; }
+    case 'barley': G.areas.push({ x: b.x, y: b.y, r: 1.6 * T, team: b.team, owner: b, life: 3, t: 0, tick: 0, dmg: 200 * dmgNow(b), A: { tick: 0.5 } }); break;
+    case 'sprout': heal(b, 1000 * b.dmgMult); break;
+    case 'eightbit': { const q = (G.boosters || []).find(q => q.owner === b); if (!q) { ok = false; break; } puff(b.x, b.y, 8); b.x = q.x; b.y = q.y; const sp = freeSpot(b.x, b.y, b.r); b.x = sp.x; b.y = sp.y; puff(b.x, b.y, 8, '#ff7ab8'); break; }
+    case 'emz': case 'gene': for (const tg of targetsFor(b.team)) { const d = dist(b.x, b.y, tg.x, tg.y); if (tg.kind === 'brawler' && d < 2.4 * T && d > 1) { damage(tg, 400 * b.dmgMult, b, { noCharge: true }); tg.kx = (tg.x - b.x) / d * 800; tg.ky = (tg.y - b.y) / d * 800; } } ringFx(b.x, b.y, 2.4 * T, '#d0a0ff', 0.35, 6); break;
   }
-  if (!ok) { if (b.isPlayer) { Sound.play('error'); textFx(b.x, b.y - 60, b.id === 'primo' ? 'NO ONE CLOSE' : 'NEED YOUR PET', '#ffffff', 12, 0.9); } return false; }
+  if (!ok) { if (b.isPlayer) { Sound.play('error'); textFx(b.x, b.y - 60, b.id === 'primo' ? 'NO ONE CLOSE' : b.id === 'eightbit' ? 'NEED A BOOSTER' : 'NEED YOUR PET', '#ffffff', 12, 0.9); } return false; }
   b.gadgets--; b.gadgetCd = 4 * (b.gears.has('gadget') ? 0.6 : 1); b.revealT = 1; b.atkT = 0;
   if (b.isPlayer) G.stats.gadgets++;
   Sound.play('cube', vol(b)); ringFx(b.x, b.y, 40, '#4fd145', 0.3, 5);
@@ -2475,7 +2795,7 @@ function doHyper(b) {
 function spawnPet(b, x, y, A) {
   for (let i = G.pets.length - 1; i >= 0; i--) if (G.pets[i].owner === b) { puff(G.pets[i].x, G.pets[i].y, 8); G.pets.splice(i, 1); }
   const sp = freeSpot(x, y, 20);
-  G.pets.push({ kind: 'pet', id: 'bruce', x: sp.x, y: sp.y, r: 20, team: b.team, owner: b, hp: A.hp * b.dmgMult, hpMax: A.hp * b.dmgMult, dmg: A.petDmg * b.dmgMult, rate: A.petRate, speed: A.petSpeed,
+  G.pets.push({ kamikaze: !!A.kamikaze, kind: 'pet', id: A.kamikaze ? 'tick' : 'bruce', x: sp.x, y: sp.y, r: 20, team: b.team, owner: b, hp: A.hp * b.dmgMult, hpMax: A.hp * b.dmgMult, dmg: A.petDmg * b.dmgMult, rate: A.petRate, speed: A.petSpeed,
     cd: 0.6, flash: 0, walk: 0, moving: false, aim: b.aim, ai: makeAI(0.5, 0), dmgMult: b.dmgMult, cubes: 0, vx: 0, vy: 0, big: A.hp > b.def.super.hp });
   puff(sp.x, sp.y, 10, '#c08850'); Sound.play('crate', volAt(sp.x, sp.y)); shake(3);
 }
@@ -2497,6 +2817,7 @@ function updatePets(dt) {
     pt.vx = (pt.x - ox) / dt; pt.vy = (pt.y - oy) / dt; pt.moving = Math.hypot(pt.vx, pt.vy) > 20; if (pt.moving) pt.walk += dt * 10;
     if (tgt && bd < pt.r + (tgt.r || 19) + (pt.robot ? 40 : 14) && pt.cd <= 0) {
       pt.cd = pt.rate; pt.aim = Math.atan2((tgt.cy ?? tgt.y) - pt.y, tgt.x - pt.x); pt.swipe = 0.2;
+      if (pt.kamikaze) { explode(pt.x, pt.y, 1.6 * T, pt.dmg, pt.owner, { isSuper: true, big: true }); pt.hp = 0; continue; }
       damage(tgt, pt.dmg, pt.owner, { noCharge: true, fromPet: true });
       if (pt.owner.star && pt.owner.id === 'nita' && pt.owner.alive) heal(pt.owner, 500, true);
       burst(tgt.x, tgt.y, '#ffffff', 5, 140, 4, 0.25); Sound.play('punch', volAt(pt.x, pt.y) * 0.7);
@@ -2572,7 +2893,7 @@ const teamHome = team => { const s = G.map.teamSpawns[team]; return { x: s.reduc
 
 function aiDecide(b) {
   const ai = b.ai, A = b.def.attack, range = attackRange(b);
-  ai.want = A.kind === 'punch' || A.kind === 'mdash' ? range * 0.55 : b.id === 'frank' ? range * 0.6 : b.id === 'bull' ? range * 0.5 : b.id === 'shelly' ? range * 0.55 : range * 0.72;
+  ai.want = A.kind === 'punch' || A.kind === 'mdash' ? range * 0.55 : b.id === 'emz' ? range * 0.65 : b.id === 'frank' ? range * 0.6 : b.id === 'bull' ? range * 0.5 : b.id === 'shelly' ? range * 0.55 : range * 0.72;
   // choose a target among visible enemies
   let tgt = null, best = 1e9;
   const aggro = !isSD(G.mode) ? 10.5 * T : b.hurtT < 3 ? 10 * T : G.time < 25 ? 5 * T : 8 * T;
@@ -2701,6 +3022,14 @@ function aiWantsSuper(b, tg, d, los) {
     case 'pjump': return isB && d < 3 * T;
     case 'fsuper': return los && d < 5 * T;
     case 'rshield': return isB && d < 4 * T;
+    case 'teamboost': return isB && d < 7 * T;
+    case 'pet': return (isB || tg.kind === 'safe') && d < 7 * T;
+    case 'barrage': return d < 8 * T;
+    case 'hedge': return isB && d < 6 * T && b.hp < b.hpMax * 0.6;
+    case 'booster': return d < 9 * T;
+    case 'aura': return isB && d < 3 * T;
+    case 'grab': return isB && los && d < 9 * T && d > 2.5 * T;
+    case 'wave': return los && d < b.def.super.range * T * 0.9;
   }
   return false;
 }
@@ -2788,6 +3117,12 @@ function aiExtras(b, tgt) {
     case 'mortis': use = tgt && d < 1.7 * T; break;
     case 'piper': use = tgt && d < 2.3 * T; break;
     case 'frank': use = tgt && d < 4 * T && b.hp < b.hpMax * 0.7; break;
+    case 'edgar': use = tgt && b.charge < 0.5 && d < 7 * T; break;
+    case 'bibi': case 'sprout': use = b.hp < b.hpMax * 0.45; break;
+    case 'max': use = tgt && b.hp < b.hpMax * 0.35; break;
+    case 'tick': case 'barley': use = tgt && d < 2.5 * T; break;
+    case 'eightbit': { const q = (G.boosters || []).find(q => q.owner === b); use = q && tgt && dist(q.x, q.y, b.x, b.y) > 5 * T; break; }
+    case 'emz': case 'gene': use = tgt && d < 2 * T; break;
     case 'brock': use = tgt && d < 2.5 * T && b.hp < b.hpMax * 0.5; if (use) { const a = Math.atan2(b.y - tgt.y, b.x - tgt.x); b.mx = Math.cos(a); b.my = Math.sin(a); } break;
   }
   if (use && doGadget(b)) ai.gadT = rand(3, 6); else ai.gadT = 0.5;
@@ -3088,11 +3423,15 @@ function render() {
   // spike fields
   for (const a of G.areas) {
     const ax = A3(a.x), ay = A3(a.y), ar = A3(a.r); lx.globalAlpha = Math.min(1, (1 - a.t / a.life) * 3) * 0.55;
-    lx.fillStyle = '#3a8a2a'; lx.beginPath(); lx.arc(ax, ay, ar, 0, Math.PI * 2); lx.fill(); lx.globalAlpha = Math.min(1, (1 - a.t / a.life) * 3);
-    lx.fillStyle = '#e6ffc0'; for (let i = 0; i < 22; i++) { const an = i * 2.4, r = ar * Math.sqrt((i * 0.37) % 1); const x = Math.round(ax + Math.cos(an) * r), y = Math.round(ay + Math.sin(an) * r); lx.fillRect(x, y - 1, 1, 2); lx.fillRect(x - 1, y, 3, 1); }
+    lx.fillStyle = a.puddle ? '#4ab0ff' : a.aura ? '#a060e0' : '#3a8a2a'; lx.beginPath(); lx.arc(ax, ay, ar, 0, Math.PI * 2); lx.fill(); lx.globalAlpha = Math.min(1, (1 - a.t / a.life) * 3);
+    lx.fillStyle = a.puddle ? '#c0e8ff' : a.aura ? '#e8c8ff' : '#e6ffc0'; for (let i = 0; i < (a.puddle ? 6 : 22); i++) { const an = i * 2.4, r = ar * Math.sqrt((i * 0.37) % 1); const x = Math.round(ax + Math.cos(an) * r), y = Math.round(ay + Math.sin(an) * r); lx.fillRect(x, y - 1, 1, 2); lx.fillRect(x - 1, y, 3, 1); }
     lx.globalAlpha = 1;
   }
   if (G.mode === 'gemgrab' && G.mineT < 1.2 && Math.floor(t * 8) % 2) { lx.fillStyle = '#e6a2ff'; lx.fillRect(A3(m.mine.x) - 10, A3(m.mine.y) - 6, 20, 1); }
+  for (const q of (G.boosters || [])) {
+    const qx = A3(q.x), qy = A3(q.y); lx.globalAlpha = 0.25; lx.fillStyle = q.team === G.player.team ? '#ff7ab8' : '#ff4659'; lx.beginPath(); lx.arc(qx, qy, A3(q.r), 0, Math.PI * 2); lx.fill(); lx.globalAlpha = 1;
+    lx.fillStyle = INK; lx.fillRect(qx - 4, qy - 9, 8, 11); lx.fillStyle = '#ff7ab8'; lx.fillRect(qx - 3, qy - 8, 6, 9); lx.fillStyle = '#ffffff'; lx.fillRect(qx - 1, qy - 7, 2, 1); lx.fillRect(qx - 2, qy - 6, 4, 1); lx.fillRect(qx - 1, qy - 5, 2, 3);
+  }
   drawAimPix();
   // y-sorted world objects
   const list = [];
@@ -3193,10 +3532,11 @@ function drawProjPix(p, t) {
   if (p.lob) {
     if (p.t < 0) return;
     lx.fillStyle = 'rgba(13,11,30,.35)'; lx.fillRect(x - 2, y + 2, 5, 2);
-    const yy = y - A3(p.z), sp = p.what === 'boom' ? (p.rocket ? null : p.big ? 'barrel' : 'dyna') : p.what === 'area' ? null : p.what === 'pet' ? 'bruce' : 'scrappy';
+    const yy = y - A3(p.z), sp = p.what === 'boom' ? (p.rocket ? null : p.big ? 'barrel' : p.seed ? 'cube' : 'dyna') : p.what === 'area' ? (p.A.kind === 'bottle' || p.A.kind === 'barrage' ? 'bottle' : null) : p.what === 'pet' ? (p.A.kamikaze ? 'tick' : 'bruce') : 'scrappy';
     if (p.rocket) { lx.fillStyle = INK; lx.fillRect(x - 2, yy - 3, 4, 6); lx.fillStyle = '#e04028'; lx.fillRect(x - 1, yy - 2, 2, 4); return; }
     if (!sp) { lx.fillStyle = INK; lx.fillRect(x - 3, yy - 3, 7, 7); lx.fillStyle = '#9be862'; lx.fillRect(x - 2, yy - 2, 5, 5); return; }
-    const S_ = getSpr(sp); const sc = sp === 'bruce' || sp === 'scrappy' ? 0.5 : 1;
+    if (sp === 'bottle') { lx.fillStyle = INK; lx.fillRect(x - 2, yy - 4, 5, 8); lx.fillStyle = '#4ab0ff'; lx.fillRect(x - 1, yy - 1, 3, 4); lx.fillStyle = '#c0e8ff'; lx.fillRect(x - 1, yy - 3, 3, 2); return; }
+    const S_ = getSpr(sp); const sc = sp === 'bruce' || sp === 'scrappy' || sp === 'tick' ? 0.5 : 1;
     lx.drawImage(S_.n[0], Math.round(x - S_.w * sc / 2), Math.round(yy - S_.h * sc / 2), Math.round(S_.w * sc), Math.round(S_.h * sc)); return;
   }
   const ca = Math.cos(p.ang), sa = Math.sin(p.ang);
@@ -3206,6 +3546,7 @@ function drawProjPix(p, t) {
     case 'spike': lx.fillStyle = p.color; lx.fillRect(x, y, 1, 1); lx.fillRect(x - Math.round(ca), y - Math.round(sa), 1, 1); break;
     case 'orb': lx.fillStyle = Math.floor(t * 20) % 2 ? '#5ef0ff' : '#2ab0d0'; lx.fillRect(x - 2, y - 1, 5, 3); lx.fillRect(x - 1, y - 2, 3, 5); lx.fillStyle = '#fff'; lx.fillRect(x, y, 1, 1); break;
     case 'bomb': lx.fillStyle = INK; lx.fillRect(x - 3, y - 3, 7, 7); lx.fillStyle = '#6ccf4a'; lx.fillRect(x - 2, y - 2, 5, 5); lx.fillStyle = '#e6ffc0'; lx.fillRect(x - 3, y, 1, 1); lx.fillRect(x + 3, y, 1, 1); lx.fillRect(x, y - 3, 1, 1); lx.fillRect(x, y + 3, 1, 1); break;
+    case 'grab': lx.fillStyle = INK; lx.fillRect(x - 3, y - 3, 7, 7); lx.fillStyle = '#d0a0ff'; lx.fillRect(x - 2, y - 2, 5, 5); lx.fillStyle = '#ffffff'; lx.fillRect(x - 1, y - 2, 1, 2); lx.fillRect(x + 1, y - 2, 1, 2); break;
     case 'punch': lx.fillStyle = '#ff8a1f'; lx.fillRect(x - 2, y - 2, 4, 4); lx.fillStyle = '#ffe040'; lx.fillRect(x - 1, y - 1, 2, 2); break;
     case 'rocket': lx.fillStyle = INK; lx.fillRect(x - 2, y - 2, 4, 4); lx.fillStyle = '#e04028'; lx.fillRect(x - 1, y - 1, 2, 2); lx.fillStyle = '#ffd23a'; lx.fillRect(x - Math.round(ca * 3), y - Math.round(sa * 3), 1, 1); if (Math.random() < 0.6) G.parts.push({ type: 'smoke', x: p.x - ca * 10, y: p.y - sa * 10, vx: 0, vy: 0, life: 0.3, max: 0.3, size: 6, color: '#b0a0a0', drag: 0 }); break;
     case 'wave': { const w = Math.max(3, A3(p.r)), px = -sa, py = ca; lx.fillStyle = p.color; for (let i = -w; i <= w; i++) { const cv = Math.round(Math.abs(i) * Math.abs(i) / (w * 2)); lx.fillRect(Math.round(x + px * i - ca * cv), Math.round(y + py * i - sa * cv), 1, 1); } lx.fillStyle = '#fff'; lx.fillRect(x, y, 1, 1); break; }
@@ -3242,11 +3583,12 @@ function aimShapePix(p, A, ang, d, col) {
   const circle = (cx, cy, r) => { const o = []; for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; o.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } return o; };
   switch (A.kind) {
     case 'spread': { const pts = [[p.x, p.y]], s = A.spread / 2 + 0.04; for (let i = 0; i <= 12; i++) { const a = ang - s + i / 12 * s * 2; pts.push([p.x + Math.cos(a) * range, p.y + Math.sin(a) * range]); } aimPoly(pts, col); break; }
-    case 'burst': case 'bounce': case 'rocket': aimPoly(rect(range, 18), col); break;
+    case 'burst': case 'bounce': case 'rocket': case 'snipe': case 'grab': aimPoly(rect(range, 18), col); break;
     case 'wave': aimPoly(rect(range, (A.r || 16) * 2), col); break;
     case 'dash': aimPoly(rect(range, 40), col); break;
     case 'punch': aimPoly(rect(range, 36), col); break;
     case 'heal': aimPoly(circle(p.x, p.y, A.radius * T), '#7dff6a'); break;
+    case 'teamboost': case 'aura': case 'invis': case 'rshield': aimPoly(circle(p.x, p.y, (A.radius || 1.2) * T), col); break;
     default: {
       const dd = clamp(d || range * 0.8, T, range), tx = p.x + ca * dd, ty = p.y + sa * dd;
       lx.fillStyle = '#ffffff'; for (let i = 0; i < 20; i++) if (i % 2 === 0) lx.fillRect(A3(lerp(p.x, tx, i / 20)), A3(lerp(p.y, ty, i / 20)), 1, 1);
@@ -3413,13 +3755,13 @@ function drawPortrait(cv, id, opts = {}) {
 // Menus, progression and app flow
 // ===================================================================
 const App = { screen: 'loading', detailId: null, passTab: 'pass' };
-const SCREENS = { menu: '#menu', brawlers: '#scr-brawlers', detail: '#scr-detail', modes: '#scr-modes', shop: '#scr-shop', quests: '#scr-quests', pass: '#scr-pass', profile: '#scr-profile' };
+const SCREENS = { menu: '#menu', brawlers: '#scr-brawlers', detail: '#scr-detail', modes: '#scr-modes', shop: '#scr-shop', quests: '#scr-quests', pass: '#scr-pass', profile: '#scr-profile', ranked: '#scr-ranked', club: '#scr-club' };
 function show(name) {
   App.screen = name;
   for (const [k, sel] of Object.entries(SCREENS)) $(sel).hidden = k !== name;
   const battle = name === 'battle'; cv.hidden = !battle; $('#hud').hidden = !battle; if (R3.gl) R3.gl.hidden = !battle;
   if (!battle) { updateWallet(); }
-  const r = { menu: renderHome, brawlers: renderBrawlers, detail: renderDetail, modes: renderModes, shop: renderShop, quests: renderQuests, pass: renderPass, profile: renderProfile }[name];
+  const r = { menu: renderHome, brawlers: renderBrawlers, detail: renderDetail, modes: renderModes, shop: renderShop, quests: renderQuests, pass: renderPass, profile: renderProfile, ranked: renderRanked, club: renderClub }[name];
   if (r) r();
   const sc = SCREENS[name] && $(SCREENS[name] + ' .scroll'); if (sc) sc.scrollTop = 0;
 }
@@ -3484,6 +3826,7 @@ function renderHome() {
   const into = tier >= PASS_TIERS ? PASS_XP : S.passXp - tier * PASS_XP; $('#passXpMini').textContent = tier >= PASS_TIERS ? 'Complete' : `${into}/${PASS_XP} XP`; $('#passBarMini').style.width = `${into / PASS_XP * 100}%`;
   const n = counts();
   const setB = (sel, v) => { const e = $(sel); e.hidden = !v; e.textContent = v === true ? '!' : v; };
+  setB('#clubBadge', CLUB_GOALS.some((g, i) => clubTrophies() >= g.t && !ensureClub().claimed.includes(i)));
   setB('#questBadge', n.q); setB('#passBadge', n.p); setB('#roadBadge', n.r); setB('#shopBadge', n.gift);
   resizeFeatured(); updateWallet();
 }
@@ -3517,8 +3860,11 @@ function atkNumbers(A, m) {
     case 'area': return `${r(A.dmg)} every ${A.tick}s`;
     case 'dash': case 'leap': return r(A.dmg);
     case 'turret': return `${r(A.dmg)} / shot · ${r(A.hp)} HP`;
+    case 'dyna': return `${A.count || 2} × ${r(A.dmg)}`;
+    case 'bottle': case 'barrage': return `${r(A.dmg)} every ${A.tick}s`;
+    case 'snipe': return `${r(A.dmg)} to ${r(A.dmg + A.distBonus)}`;
   }
-  return '';
+  return A.dmg ? r(A.dmg) : 'No damage';
 }
 function renderDetail() {
   const id = App.detailId || S.selected, d = BR[id], st = S.brawlers[id], m = levelMult(st.level), mN = levelMult(Math.min(MAX_LEVEL, st.level + 1));
@@ -3545,6 +3891,7 @@ function renderDetail() {
       <div class="ability"><span class="aic" style="background:#ff4659">A</span><div><b>${d.attack.name}</b><p>${d.attack.desc} <br><span style="color:#8a6b3a">Damage ${atkNumbers(d.attack, m)}</span></p></div></div>
       <div class="ability"><span class="aic" style="background:#ffc824">S</span><div><b>Super: ${d.super.name}</b><p>${d.super.desc} <br><span style="color:#8a6b3a">Damage ${atkNumbers(d.super, m)}</span></p></div></div>
       ${[['G', '#4fd145', 'Gadget', d.gadget, GADGET_LVL], ['★', '#ffe040', 'Star Power', d.star, STAR_LVL], ['H', '#c050ff', 'Hypercharge', d.hyper, HYPER_LVL]].map(([ic, col, label, ab, lvl]) => `<div class="ability" style="opacity:${st.level >= lvl ? 1 : 0.55}"><span class="aic" style="background:${col}">${ic}</span><div><b>${label}: ${ab.name}</b><p>${ab.desc} <br><span style="color:#8a6b3a">${st.level >= lvl ? 'Unlocked' : 'Unlocks at Power ' + lvl}</span></p></div></div>`).join('')}
+      <div style="margin-top:14px"><b style="font-family:var(--display);font-size:12px;color:var(--ink)">Mastery: ${MASTERY_NAMES[masteryLvl(st.mastery || 0)]}</b><div class="bar purple" style="margin-top:6px"><i style="width:${(() => { const l = masteryLvl(st.mastery || 0); return l >= 10 ? 100 : ((st.mastery || 0) - MASTERY[l]) / (MASTERY[l + 1] - MASTERY[l]) * 100; })()}%"></i></div><p style="font-size:8px;margin-top:4px">${fmt(st.mastery || 0)} points. Reach Master to earn the title Master of ${d.name}.</p></div>
       <div id="skinBox" style="margin-top:14px"></div>
       <div id="gearBox" style="margin-top:14px"></div>
       <div class="row" style="margin-top:14px" id="dBtns"></div>
@@ -3570,10 +3917,10 @@ function renderDetail() {
 function renderSkins(id, st) {
   st.skins = st.skins || []; const box = $('#skinBox');
   box.innerHTML = `<b style="font-family:var(--display);font-size:12px;color:var(--ink)">Skins</b><div id="skinList" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"></div>`;
-  for (const sk of [{ id: '', name: 'Classic', price: null }, ...SKINS]) {
+  for (const sk of [{ id: '', name: 'Classic', price: null }, ...(SPECIAL_SKINS[id] || []).map(x => ({ ...x, special: true })), ...SKINS]) {
     const owned = !sk.id || st.skins.includes(sk.id), on = (st.skin || '') === sk.id;
     const el = document.createElement('div'); el.className = 'stat'; el.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;width:116px';
-    el.innerHTML = `<canvas width="96" height="96" style="width:72px;height:72px"></canvas><b style="font-size:9px">${sk.name}</b>`;
+    el.innerHTML = `<canvas width="96" height="96" style="width:72px;height:72px"></canvas><b style="font-size:9px;text-align:center">${sk.name}</b>${sk.special ? '<small style="font-size:7px;color:#c050ff">SPECIAL</small>' : ''}`;
     drawPortrait(el.querySelector('canvas'), id, { skin: sk.id });
     const b = document.createElement('button'); b.className = 'btn small ' + (on ? 'grey' : owned ? 'green' : 'purple'); b.style.fontSize = '8px';
     if (!st.owned) { b.textContent = 'Locked'; b.disabled = true; }
@@ -3628,6 +3975,7 @@ function renderShop() {
   B.innerHTML = `<p class="stroke-sm" style="margin:0;font-size:15px">Everything here costs coins or gems you earn by playing. There are no real-money purchases.</p>
     <h3 class="section-title stroke-sm">Daily deals</h3><div class="offers" id="offA"></div>
     ${locked.length ? '<h3 class="section-title stroke-sm">Brawlers</h3><div class="offers" id="offB"></div>' : ''}
+    <h3 class="section-title stroke-sm">Featured skins</h3><div class="offers" id="offS"></div>
     <h3 class="section-title stroke-sm">Exchange</h3><div class="offers" id="offC"></div>`;
   const offer = (parent, bg, draw, title, text, btn, cls, fn, dis) => {
     const el = document.createElement('div'); el.className = 'offer'; el.style.background = bg;
@@ -3648,6 +3996,16 @@ function renderShop() {
     const u = UNLOCK[d.id];
     const cur = u.coins ? 'coins' : 'gems', price = u.coins || u.gems;
     offer($('#offB'), `linear-gradient(180deg,${d.bg},${d.bg2})`, (c, cvs) => drawPortrait(cvs, d.id, { scale: 2.2 }), d.name, d.role + '. ' + d.attack.name + ' and ' + d.super.name + '.', `${icon(cur === 'coins' ? 'coin' : 'gem')} ${price}`, cur === 'coins' ? 'green' : 'purple', () => buyBrawler(d.id, cur, price));
+  }
+  const allSp = Object.entries(SPECIAL_SKINS).flatMap(([bid, list]) => list.map(sk => ({ bid, sk })));
+  const day = Math.floor(Date.now() / 86400000);
+  for (let i = 0; i < 3; i++) {
+    const { bid, sk } = allSp[(day * 7 + i * 5) % allSp.length], st = S.brawlers[bid], owned = (st.skins || []).includes(sk.id);
+    const cur = sk.price.gems ? 'gems' : 'coins', price = sk.price[cur];
+    offer($('#offS'), `linear-gradient(180deg,${BR[bid].bg},${BR[bid].bg2})`, (c, cvs) => drawPortrait(cvs, bid, { scale: 2.2, skin: sk.id }), `${sk.name} ${BR[bid].name}`, st.owned ? 'A special skin. Changes daily.' : `Unlock ${BR[bid].name} first.`, owned ? 'Owned' : `${icon(cur === 'gems' ? 'gem' : 'coin')} ${price}`, 'purple', () => {
+      if (S[cur] < price) { Sound.play('error'); toast(`You need ${price - S[cur]} more ${cur}.`); return; }
+      S[cur] -= price; st.skins = st.skins || []; st.skins.push(sk.id); st.skin = sk.id; save(); Sound.play('buy'); toast(`${sk.name} ${BR[bid].name} unlocked!`); updateWallet(); renderShop();
+    }, owned || !st.owned);
   }
   const ex = (gems, coins) => offer($('#offC'), 'linear-gradient(180deg,#3fa2ff,#2a5ad8)', drawCoins(Math.min(6, Math.round(coins / 120))), `${fmt(coins)} coins`, `Trade ${gems} gems for a pile of coins.`, `${icon('gem')} ${gems}`, 'purple', () => {
     if (S.gems < gems) { Sound.play('error'); toast(`You need ${gems - S.gems} more gems.`); return; }
@@ -3716,16 +4074,65 @@ function renderProfile() {
   const B = $('#profileBody'), st = S.stats;
   const rate = st.matches ? Math.round(st.wins / st.matches * 100) : 0;
   B.innerHTML = `<div class="panel"><h3>Your name</h3><div class="row"><input type="text" id="nameIn" maxlength="14" value=""><button class="btn small green" id="nameSave">Save name</button></div>
-    <h3 style="margin-top:14px">Profile icon</h3><div class="avatars" id="avs"></div></div>
+    <h3 style="margin-top:14px">Profile icon</h3><div class="avatars" id="avs"></div>
+    <h3 style="margin-top:14px">Title</h3><p>${S.titles.length ? '' : 'Reach Master on a brawler to earn a title.'}</p><div class="row" id="titles"></div></div>
     <div class="panel"><h3>Stats</h3><div class="kv">
       ${[['Trophies', fmt(totalTrophies())], ['Highest trophies', fmt(S.bestTrophies)], ['Matches', fmt(st.matches)], ['Wins', `${fmt(st.wins)} (${rate}%)`], ['Enemies defeated', fmt(st.kills)], ['Damage dealt', fmt(st.damage)], ['Goals scored', fmt(st.goals)], ['Gems collected', fmt(st.gems)], ['Supers used', fmt(st.supers)],
         ...Object.keys(MODES).map(k => [`${MODES[k].name} wins`, fmt(st.modeWins[k] || 0)])].map(([k, v]) => `<div class="stat"><small>${k}</small><b>${v}</b></div>`).join('')}
     </div></div>
     <div class="panel"><h3>Brawler trophies</h3><div class="kv">${BR_LIST.map(d => `<div class="stat"><small>${d.name}${S.brawlers[d.id].owned ? '' : ' (locked)'}</small><b>${S.brawlers[d.id].trophies} · Power ${S.brawlers[d.id].level}</b></div>`).join('')}</div></div>`;
   $('#nameIn').value = S.name;
+  for (const t of ['', ...S.titles]) { const b = document.createElement('button'); b.className = 'btn small ' + (S.title === t ? 'grey' : 'blue'); b.textContent = t || 'No title'; b.onclick = () => { S.title = t; save(); renderProfile(); }; $('#titles').appendChild(b); }
   $('#nameSave').onclick = () => { const v = $('#nameIn').value.trim().replace(/[<>]/g, '').slice(0, 14); if (!v) { toast('Type a name first.'); return; } S.name = v; save(); updateWallet(); toast('Name saved'); };
   const avs = $('#avs');
   BR_LIST.forEach((d, i) => { const b = document.createElement('button'); b.className = S.avatar === i ? 'on' : ''; b.setAttribute('aria-label', d.name + ' icon'); b.innerHTML = '<canvas width="128" height="128"></canvas>'; drawPortrait(b.querySelector('canvas'), d.id, { scale: 2.9 }); b.onclick = () => { S.avatar = i; save(); updateWallet(); renderProfile(); }; avs.appendChild(b); });
+}
+
+// ---------------- ranked ----------------
+function rankBadge(idx) { const [nm] = RANKS[idx], col = RANK_COL[nm.split(' ')[0]]; return `<div class="rankbadge" style="background:${col}">${nm.replace(' ', '<br>')}</div>`; }
+function renderRanked() {
+  const B = $('#rankedBody'), pts = S.ranked.pts, i = rankIdx(pts), next = RANKS[i + 1];
+  B.innerHTML = `<div class="panel" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">${rankBadge(i)}<div style="flex:1;min-width:200px"><h3>${RANKS[i][0]}</h3><p>${fmt(pts)} ranked points${next ? ` · ${next[1] - pts} to ${next[0]}` : ' · top rank!'}</p><div class="bar" style="margin-top:8px"><i style="width:${next ? (pts - RANKS[i][1]) / (next[1] - RANKS[i][1]) * 100 : 100}%"></i></div>
+    <p style="margin-top:8px;font-size:9px">Ranked matches are 3 vs 3 in a random mode against tougher bots. Win +35, draw +5, lose -20 points. Your first time reaching each rank gives a reward. Ranked does not change trophies.</p>
+    <button class="btn green" id="rankedPlay" style="margin-top:10px">Play Ranked</button></div></div>
+    <div class="panel"><h3>Ranks</h3><div class="kv">${RANKS.map(([nm, p], k) => `<div class="stat" style="background:${RANK_COL[nm.split(' ')[0]]};opacity:${k <= i ? 1 : 0.5}"><small style="color:#1a1a3a">${p} points</small><b style="color:#1a1a3a">${nm}</b></div>`).join('')}</div></div>`;
+  $('#rankedPlay').onclick = () => startMatch(true);
+}
+
+// ---------------- club ----------------
+const CLUB_LINES = { hi: ['hey!', 'hi :)', 'yo', 'welcome back!'], gg: ['gg!', 'gg wp', 'nice one'], help: ['try Shelly in Showdown', 'hide in bushes before you attack', 'save your gadget for close fights', 'heal by not shooting for 3 seconds'],
+  any: ['who wants to play Brawl Ball?', 'just got a Star Drop!', 'Spike is so good', 'anyone pushing Ranked?', 'Crow poison is annoying lol', 'I love the new skins', 'need 50 more trophies', 'Gem Grab is my favorite'] };
+function ensureClub() {
+  const C = S.club;
+  if (!C.members.length) { const ns = shuffle(BOT_NAMES.slice()).slice(0, 9); C.members = ns.map((n, i) => ({ name: n, trophies: randi(150, 900), role: i === 0 ? 'President' : i < 3 ? 'Vice President' : i < 5 ? 'Senior' : 'Member' })); C.chat = [{ from: ns[0], text: 'Welcome to the club!', t: Date.now() }]; }
+  return C;
+}
+const clubTrophies = () => ensureClub().members.reduce((a, m) => a + m.trophies, 0) + totalTrophies();
+function clubSay(from, text) { const C = ensureClub(); C.chat.push({ from, text: String(text).slice(0, 120), t: Date.now() }); if (C.chat.length > 60) C.chat.splice(0, C.chat.length - 60); }
+function clubAfterMatch(win) {
+  const C = ensureClub(); for (const m of C.members) m.trophies += randi(-2, 9);
+  if (Math.random() < 0.5) clubSay(pick(C.members).name, win ? pick(['nice win!', 'gg!', 'you are on fire', 'carry me next time']) : pick(['unlucky', 'you got this', 'next one is yours']));
+}
+function renderClub() {
+  const C = ensureClub(), B = $('#clubBody'), tot = clubTrophies();
+  B.innerHTML = `<div class="panel"><h3>${C.name.replace(/[<>]/g, '')}</h3><div class="row"><input type="text" id="clubName" maxlength="18" value=""><button class="btn small green" id="clubRename">Rename</button></div>
+    <p style="margin-top:8px">Club trophies: ${fmt(tot)} · ${C.members.length + 1} members</p><div id="clubGoals" class="row" style="margin-top:8px"></div></div>
+    <div class="panel"><h3>Chat</h3><div class="chat" id="chatBox"></div><div class="row" style="margin-top:8px"><input type="text" id="chatIn" maxlength="100" placeholder="Say something"><button class="btn small blue" id="chatSend">Send</button></div></div>
+    <div class="panel"><h3>Members</h3><div class="kv" id="memberList"></div></div>`;
+  $('#clubName').value = C.name;
+  $('#clubRename').onclick = () => { const v = $('#clubName').value.trim().slice(0, 18); if (v) { C.name = v; save(); renderClub(); } };
+  CLUB_GOALS.forEach((g, i) => { const ok = tot >= g.t, got = C.claimed.includes(i); const b = document.createElement('button'); b.className = 'btn small ' + (ok && !got ? 'green' : 'grey'); b.textContent = `${fmt(g.t)}: ${g.gems ? g.gems + ' gems' : g.coins + ' coins'}${got ? ' ✓' : ''}`; b.disabled = !ok || got; b.onclick = () => { C.claimed.push(i); grant(g); save(); renderClub(); }; $('#clubGoals').appendChild(b); });
+  const list = [...C.members, { name: S.name + ' (you)', trophies: totalTrophies(), role: 'Member' }].sort((a, b) => b.trophies - a.trophies);
+  $('#memberList').innerHTML = list.map(m => `<div class="stat"><small>${m.role}</small><b>${m.name.replace(/[<>]/g, '')}</b><br><span class="trophy-line" style="color:#8a6b3a">${icon('trophy')} ${fmt(m.trophies)}</span></div>`).join('');
+  const box = $('#chatBox');
+  const draw = () => { box.innerHTML = ''; for (const m of C.chat) { const d = document.createElement('div'); d.className = 'msg' + (m.from === S.name ? ' me' : ''); const b = document.createElement('b'); b.textContent = m.from + ': '; d.appendChild(b); d.appendChild(document.createTextNode(m.text)); box.appendChild(d); } box.scrollTop = box.scrollHeight; };
+  draw();
+  const send = () => {
+    const v = $('#chatIn').value.trim(); if (!v) return; $('#chatIn').value = ''; clubSay(S.name, v); save(); draw();
+    const low = v.toLowerCase(), key = /\b(hi|hello|hey|yo)\b/.test(low) ? 'hi' : /\bgg\b/.test(low) ? 'gg' : /help|how|tip/.test(low) ? 'help' : 'any';
+    const n = randi(1, 2); for (let i = 0; i < n; i++) setTimeout(() => { clubSay(pick(C.members).name, pick(CLUB_LINES[key])); save(); if (App.screen === 'club') draw(); }, 900 + i * 1200 + Math.random() * 800);
+  };
+  $('#chatSend').onclick = send; $('#chatIn').onkeydown = e => { if (e.key === 'Enter') send(); };
 }
 
 // ---------------- settings ----------------
@@ -3740,11 +4147,12 @@ function syncSettings() {
 function openSettings() { syncSettings(); $('#ov-settings').hidden = false; }
 
 // ---------------- matches ----------------
-function startMatch() {
-  Sound.init(); Sound.resume();
+let rankedNext = false;
+function startMatch(ranked = false) {
+  Sound.init(); Sound.resume(); rankedNext = !!ranked;
   if (!S.seenHelp) { S.seenHelp = true; save(); $('#ov-help').hidden = false; $('#ov-help').dataset.then = 'play'; return; }
   Input.keys.clear(); Input.joy = Input.atk = Input.sup = null; Input.queue.length = 0; Input.mouse.down = false; Input.superPress = false;
-  startBattle(S.mode);
+  startBattle(ranked ? pick(RANKED_MODES) : S.mode); rankedNext = false;
   show('battle'); resize();
   Sound.music('battle');
 }
@@ -3769,7 +4177,27 @@ function finishMatch() {
   else { tro = res === 'win' ? 8 : res === 'draw' ? 0 : -4; coins = res === 'win' ? 40 : res === 'draw' ? 20 : 10; xp = res === 'win' ? 40 : res === 'draw' ? 25 : 15; }
   if (g.quit) { coins = 0; xp = 0; tro = Math.min(tro, -2); }
   coins += g.quit ? 0 : g.stats.kills * 3;
+  if (g.ranked) tro = 0;
   const before = bs.trophies; bs.trophies = Math.max(0, bs.trophies + tro); const dTro = bs.trophies - before;
+  const extraLines = [];
+  if (g.ranked && !g.quit) {
+    const rpD = res === 'win' ? 35 : res === 'draw' ? 5 : -20, oldIdx = rankIdx(S.ranked.pts);
+    S.ranked.pts = Math.max(0, S.ranked.pts + rpD); S.ranked.best = Math.max(S.ranked.best, S.ranked.pts);
+    const ni = rankIdx(S.ranked.pts);
+    extraLines.push(`Ranked: ${rpD >= 0 ? '+' : ''}${rpD} points · ${RANKS[ni][0]}`);
+    if (ni > oldIdx && !S.ranked.claimed.includes(ni)) { S.ranked.claimed.push(ni); const rw = ni % 3 === 0 ? { gems: 10 + ni * 2 } : { coins: 60 + ni * 20 }; grant(rw, true); extraLines.push(`Ranked up to ${RANKS[ni][0]}! Reward: ${rw.gems ? rw.gems + ' gems' : rw.coins + ' coins'}`); }
+  } else if (g.ranked) { S.ranked.pts = Math.max(0, S.ranked.pts - 20); extraLines.push('Ranked: -20 points'); }
+  if (!g.quit) {
+    const mp = (res === 'win' ? 50 : res === 'draw' ? 30 : 20) + Math.min(5, g.stats.kills) * 10;
+    const ml = masteryLvl(bs.mastery || 0); bs.mastery = (bs.mastery || 0) + mp; const nl = masteryLvl(bs.mastery);
+    extraLines.push(`Mastery: +${mp} (${MASTERY_NAMES[nl]})`);
+    for (let l = ml + 1; l <= nl; l++) {
+      const rw = l % 3 === 0 ? { gems: l * 3 } : { coins: l * 40 }; grant(rw, true);
+      extraLines.push(`Mastery ${MASTERY_NAMES[l]} reward: ${rw.gems ? rw.gems + ' gems' : rw.coins + ' coins'}`);
+      if (l === 10) { const t = 'Master of ' + BR[pid].name; if (!S.titles.includes(t)) S.titles.push(t); extraLines.push(`New title: ${t}!`); }
+    }
+    clubAfterMatch(res === 'win');
+  }
   S.coins += coins; S.passXp += xp; S.bestTrophies = Math.max(S.bestTrophies, totalTrophies());
   const win = res === 'win', st = S.stats, gs = g.stats;
   st.matches++; if (win) { st.wins++; st.modeWins[g.mode] = (st.modeWins[g.mode] || 0) + 1; }
@@ -3791,6 +4219,7 @@ function finishMatch() {
         <div class="rw-line">${icon('trophy')} <span>${dTro >= 0 ? '+' : ''}${dTro}</span><span style="margin-left:auto;font-size:15px;opacity:.85">${BR[pid].name}: ${bs.trophies}</span></div>
         <div class="rw-line">${icon('coin')} <span>+${coins}</span></div>
         <div class="rw-line">${icon('pass')} <span>+${xp} pass XP</span></div>
+        ${extraLines.map(l => `<div class="rw-line" style="font-size:9px;line-height:1.6">${l}</div>`).join('')}
       </div></div>
     <div class="rstats"><span>KOs ${gs.kills}</span><span>Damage ${fmt(gs.damage)}</span><span>Supers ${gs.supers}</span><span>${extra}</span></div>
     ${win && !g.quit ? `<div style="text-align:center;margin-top:12px"><button class="btn purple" id="rDrop">Open Star Drop!</button><p id="dropOut" class="qnote" style="font-size:12px"></p></div>` : ''}
@@ -3802,7 +4231,7 @@ function finishMatch() {
   $('#ov-result').hidden = false;
   Sound.play(win ? 'win' : 'lose');
   if ($('#rDrop')) $('#rDrop').onclick = () => openStarDrop($('#rDrop'), $('#dropOut'));
-  $('#rAgain').onclick = () => { $('#ov-result').hidden = true; startMatch(); };
+  $('#rAgain').onclick = () => { $('#ov-result').hidden = true; startMatch(g.ranked); };
   $('#rHome').onclick = () => { $('#ov-result').hidden = true; goHome(); };
 }
 function openStarDrop(btn, out) {
