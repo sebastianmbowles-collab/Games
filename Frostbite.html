@@ -487,6 +487,7 @@ function genWorld(sd) {
     spots.push({ tx: x, ty: y, x: x * T + T / 2, y: y * T + T / 2, name: cat.name, found: false });
   }
 
+  placeShrines(dst);
   // fill the world with things
   objs = []; ogrid = new Array(W * H);
   for (let i = 0; i < W * H; i++) ogrid[i] = [];
@@ -494,6 +495,7 @@ function genWorld(sd) {
     const t = tiles[y * W + x];
     if (Math.hypot(x - vill.tx, y - vill.ty) < 8.5) continue;
     if (spots.some(s => Math.hypot(s.tx - x, s.ty - y) < 3.5)) continue;
+    if (nearShrineOrCastle(x, y)) continue;
     const h = hash2(x, y, seed + 7);
     const px = x * T + T / 2 + (hash2(x, y, seed + 9) - 0.5) * 18, py = y * T + T / 2 + (hash2(x, y, seed + 10) - 0.5) * 18;
     let type = null, extra = null;
@@ -711,7 +713,8 @@ function newGame() {
   camp = null; spawn = null;
   enemies = []; proj = []; drops = []; baits = []; shopOpen = null; campOpen = false; yetiNight = 0;
   makeTraders();
-  flags = { cold: false, hungry: false, firstFish: false, spotSeen: {}, villTalk: 0, robe: 0 };
+  flags = { cold: false, hungry: false, firstFish: false, spotSeen: {}, villTalk: 0, robe: 0, pieces: 0 };
+  arena = null;
   owl = { on: false, x: 0, y: 0, z: 30, flap: 0, still: 0, face: 1, hootT: 8 };
   gameTime = DAY * 0.08;
   speech = null; toasts = []; floats = []; parts = []; prints = [];
@@ -738,7 +741,7 @@ function saveGame() {
   if (state !== 'play' && state !== 'dead') return;
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v: 1, seed, gameTime, p: { x: player.x, y: player.y }, S, camp, spawn, flags, owl: owl.on,
+      v: 1, seed, gameTime, p: arena ? arena.back : { x: player.x, y: player.y }, S, camp, spawn, flags, owl: owl.on,
       // a rock snowball lying on the ground goes back in the bag when saving
       inv: Object.assign({}, inv, { rockball: inv.rockball + drops.filter(dr => dr.item === 'rockball').length + proj.filter(q => q.kind === 'rockball').length }),
       ex: packBits(explored), spots: spots.map(s => s.found ? 1 : 0),
@@ -877,6 +880,7 @@ const VOICES = {
   'Old Hesk': { f: 215, type: 'square', vol: 0.05, cut: 1900, wobble: true },
   Wren: { f: 270, type: 'triangle', vol: 0.08, cut: 2000 },
   'Masked trader': { f: 112, type: 'triangle', vol: 0.1, cut: 1100, wobble: true },
+  'Frost Spirit': { f: 76, type: 'sawtooth', vol: 0.08, cut: 900, wobble: true },
 };
 let babbleUntil = {};
 function babble(text, voice, loud = 1) {
@@ -975,6 +979,7 @@ addEventListener('blur', () => { for (const k in keys) keys[k] = false; hold.run
 function onKey(code) {
   if (state === 'title') { if (code === 'Enter' || code === 'Space') { if (hasSave()) continueGame(); else startNew(); } else if (code === 'KeyN') startNew(); return; }
   if (state === 'story') { if (code === 'Escape') beginPlay(); else storyNext(); return; }
+  if (state === 'ending') { endingNext(); return; }
   if (state === 'dead') { if (code === 'KeyE' || code === 'Space' || code === 'Enter') respawn(); return; }
   if (fade.phase !== 'none') return;
   if (code === 'Escape' || code === 'KeyP') { if (mapOpen) mapOpen = false; else if (bagOpen) bagOpen = false; else if (shopOpen) shopOpen = null; else if (campOpen) campOpen = false; else paused = !paused; sfx.ui(); return; }
@@ -991,6 +996,7 @@ function onKey(code) {
   }
   if (bagOpen) { if (/^Digit[1-9]$/.test(code)) { const k = ORDER.filter(k => count(k) > 0)[+code.slice(5) - 1]; if (k) bagSel = k; } else if (code === 'KeyE' && bagSel) useItem(bagSel); return; }
   helpT = Math.min(helpT, 0.6);
+  if (arena && /KeyM|Tab|KeyB|KeyI|KeyZ|KeyC|KeyT|KeyE/.test(code)) return;
   if (code === 'KeyE' || code === 'Space') act();
   else if (code === 'KeyQ') eatBest();
   else if (code === 'KeyC') cook();
@@ -1018,6 +1024,7 @@ cv.addEventListener('pointerdown', e => {
     return;
   }
   if (state === 'story') { storyNext(); return; }
+  if (state === 'ending') { endingNext(); return; }
   if (state === 'dead') { respawn(); return; }
   if (state === 'play' && !paused && !mapOpen && !bagOpen && !shopOpen && !campOpen && e.pointerType !== 'mouse' && x < VW * 0.62) {
     joy = { id: e.pointerId, ox: x, oy: y, x, y };
@@ -1055,6 +1062,8 @@ function findTarget() {
   for (const v of villagers) { const d = dist(px, py, v.x, v.y); if (d < 40 && d < bd && v.mode !== 'chase') { best = { kind: 'villager', v }; bd = d; } }
   if (!camp) for (const s of spots) { const d = dist(px, py, s.x, s.y); if (d < 56 && d < bd + 20) { best = { kind: 'spot', s }; bd = d; } }
   for (const tr of traders) { const d = dist(px, py, tr.x, tr.y); if (d < 46 && d < bd + 10) { best = { kind: 'trader', tr }; bd = d; } }
+  for (const sh of shrines) if ((flags.beat || [])[sh.i] && !(flags.taken || [])[sh.i] && dist(px, py, sh.x, sh.y) < 56) return { kind: 'shrine', s: sh };
+  if (flags.castle && dist(px, py, castle.x, castle.y + 12) < 56) return { kind: 'castle' };
   if (player.climb) return { kind: 'climb' };
   if (enemies.some(e => e.type === 'bear' && e.state === 'chase')) {
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) for (const o of ogrid[(ty + j) * W + tx + i] || []) {
@@ -1073,6 +1082,8 @@ function verbFor(tg) {
       return inv.sticks >= 2 ? 'Light the fire (2 sticks)' : 'Need 2 sticks to light it';
     case 'tent': return 'Open the camp menu';
     case 'trader': return 'Trade with the masked stranger';
+    case 'shrine': return 'Take the mask piece';
+    case 'castle': return flags.won ? 'Look inside the empty castle' : 'Enter the frozen castle';
     case 'climb': return player.climb ? 'Climb down' : 'Climb the tree!';
     case 'spot': return 'Set up camp here';
     case 'villager': return `Talk to ${tg.v.name}`;
@@ -1095,6 +1106,8 @@ function act() {
     } else say('I need 2 sticks to light it.');
   } else if (tg.kind === 'tent') { campOpen = true; sfx.ui(); }
   else if (tg.kind === 'trader') talkTrader(tg.tr);
+  else if (tg.kind === 'shrine') takePiece(tg.s);
+  else if (tg.kind === 'castle') enterCastle();
   else if (tg.kind === 'climb') {
     if (player.climb) { player.climb = null; player.y += 14; }
     else { player.climb = tg.o; player.fishing = null; sfx.pick(); say('Up the tree! Bears cannot climb.', 2); }
@@ -1258,6 +1271,7 @@ function sleep() {
 }
 function fadeTo(text, mid) { fade.phase = 'out'; fade.t = 0; fade.text = text; fade.mid = mid; }
 function die(cause) {
+  leaveArena();
   deathCause = cause;
   bagOpen = false; mapOpen = false;
   state = 'dead';
@@ -1302,6 +1316,8 @@ function reveal() {
 
 // ---------- collisions ----------
 function blocked(x, y) {
+  for (const sh of shrines) if (Math.abs(x - sh.x) < 60 && Math.abs(y - sh.y) < 40 && dist(x, (y - sh.y) * 1.6 + sh.y, sh.x, sh.y - 4) < 20) return true;
+  if (flags && flags.castle && Math.abs(y - castle.y + 30) < 36 && Math.abs(x - castle.x) < 112 && Math.abs(x - castle.x) > 22) return true;
   const r = 9;
   if (tileAtW(x - r, y) === PEAK || tileAtW(x + r, y) === PEAK || tileAtW(x, y - 5) === PEAK || tileAtW(x, y + 4) === PEAK) return true;
   const tx = Math.floor(x / T), ty = Math.floor(y / T);
@@ -1334,7 +1350,8 @@ function update(dt) {
     else { fade.a = Math.max(0, 1 - fade.t / 0.8); if (fade.t >= 0.8) { fade.phase = 'none'; fade.a = 0; } }
   }
   if (state === 'title' || state === 'story') updateSnow(dt, 0, 0);
-  if (state === 'play' && !paused && !mapOpen && !bagOpen && !shopOpen && !campOpen && fade.phase !== 'hold') gameUpdate(dt);
+  if (state === 'play' && !paused && !mapOpen && !bagOpen && !shopOpen && !campOpen && fade.phase !== 'hold') { if (arena) arenaUpdate(dt); else gameUpdate(dt); }
+  if (state === 'ending') updateSnow(dt, 0, 0);
   updateAudio(dt);
 }
 
@@ -1360,7 +1377,7 @@ function gameUpdate(dt) {
   const wantRun = keys.ShiftLeft || keys.ShiftRight || hold.run;
   const running = moving && wantRun && !player.exhausted;
   const sadWalk = S.warm < 30 || S.food < 30;
-  const speed = (running ? 165 : player.exhausted ? 70 : sadWalk ? 76 : 95);
+  const speed = (running ? 165 * (piecesN() >= 2 ? 1.1 : 1) : player.exhausted ? 70 : sadWalk ? 76 : 95);
   if (moving && player.fishing) { player.fishing = null; say('Oops, scared the fish away.', 1.2); }
   if (player.climb) {
     // up a tree: moving climbs back down
@@ -1395,7 +1412,7 @@ function gameUpdate(dt) {
   const tile = tileAtW(player.x, player.y);
   const night = darkness(t) / 0.8;
   const biomeMul = { [SNOW]: 1, [FOREST]: 0.85, [ICE]: 1.25, [ROCK]: 1.35, [PEAK]: 1.35, [CAVE]: 0.6, [VILL]: 0.9, [SPRING]: 0 }[tile];
-  let warmRate = -0.62 * (1 + night * 0.75) * biomeMul * (1 + windNow() * 0.3) * ROBES[flags.robe || 0].mul * (flags.singed ? 1.35 : 1);
+  let warmRate = -0.62 * (1 + night * 0.75) * biomeMul * (1 + windNow() * 0.3) * ROBES[flags.robe || 0].mul * (flags.singed ? 1.35 : 1) * (piecesN() >= 1 ? 0.9 : 1);
   if (running) warmRate *= 0.8;
   let heat = 0, nearFire = false;
   if (camp && camp.fuel > 0) {
@@ -1411,7 +1428,7 @@ function gameUpdate(dt) {
   S.food = clamp(S.food - (running ? 0.5 : 0.33) * dt, 0, 100);
   const cold = S.warm < 30, hungry = S.food < 30;
   if (running) S.sta = clamp(S.sta - 22 * dt * (cold ? 1.5 : 1) * (hungry ? 1.5 : 1), 0, 100);
-  else S.sta = clamp(S.sta + 16 * dt * (cold ? 0.5 : 1) * (hungry ? 0.5 : 1), 0, 100);
+  else S.sta = clamp(S.sta + 16 * dt * (cold ? 0.5 : 1) * (hungry ? 0.5 : 1) * (piecesN() >= 4 ? 1.35 : 1), 0, 100);
   if (S.warm <= 0) { S.hp -= 2.5 * dt; deathCause = 'cold'; }
   if (S.food <= 0) { S.hp -= 1.5 * dt; if (S.warm > 0) deathCause = 'hunger'; }
   if (S.warm > 40 && S.food > 40) S.hp = Math.min(100, S.hp + 0.6 * dt);
@@ -1419,6 +1436,7 @@ function gameUpdate(dt) {
 
   updateCombat(dt);
   updateEnemies(dt, running);
+  updateBosses(dt);
   if (S.hp <= 0) { S.hp = 0; die(deathCause || 'cold'); return; }
 
   // the kid talks about how they feel
@@ -1468,6 +1486,7 @@ function gameUpdate(dt) {
   if (tickT >= 1) {
     tickT = 0;
     spawnTick();
+    shrineTick();
     for (const o of objs) if (o.stock <= 0 && o.regrowAt && gameTime >= o.regrowAt && !o.gone) { o.stock = OT[o.type].stock; o.regrowAt = 0; }
     let spoiled = 0;
     for (const k of ['ckBugs', 'ckCod', 'ckPerch', 'ckChar', 'ckMeat']) while (inv[k].length && inv[k][0] <= gameTime) { inv[k].shift(); spoiled++; }
@@ -1657,6 +1676,8 @@ function spawnTick() {
     const d = dist(e.x, e.y, player.x, player.y);
     if (e.type === 'snowman') return d < 1300 && !(e.hp <= 0 && e.dead <= 0.02);
     if (e.type === 'bear') return d < 1800 || e.state === 'chase';
+    if (e.type === 'boss') return e.hp > 0 && d < 1000;
+    if (e.type === 'wolf') return e.hp > 0 && d < 800 && (enemies.includes(e.leader) || e.state === 'flee');
     return !(e.state === 'leave' && d > 950);
   });
 }
@@ -1804,7 +1825,7 @@ function attack() {
   if (wp.reach) {
     const hx = player.x + dv[0] * 22, hy = player.y - 10 + dv[1] * 18;
     let hit = false;
-    for (const e of enemies) if ((e.hp === undefined || e.hp > 0) && dist(e.x, e.y - 14, hx, hy) < wp.reach + (e.type === 'snowman' ? 0 : 14)) { hitEnemy(e, wp.dmg, w); hit = true; }
+    for (const e of enemies) if ((e.hp === undefined || e.hp > 0) && dist(e.x, e.y - 14, hx, hy) < wp.reach + (e.type === 'snowman' ? 0 : (e.r || 14))) { hitEnemy(e, wp.dmg, w); hit = true; }
     sfx.swing();
     if (w === 'spear' && hit) {
       inv.spearUses--;
@@ -1825,6 +1846,7 @@ function attack() {
   sfx.throw();
 }
 function hitEnemy(e, dmg, w) {
+  if (e.type === 'boss' || e.type === 'wolf') return hitBoss(e, dmg, w);
   e.flash = 0.25;
   if (e.type === 'snowman') {
     if (w === 'torch') dmg += 1;
@@ -1893,13 +1915,13 @@ function updateCombat(dt) {
       for (const e of enemies) {
         if (p.life <= 0) break;
         if (e.type === 'snowman' && e.hp > 0 && dist(p.x, p.y, e.x, e.y - 16) < 16) { hitEnemy(e, p.dmg, p.kind); p.life = 0; }
-        else if (e.type !== 'snowman' && dist(p.x, p.y, e.x, e.y - 20) < 24) { hitEnemy(e, 0, p.kind); p.life = 0; }
+        else if (e.type !== 'snowman' && (e.hp === undefined || e.hp > 0) && dist(p.x, p.y, e.x, e.y - 20) < (e.r || 24)) { hitEnemy(e, e.type === 'boss' || e.type === 'wolf' ? p.dmg : 0, p.kind); p.life = 0; }
       }
       if (p.life <= 0 && p.kind === 'rockball') drops.push({ x: p.x, y: p.y + 10, item: 'rockball', amt: 1 });
-    } else if (!player.climb && dist(p.x, p.y, player.x, player.y - 14) < 13) {
+    } else if (!player.climb && dist(p.x, p.y, player.x, player.y - 14) < (p.kind === 'snowball' ? 13 : 18)) {
       p.life = 0;
-      S.warm = Math.max(0, S.warm - 5); frostFlash = 0.5;
-      floatText('-5 warmth', player.x, player.y - 50, '#2a6a8a');
+      if (p.hp) hurt(p.hp, 'guardian');
+      else { const wl = p.warm || 5; S.warm = Math.max(0, S.warm - wl); frostFlash = 0.5; floatText(`-${wl} warmth`, player.x, player.y - 50, '#2a6a8a'); }
       sfx.splat();
       if (!flags.snowTip) { flags.snowTip = true; say('Hey! A snowman! I can throw my rock snowball back (F).', 3.5); }
     }
@@ -1953,7 +1975,9 @@ function makeTraders() {
 }
 function talkTrader(tr) {
   shopOpen = tr;
-  speak(tr, `Masked trader: ${TRADER_LINES[(tr.line++) % TRADER_LINES.length]}`, 4.5);
+  const sh = markShrine();
+  if (sh) speak(tr, `Masked trader: I marked a shrine on your map. The ${sh.g.name} guards a piece of the old mask there.`, 5);
+  else speak(tr, `Masked trader: ${TRADER_LINES[(tr.line++) % TRADER_LINES.length]}`, 4.5);
   if (!flags.metTrader) { flags.metTrader = true; }
 }
 function buy(item) {
@@ -2172,6 +2196,760 @@ function drawCampMenu() {
     bagText(wrap(row.cost, w - 110)[0], x + 72, ry + 32, 15, '#6b6457');
     if (row.fn) hits.push({ x: x + 14, y: ry, w: w - 28, h: 58, fn: () => { sfx.ui(); row.fn(); } });
   });
+}
+
+// ---------- step 3: the five shrines, their guardians, the mask, the castle and the Frost Spirit ----------
+const GUARDIANS = [
+  { kind: 'gsnow', name: 'Giant Snowman', tiles: [SNOW], hp: 24, r: 30 },
+  { kind: 'wolf', name: 'Ice Wolf pack', tiles: [FOREST], hp: 14, r: 20 },
+  { kind: 'bking', name: 'Old Bear King', tiles: [ICE], hp: 30, r: 34 },
+  { kind: 'yking', name: 'King Yeti', tiles: [ROCK], hp: 32, r: 34 },
+  { kind: 'golem', name: 'Ice Golem', tiles: [CAVE], hp: 28, r: 28 },
+];
+const POWERS = [
+  'Your warmth lasts a little longer.',
+  'You run a little faster.',
+  'You can see farther in the dark.',
+  'Your energy comes back faster.',
+  'The old mask is whole.',
+];
+let shrines = [], castle = null, arena = null, bossT = 0;
+const piecesN = () => flags.pieces || 0;
+
+// picked during world making, with their own random numbers so the rest of the world stays the same
+function placeShrines(dst) {
+  const R = mulberry32(seed + 4242);
+  shrines = [];
+  const far = (x, y, d) => shrines.every(s => Math.hypot(s.tx - x, s.ty - y) >= d) && spots.every(s => Math.hypot(s.tx - x, s.ty - y) >= 14);
+  const open = (x, y) => { for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (tileAt(x + dx, y + dy) === PEAK) return false; return true; };
+  GUARDIANS.forEach((g, i) => {
+    let cand = [];
+    for (let k = 0; k < W * H; k++) {
+      if (dst[k] < 25 || dst[k] > 90) continue;
+      const x = k % W, y = (k / W) | 0;
+      if (g.tiles.includes(tiles[k]) && open(x, y) && far(x, y, 22)) cand.push(k);
+    }
+    if (!cand.length) for (let k = 0; k < W * H; k++) {
+      const x = k % W, y = (k / W) | 0;
+      if (dst[k] >= 20 && tiles[k] !== SPRING && tiles[k] !== VILL && open(x, y) && far(x, y, 16)) cand.push(k);
+    }
+    if (!cand.length) return;
+    const k = cand[(R() * cand.length) | 0], x = k % W, y = (k / W) | 0;
+    shrines.push({ i, tx: x, ty: y, x: x * T + T / 2, y: y * T + T / 2, g });
+  });
+  // the frozen castle goes far away, in an open spot
+  let best = -1, bk = -1;
+  for (let k = 0; k < W * H; k++) {
+    const x = k % W, y = (k / W) | 0;
+    if (dst[k] < 30 || tiles[k] === SPRING || tiles[k] === VILL || tiles[k] === ICE) continue;
+    let ok = true;
+    for (let dy = -4; dy <= 3 && ok; dy++) for (let dx = -4; dx <= 4; dx++) if (tileAt(x + dx, y + dy) === PEAK) { ok = false; break; }
+    if (!ok || !far(x, y, 14)) continue;
+    const score = dst[k] + R() * 20;
+    if (score > best) { best = score; bk = k; }
+  }
+  if (bk < 0) bk = (vill.ty + 20) * W + vill.tx;
+  castle = { tx: bk % W, ty: (bk / W) | 0 };
+  castle.x = castle.tx * T + T / 2; castle.y = castle.ty * T + T / 2;
+}
+const nearShrineOrCastle = (x, y) => shrines.some(s => Math.hypot(s.tx - x, s.ty - y) < 4) || (castle && Math.hypot(castle.tx - x, castle.ty - y) < 6);
+
+// ---------- guardians ----------
+function bossFor(i) { return enemies.find(e => e.type === 'boss' && e.si === i); }
+function shrineTick() {
+  for (const s of shrines) {
+    const d = dist(s.x, s.y, player.x, player.y);
+    if (d < T * 8 && !(flags.found || [])[s.i]) {
+      flags.found = flags.found || []; flags.found[s.i] = true;
+      say(flags.beat && flags.beat[s.i] ? 'The shrine is quiet now.' : `An ice shrine... something big guards it. (${s.g.name})`, 3.5);
+    }
+    if ((flags.beat || [])[s.i]) continue;
+    if (d < 430 && !bossFor(s.i)) spawnGuardian(s);
+  }
+}
+function spawnGuardian(s) {
+  const g = s.g, hard = hardness();
+  const e = { type: 'boss', kind: g.kind, name: g.name, si: s.i, x: s.x, y: s.y + 70, hx: s.x, hy: s.y, hp: Math.round(g.hp * hard), max: Math.round(g.hp * hard), r: g.r, state: 'idle', t: 0, cool: 2, dir: 1, walk: 0, flash: 0, hopT: 0 };
+  enemies.push(e);
+  if (g.kind === 'wolf') {
+    for (let k = 0; k < 3; k++) enemies.push({ type: 'wolf', leader: e, x: s.x + (k - 1) * 50, y: s.y + 110, hp: 4, state: 'idle', t: Math.random() * 2, dir: 1, walk: 0, flash: 0, ang: k * 2.1, r: 14 });
+  }
+  toast(`${g.name} guards this shrine!`);
+  sfx.roar(); camShake = 0.4;
+}
+function updateBosses(dt) {
+  const hard = hardness();
+  const torch = player.torch > 0;
+  for (const e of enemies) {
+    if (e.type !== 'boss' && e.type !== 'wolf') continue;
+    e.flash = Math.max(0, e.flash - dt);
+    const d = dist(e.x, e.y, player.x, player.y);
+    const toP = () => { const l = d || 1; return [(player.x - e.x) / l, (player.y - e.y) / l]; };
+    if (e.type === 'wolf' || e.kind === 'wolf') {
+      // wolves circle you and lunge; they keep away from a torch
+      if (e.type === 'wolf' && e.leader.hp <= 0) { e.state = 'flee'; }
+      if (e.state === 'flee') { moveEnt(e, e.x + (e.x - player.x), e.y + (e.y - player.y), 120, dt); continue; }
+      e.ang = (e.ang || 0) + dt * 0.9;
+      const R = torch ? 170 : 105;
+      if (e.state === 'lunge') {
+        e.t -= dt;
+        e.x += e.lx * 270 * dt; e.y += e.ly * 270 * dt;
+        if (!e.bit && d < 20) { e.bit = true; hurt(e.type === 'boss' ? 14 : 10, 'wolf'); sfx.splat(); }
+        if (e.t <= 0 || tileAtW(e.x, e.y) === PEAK) { e.state = 'circle'; e.cool = 2 + Math.random() * 2; }
+      } else {
+        moveEnt(e, player.x + Math.cos(e.ang) * R, player.y + Math.sin(e.ang) * R * 0.7, 105 * hard, dt);
+        e.cool -= dt;
+        if (e.cool <= 0 && !torch && d < 200 && !player.climb) {
+          const [lx, ly] = toP(); e.lx = lx; e.ly = ly; e.state = 'lunge'; e.t = 0.5; e.bit = false; sfx.growl();
+        }
+      }
+      continue;
+    }
+    if (e.kind === 'gsnow') {
+      e.hopT += dt * 1.6;
+      if (d > 120) moveEnt(e, player.x, player.y, 30 * hard * (Math.sin(e.hopT * Math.PI) > 0 ? 1.5 : 0.2), dt);
+      e.dir = player.x > e.x ? 1 : -1;
+      e.cool -= dt; e.throwAnim = Math.max(0, (e.throwAnim || 0) - dt);
+      if (e.cool <= 0 && d < 420) {
+        e.cool = 3 / hard; e.throwAnim = 0.4;
+        for (const spread of [-0.25, 0, 0.25]) {
+          const a = Math.atan2(player.y - 12 - (e.y - 70), player.x - e.x) + spread;
+          proj.push({ x: e.x, y: e.y - 70, vx: Math.cos(a) * 190, vy: Math.sin(a) * 190, from: 'boss', kind: 'bigball', warm: 10, life: 2.4, life0: 2.4 });
+        }
+        sfx.throw();
+      }
+      e.summon = (e.summon || 6) - dt;
+      if (e.summon <= 0) {
+        e.summon = 9;
+        if (enemies.filter(m => m.type === 'snowman' && m.hp > 0 && dist(m.x, m.y, e.x, e.y) < 400).length < 4)
+          for (const s of [-1, 1]) enemies.push({ type: 'snowman', x: e.x + s * 60, y: e.y + 20, hp: 2, cool: 2, hopT: 0, dir: 1, flash: 0, dead: 0, aware: true });
+      }
+    } else if (e.kind === 'bking') {
+      // it scrapes the ground, charges in a straight line, then gets dizzy
+      if (e.state === 'idle' || e.state === 'stalk') {
+        e.state = 'stalk';
+        moveEnt(e, player.x, player.y, 50 * hard, dt);
+        e.cool -= dt;
+        if (e.cool <= 0 && d < 330) { e.state = 'windup'; e.t = 1; const [lx, ly] = toP(); e.lx = lx; e.ly = ly; e.dir = lx > 0 ? 1 : -1; sfx.growl(); }
+      } else if (e.state === 'windup') {
+        e.t -= dt;
+        if (e.t <= 0) { e.state = 'charge'; e.t = 0.9; e.bit = false; sfx.roar(); }
+      } else if (e.state === 'charge') {
+        e.t -= dt;
+        const nx = e.x + e.lx * 310 * hard * dt, ny = e.y + e.ly * 310 * hard * dt;
+        if (tileAtW(nx, ny) === PEAK) e.t = 0; else { e.x = nx; e.y = ny; }
+        e.walk += dt * 14;
+        if (!e.bit && d < 34 && !player.climb) { e.bit = true; hurt(25, 'bking'); }
+        if (e.t <= 0) { e.state = 'dizzy'; e.t = 2.2; camShake = 0.3; }
+      } else if (e.state === 'dizzy') {
+        e.t -= dt;
+        if (e.t <= 0) { e.state = 'stalk'; e.cool = 1.6; }
+      }
+    } else if (e.kind === 'yking') {
+      if (e.state === 'scared') { e.t -= dt; moveEnt(e, e.x + (e.x - player.x), e.y + (e.y - player.y), 90, dt); if (e.t <= 0) e.state = 'idle'; continue; }
+      if (torch && d < 120) { e.state = 'scared'; e.t = 2.5; sfx.roar(); continue; }
+      if (e.state === 'slam') {
+        e.t -= dt;
+        if (e.t <= 0 && !e.wave) { e.wave = 0.01; camShake = 0.5; sfx.poof(); }
+        if (e.wave) {
+          e.wave += dt * 190;
+          if (!e.bit && Math.abs(d - e.wave) < 14 && !player.climb) { e.bit = true; hurt(20, 'yking'); }
+          if (e.wave > 130) { e.wave = 0; e.state = 'idle'; e.cool = 2.5; }
+        }
+        continue;
+      }
+      moveEnt(e, player.x, player.y, 70 * hard, dt);
+      e.cool -= dt;
+      if (e.cool <= 0 && d < 95) { e.state = 'slam'; e.t = 0.8; e.wave = 0; e.bit = false; sfx.growl(); }
+      else if (e.cool <= 0 && d > 160 && d < 420) {
+        e.cool = 3.5 / hard;
+        const [lx, ly] = toP();
+        proj.push({ x: e.x, y: e.y - 60, vx: lx * 210, vy: ly * 210, from: 'boss', kind: 'boulder', hp: 15, life: 2.2, life0: 2.2 });
+        sfx.throw();
+      }
+    } else if (e.kind === 'golem') {
+      if (e.state === 'punch') {
+        e.t -= dt;
+        if (e.t <= 0) { if (d < 58 && !player.climb) hurt(25, 'golem'); camShake = 0.4; sfx.poof(); e.state = 'idle'; e.cool = 2; }
+        continue;
+      }
+      if (d > 40) moveEnt(e, player.x, player.y, 36 * hard, dt);
+      e.dir = player.x > e.x ? 1 : -1;
+      e.cool -= dt;
+      if (e.cool <= 0 && d < 52) { e.state = 'punch'; e.t = 0.9; sfx.growl(); }
+      else if (e.cool <= 0 && d > 140 && d < 400) {
+        e.cool = 4.5 / hard;
+        const [lx, ly] = toP();
+        proj.push({ x: e.x, y: e.y - 50, vx: lx * 200, vy: ly * 200, from: 'boss', kind: 'block', hp: 15, life: 2.2, life0: 2.2 });
+        sfx.throw();
+      }
+    }
+  }
+}
+function hitBoss(e, dmg, w) {
+  e.flash = 0.25;
+  if (e.type === 'wolf') { e.hp -= dmg; if (e.hp <= 0) { e.dead = 1; sfx.poof(); } else sfx.splat(); return; }
+  let k = 1;
+  if (e.kind === 'bking') k = e.state === 'dizzy' ? 2 : 0.5;
+  if ((e.kind === 'gsnow' || e.kind === 'yking') && w === 'torch') k = 2;
+  e.hp -= Math.max(1, Math.round(dmg * k));
+  sfx.splat();
+  if (e.kind === 'bking' && e.state !== 'dizzy' && !flags.bkTip) { flags.bkTip = true; say('It barely felt that. Hit it when it is dizzy after a charge!', 3.5); }
+  if (e.hp <= 0) {
+    e.hp = 0; e.dead = 1;
+    flags.beat = flags.beat || []; flags.beat[e.si] = true;
+    sfx.roar(); camShake = 0.6;
+    for (let i = 0; i < 20; i++) parts.push({ x: e.x, y: e.y - 30, vx: (Math.random() - 0.5) * 120, vy: -40 - Math.random() * 80, t: 1, kind: 'snow' });
+    say(`I beat the ${e.name}! The mask piece is free.`, 3.5);
+    saveGame();
+  }
+}
+function takePiece(s) {
+  flags.taken = flags.taken || []; flags.taken[s.i] = true;
+  flags.pieces = piecesN() + 1;
+  const n = flags.pieces;
+  sfx.hoot();
+  burstSparks(s.x, s.y - 30, 24);
+  toast(`Mask piece ${n} of 5! ${POWERS[n - 1]}`);
+  if (n === 5) {
+    flags.castle = true;
+    setTimeout(() => {
+      fadeTo('Far away, something cracks...', () => { toast('The old mask is whole. A frozen castle rose in the far snow. It is on your map.'); });
+    }, 1800);
+  } else say(n === 1 ? 'A piece of an old mask... it feels warm.' : `${5 - n} more to go.`, 3);
+  saveGame();
+}
+function markShrine() {
+  flags.marked = flags.marked || [];
+  const left = shrines.filter(s => !flags.marked[s.i] && !(flags.taken || [])[s.i]);
+  if (!left.length) return null;
+  const s = left[(Math.random() * left.length) | 0];
+  flags.marked[s.i] = true;
+  return s;
+}
+
+// ---------- the Frost Spirit's castle ----------
+function enterCastle() {
+  if (piecesN() < 5) { say('The door is sealed with ice.', 2); return; }
+  if (flags.won) { say('The castle is empty now. Cold, and quiet.', 3); return; }
+  fadeTo('The frozen castle', () => {
+    arena = {
+      back: { x: player.x, y: player.y },
+      spirit: { x: 0, y: -125, hp: 100, phase: 1, cool: 6, atk: null, flash: 0, bob: 0, leaving: 0 },
+      mins: [], icicles: [], beams: [], reflects: [], talk: null, t: 0, ended: false,
+    };
+    enemies = arena.mins; proj = []; drops = []; baits = [];
+    player.x = 0; player.y = 150; player.dir = 'up'; player.climb = null; player.fishing = null; player.frozen = 0;
+    cam.x = 0; cam.y = 0;
+    spiritSay("So... the little maker came. Do you know what I am?", 4);
+    setTimeout(() => { if (arena) spiritSay('I am every drawing they burned. Every carving. Every toy.', 4.5); }, 4300);
+  });
+}
+function spiritSay(text, t) { if (!arena) return; arena.talk = { text, t }; babble(text, VOICES['Frost Spirit'], 1); }
+const AREA_RX = 300, AREA_RY = 185;
+function inArena(x, y, pad = 0) { return (x * x) / ((AREA_RX - pad) ** 2) + (y * y) / ((AREA_RY - pad) ** 2) <= 1; }
+
+function arenaUpdate(dt) {
+  const A = arena, sp = A.spirit;
+  A.t += dt;
+  // input
+  let mx = 0, my = 0;
+  if (keys.KeyA || keys.ArrowLeft) mx -= 1;
+  if (keys.KeyD || keys.ArrowRight) mx += 1;
+  if (keys.KeyW || keys.ArrowUp) my -= 1;
+  if (keys.KeyS || keys.ArrowDown) my += 1;
+  if (joy) { const dx = joy.x - joy.ox, dy = joy.y - joy.oy, l = Math.hypot(dx, dy); if (l > 8) { const k = Math.min(1, l / 50); mx = dx / l * k; my = dy / l * k; } }
+  const ml = Math.hypot(mx, my);
+  if (ml > 1) { mx /= ml; my /= ml; }
+  player.frozen = Math.max(0, (player.frozen || 0) - dt);
+  if (S.sta <= 0) player.exhausted = true;
+  if (player.exhausted && S.sta > 30) player.exhausted = false;
+  const running = ml > 0.1 && (keys.ShiftLeft || keys.ShiftRight || hold.run) && !player.exhausted;
+  const speed = (running ? 165 * (piecesN() >= 2 ? 1.1 : 1) : player.exhausted ? 70 : 95);
+  player.moving = ml > 0.1 && !player.frozen && fade.phase === 'none';
+  if (player.moving) {
+    const nx = player.x + mx * speed * dt, ny = player.y + my * speed * dt;
+    if (inArena(nx, player.y, 12)) player.x = nx;
+    if (inArena(player.x, ny, 12)) player.y = ny;
+    player.walk += speed * dt * 0.16;
+    if (Math.abs(mx) > Math.abs(my)) player.dir = mx < 0 ? 'left' : 'right'; else player.dir = my < 0 ? 'up' : 'down';
+  }
+  S.warm = clamp(S.warm - 0.35 * dt * ROBES[flags.robe || 0].mul + (player.torch > 0 ? 1.5 * dt : 0), 0, 100);
+  if (running) S.sta = clamp(S.sta - 22 * dt, 0, 100); else S.sta = clamp(S.sta + 16 * dt * (piecesN() >= 4 ? 1.35 : 1), 0, 100);
+  if (S.warm <= 0) { S.hp -= 2.5 * dt; deathCause = 'spirit'; }
+  player.cool = Math.max(0, player.cool - dt);
+  player.atkCool = Math.max(0, (player.atkCool || 0) - dt);
+  player.swing = Math.max(0, (player.swing || 0) - dt);
+  hurtFlash = Math.max(0, hurtFlash - dt); frostFlash = Math.max(0, frostFlash - dt); camShake = Math.max(0, camShake - dt);
+  if (player.torch > 0) { player.torch -= dt; if (player.torch <= 0) player.torch = 0; }
+  if (speech) { speech.t -= dt; if (speech.t <= 0) speech = null; }
+  if (A.talk) { A.talk.t -= dt; if (A.talk.t <= 0) A.talk = null; }
+  for (const f of floats) { f.t -= dt; f.y -= 22 * dt; }
+  floats = floats.filter(f => f.t > 0);
+  for (const tt of toasts) tt.t -= dt;
+  toasts = toasts.filter(tt => tt.t > 0);
+  for (const p of parts) { p.t -= dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.kind === 'snow') p.vy += 120 * dt; }
+  parts = parts.filter(p => p.t > 0);
+  sp.bob += dt; sp.flash = Math.max(0, sp.flash - dt);
+  if (!sp.leaving) sp.x = Math.sin(A.t * 0.4) * 120;
+  if (Math.random() < dt * (sp.phase === 3 ? 14 : 6)) parts.push({ x: sp.x + (Math.random() - 0.5) * 50, y: sp.y + (Math.random() - 0.5) * 40, vx: (Math.random() - 0.5) * 20, vy: -20 - Math.random() * 20, t: 1, kind: sp.phase === 3 ? 'spark' : 'snow' });
+
+  // minions the Spirit calls
+  for (const m of A.mins) {
+    if (m.hp <= 0) { m.dead = Math.max(0, m.dead - dt * 0.8); continue; }
+    m.hopT += dt * 2; m.dir = player.x > m.x ? 1 : -1; m.throwAnim = Math.max(0, (m.throwAnim || 0) - dt);
+    m.cool -= dt;
+    if (m.cool <= 0) {
+      m.cool = 2.6; m.throwAnim = 0.35;
+      const l = dist(m.x, m.y - 30, player.x, player.y - 12) || 1;
+      proj.push({ x: m.x, y: m.y - 30, vx: (player.x - m.x) / l * 160, vy: (player.y - 12 - m.y + 30) / l * 160, from: 'snowman', kind: 'snowball', life: 2.5, life0: 2.5 });
+    }
+  }
+  // projectiles
+  for (const p of proj) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    if (p.from === 'kid') {
+      for (const m of A.mins) if (m.hp > 0 && dist(p.x, p.y, m.x, m.y - 16) < 16) { hitEnemy(m, p.dmg, p.kind); p.life = 0; break; }
+      if (p.life <= 0 && p.kind === 'rockball') inv.rockball++;
+    } else if (dist(p.x, p.y, player.x, player.y - 14) < 13) {
+      p.life = 0;
+      if (p.from === 'spirit') { hurt(8, 'spirit'); S.warm = Math.max(0, S.warm - 6); if (A.spirit.atk) A.spirit.atk.hit = true; }
+      else { S.warm = Math.max(0, S.warm - 5); frostFlash = 0.5; floatText('-5 warmth', player.x, player.y - 50, '#2a6a8a'); }
+      sfx.splat();
+    }
+  }
+  proj = proj.filter(p => p.life > 0 && Math.abs(p.x) < 420 && Math.abs(p.y) < 300);
+  // icicles falling where the red circles are
+  for (const ic of A.icicles) {
+    ic.t -= dt;
+    if (ic.t <= 0 && !ic.done) {
+      ic.done = true; sfx.crack();
+      for (let i = 0; i < 4; i++) parts.push({ x: ic.x, y: ic.y, vx: (Math.random() - 0.5) * 60, vy: -30 - Math.random() * 30, t: 0.5, kind: 'snow' });
+      if (dist(ic.x, ic.y, player.x, player.y) < 22) { hurt(12, 'spirit'); if (sp.atk) sp.atk.hit = true; }
+    }
+  }
+  A.icicles = A.icicles.filter(ic => ic.t > -0.4);
+  for (const r of A.reflects) r.t -= dt;
+  A.reflects = A.reflects.filter(r => r.t > 0);
+
+  // the Spirit leaves at the end
+  if (sp.leaving) {
+    sp.leaving += dt;
+    sp.y -= dt * 60 * sp.leaving;
+    if (sp.leaving > 4.5 && !A.ended) { A.ended = true; fadeTo('', () => { endGame(); }); }
+    return;
+  }
+  if (S.hp <= 0) { S.hp = 0; leaveArena(); die(deathCause || 'spirit'); return; }
+
+  // attacks: survive one without getting hit and the mask throws it back
+  const atk = sp.atk;
+  if (!atk) {
+    sp.cool -= dt;
+    if (sp.cool <= 0 && !A.talk) startSpiritAttack();
+  } else {
+    atk.t += dt;
+    if (atk.type === 'beam') {
+      if (atk.t < 0.9) { atk.ax = player.x; atk.ay = player.y - 12; }
+      if (atk.t >= 1.2 && atk.t < 1.6 && !atk.zapped) {
+        const dx = atk.ax - sp.x, dy = atk.ay - sp.y, l = Math.hypot(dx, dy) || 1;
+        const px = player.x - sp.x, py = player.y - 12 - sp.y, along = (px * dx + py * dy) / l;
+        const off = Math.abs(px * dy - py * dx) / l;
+        if (along > 0 && off < 15) { atk.zapped = true; atk.hit = true; hurt(18, 'spirit'); player.frozen = 1; frostFlash = 1; say('Frozen...!', 1.2); }
+      }
+      if (atk.t >= 1.2 && !atk.sound) { atk.sound = true; tone(900, 200, 0.5, 0.08, 'sawtooth'); }
+    } else if (atk.type === 'blizzard') {
+      while (atk.rows.length && atk.rows[0].at <= atk.t) {
+        const row = atk.rows.shift();
+        for (let y = -AREA_RY; y <= AREA_RY; y += 24) {
+          if (Math.abs(y - row.gap) < 42) continue;
+          proj.push({ x: -row.side * 340, y, vx: row.side * 170, vy: 0, from: 'spirit', kind: 'snowball', life: 4.2, life0: 4.2 });
+        }
+        sfx.throw();
+      }
+    } else if (atk.type === 'summon') {
+      if (A.mins.every(m => m.hp <= 0)) atk.t = atk.dur;
+    }
+    if (atk.t >= atk.dur) {
+      const ok = atk.type === 'summon' ? A.mins.every(m => m.hp <= 0) : !atk.hit;
+      sp.atk = null; sp.cool = 1.4;
+      if (ok) {
+        const dmg = sp.phase === 3 ? 9 : 10;
+        sp.hp = Math.max(0, sp.hp - dmg); sp.flash = 0.5;
+        A.reflects.push({ t: 0.7 });
+        floatText('The mask throws it back!', player.x, player.y - 60, '#2a6a8a');
+        tone(500, 1400, 0.4, 0.1, 'triangle'); camShake = 0.3;
+        spiritPhaseCheck();
+      } else say(['Ow... I have to dodge all of it.', 'It got me. Dodge, then the mask can fight back.'][(Math.random() * 2) | 0], 2);
+      A.mins = A.mins.filter(m => m.hp > 0 || m.dead > 0);
+      enemies = A.mins;
+    }
+  }
+}
+function startSpiritAttack() {
+  const A = arena, sp = A.spirit;
+  const list = sp.phase === 1 ? ['icicles', 'beam'] : sp.phase === 2 ? ['icicles', 'beam', 'blizzard'] : ['icicles', 'beam', 'blizzard', 'summon'];
+  let type = list[(Math.random() * list.length) | 0];
+  if (type === sp.lastAtk && Math.random() < 0.6) type = list[(list.indexOf(type) + 1) % list.length];
+  sp.lastAtk = type;
+  const fast = sp.phase === 3 ? 0.8 : 1;
+  if (type === 'icicles') {
+    const n = 5 + sp.phase * 3;
+    for (let i = 0; i < n; i++) {
+      let x, y;
+      do { x = (Math.random() * 2 - 1) * AREA_RX; y = (Math.random() * 2 - 1) * AREA_RY; } while (!inArena(x, y, 20));
+      A.icicles.push({ x, y, t: (1.1 + i * 0.07) * fast, t0: (1.1 + i * 0.07) * fast });
+    }
+    for (const o of [[0, 0], [30, 10]]) A.icicles.push({ x: player.x + o[0], y: player.y + o[1], t: 1.2 * fast, t0: 1.2 * fast });
+    sp.atk = { type, t: 0, dur: 2.2 * fast + 0.4 };
+  } else if (type === 'beam') {
+    sp.atk = { type, t: 0, dur: 1.8, ax: player.x, ay: player.y };
+  } else if (type === 'blizzard') {
+    const side = Math.random() < 0.5 ? 1 : -1, rows = [];
+    for (let i = 0; i < 3; i++) rows.push({ at: i * 1.4 * fast, side, gap: (Math.random() * 2 - 1) * (AREA_RY - 50) });
+    sp.atk = { type, t: 0, dur: 3 * 1.4 * fast + 4, rows };
+  } else {
+    for (const [i, [x, y]] of [[-200, -30], [0, 40], [200, -30]].entries())
+      A.mins.push({ type: 'snowman', x, y, hp: 2, cool: 2 + i * 0.6, hopT: 0, dir: 1, flash: 0, dead: 0, aware: true });
+    enemies = A.mins;
+    sp.atk = { type, t: 0, dur: 14 };
+    say('Snowmen! I have to melt them all (F).', 2.5);
+  }
+}
+function spiritPhaseCheck() {
+  const sp = arena.spirit;
+  if (sp.hp <= 0) {
+    sp.leaving = 0.01; sp.atk = null; arena.icicles = []; proj = [];
+    spiritSay('This is not over, little maker. The snow remembers...', 4.5);
+    sfx.roar();
+    return;
+  }
+  if (sp.phase === 1 && sp.hp <= 66) {
+    sp.phase = 2; sp.cool = 4.5;
+    spiritSay('Their fire made me. Their laughing made me cold.', 4.5);
+  } else if (sp.phase === 2 && sp.hp <= 33) {
+    sp.phase = 3; sp.cool = 7;
+    spiritSay('If I am made of your work... why do you fight me?', 4);
+    setTimeout(() => { if (arena) say('Because I can make new things. Better things.', 3); }, 4000);
+  }
+}
+function leaveArena() {
+  if (!arena) return;
+  const back = arena.back;
+  arena = null; enemies = []; proj = [];
+  player.x = back.x; player.y = back.y + 30; player.frozen = 0;
+  cam.x = player.x; cam.y = player.y;
+}
+function endGame() {
+  leaveArena();
+  flags.won = true;
+  saveGame();
+  state = 'ending'; storyI = 0;
+}
+const ENDING = [
+  'The Frost Spirit broke into a thousand snowflakes... and flew away to the north.',
+  'The kid walked home to the cabin. The owl. The fire. Wren waving from the trees. Under the mask, for the first time in a long time... a smile.',
+  'But far away in the north, in the dark, the snowflakes began to gather again.',
+  'FROSTBITE',
+];
+function drawEnding() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = storyI === 2 ? '#141a2a' : '#2a3242'; ctx.fillRect(0, 0, VW, VH);
+  const w = Math.min(VW - 30, 620), h = Math.min(VH - 40, 460), x = VW / 2 - w / 2, y = VH / 2 - h / 2;
+  paper(ctx, x, y, w, h, 10, storyI === 2 ? '#dfe4ee' : '#f3ecda');
+  ctx.save();
+  const pic = Math.min(1.6, (h - 170) / 120, w / 300);
+  ctx.translate(VW / 2, y + 30 + 100 * pic); ctx.scale(pic, pic);
+  if (storyI === 0) drawSpirit(ctx, 0, -20, 0.6, 3);
+  else if (storyI === 1) { drawSpr(ctx, 'cabin', 0, 10); drawFlame(ctx, 70, 8, 12, realT); drawKid(ctx, 40, 20, 'down', 0, false); drawOwl(ctx, { x: 58, y: 22, z: 0, flap: 0, face: -1 }); }
+  else if (storyI === 2) { drawSpr(ctx, 'peak', -60, 10); drawSpr(ctx, 'peak', 60, 0); for (let i = 0; i < 14; i++) { const a = realT * 0.8 + i; drawStar(ctx, Math.cos(a) * (30 + i * 2), -40 + Math.sin(a * 1.3) * 18, 3, '#ffffff', '#8fb3cc'); } }
+  else { drawKid(ctx, 0, 14, 'down', 0, false); }
+  ctx.restore();
+  ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  if (storyI < 3) {
+    ctx.font = `700 ${VW < 500 ? 21 : 25}px ${FONT}`;
+    wrap(ENDING[storyI], w - 50).forEach((l, i) => ctx.fillText(l, VW / 2, y + h - 150 + i * 28));
+    ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#7a7266';
+    ctx.fillText(`${touchUI ? 'tap' : 'click or press a key'} to continue`, VW / 2, y + h - 26);
+  } else {
+    ctx.font = `700 ${clamp(VW / 10, 40, 70)}px ${FONT}`; ctx.fillStyle = '#3d6d8a';
+    ctx.fillText('THE END...?', VW / 2, y + h - 190);
+    ctx.font = `700 20px ${FONT}`; ctx.fillStyle = '#4a4f58';
+    ctx.fillText('To be continued in FROSTBITE part 2', VW / 2, y + h - 130);
+    menuButton(VW / 2 - 120, y + h - 80, 210, 'Keep playing', () => { state = 'play'; say('The snow is still here. So am I.', 3); });
+    menuButton(VW / 2 + 120, y + h - 80, 210, 'Title screen', () => { state = 'title'; });
+  }
+  drawSnow(ctx, 0.6);
+}
+function endingNext() { if (fade.phase === 'none' && storyI < 3) { sfx.ui(); storyI++; } }
+
+// ---------- drawing step 3 ----------
+function drawMaskPiece(c, n, x, y, s, got) {
+  // the old mask is split into 5 pieces, like a pie
+  const r = mulberry32(n * 13 + 5);
+  const a0 = -Math.PI / 2 + n * Math.PI * 2 / 5, a1 = a0 + Math.PI * 2 / 5;
+  const p = [[x, y]];
+  for (let i = 0; i <= 6; i++) { const a = a0 + (a1 - a0) * i / 6; p.push([x + Math.cos(a) * s * 0.42, y + Math.sin(a) * s * 0.5]); }
+  shape(c, r, p, got ? '#f4f0e6' : 'rgba(0,0,0,0)', got ? '#4a4640' : 'rgba(80,80,90,.45)', { smooth: false, lw: 1.2, j: 0.3, double: false });
+}
+function drawMaskHUD(x, y, s) {
+  for (let n = 0; n < 5; n++) drawMaskPiece(ctx, n, x, y, s, n < piecesN());
+  if (piecesN() >= 5) {
+    ctx.fillStyle = '#1c1f26';
+    for (const e of [-1, 1]) { ctx.beginPath(); ctx.ellipse(x + e * s * 0.13, y - s * 0.06, s * 0.05, s * 0.07, 0, 0, 7); ctx.fill(); }
+  }
+}
+function drawShrine(c, s) {
+  const r = mulberry32(boil * 17 + s.i);
+  const beat = (flags.beat || [])[s.i], taken = (flags.taken || [])[s.i];
+  shadow(c, s.x, s.y + 4, 40, 10, 0.2);
+  for (const [px, py] of [[-34, -8], [34, -8], [-26, 14], [26, 14]]) {
+    shape(c, r, [[s.x + px - 5, s.y + py], [s.x + px - 4, s.y + py - 40], [s.x + px, s.y + py - 48], [s.x + px + 4, s.y + py - 40], [s.x + px + 5, s.y + py]], '#bfe6f5', '#3d8db0', { smooth: false, lw: 1.3, j: 0.4 });
+  }
+  shape(c, r, [[s.x - 18, s.y + 2], [s.x + 18, s.y + 2], [s.x + 14, s.y - 16], [s.x - 14, s.y - 16]], '#d8eef7', '#3d8db0', { smooth: false, lw: 1.5, j: 0.4 });
+  for (let i = 0; i < 3; i++) line(c, r, s.x - 10 + i * 10, s.y - 10, s.x - 6 + i * 10, s.y - 4, '#7fb0cb', 1, 0.3);
+  if (!taken) {
+    const fy = s.y - 34 + Math.sin(realT * 2 + s.i) * 3;
+    if (beat) {
+      const g = c.createRadialGradient(s.x, fy, 0, s.x, fy, 22);
+      g.addColorStop(0, 'rgba(255,240,180,.8)'); g.addColorStop(1, 'rgba(255,240,180,0)');
+      c.fillStyle = g; c.fillRect(s.x - 22, fy - 22, 44, 44);
+    }
+    drawMaskPiece(c, s.i, s.x, fy + 6, 30, true);
+    if (!beat) shape(c, r, ell(s.x, fy, 14, 16, 8), 'rgba(170,220,240,.45)', '#3d8db0', { lw: 1.2, j: 0.6, smooth: false, double: false });
+  }
+}
+function drawCastle(c) {
+  const r = mulberry32(boil * 23 + 9), x = castle.x, y = castle.y;
+  shadow(c, x, y + 4, 120, 18, 0.25);
+  const wall = '#cfe8f4', ink = '#2f6f92';
+  for (const [tx, h, w] of [[-95, 150, 36], [95, 150, 36], [-48, 120, 30], [48, 120, 30], [0, 190, 44]]) {
+    shape(c, r, [[x + tx - w / 2, y], [x + tx - w / 2, y - h], [x + tx + w / 2, y - h], [x + tx + w / 2, y]], wall, ink, { smooth: false, lw: 2, j: 1 });
+    shape(c, r, [[x + tx - w / 2 - 6, y - h], [x + tx, y - h - w * 1.2], [x + tx + w / 2 + 6, y - h]], '#a8d8ee', ink, { smooth: false, lw: 2, j: 1 });
+    for (let k = 0; k < 3; k++) line(c, r, x + tx - w / 4, y - h + 20 + k * 30, x + tx + w / 5, y - h + 34 + k * 30, '#8fc4dc', 1.2, 0.6);
+    shape(c, r, ell(x + tx, y - h + 40, 5, 8, 8), '#1a3446', null, { j: 0.2 });
+  }
+  shape(c, r, [[x - 110, y], [x - 110, y - 70], [x + 110, y - 70], [x + 110, y]], wall, ink, { smooth: false, lw: 2, j: 1 });
+  shape(c, r, [[x - 24, y], [x - 24, y - 50], [x, y - 64], [x + 24, y - 50], [x + 24, y]], flags.won ? '#3a4660' : '#1a2a3a', ink, { smooth: false, lw: 2, j: 0.6 });
+  if (!flags.won) { const g = c.createRadialGradient(x, y - 30, 0, x, y - 30, 40); g.addColorStop(0, 'rgba(140,210,255,.5)'); g.addColorStop(1, 'rgba(140,210,255,0)'); c.fillStyle = g; c.fillRect(x - 40, y - 70, 80, 80); }
+  for (let k = 0; k < 6; k++) line(c, r, x - 100 + k * 40, y - 70, x - 96 + k * 40, y - 50, '#ffffff', 2, 0.4);
+}
+function drawSpirit(c, x, y, k, phase, flash) {
+  const r = mulberry32(boil * 91 + 3);
+  c.save(); c.translate(x, y); c.scale(k, k);
+  // burned drawings, toys and carvings spinning around it
+  for (let i = 0; i < 9; i++) {
+    const a = realT * 0.9 + i * Math.PI * 2 / 9, px = Math.cos(a) * 92, py = Math.sin(a) * 42 + 10;
+    c.save(); c.translate(px, py); c.rotate(Math.sin(realT + i) * 0.4);
+    if (i % 3 === 0) { shape(c, r, [[-10, -8], [10, -9], [11, 8], [-9, 9]], '#efe6cf', '#5a4f3a', { smooth: false, lw: 1, j: 0.4, double: false }); drawStar(c, -2, -1, 4, '#f2c230', '#8a6a1c'); c.fillStyle = 'rgba(40,30,20,.6)'; c.fillRect(4, 3, 6, 6); }
+    else if (i % 3 === 1) shape(c, r, ell(0, 0, 8, 6, 8), '#b08455', '#3a281b', { lw: 1, j: 0.3 });
+    else shape(c, r, [[-7, 6], [0, -8], [7, 6]], '#d64545', '#3a1c18', { smooth: false, lw: 1, j: 0.3 });
+    c.restore();
+  }
+  // the body: ash and ice
+  const body = [];
+  for (let i = 0; i < 20; i++) {
+    const a = i / 20 * Math.PI * 2, wob = 1 + Math.sin(realT * 3 + i * 1.7) * 0.08 + (i % 2 ? 0.12 : 0);
+    body.push([Math.cos(a) * 46 * wob, Math.sin(a) * 60 * wob + (Math.sin(a) > 0 ? Math.sin(a) * 26 : 0)]);
+  }
+  const g = c.createRadialGradient(0, -10, 4, 0, 0, 80);
+  g.addColorStop(0, phase === 3 ? '#5a3a4a' : '#4a5a7a'); g.addColorStop(1, '#1e2638');
+  c.fillStyle = g; trace(c, body, true, true); c.fill();
+  c.strokeStyle = flash ? '#ffffff' : '#bfe6f5'; c.lineWidth = 2.5; trace(c, jit(body, r, 1.5), true, true); c.stroke();
+  // crown of icicles
+  for (let i = -3; i <= 3; i++) shape(c, r, [[i * 10 - 5, -58], [i * 10, -58 - 18 + Math.abs(i) * 3], [i * 10 + 5, -58]], '#d8f2fb', '#3d8db0', { smooth: false, lw: 1.1, j: 0.3, double: false });
+  // hollow glowing eyes
+  for (const s of [-1, 1]) {
+    const eg = c.createRadialGradient(s * 14, -20, 0, s * 14, -20, 14);
+    eg.addColorStop(0, phase === 3 ? '#ffb070' : '#e8fbff'); eg.addColorStop(1, 'rgba(160,220,255,0)');
+    c.fillStyle = eg; c.fillRect(s * 14 - 14, -34, 28, 28);
+    c.fillStyle = '#0e1220'; c.beginPath(); c.ellipse(s * 14, -20, 5, 7, s * 0.2, 0, 7); c.fill();
+  }
+  c.strokeStyle = '#bfe6f5'; c.lineWidth = 1.6;
+  c.beginPath(); c.moveTo(-12, 4); c.lineTo(-5, 0); c.lineTo(0, 6); c.lineTo(6, 0); c.lineTo(12, 5); c.stroke();
+  c.restore();
+}
+function drawWolf(c, e) {
+  const r = mulberry32(boil * 47 + (e.x | 0));
+  const big = e.type === 'boss', k = big ? 1.35 : 1, f = e.dir || 1, step = Math.sin(e.walk || 0) * 3;
+  if (e.hp <= 0 && e.type === 'wolf') return;
+  shadow(c, e.x, e.y, 18 * k, 4, 0.2);
+  c.save(); c.translate(e.x, e.y); c.scale(k, k);
+  const out = e.flash > 0 ? '#c8313d' : '#3e4a5a', fur = big ? '#c9d6e3' : '#9fb0c2';
+  for (const [lx, s] of [[-10, 1], [-4, -1], [6, 1], [11, -1]]) line(c, r, f * lx, -10, f * lx + step * s * f * 0.6, 0, out, 3.2, 0.3);
+  shape(c, r, [[-f * 14, -14], [-f * 24, -22], [-f * 16, -11]], fur, out, { smooth: false, lw: 1.2, j: 0.3 });
+  shape(c, r, ell(0, -14, 15, 7.5, 10), fur, out, { lw: 1.5, j: 0.4 });
+  shape(c, r, [[f * 10, -20], [f * 22, -18], [f * 26, -14], [f * 18, -11], [f * 9, -12]], fur, out, { smooth: false, lw: 1.3, j: 0.3 });
+  shape(c, r, [[f * 11, -20], [f * 13, -27], [f * 16, -20]], fur, out, { smooth: false, lw: 1.1, j: 0.2, double: false });
+  c.fillStyle = '#9fe6ff'; c.beginPath(); c.arc(f * 17, -17.5, 1.3, 0, 7); c.fill();
+  c.fillStyle = '#1c1f26'; c.beginPath(); c.arc(f * 26, -14.5, 1.2, 0, 7); c.fill();
+  if (big) { for (let i = 0; i < 5; i++) line(c, r, f * (4 + i * 1.6), -21, f * (2 + i * 1.6), -14, '#ffffff', 1.6, 0.3); line(c, r, f * 15, -20, f * 18, -16, '#c8313d', 0.9, 0.1); }
+  c.restore();
+}
+function drawGolem(c, e) {
+  const r = mulberry32(boil * 29 + 4);
+  const f = e.dir || 1, sway = Math.sin(e.walk || 0) * 2, punch = e.state === 'punch' ? (1 - e.t / 0.9) : 0;
+  shadow(c, e.x, e.y, 28, 7, 0.25);
+  c.save(); c.translate(e.x, e.y);
+  const out = e.flash > 0 ? '#c8313d' : '#2f6f92', ice = '#bfe2f2';
+  for (const s of [-1, 1]) shape(c, r, [[s * 10 - 7, -18], [s * 10 + 7, -18], [s * 10 + 7 + sway * s, 0], [s * 10 - 7 + sway * s, 0]], ice, out, { smooth: false, lw: 1.5, j: 0.5 });
+  shape(c, r, [[-22, -56], [22, -58], [24, -16], [-24, -16]], ice, out, { smooth: false, lw: 2, j: 0.8 });
+  for (let i = 0; i < 4; i++) line(c, r, -18 + i * 12, -50, -14 + i * 12, -24, '#ffffff', 1.4, 0.5);
+  const core = 0.6 + Math.sin(realT * 4) * 0.3;
+  c.fillStyle = `rgba(120,220,255,${core})`; c.beginPath(); c.arc(0, -38, 6, 0, 7); c.fill();
+  shape(c, r, [[-12, -76], [12, -76], [13, -57], [-13, -57]], ice, out, { smooth: false, lw: 1.8, j: 0.6 });
+  c.fillStyle = '#5fd0ff';
+  for (const s of [-1, 1]) c.fillRect(f * 2 + s * 5 - 2, -69, 4, 3);
+  for (const s of [-1, 1]) {
+    const reach = s === f ? punch * 22 : 0;
+    shape(c, r, [[s * 24 + s * reach - 7, -54], [s * 24 + s * reach + 7, -54], [s * 26 + s * reach + 7, -24], [s * 26 + s * reach - 7, -24]], ice, out, { smooth: false, lw: 1.6, j: 0.5 });
+  }
+  c.restore();
+}
+function drawBossTele(c, e) {
+  // warnings on the ground so you can see what is coming
+  if (e.kind === 'bking' && e.state === 'windup') {
+    c.strokeStyle = 'rgba(200,50,50,.6)'; c.lineWidth = 6; c.setLineDash([10, 8]);
+    c.beginPath(); c.moveTo(e.x, e.y); c.lineTo(e.x + e.lx * 280, e.y + e.ly * 280); c.stroke(); c.setLineDash([]);
+  }
+  if (e.kind === 'yking' && e.state === 'slam') {
+    if (!e.wave) { c.strokeStyle = 'rgba(200,50,50,.5)'; c.lineWidth = 3; c.beginPath(); c.ellipse(e.x, e.y, 130, 70, 0, 0, 7); c.stroke(); }
+    else { c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 8; c.beginPath(); c.ellipse(e.x, e.y, e.wave, e.wave * 0.55, 0, 0, 7); c.stroke(); }
+  }
+  if (e.kind === 'golem' && e.state === 'punch') { c.strokeStyle = 'rgba(200,50,50,.6)'; c.lineWidth = 3; c.beginPath(); c.ellipse(e.x, e.y, 58, 32, 0, 0, 7); c.stroke(); }
+}
+function drawCrown(c, e) {
+  const f = e.dir || 1, r = mulberry32(boil + 31);
+  const [cx, top] = { gsnow: [0, 100], bking: [f * 35, 62], yking: [f * 3, 106], golem: [0, 82] }[e.kind];
+  for (let i = -2; i <= 2; i++) shape(c, r, [[e.x + cx + i * 6 - 3, e.y - top], [e.x + cx + i * 6, e.y - top - 10 + Math.abs(i) * 2], [e.x + cx + i * 6 + 3, e.y - top]], '#d8f2fb', '#3d8db0', { smooth: false, lw: 1, j: 0.2, double: false });
+  if (e.kind === 'bking' && e.state === 'dizzy') for (let i = 0; i < 3; i++) { const a = realT * 4 + i * 2.1; drawStar(c, e.x + cx + Math.cos(a) * 18, e.y - top - 16 + Math.sin(a) * 5, 4, '#f2c230', '#8a6a1c'); }
+}
+function drawBossEnt(c, e) {
+  if (e.hp <= 0) return;
+  if (e.type === 'wolf' || e.kind === 'wolf') { drawWolf(c, e); return; }
+  drawBossTele(c, e);
+  c.save();
+  if (e.kind === 'gsnow') { c.translate(e.x, e.y); c.scale(2.2, 2.2); drawSnowman(c, Object.assign({}, e, { x: 0, y: 0, hp: 1, aware: true })); }
+  else if (e.kind === 'bking') { c.translate(e.x, e.y); c.scale(1.6, 1.6); drawBear(c, Object.assign({}, e, { x: 0, y: 0, state: e.state === 'charge' || e.state === 'windup' ? 'chase' : 'wait' })); }
+  else if (e.kind === 'yking') { c.translate(e.x, e.y); c.scale(1.45, 1.45); drawYeti(c, Object.assign({}, e, { x: 0, y: 0 })); }
+  else drawGolem(c, e);
+  c.restore();
+  drawCrown(c, e);
+}
+function drawBossBar(name, hp, max, y) {
+  const w = Math.min(VW - 40, 420), x = VW / 2 - w / 2;
+  ctx.font = `700 18px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(247,242,230,.9)'; ctx.strokeText(name, VW / 2, y - 2);
+  ctx.fillStyle = '#2b2f36'; ctx.fillText(name, VW / 2, y - 2);
+  const r = mulberry32(boil * 3 + 77);
+  shape(ctx, r, [[x, y], [x + w, y], [x + w, y + 14], [x, y + 14]], '#f7f2e6', null, { smooth: false, j: 0.5 });
+  if (hp > 0) shape(ctx, r, [[x + 2, y + 2], [x + 2 + (w - 4) * hp / max, y + 2], [x + 2 + (w - 4) * hp / max, y + 12], [x + 2, y + 12]], '#7a5fa8', null, { smooth: false, j: 0.4 });
+  shape(ctx, r, [[x, y], [x + w, y], [x + w, y + 14], [x, y + 14]], null, '#2b2f36', { smooth: false, lw: 1.8, j: 0.7 });
+}
+function drawArena() {
+  const A = arena, sp = A.spirit;
+  const az = Math.min(VW / 700, VH / 470) * 0.98;
+  const saveZ = ZOOM; ZOOM = az; cam.x = 0; cam.y = 0;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const bg = ctx.createLinearGradient(0, 0, 0, VH); bg.addColorStop(0, '#1a2440'); bg.addColorStop(1, '#2c3d5c');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, VW, VH);
+  const sh = camShake > 0 ? (Math.random() - 0.5) * camShake * 10 : 0;
+  ctx.setTransform(DPR * az, 0, 0, DPR * az, DPR * (VW / 2 + sh), DPR * (VH / 2 + sh));
+  const r = mulberry32(boil * 5 + 2);
+  // ice pillars behind the floor
+  for (let i = -4; i <= 4; i++) {
+    const px = i * 80, py = -AREA_RY - 10 + Math.abs(i) * 14;
+    shape(ctx, r, [[px - 14, py + 30], [px - 12, py - 140], [px, py - 165], [px + 12, py - 140], [px + 14, py + 30]], '#8fbfd6', '#1e4a66', { smooth: false, lw: 2, j: 1 });
+  }
+  shape(ctx, r, ell(0, 0, AREA_RX + 14, AREA_RY + 12, 28), '#cfe8f4', '#2f6f92', { lw: 3, j: 2 });
+  for (let i = 0; i < 9; i++) { const a = i * 0.7; line(ctx, r, Math.cos(a) * 60, Math.sin(a) * 40, Math.cos(a) * 220, Math.sin(a) * 140, '#ffffff', 1.4, 3); }
+  // icicle markers
+  for (const ic of A.icicles) {
+    if (!ic.done) {
+      const k = 1 - ic.t / ic.t0;
+      ctx.fillStyle = `rgba(200,50,50,${0.15 + k * 0.35})`; ctx.beginPath(); ctx.ellipse(ic.x, ic.y, 20, 10, 0, 0, 7); ctx.fill();
+      if (ic.t < 0.35) shape(ctx, r, [[ic.x - 5, ic.y - 10 - ic.t * 300], [ic.x, ic.y - ic.t * 300 + 6], [ic.x + 5, ic.y - 10 - ic.t * 300], [ic.x, ic.y - 40 - ic.t * 300]], '#d8f2fb', '#3d8db0', { smooth: false, lw: 1.2, j: 0.2 });
+    } else shape(ctx, r, [[ic.x - 6, ic.y], [ic.x - 2, ic.y - 16], [ic.x + 3, ic.y - 12], [ic.x + 6, ic.y]], '#d8f2fb', '#3d8db0', { smooth: false, lw: 1.2, j: 0.3 });
+  }
+  const list = [{ y: player.y, kid: true }];
+  for (const m of A.mins) list.push({ y: m.y, m });
+  for (const p of proj) list.push({ y: p.y + 14, p });
+  list.sort((a, b) => a.y - b.y);
+  for (const it of list) {
+    if (it.kid) {
+      drawKid(ctx, player.x, player.y, player.dir, player.walk, player.moving, { shiver: S.warm < 30 });
+      if (player.torch > 0) drawHeldTorch(ctx);
+      drawSwing(ctx);
+      if (player.frozen > 0) shape(ctx, r, ell(player.x, player.y - 18, 14, 22, 8), 'rgba(170,220,240,.5)', '#3d8db0', { smooth: false, lw: 1.2, j: 0.6 });
+    } else if (it.m) drawSnowman(ctx, it.m);
+    else drawProjectile(ctx, it.p);
+  }
+  // the beam
+  const atk = sp.atk;
+  if (atk && atk.type === 'beam') {
+    const dx = atk.ax - sp.x, dy = atk.ay - sp.y, l = Math.hypot(dx, dy) || 1, ex = sp.x + dx / l * 700, ey = sp.y + dy / l * 700;
+    if (atk.t < 1.2) { ctx.strokeStyle = `rgba(220,60,60,${0.3 + 0.4 * Math.sin(atk.t * 20) ** 2})`; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]); }
+    else if (atk.t < 1.6) {
+      ctx.strokeStyle = 'rgba(160,230,255,.6)'; ctx.lineWidth = 26; ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(ex, ey); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 9; ctx.stroke();
+    }
+  }
+  drawSpirit(ctx, sp.x, sp.y + Math.sin(sp.bob * 1.5) * 6, 1, sp.phase, sp.flash > 0);
+  // the mask reflecting an attack back
+  for (const rf of A.reflects) {
+    ctx.strokeStyle = `rgba(255,240,180,${rf.t})`; ctx.lineWidth = 10 * rf.t + 2;
+    ctx.beginPath(); ctx.moveTo(player.x, player.y - 28); ctx.lineTo(sp.x, sp.y); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${rf.t})`; ctx.lineWidth = 3; ctx.stroke();
+  }
+  for (const p of parts) {
+    if (p.kind === 'spark') { ctx.fillStyle = '#ffb070'; ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3); }
+    else { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, 7); ctx.fill(); }
+  }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  drawSnow(ctx, 0.5);
+  if (hurtFlash > 0 || frostFlash > 0) {
+    const col = hurtFlash > 0 ? `rgba(200,40,40,${hurtFlash * 0.5})` : `rgba(200,230,255,${frostFlash * 0.9})`;
+    const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.3, VW / 2, VH / 2, Math.max(VW, VH) * 0.7);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, col);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of floats) {
+    const [sx, sy] = toScreen(f.x, f.y);
+    ctx.globalAlpha = Math.min(1, f.t * 1.5); ctx.font = `700 18px ${FONT}`;
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.strokeText(f.text, sx, sy);
+    ctx.fillStyle = f.col; ctx.fillText(f.text, sx, sy);
+  }
+  ctx.globalAlpha = 1;
+  if (A.talk) speechBubble(A.talk.text, sp.x, sp.y - 70, '#dfe8f5');
+  if (speech) speechBubble(speech.text, player.x, player.y - 44);
+  // HUD
+  const bw = VW < 520 ? 190 : 230;
+  bar(14, 14, bw, 'Health', S.hp, '#d9534f', S.hp < 25);
+  bar(14, 38, bw, 'Warmth', S.warm, S.warm > 50 ? '#f08a3c' : '#5b8fd1', S.warm < 20);
+  bar(14, 62, bw, 'Energy', S.sta, player.exhausted ? '#a8a8a8' : '#7bbf5a', false);
+  drawBossBar('THE FROST SPIRIT', sp.hp, 100, VH < 600 ? 120 : 40);
+  ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  const tip = 'Dodge every attack. The mask throws back what you survive.';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(247,242,230,.9)';
+  wrap(tip, VW < 520 ? VW - 40 : 300).forEach((l, i) => { ctx.strokeText(l, 14, 90 + i * 18); ctx.fillStyle = '#2b2f36'; ctx.fillText(l, 14, 90 + i * 18); });
+  if (touchUI) {
+    const bx = VW - 72, by = VH - 92;
+    hudButton(bx - 20, by + 8, 34, 'Hit', attack, { size: 18 });
+    hudButton(bx - 84, by + 54, 24, 'Run', null, { hold: 'run', size: 15 });
+    if (joy) {
+      const rr = mulberry32(boil + 4);
+      shape(ctx, rr, ell(joy.ox, joy.oy, 50, 50, 14), 'rgba(247,242,230,.25)', 'rgba(43,47,54,.6)', { lw: 2 });
+    }
+  }
+  toasts.forEach((tt, i) => {
+    ctx.font = `700 18px ${FONT}`;
+    const lines = wrap(tt.text, Math.min(460, VW - 60));
+    const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 28, h = lines.length * 20 + 14, y = VH - 90 - i * (h + 8);
+    paper(ctx, VW / 2 - w / 2, y, w, h, 6, '#fff8dc');
+    ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    lines.forEach((l, j) => ctx.fillText(l, VW / 2, y + 8 + j * 20));
+  });
+  ZOOM = saveZ;
 }
 
 // ---------- snow ----------
@@ -2560,7 +3338,9 @@ function drawWorld() {
   }
   list.push({ y: player.climb ? player.climb.y + 3 : player.y, kid: true });
   const inView = (x, y, m = 80) => x > x0 - m && x < x1 + m && y > y0 - m && y < y1 + m * 1.5;
-  for (const e of enemies) if (inView(e.x, e.y)) list.push({ y: e.y, e });
+  for (const e of enemies) if (inView(e.x, e.y, 140)) list.push({ y: e.y, e });
+  for (const sh of shrines) if (inView(sh.x, sh.y, 80)) list.push({ y: sh.y, sh });
+  if (flags.castle && inView(castle.x, castle.y, 260)) list.push({ y: castle.y, castle: true });
   for (const tr of traders) if (inView(tr.x, tr.y)) list.push({ y: tr.y, tr });
   for (const dr of drops) if (inView(dr.x, dr.y)) list.push({ y: dr.y - 20, dr });
   for (const b of baits) if (inView(b.x, b.y)) list.push({ y: b.y - 20, dr: b });
@@ -2579,7 +3359,9 @@ function drawWorld() {
       if (player.climb) ctx.restore();
       if (player.fishing && player.fishing.need - player.fishing.t < 0.7) bubbleWorld('!', player.fishing.hx, player.fishing.hy - 16);
     } else if (it.owl) { drawOwl(ctx, owl); if (owl.warn) bubbleWorld('!', owl.x, owl.y - owl.z - 22); }
-    else if (it.e) { if (it.e.type === 'snowman') drawSnowman(ctx, it.e); else if (it.e.type === 'bear') drawBear(ctx, it.e); else drawYeti(ctx, it.e); }
+    else if (it.e) { const t2 = it.e.type; if (t2 === 'snowman') drawSnowman(ctx, it.e); else if (t2 === 'bear') drawBear(ctx, it.e); else if (t2 === 'yeti') drawYeti(ctx, it.e); else drawBossEnt(ctx, it.e); }
+    else if (it.sh) drawShrine(ctx, it.sh);
+    else if (it.castle) drawCastle(ctx);
     else if (it.tr) drawTrader(ctx, it.tr);
     else if (it.dr) { shadow(ctx, it.dr.x, it.dr.y + 4, 7, 2.5); drawIcon(ctx, it.dr.item, it.dr.x, it.dr.y - 4, 16); }
     else if (it.p) drawProjectile(ctx, it.p);
@@ -2634,7 +3416,9 @@ function drawWorld() {
     if (camp && camp.level > 0) lights.push([camp.tx, camp.ty - 20, 55]);
     lights.push([vill.x, vill.y - 8, 150 * flick]);
     for (const h of objs) if (h.type === 'house' && Math.abs(h.x - cam.x) < hw + 100 && Math.abs(h.y - cam.y) < hh + 100) lights.push([h.x, h.y - 18, 50]);
-    lights.push([player.x, player.y - 16, player.torch > 0 ? 140 * flick : 52]);
+    lights.push([player.x, player.y - 16, player.torch > 0 ? 140 * flick : piecesN() >= 3 ? 105 : 52]);
+    if (flags.castle) lights.push([castle.x, castle.y - 40, 110]);
+    for (const sh of shrines) if (!(flags.taken || [])[sh.i]) lights.push([sh.x, sh.y - 30, 60]);
     for (const tr of traders) lights.push([tr.x, tr.y - 20, 80 * flick]);
     for (let ty = Math.max(0, ty0); ty <= Math.min(H - 1, ty1); ty++) for (let tx = Math.max(0, tx0); tx <= Math.min(W - 1, tx1); tx++)
       for (const o of ogrid[ty * W + tx]) if (o.type === 'crystal' && o.stock > 0) lights.push([o.x, o.y - 14, 42]);
@@ -2837,7 +3621,13 @@ function goalText() {
   if (camp.fuel <= 0) return 'Your fire is out! Bring 2 sticks to light it.';
   if (camp.level === 0) return 'Keep the fire burning. Collect 12 sticks and 8 stones to build a hut.';
   if (camp.level === 1) return 'Collect 25 sticks and 15 stones to turn your hut into a cabin.';
-  return 'Your cabin is done. Explore, but watch out for polar bears, and the Yeti at night. (Mask pieces come in step 3.)';
+  return 'Your cabin is done. Explore, but watch out for polar bears, and the Yeti at night.';
+}
+function goalText2() {
+  if (!camp || camp.fuel <= 0) return goalText();
+  if (flags.won) return 'You beat the Frost Spirit... for now. Keep exploring the snow.';
+  if (piecesN() >= 5) return 'The mask is whole. Go to the frozen castle (it is on your map).';
+  return `Find the 5 pieces of the old mask (${piecesN()}/5). Masked traders mark shrines on your map.`;
 }
 function drawHUD() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2850,7 +3640,7 @@ function drawHUD() {
   bar(14, 86, bw, 'Energy', S.sta, player.exhausted ? '#a8a8a8' : '#7bbf5a', false);
   // goal
   ctx.font = `700 17px ${FONT}`;
-  const gl = wrap(goalText(), small ? VW - 90 : 330);
+  const gl = wrap(goalText2(), small ? VW - 90 : 330);
   ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   gl.forEach((l, i) => { ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(247,242,230,.9)'; ctx.strokeText(l, 14, 112 + i * 19); ctx.fillStyle = '#2b2f36'; ctx.fillText(l, 14, 112 + i * 19); });
 
@@ -2869,6 +3659,12 @@ function drawHUD() {
   hudButton(VW - 150, 34, 20, muted ? 'x' : '♪', () => setMuted(!muted), { size: 18 });
   hudButton(VW - 150, 82, 20, 'Bag', toggleBag, { size: 15 });
 
+  // the mask pieces you have
+  drawMaskHUD(VW - 42, 142, 38);
+  ctx.font = `700 14px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#4a4f58';
+  ctx.fillText(`${piecesN()}/5`, VW - 42, 166);
+  const boss = enemies.find(e => e.type === 'boss' && e.hp > 0 && dist(e.x, e.y, player.x, player.y) < 650);
+  if (boss) drawBossBar(boss.name, boss.hp, boss.max, small ? 196 : 40);
   // where am I
   const tl = tileAtW(player.x, player.y);
   ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'right';
@@ -2958,7 +3754,7 @@ function drawHUD() {
     ctx.font = `700 18px ${FONT}`;
     const lines = wrap(tt.text, Math.min(460, VW - 60));
     const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 28, h = lines.length * 20 + 14;
-    const y = (small ? 170 : 14) + i * (h + 8);
+    const y = (small ? 170 : 14) + (boss ? 50 : 0) + i * (h + 8);
     ctx.globalAlpha = Math.min(1, tt.t * 2);
     paper(ctx, VW / 2 - w / 2, y, w, h, 6, '#fff8dc');
     ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
@@ -3106,6 +3902,18 @@ function drawMap() {
     shape(ctx, r, [[cx - 8, cy + 6], [cx, cy - 9], [cx + 8, cy + 6]], '#4f79a8', '#22395a', { smooth: false, lw: 1.4, j: 0.4 });
     label('my camp', cx, cy + 16);
   }
+  for (const sh of shrines) {
+    const known = (flags.marked || [])[sh.i] || (flags.found || [])[sh.i];
+    if (!known) continue;
+    const sx2 = x + sh.x * k, sy2 = y + sh.y * k;
+    drawMaskPiece(ctx, sh.i, sx2, sy2, 24, true);
+    label((flags.taken || [])[sh.i] ? 'done' : sh.g.name, sx2, sy2 + 16, 13);
+  }
+  if (flags.castle) {
+    const cx2 = x + castle.x * k, cy2 = y + castle.y * k;
+    shape(ctx, r, [[cx2 - 10, cy2 + 6], [cx2 - 10, cy2 - 6], [cx2 - 6, cy2 - 12], [cx2 - 2, cy2 - 6], [cx2 + 2, cy2 - 14], [cx2 + 6, cy2 - 6], [cx2 + 10, cy2 - 10], [cx2 + 10, cy2 + 6]], '#bfe6f5', '#2f6f92', { smooth: false, lw: 1.4, j: 0.4 });
+    label('frozen castle', cx2, cy2 + 18, 14);
+  }
   const px = x + player.x * k, py = y + player.y * k;
   shape(ctx, r, ell(px, py, 5, 5, 8), '#3b6db3', '#1f3c66', { lw: 1.6 });
   ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#6b6457'; ctx.textAlign = 'center';
@@ -3139,8 +3947,8 @@ function drawPause() {
     : ['WASD / arrows: walk. Shift: run. E: use.', 'F: throw / hit. R: switch. T: torch at a fire.', 'Q: eat. C: cook. Z: sleep. M: map. B: bag.', '1-9: use an item.'];
   lines.forEach((l, i) => ctx.fillText(l, VW / 2, y + 62 + i * 21));
   ctx.fillStyle = '#6b6457';
-  ctx.fillText('Step 2 of Frostbite. Coming next: the five', VW / 2, y + 156);
-  ctx.fillText('mask pieces and the Frost Spirit.', VW / 2, y + 177);
+  ctx.fillText(`Mask pieces: ${piecesN()}/5. Robe scraps and mask`, VW / 2, y + 156);
+  ctx.fillText('pieces are safe even if you die.', VW / 2, y + 177);
   menuButton(VW / 2, y + 212, 240, 'Resume', () => { paused = false; });
   menuButton(VW / 2, y + 272, 240, muted ? 'Sound: off' : 'Sound: on', () => setMuted(!muted));
   menuButton(VW / 2, y + 332, 240, confirmNew ? 'Really? Tap again' : 'New world', () => {
@@ -3156,12 +3964,18 @@ function drawDead() {
   paper(ctx, x, y, w, h, 10);
   ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.font = `700 38px ${FONT}`;
-  ctx.fillText({ hunger: 'You starved.', yeti: 'The Yeti got you.', bear: 'A polar bear got you.' }[deathCause] || 'You froze.', VW / 2, y + 18);
+  ctx.fillText({ hunger: 'You starved.', yeti: 'The Yeti got you.', bear: 'A polar bear got you.', spirit: 'The Frost Spirit froze you.', wolf: 'The ice wolves got you.', bking: 'The Old Bear King got you.', yking: 'King Yeti got you.', golem: 'The Ice Golem got you.', guardian: 'A guardian got you.' }[deathCause] || 'You froze.', VW / 2, y + 18);
   ctx.font = `700 19px ${FONT}`;
   const tip = {
     hunger: 'Tip: fish on the frozen lake and cook it at your fire.',
     yeti: "Tip: stay by fire at night, or carry a torch. Don't run near it: it hears you.",
     bear: 'Tip: climb a tree (E), or throw it a fish or a toy (F).',
+    spirit: 'Tip: dodge every attack. The mask only throws back what you survive. Your mask pieces are safe.',
+    wolf: 'Tip: wolves keep away from a torch. Hit them when they come close.',
+    bking: 'Tip: step aside when it scrapes the ground, then hit it while it is dizzy.',
+    yking: 'Tip: when the red ring shows, run out of it. A torch scares it.',
+    golem: 'Tip: stay out of the red ring when it punches. Its ice blocks are slow.',
+    guardian: 'Tip: watch for its thrown attacks and keep moving.',
   }[deathCause] || 'Tip: stay near fire at night, and keep sticks for it.';
   wrap(inv.scraps ? 'Everything you were carrying is gone, for good. Your robe scraps are safe.' : 'Everything you were carrying is gone, for good.', w - 40).forEach((l, i) => ctx.fillText(l, VW / 2, y + 74 + i * 22));
   ctx.fillStyle = '#6b6457';
@@ -3217,7 +4031,7 @@ function drawTitle() {
   if (hasSave()) { menuButton(VW / 2, by, 240, 'Continue', continueGame); menuButton(VW / 2, by + 62, 240, 'New game', startNew); }
   else menuButton(VW / 2, by, 240, 'New game', startNew);
   ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#6b6457';
-  ctx.fillText('Step 2: snowmen, polar bears, the Yeti, weapons and traders', VW / 2, VH - 22);
+  ctx.fillText('Find the 5 pieces of the old mask. Face the Frost Spirit.', VW / 2, VH - 22);
 }
 function drawStory() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -3265,8 +4079,9 @@ function render() {
   ctx.imageSmoothingEnabled = true;
   if (state === 'title') { drawTitle(); return; }
   if (state === 'story') { drawStory(); return; }
-  drawWorld();
-  drawHUD();
+  if (state === 'ending') { drawEnding(); drawFade(); return; }
+  if (arena) drawArena();
+  else { drawWorld(); drawHUD(); }
   if (mapOpen) drawMap();
   if (bagOpen) drawBag();
   if (shopOpen) drawShop();
