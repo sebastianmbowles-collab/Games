@@ -578,7 +578,7 @@ let S = null;
 function defaultSave() {
   return {
     v: 1, name: 'Player', avatar: 0, coins: 150, gems: 20, selected: 'shelly', mode: 'showdown',
-    brawlers: Object.fromEntries(['shelly', 'nita', 'colt', 'bull', 'primo', 'poco', 'brock', 'jessie', 'dynamike', 'spike'].map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0 }])),
+    brawlers: Object.fromEntries(['shelly', 'nita', 'colt', 'bull', 'primo', 'poco', 'brock', 'jessie', 'dynamike', 'spike'].map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [] }])),
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
     stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto' },
@@ -684,6 +684,17 @@ const UNLOCK = {
   jessie: { coins: 400, pass: 10 }, dynamike: { coins: 450, road: 300 }, spike: { gems: 120, road: 500 },
 };
 const GADGET_LVL = 7, STAR_LVL = 9, HYPER_LVL = 11;
+// Gears: unlock slot 1 at Power 8 and slot 2 at Power 10, buy each gear with coins, equip up to the slot count.
+const GEARS = [
+  { id: 'speed', name: 'Speed', desc: 'Move 15% faster while in a bush.', col: '#3ad8ff' },
+  { id: 'health', name: 'Health', desc: 'Heal 50% faster when out of combat.', col: '#4fd145' },
+  { id: 'vision', name: 'Vision', desc: 'Enemies you hit are revealed for 2 seconds, even in bushes.', col: '#ffe040' },
+  { id: 'shield', name: 'Shield', desc: 'Start with a 900 health shield. It comes back after 10 seconds without taking damage.', col: '#9ab0ff' },
+  { id: 'damage', name: 'Damage', desc: 'Deal 15% more damage while below half health.', col: '#ff4659' },
+  { id: 'gadget', name: 'Gadget Cooldown', desc: 'Your gadget recharges 40% faster.', col: '#c050ff' },
+];
+const GEAR_COST = 120, GEAR_SLOT_LVL = [8, 10];
+const gearSlots = lvl => GEAR_SLOT_LVL.filter(l => lvl >= l).length;
 const RARITY_COL = { Starting: '#9ad0ff', Rare: '#5ad84a', 'Super Rare': '#3a8aff', Epic: '#c050ff', Mythic: '#ff4a6a', Legendary: '#ffe040' };
 const brawlerRank = tro => Math.min(35, 1 + Math.floor(tro / 20));
 
@@ -958,176 +969,176 @@ const questText = q => QUEST_TEMPLATES.find(t => t.k === q.k).text(q.n);
 // ===================================================================
 const PAL = { k: '#0d0b1e', w: '#ffffff', s: '#f8c890', S: '#d08850', m: '#a02838', g: '#8a90a8' };
 const SPR = {
-  shelly: { pal: { p: '#a050e0', q: '#6a2aa8', o: '#ff7a3a', b: '#3060d8', n: '#7a3f1d', l: '#283060' }, weapon: 'shotgun', rows: [
-    '................',
-    '.....kkkkkk.....',
-    '....kppppppk....',
-    '...kppppppppk...',
-    '...koooooooopk..',
-    '...kssssssssqpk.',
-    '...kskksskkssqpk',
-    '...kssssssssk.pk',
-    '....kssmmssk..k.',
-    '.....kkkkkk.....',
-    '....kbbbbbbk....',
-    '...ksbbbbbbsk...',
-    '...ksbnnnnbsk...',
-    '....kbbbbbbk....',
-    '....kllk.kllk...',
-    '....kkkk.kkkk...'] },
-  colt: { pal: { r: '#e04028', b: '#3050c0', n: '#7a3f1d', l: '#5a3a22' }, weapon: 'revolver', rows: [
-    '................',
-    '......kkkkk.....',
-    '.....krrrrrk....',
-    '....krrrrrrrk...',
-    '...krrrrrrrrrk..',
-    '...krsssssssrk..',
-    '...kskkkskkksk..',
-    '...ksssssssssk..',
-    '....kssmmmssk...',
-    '.....kkrrkk.....',
-    '....kbbwwbbk....',
-    '...ksbbwwbbsk...',
-    '...ksbbwwbbsk...',
-    '....knnnnnnk....',
-    '....kllk.kllk...',
-    '....kkkk.kkkk...'] },
-  spike: { pal: { g: '#50c048', G: '#2f8a35', f: '#ff70b0', y: '#ffe040' }, weapon: null, rows: [
-    '.......ff.......',
-    '......fyyf......',
-    '.....kkffkk.....',
-    '....kggggggk....',
-    '...kgwggggwgk...',
-    '..kggggggggggk..',
-    '..kgwkkggkkgwk..',
-    '..kgggkggkgggk..',
-    '.kwggggggggggwk.',
-    'kgkggkkkkkkggkgk',
-    'kgkgggkwwkgggkgk',
-    '.kkggggkkggggkk.',
-    '..kwggggggggwk..',
-    '...kggggggggk...',
-    '....kGGkkGGk....',
-    '.....kk..kk.....'] },
-  bull: { pal: { v: '#303040', n: '#7a3f1d', l: '#2b2d3d', y: '#ffd23a' }, weapon: 'double', rows: [
-    '.......kk.......',
-    '......kkkk......',
-    '.....kkkkkkk....',
-    '....ksssksssk...',
-    '...ksssssssssk..',
-    '...kskkssskksk..',
-    '...kswkssskwsk..',
-    '...ksssSSSsssk..',
-    '...kkkkyykkkk...',
-    '..kkvvkkkkvvkk..',
-    '.ksvvvvvvvvvvsk.',
-    '.ksvvvssssvvvsk.',
-    '.kskvvvvvvvvksk.',
-    '..kknnnnnnnnkk..',
-    '...kllk..kllk...',
+  shelly: { pal: { p: '#a050e0', P: '#7a30c0', s: '#e8a070', y: '#ffc020', v: '#b08ae0', b: '#2a3a7a', n: '#7a3f1d' }, weapon: 'shotgun', rows: [
+    '..k..k.kk.k.....',
+    '.kpk.kpppkpk....',
+    '.kppkpppppppk...',
+    '..kpppppppppk...',
+    '.kpPpppppppPpk..',
+    '.kpPssssssssPpk.',
+    '..kPskksskksPk..',
+    '..kPssssssssPk..',
+    '...ksssmssssk...',
+    '...kyyyyyyyyk...',
+    '..kvvyyyyyyvvk..',
+    '..ksvvvyyvvvsk..',
+    '...kvvvvvvvvk...',
+    '...kbnnnnnnbk...',
+    '...kbbk..kbbk...',
     '...kkkk..kkkk...'] },
-  jessie: { pal: { o: '#ff7a1f', y: '#ffcf3a', c: '#5ef0ff', p: '#7a4ae0', r: '#e04040' }, weapon: 'blaster', rows: [
-    '................',
-    '......kkkk......',
-    '....kkooookk....',
-    '...kooooooook...',
-    '...kyccyooyccyk.',
-    '.koksssssssskok.',
-    'kookskksskkskook',
-    'kooksssmmssskook',
-    '.kk.kssssssk.kk.',
-    '....kkrrrrkk....',
-    '...kpprrrrppk...',
-    '..ksppppppppsk..',
-    '..ksppppppppsk..',
-    '...kppppppppk...',
-    '....kppk.kppk...',
-    '....kkkk.kkkk...'] },
-  primo: { pal: { m: '#2f6bff', f: '#ff8a1f', Y: '#ffe040', t: '#c8703f', r: '#e8383a', y: '#ffcf3a' }, weapon: null, rows: [
-    '................',
-    '.....kkkkkk.....',
-    '....kmmffmmk....',
-    '...kmmfYYfmmk...',
-    '...kmmmffmmmk...',
-    '...kmwwmmwwmk...',
-    '...kmwkmmkwmk...',
-    '...kmmmttmmmk...',
-    '..kkkmmmmmmkkk..',
-    '.krrktttttttkrrk',
-    'krrrkttttttkrrrk',
-    '.krrkttttttkrrk.',
-    '..kkkyyyyyykkk..',
-    '...kmmmmmmmmk...',
-    '...kmmk..kmmk...',
-    '...kkkk..kkkk...'] },
-  nita: { pal: { h: '#9a6030', g: '#3a9a6a', G: '#2a6a4a', n: '#7a3f1d' }, weapon: null, rows: [
-    '...kk......kk...',
-    '..khhk....khhk..',
-    '..khhkkkkkkhhk..',
-    '..khhhhhhhhhhk..',
-    '..khkkhhhhkkhk..',
-    '..khhhhhhhhhhk..',
-    '...kssssssssk...',
-    '...kskkssskksk..',
-    '....kssmmssk....',
-    '.....kkkkkk.....',
-    '....kgGgGgGk....',
-    '...ksgggggggsk..',
-    '...ksgGgGgGgsk..',
-    '....knnnnnnk....',
-    '....kssk.kssk...',
-    '....kkkk.kkkk...'] },
-  poco: { pal: { Y: '#f0c040', r: '#e03838', w: '#f4f0e0', m: '#2a8a5a', n: '#9a5a2a' }, weapon: null, rows: [
-    '......kkkk......',
-    '.....kYYYYk.....',
-    '.....kYrrYk.....',
-    '.kkkkkYYYYkkkkk.',
-    'kYYYYYYYYYYYYYYk',
-    '.kkkkkkkkkkkkkk.',
-    '...kwwwwwwwwk...',
-    '...kwkkwwkkwk...',
-    '...kwwwkkwwwk...',
-    '....kwkwkwkk....',
-    '....kmmmmmmk....',
-    '...kwmmmmmmwk...',
-    '...kkmnnnnmkk...',
-    '....kmmmmmmk....',
-    '....kwk..kwk....',
-    '....kkk..kkk....'] },
-  brock: { pal: { K: '#222233', D: '#8a5a3a', b: '#3080e0', n: '#7a3f1d', l: '#2a3a6a' }, weapon: 'launcher', rows: [
-    '....kkkkkkk.....',
-    '...kKKKKKKKk....',
-    '...kKKKKKKKk....',
-    '...kKKKKKKKk....',
-    '...kDDDDDDDk....',
-    '...kkkkDkkkk....',
-    '...kDDDDDDDk....',
-    '...kDDmmmDDk....',
-    '....kkDDDkk.....',
-    '...kbbbbbbbk....',
-    '..kDbbbbbbbDk...',
-    '..kDbbbbbbbDk...',
-    '...knnnnnnnk....',
+  colt: { pal: { r: '#e0305a', R: '#a01a40', s: '#f0b08a', c: '#a8c8f0', v: '#5a3aa0', n: '#7a4a2a', l: '#4a2a8a', y: '#ffc020' }, weapon: 'revolver', rows: [
+    '....kkkkk.......',
+    '...krrrrrk......',
+    '..krrrrrrrk.....',
+    '..krRrrrrrrk....',
+    '..kRrrrrrrrrk...',
+    '..kRssssssssk...',
+    '..kRskksskkssk..',
+    '..kRssssssssk...',
+    '...ksssmmsssk...',
+    '....kkcckkk.....',
+    '...kvcccccvk....',
+    '..ksvccyccvsk...',
+    '...kvvnnnvvk....',
     '...klllllllk....',
     '...kllk.kllk....',
     '...kkkk.kkkk....'] },
-  dynamike: { pal: { y: '#ffe040', H: '#c09040', w: '#f0f0f0', r: '#d83030', b: '#3a5ab0' }, weapon: 'dynamite', rows: [
-    '......kkkk......',
-    '.....kyyyyk.....',
-    '....kHHyyHHk....',
-    '...kHHHHHHHHk...',
-    '..kkkkkkkkkkkk..',
-    '...kssssssssk...',
-    '...kskkssskksk..',
-    '...kwwwSSwwwk...',
-    '...kwwwwwwwwk...',
-    '....kwwwwwwk....',
-    '...krkwwwwkrk...',
-    '...ksrrrrrrsk...',
-    '...kbbbbbbbbk...',
-    '....kbbbbbbk....',
-    '....kbbk.kbbk...',
+  spike: { pal: { g: '#80e030', G: '#50a820', d: '#2a6a1a', r: '#e04020', v: '#a040e0', n: '#8a4a1a' }, weapon: null, rows: [
+    '......krrk......',
+    '.....krrrrk.....',
+    '....kkrrrrkk....',
+    '...kggggggggk...',
+    '..kggggggggggk..',
+    '..kgddggggddgk..',
+    '..kgddggggddgk..',
+    '..kggggggggggk..',
+    '..kgggddddgggk..',
+    '.kvkggddddggkvk.',
+    'kgvvkggggggkvvgk',
+    'kgvvkggggggkvvgk',
+    '.kkkkggggggkkkk.',
+    '...knnnnnnnnk...',
+    '...kggk..kggk...',
+    '...kkkk..kkkk...'] },
+  bull: { pal: { K: '#1a1e30', s: '#e8a08a', y: '#ffc020', v: '#2a2a35', w: '#e8e8f8', l: '#2a4a9a', c: '#e8dcb0', n: '#4a2a1a' }, weapon: 'double', rows: [
+    '....kkkkk.......',
+    '...kKKKKKk......',
+    '..kKKKKKKKk.....',
+    '..kKKKKKKKKk....',
+    '..kKssssssKk....',
+    '..kKkkssskkKk...',
+    '..kswksssswksk..',
+    '..kssssyyssssk..',
+    '...ksskkkkssk...',
+    '.kkkvvwwwwvvkkk.',
+    'kssvvvwwwwvvvssk',
+    'kssvvvwwwwvvvssk',
+    '.kkkvvvccvvvkkk.',
+    '...klllllllllk..',
+    '...knnnk.knnnk..',
+    '...kkkkk.kkkkk..'] },
+  jessie: { pal: { B: '#2a3aa0', c: '#3a8af0', r: '#e03838', s: '#f8c8a0', o: '#f09030', O: '#c06a20', n: '#a02060', g: '#6a8ad8', R: '#a03040' }, weapon: null, rows: [
+    '....kkkkkkk.....',
+    '...kBBcBBcBk....',
+    '..kBBcccBcccBk..',
+    '..kBBBcBBBcBBk..',
+    '..krrrrrrrrrrk..',
+    '..krsssssssssk..',
+    'rrkskksssskksk..',
+    'rrksssssssssk...',
+    '.rkssssmmsssk...',
+    '..r.kkooookk....',
+    '...koooggggggk..',
+    '...ksoRRRRgggk..',
+    '...kOooooooOk...',
+    '...kOOOOOOOOk...',
+    '....knnk.knnk...',
     '....kkkk.kkkk...'] },
+  primo: { pal: { m: '#2a7af0', r: '#e03040', t: '#d0844a', y: '#ffc030', R: '#c02838', B: '#2a7af0' }, weapon: null, rows: [
+    '................',
+    '.....kkkkkk.....',
+    '....kmmyymmk....',
+    '...kmmmmmmmmk...',
+    '...krrrmmrrrk...',
+    '...krwkrrkwrk...',
+    '...krwwrrwwrk...',
+    '...kmmmttmmmk...',
+    '...kmkwwwwkmk...',
+    '.kkkkttttttkkkk.',
+    'kttkttttttttkttk',
+    'kmmkttttttttkmmk',
+    '..kRRRyyRRRk....',
+    '...kBBBBBBBk....',
+    '...kBBk.kBBk....',
+    '...kkkk.kkkk....'] },
+  nita: { pal: { h: '#e04848', H: '#b02a3a', n: '#1b2240', s: '#a8603a', g: '#3ad88a', t: '#4ab0d8', L: '#8a2a2a', c: '#6af0f0' }, weapon: null, rows: [
+    '..kk......kk....',
+    '.khhk....khhk...',
+    '.khhhkkkkkhhhk..',
+    '.khkhhhhhhhkhk..',
+    '.khhhhnnnnhhhk..',
+    '.kHhhhnnnnhhHk..',
+    '.kHksssssssKHk..',
+    '..kswwsssswwsk..',
+    '..kskksssskksk..',
+    '...kssmmmmssk...',
+    '.ss.kkhhhhkk.ss.',
+    '.sskhggcgghkss..',
+    '...kgggggggk....',
+    '...ktttttttk....',
+    '...kLLk.kLLk....',
+    '...kkkk.kkkk....'] },
+  poco: { pal: { N: '#202a5a', c: '#e8dcb0', Y: '#f8c830', g: '#3ad84a', p: '#ff6aa0', n: '#28306a', P: '#ff70b0', r: '#e03030', w: '#ffffff' }, weapon: null, rows: [
+    '......kkkk......',
+    '.....kNNNNk.....',
+    '...kkNNNNNNkk...',
+    '.kkNNNNNNNNNNkk.',
+    'kccNccNccNccNcck',
+    '.kkkkkkkkkkkkkk.',
+    '...kYYYYYYYYk...',
+    '...kgkgYpYgkgk..',
+    '...kYggYYYggYk..',
+    '...kYYYYkYYYk...',
+    '...kYkwkwkwkYk..',
+    '....kkrrrkkk....',
+    '...knnPPPPPkk...',
+    '...knPPkPPYYk...',
+    '....knPPPnk.....',
+    '....kkk.kkk.....'] },
+  brock: { pal: { K: '#24306a', D: '#8a5a3a', w: '#f0f0f8', v: '#6a4ad0', l: '#2a3a7a', W: '#e8e8f0' }, weapon: 'launcher', rows: [
+    '...kkkkkkk......',
+    '..kKKKKKKKk.....',
+    '..kKKKKKKKKk....',
+    '..kKDDDDDDKk....',
+    '..kDDDDDDDDk....',
+    '..kkkkkDkkkk....',
+    '..kkkkkDkkkk....',
+    '..kDDDDmmDDk....',
+    '...kkDDDDkk.....',
+    '..kvvwwwwvvk....',
+    '.kDvvwwwwvvDk...',
+    '.kDvvwwwwvvDk...',
+    '..kkllllllkk....',
+    '...kllllllk.....',
+    '...kllk.kllk....',
+    '...kWWk.kWWk....'] },
+  dynamike: { pal: { y: '#ffd020', Y: '#d8a010', L: '#e8eaff', l: '#8a90e0', s: '#f0b8a0', w: '#e8e8f0', r: '#e03040', b: '#2a3a8a', n: '#6a3a1a', d: '#d82838' }, weapon: null, rows: [
+    '.....kkkkkk.....',
+    '....kylLLlyk....',
+    '...kyylLLlyyk...',
+    '..kyyyyyyyyyyk..',
+    '.kYYYYYYYYYYYYk.',
+    '..kwsssssssswk..',
+    '..kwskksskkswk..',
+    '..kwwwwssswwwk..',
+    '..kwwwkkkkwwwk..',
+    '...kwwwmmwwwk...',
+    'd..kkwwwwwwkk..d',
+    'dskrrrrrrrrrrksd',
+    '...krrrrrrrrk...',
+    '...knnnLnnnnk...',
+    '...kbbbk.kbbbk..',
+    '...kkkkk.kkkkk..'] },
   bruce: { pal: { h: '#8a5020', H: '#c08850' }, rows: [
     '..kk........kk..',
     '.khhk......khhk.',
@@ -1173,9 +1184,9 @@ const SPR = {
 const WEAPONS = {
   shotgun: { pal: { n: '#8a4b23', g: '#9aa0b8' }, rows: ['kkkkkkkkkk.', 'knnngggggkk', 'kkkkkkkkkk.'], ox: 9, oy: 10 },
   revolver: { pal: { n: '#6b3a1e', g: '#c9cfe0' }, rows: ['kkkkkkk', 'knggggk', 'knkkkkk', 'kk.....'], ox: 10, oy: 10 },
-  double: { pal: { n: '#6b3a1e', g: '#6a7088' }, rows: ['kkkkkkkkkk', 'knnggggggk', 'knnggggggk', 'kkkkkkkkkk'], ox: 11, oy: 10 },
+  double: { pal: { n: '#8a4a23', g: '#6a7088' }, rows: ['kkkkkkkkkk', 'knnggggggk', 'knnggggggk', 'kkkkkkkkkk'], ox: 11, oy: 9 },
   blaster: { pal: { y: '#ffcf3a', c: '#5ef0ff' }, rows: ['kkkkkkkk.', 'kyyyyyyck', 'kyykkkkk.', 'kkk......'], ox: 10, oy: 10 },
-  launcher: { pal: { g: '#6a7088', r: '#e04028' }, rows: ['kkkkkkkkkkk', 'kgggggggrrk', 'kgggggggrrk', 'kkkkkkkkkkk'], ox: 6, oy: 7 },
+  launcher: { pal: { g: '#b0b8c8', r: '#c02040' }, rows: ['kkkkkkk', 'kgrgrgk', 'kgggggk', 'kgrgrgk', 'kkkkkkk'], ox: 10, oy: 1 },
   dynamite: { pal: { r: '#d83030', y: '#ffe040' }, rows: ['.y.', 'kkk', 'krk', 'krk', 'kkk'], ox: 12, oy: 9 },
 };
 (function finishSprites() {
@@ -1311,6 +1322,7 @@ function makeBrawler(id, team, pos, o) {
     burst: null, dash: null, leap: null, z: 0, cubes: 0, gems: 0, kills: 0, dmgDealt: 0, inBush: false, moving: false,
     isPlayer: !!o.player, name: o.name, slot: o.slot || 0, seed: Math.random() * 6, rank: 0,
     gadgets: (o.level || 1) >= GADGET_LVL ? 3 : 0, gadgetCd: 0, star: (o.level || 1) >= STAR_LVL, hyperOK: (o.level || 1) >= HYPER_LVL, hyper: 0, hyperT: 0,
+    gears: new Set(o.gears || []), shield: (o.gears || []).includes('shield') ? 900 * m : 0, shieldMax: (o.gears || []).includes('shield') ? 900 * m : 0,
     bounty: 2, burnT: 0, burnDps: 0, burnSrc: null, burnTick: 0, spinT: 0, spinTick: 0,
     ai: o.player ? null : makeAI(o.skill || 0, o.slot || 0),
   };
@@ -1331,13 +1343,13 @@ function startBattle(modeKey) {
   const others = shuffle(BR_LIST.map(b => b.id).filter(i => i !== pid));
   if (modeKey === 'showdown') {
     const sp = shuffle(map.spawns.slice());
-    G.player = addBrawler(pid, 1, sp[0], { player: true, level: plvl, name: S.name });
+    G.player = addBrawler(pid, 1, sp[0], { player: true, level: plvl, name: S.name, gears: myGears() });
     for (let i = 0; i < 5; i++) addBrawler(others[i % others.length], i + 2, sp[i + 1], { level: bl(), name: names[i], skill, slot: i });
     G.poison = { delay: 20, inset: 0, t: 0, max: Math.min(map.w, map.h) * T / 2 - 2.6 * T, speed: 6 };
   } else {
     const blue = map.teamSpawns[1], red = map.teamSpawns[2];
     addBrawler(others[0], 1, blue[0], { level: bl(), name: names[0], skill, slot: 0 });
-    G.player = addBrawler(pid, 1, blue[1], { player: true, level: plvl, name: S.name, slot: 1 });
+    G.player = addBrawler(pid, 1, blue[1], { player: true, level: plvl, name: S.name, slot: 1, gears: myGears() });
     addBrawler(others[1], 1, blue[2], { level: bl(), name: names[1], skill, slot: 2 });
     const reds = shuffle(BR_LIST.map(b => b.id)).slice(0, 3);
     for (let i = 0; i < 3; i++) addBrawler(reds[i], 2, red[i], { level: bl(), name: names[2 + i], skill, slot: i });
@@ -1351,7 +1363,10 @@ function startBattle(modeKey) {
   }
   const p = G.player; G.cam.x = p.x; G.cam.y = p.y;
 }
-function addBrawler(id, team, pos, o) { const b = makeBrawler(id, team, pos, o); b.spawn = { x: pos.x, y: pos.y }; G.brawlers.push(b); return b; }
+function myGears() { const st = S.brawlers[S.selected]; return (st.equipped || []).filter(g => (st.gears || []).includes(g)).slice(0, gearSlots(st.level)); }
+function botGears(lvl) { return shuffle(GEARS.map(g => g.id)).slice(0, gearSlots(lvl)); }
+function addBrawler(id, team, pos, o) {
+  if (!o.player && !o.gears) o.gears = botGears(o.level || 1); const b = makeBrawler(id, team, pos, o); b.spawn = { x: pos.x, y: pos.y }; G.brawlers.push(b); return b; }
 const enemiesOf = team => G.brawlers.filter(b => b.alive && b.team !== team);
 
 // ---------------- abilities ----------------
@@ -1530,6 +1545,8 @@ function damage(tg, amount, src, o = {}) {
   if (tg.kind === 'brawler') {
     if (!tg.alive || tg.shieldT > 0 || tg.leap) return;
     if (tg.hyperT > 0) amount *= 0.85;
+    if (tg.shield > 0) { const a = Math.min(tg.shield, amount); tg.shield -= a; amount -= a; if (tg.shield <= 0) burst(tg.x, tg.y - 10, '#9ab0ff', 8, 160, 4, 0.3); }
+    if (src && src.gears && src.gears.has('vision')) tg.revealT = Math.max(tg.revealT, 2);
     tg.hp -= amount; tg.hurtT = 0; tg.flash = 0.12; tg.revealT = Math.max(tg.revealT, 0.6);
     if (tg.isPlayer) { G.hurtFlash = 0.35; shake(3 + amount / 450); Sound.play('hurt'); }
   } else { tg.hp -= amount; tg.flash = 0.12; if (tg.kind === 'safe' && src && src.isPlayer) G.stats.safeDmg += amount; }
@@ -1584,13 +1601,14 @@ function updateBrawler(b, dt) {
   updateStatus(b, dt); if (!b.alive) return;
   b.atkAnim = Math.max(0, b.atkAnim - dt * 4);
   if (b.ammo < 3) { b.reloadP += dt / b.def.reload * (b.star && b.id === 'bull' && b.hp < b.hpMax * 0.6 ? 2 : 1); if (b.reloadP >= 1) { b.ammo++; b.reloadP = b.ammo < 3 ? b.reloadP - 1 : 0; } }
-  if (b.hurtT > 3 && b.atkT > 3 && b.hp < b.hpMax) { b.hp = Math.min(b.hpMax, b.hp + b.hpMax * 0.13 * dt); if (Math.random() < dt * 4 && isVisibleToPlayer(b)) G.parts.push({ type: 'p', x: b.x + rand(-14, 14), y: b.y - rand(0, 30), vx: 0, vy: -40, life: 0.6, max: 0.6, size: 4, color: '#7dff6a', grav: 0, drag: 0 }); }
+  if (b.shieldMax && b.shield < b.shieldMax && b.hurtT > 10) { b.shield = b.shieldMax; if (isVisibleToPlayer(b)) ringFx(b.x, b.y, 30, '#9ab0ff', 0.4, 4); }
+  if (b.hurtT > 3 && b.atkT > 3 && b.hp < b.hpMax) { b.hp = Math.min(b.hpMax, b.hp + b.hpMax * 0.13 * (b.gears.has('health') ? 1.5 : 1) * dt); if (Math.random() < dt * 4 && isVisibleToPlayer(b)) G.parts.push({ type: 'p', x: b.x + rand(-14, 14), y: b.y - rand(0, 30), vx: 0, vy: -40, life: 0.6, max: 0.6, size: 4, color: '#7dff6a', grav: 0, drag: 0 }); }
   if (b.burst) { const B = b.burst; B.t -= dt; while (B.t <= 0 && B.left > 0) { fireBurstShot(b, B); B.left--; B.t += B.interval; } if (B.left <= 0) b.burst = null; }
   if (b.leap) { updateLeap(b, dt); return; }
   if (b.dash) updateDash(b, dt);
   else {
     let mx = b.mx, my = b.my; const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
-    let sp = b.def.speed * (b.slowT > 0 ? 0.55 : 1) * (G.ball && G.ball.holder === b ? 0.93 : 1) * (b.star && b.id === 'colt' ? 1.1 : 1) * (b.hyperT > 0 ? 1.25 : 1);
+    let sp = b.def.speed * (b.slowT > 0 ? 0.55 : 1) * (G.ball && G.ball.holder === b ? 0.93 : 1) * (b.star && b.id === 'colt' ? 1.1 : 1) * (b.hyperT > 0 ? 1.25 : 1) * (b.inBush && b.gears.has('speed') ? 1.15 : 1);
     if (b.stunT > 0 || G.intro > 0 || G.goalPause > 0 || G.over) sp = 0;
     const ox = b.x, oy = b.y;
     moveCircle(b, mx * sp * dt + b.kx * dt, my * sp * dt + b.ky * dt, b.r);
@@ -1879,7 +1897,7 @@ function stepBattle(dt) {
 // Brawl Stars mechanics: gadgets, star powers, hypercharge, pets,
 // explosions, healing, burning and knockout rounds
 // ===================================================================
-const dmgNow = b => (b.dmgMult || 1) * cubeMult(b) * (b.hyperT > 0 ? 1.15 : 1);
+const dmgNow = b => (b.dmgMult || 1) * cubeMult(b) * (b.hyperT > 0 ? 1.15 : 1) * (b.gears && b.gears.has('damage') && b.hp < b.hpMax * 0.5 ? 1.15 : 1);
 function superStats(b) {
   const A = { ...b.def.super, isSuper: true }, hy = b.hyperT > 0;
   if (b.star && b.id === 'brock') A.rockets = 13;
@@ -1978,7 +1996,7 @@ function doGadget(b) {
     case 'dynamike': b.spinT = 1.5; b.spinTick = 0; break;
   }
   if (!ok) { if (b.isPlayer) { Sound.play('error'); textFx(b.x, b.y - 60, b.id === 'primo' ? 'NO ONE CLOSE' : 'NEED YOUR PET', '#ffffff', 12, 0.9); } return false; }
-  b.gadgets--; b.gadgetCd = 4; b.revealT = 1; b.atkT = 0;
+  b.gadgets--; b.gadgetCd = 4 * (b.gears.has('gadget') ? 0.6 : 1); b.revealT = 1; b.atkT = 0;
   if (b.isPlayer) G.stats.gadgets++;
   Sound.play('cube', vol(b)); ringFx(b.x, b.y, 40, '#4fd145', 0.3, 5);
   textFx(b.x, b.y - 66, b.def.gadget.name.toUpperCase(), '#9dff6b', 11, 1);
@@ -2630,6 +2648,7 @@ function render() {
   for (const b of G.brawlers) if (b.alive && isVisibleToPlayer(b)) {
     const bx = A3(b.x), by = A3(b.y - b.z) - 17;
     pixBar(bx, by, 16, b.hp / b.hpMax, teamCol(b), 2);
+    if (b.shield > 0) { lx.fillStyle = '#9ab0ff'; lx.fillRect(bx - 8, by - 2, Math.max(1, Math.round(16 * b.shield / b.shieldMax)), 1); }
     if (b.isPlayer) for (let i = 0; i < 3; i++) { const f = i < b.ammo ? 1 : i === b.ammo ? b.reloadP : 0; lx.fillStyle = INK; lx.fillRect(bx - 8 + i * 6 - 1, by + 3, 6, 3); lx.fillStyle = '#3a2a4a'; lx.fillRect(bx - 8 + i * 6, by + 4, 4, 1); if (f > 0) { lx.fillStyle = i < b.ammo ? '#ff9a1f' : '#a86a2a'; lx.fillRect(bx - 8 + i * 6, by + 4, Math.max(1, Math.round(4 * f)), 1); } }
     if (G.mode === 'showdown' && b.cubes > 0) { lx.drawImage(getSpr('cube').n[0], bx - 17, by - 3); }
     if (G.mode === 'gemgrab' && b.gems > 0) lx.drawImage(getSpr('gem').n[0], bx - 3, by - 13);
@@ -3027,9 +3046,11 @@ function renderDetail() {
       <div class="ability"><span class="aic" style="background:#ff4659">A</span><div><b>${d.attack.name}</b><p>${d.attack.desc} <br><span style="color:#8a6b3a">Damage ${atkNumbers(d.attack, m)}</span></p></div></div>
       <div class="ability"><span class="aic" style="background:#ffc824">S</span><div><b>Super: ${d.super.name}</b><p>${d.super.desc} <br><span style="color:#8a6b3a">Damage ${atkNumbers(d.super, m)}</span></p></div></div>
       ${[['G', '#4fd145', 'Gadget', d.gadget, GADGET_LVL], ['★', '#ffe040', 'Star Power', d.star, STAR_LVL], ['H', '#c050ff', 'Hypercharge', d.hyper, HYPER_LVL]].map(([ic, col, label, ab, lvl]) => `<div class="ability" style="opacity:${st.level >= lvl ? 1 : 0.55}"><span class="aic" style="background:${col}">${ic}</span><div><b>${label}: ${ab.name}</b><p>${ab.desc} <br><span style="color:#8a6b3a">${st.level >= lvl ? 'Unlocked' : 'Unlocks at Power ' + lvl}</span></p></div></div>`).join('')}
+      <div id="gearBox" style="margin-top:14px"></div>
       <div class="row" style="margin-top:14px" id="dBtns"></div>
     </div>`;
   drawPortrait(body.querySelector('canvas'), id, { scale: 2.5 });
+  renderGears(id, st);
   const btns = $('#dBtns');
   const mk = (label, cls, fn, dis) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.innerHTML = label; b.onclick = fn; if (dis) b.disabled = true; btns.appendChild(b); return b; };
   if (st.owned) {
@@ -3044,6 +3065,22 @@ function renderDetail() {
     if (u.coins) mk(`Unlock · ${icon('coin')} ${u.coins}`, 'green', () => buyBrawler(id, 'coins', u.coins));
     if (u.gems) mk(`Unlock · ${icon('gem')} ${u.gems}`, 'purple', () => buyBrawler(id, 'gems', u.gems));
     const info = document.createElement('p'); info.style.cssText = 'width:100%;margin:0;color:#8a6b3a'; info.textContent = [u.road ? `Free at ${u.road} total trophies on the Trophy Road.` : '', u.pass ? `Free at Brawl Pass tier ${u.pass}.` : ''].join(' '); btns.appendChild(info);
+  }
+}
+function renderGears(id, st) {
+  st.gears = st.gears || []; st.equipped = st.equipped || [];
+  const slots = gearSlots(st.level), box = $('#gearBox');
+  box.innerHTML = `<b style="font-family:var(--display);font-size:12px;color:var(--ink)">Gears</b><p style="font-size:9px;margin:6px 0 8px">${slots ? `Slots: ${st.equipped.length} of ${slots} used${slots < 2 ? ' · 2nd slot at Power 10' : ''}` : 'Gear slots unlock at Power 8 (2nd slot at Power 10).'}</p><div id="gearList" style="display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))"></div>`;
+  for (const g of GEARS) {
+    const owned = st.gears.includes(g.id), on = st.equipped.includes(g.id);
+    const el = document.createElement('div'); el.className = 'stat'; el.style.cssText = 'display:flex;gap:8px;align-items:center';
+    el.innerHTML = `<span style="width:28px;height:28px;flex:none;background:${g.col};border:3px solid var(--ink)"></span><span style="flex:1;min-width:0"><b style="font-size:10px">${g.name}</b><small style="display:block;font-size:7px;line-height:1.6;color:#6a5a3a;text-transform:none">${g.desc}</small></span>`;
+    const b = document.createElement('button'); b.className = 'btn small ' + (on ? 'grey' : owned ? 'green' : 'purple'); b.style.fontSize = '9px';
+    if (!st.owned || !slots) { b.textContent = 'Locked'; b.disabled = true; }
+    else if (!owned) { b.innerHTML = `${icon('coin')} ${GEAR_COST}`; b.onclick = () => { if (S.coins < GEAR_COST) { Sound.play('error'); toast(`You need ${GEAR_COST - S.coins} more coins.`); return; } S.coins -= GEAR_COST; st.gears.push(g.id); if (st.equipped.length < slots) st.equipped.push(g.id); save(); Sound.play('buy'); toast(`${g.name} gear bought`); updateWallet(); renderGears(id, st); }; }
+    else if (on) { b.textContent = 'Unequip'; b.onclick = () => { st.equipped = st.equipped.filter(x => x !== g.id); save(); renderGears(id, st); }; }
+    else { b.textContent = 'Equip'; b.onclick = () => { if (st.equipped.length >= slots) { Sound.play('error'); toast('All gear slots are full. Unequip one first.'); return; } st.equipped.push(g.id); save(); renderGears(id, st); }; }
+    el.appendChild(b); $('#gearList').appendChild(el);
   }
 }
 function buyBrawler(id, cur, price) {
