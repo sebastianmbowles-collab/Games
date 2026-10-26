@@ -508,12 +508,15 @@ function genWorld(sd) {
     addObj('house', vill.x + Math.cos(a) * T * 4.2, vill.y + Math.sin(a) * T * 3.6);
   }
   addObj('pile', vill.x, vill.y);
-  const lines = ["Go away, mask kid.", "Your drawings burned nicely.", "Nobody wants your toys.", "Why do you even wear that mask?", "Don't come crying back.", "That carving made a good log."];
   villagers = [];
   for (let k = 0; k < 4; k++) {
     const a = k / 4 * Math.PI * 2 + 1.3, x = vill.x + Math.cos(a) * T * 2.3, y = vill.y + Math.sin(a) * T * 2.1;
-    villagers.push({ x, y, hx: x, hy: y, tx: x, ty: y, wait: R() * 3, dir: 1, walk: 0, say: null, line: k, lines, id: k, look: VLOOKS[k] });
+    villagers.push({ x, y, hx: x, hy: y, tx: x, ty: y, wait: R() * 3, dir: 1, walk: 0, say: null, line: 0, id: k, look: VLOOKS[k], name: VNAMES[k], lines: VLINES[k], mode: null });
   }
+  villagers[1].hasDrawing = true;
+  // Wren, the shy teenager, keeps away from the others
+  const wa = R() * Math.PI * 2, wx = vill.x + Math.cos(wa) * T * 6.5, wy = vill.y + Math.sin(wa) * T * 6.5;
+  villagers.push({ x: wx, y: wy, hx: wx, hy: wy, tx: wx, ty: wy, wait: 2, dir: 1, walk: 0, say: null, line: 0, id: 4, look: VLOOKS[4], name: 'Wren', teen: true, mode: null });
 
   // the map the kid draws while walking
   mapBase = document.createElement('canvas'); mapBase.width = W; mapBase.height = H;
@@ -640,7 +643,7 @@ let player, S, inv, camp, spawn, flags, owl;
 let speech = null, toasts = [], floats = [], parts = [], prints = [];
 let target = null, deathCause = '', helpT = 0;
 let cam = { x: 0, y: 0 };
-let saveT = 0, tickT = 0, lastTile = -1, lastNight = false;
+let saveT = 0, tickT = 0, lastTile = -1, lastNight = false, villT = 0, kaelWarned = false, pileFlare = 0;
 const fade = { a: 0, phase: 'none', t: 0, text: '', mid: null };
 
 function newGame() {
@@ -910,7 +913,7 @@ function findTarget() {
       if (d < bd) { best = { kind: 'obj', o }; bd = d; }
     }
   }
-  for (const v of villagers) { const d = dist(px, py, v.x, v.y); if (d < 40 && d < bd) { best = { kind: 'villager', v }; bd = d; } }
+  for (const v of villagers) { const d = dist(px, py, v.x, v.y); if (d < 40 && d < bd && v.mode !== 'chase') { best = { kind: 'villager', v }; bd = d; } }
   if (!camp) for (const s of spots) { const d = dist(px, py, s.x, s.y); if (d < 56 && d < bd + 20) { best = { kind: 'spot', s }; bd = d; } }
   if (tileAtW(px, py) === ICE && (!best || (best.kind === 'obj' && bd > 24))) best = { kind: 'fish' };
   return best;
@@ -928,7 +931,7 @@ function verbFor(tg) {
       return `Build a ${up.name} (${up.sticks} sticks, ${up.stones} stones)`;
     }
     case 'spot': return 'Set up camp here';
-    case 'villager': return 'Talk';
+    case 'villager': return `Talk to ${tg.v.name}`;
     case 'fish': return player.fishing ? 'Fishing...' : 'Fish through the ice';
   }
   return '';
@@ -949,13 +952,50 @@ function act() {
   } else if (tg.kind === 'tent') upgradeCamp();
   else if (tg.kind === 'spot') makeCamp(tg.s);
   else if (tg.kind === 'villager') {
-    const v = tg.v;
-    v.say = { text: v.lines[(v.line++) % v.lines.length], t: 2.8 };
-    flags.villTalk++;
-    if (flags.villTalk === 2) setTimeout(() => say("...I should go find my own place."), 1800);
+    talkTo(tg.v);
   } else if (tg.kind === 'fish') {
     if (!player.fishing) { player.fishing = { t: 0, need: 3 + Math.random() * 3 }; say('Cutting a little hole... now I wait.', 2); }
   }
+}
+function talkTo(v) {
+  if (v.mode === 'chase') return;
+  if (v.teen) { wrenTalk(v); return; }
+  if (v.hasDrawing) {
+    // Mira walks to the fire and throws the kid's drawing in
+    v.mode = 'burn'; v.wait = 0;
+    v.say = { text: 'Mira: Oh, is this yours? Watch this!', t: 2.6 };
+    return;
+  }
+  v.say = { text: `${v.name}: ${v.lines[(v.line++) % v.lines.length]}`, t: 3 };
+  flags.villTalk++;
+  if (flags.villTalk === 2) setTimeout(() => say("...I should go find my own place."), 1800);
+}
+function wrenTalk(v) {
+  if (!flags.metWren) {
+    flags.metWren = true;
+    v.say = { text: "Wren: Oh! Um... hi. I'm Wren. I liked your toys. I'm sorry they burned them. Here, take these.", t: 6 };
+    inv.berries += 3; floatText('+3 frost berries', player.x, player.y - 40, '#8a5a1c');
+    setTimeout(() => say('Someone in this village is... nice?'), 3000);
+    v.giftAt = gameTime + 20;
+    return;
+  }
+  if (gameTime < (v.giftAt || 0)) { v.say = { text: "Wren: I... need to go find more. Come back in a little bit.", t: 3 }; return; }
+  v.giftAt = gameTime + 20;
+  flags.wrenTalks = (flags.wrenTalks || 0) + 1;
+  let gift;
+  if (flags.wrenScrapDay !== dayNum() && flags.wrenTalks % 3 === 0) { inv.scraps++; flags.wrenScrapDay = dayNum(); gift = 'a robe scrap'; }
+  else if (Math.random() < 0.5) { inv.ckCod.push(gameTime + 3 * DAY); gift = 'a cooked fish'; }
+  else { inv.berries += 3; gift = '3 frost berries'; }
+  floatText(`+ ${gift}`, player.x, player.y - 40, '#8a5a1c');
+  sfx.pick();
+  v.say = { text: `Wren: Here, ${gift}. And... ${WREN_TIPS[flags.wrenTalks % WREN_TIPS.length]}`, t: 6 };
+}
+function singeRobe() {
+  flags.singed = true;
+  sfx.sizzle();
+  for (let i = 0; i < 10; i++) parts.push({ x: player.x + (Math.random() - 0.5) * 14, y: player.y - 10, vx: (Math.random() - 0.5) * 20, vy: -20 - Math.random() * 20, t: 1.4, kind: 'smoke' });
+  burstSparks(player.x, player.y - 12, 12);
+  say('My robe! He burned my robe... it will be colder until I sleep.', 4);
 }
 function gather(o) {
   const d = OT[o.type];
@@ -1053,6 +1093,7 @@ function sleep() {
     S.food = Math.max(5, S.food - 22);
     S.warm = Math.max(S.warm, 80);
     S.hp = Math.min(100, S.hp + 30 + camp.level * 15);
+    if (flags.singed) { flags.singed = false; setTimeout(() => toast('You patched up the burned spot on your robe.'), 2600); }
     S.sta = 100;
     camp.fuel = Math.max(15, camp.fuel - 35);
     player.x = spawn.x; player.y = spawn.y;
@@ -1078,6 +1119,8 @@ function respawn() {
   const sp = spawn || { x: vill.x, y: vill.y + 70 };
   player.x = sp.x; player.y = sp.y;
   S.hp = 70; S.warm = 70; S.food = Math.max(S.food, 55); S.sta = 100;
+  flags.singed = false; villT = 0;
+  for (const v of villagers) if (v.mode === 'chase') v.mode = 'return';
   gameTime = (Math.floor(gameTime / DAY) + 1) * DAY + DAY * 0.06;
   lastNight = false;
   cam.x = player.x; cam.y = player.y;
@@ -1190,7 +1233,7 @@ function gameUpdate(dt) {
   const tile = tileAtW(player.x, player.y);
   const night = darkness(t) / 0.8;
   const biomeMul = { [SNOW]: 1, [FOREST]: 0.85, [ICE]: 1.25, [ROCK]: 1.35, [PEAK]: 1.35, [CAVE]: 0.6, [VILL]: 0.9, [SPRING]: 0 }[tile];
-  let warmRate = -0.62 * (1 + night * 0.75) * biomeMul * (1 + windNow() * 0.3) * ROBES[flags.robe || 0].mul;
+  let warmRate = -0.62 * (1 + night * 0.75) * biomeMul * (1 + windNow() * 0.3) * ROBES[flags.robe || 0].mul * (flags.singed ? 1.35 : 1);
   if (running) warmRate *= 0.8;
   let heat = 0, nearFire = false;
   if (camp && camp.fuel > 0) {
@@ -1281,13 +1324,58 @@ function gameUpdate(dt) {
     if (owl.hootT <= 0) { owl.hootT = 25 + Math.random() * 30; if (night > 0.5) sfx.hoot(); }
   }
   // villagers wander a little
+  const inVill = dist(player.x, player.y, vill.x, vill.y) < 230;
+  villT = inVill ? villT + dt : Math.max(0, villT - dt * 3);
+  const kael = villagers[2];
+  if (!kael.mode && villT > 45 && !kaelWarned) { kaelWarned = true; kael.say = { text: "Kael: Hey, mask kid. You've been here too long.", t: 3.5 }; }
+  if (!kael.mode && villT > 60) { kael.mode = 'chase'; kael.say = { text: 'Kael: OUT! Get out of our village!', t: 3 }; say('He has a torch! Run! (Shift)', 2.5); }
+  if (villT === 0) kaelWarned = false;
+  const mira = villagers[1];
+  if (mira.hasDrawing === false && dayNum() > mira.burnDay) mira.hasDrawing = true;
   for (const v of villagers) {
-    v.wait -= dt;
-    if (v.wait <= 0) { v.tx = v.hx + (Math.random() - 0.5) * 60; v.ty = v.hy + (Math.random() - 0.5) * 50; v.wait = 2 + Math.random() * 4; }
+    let speed = 30;
+    if (v.mode === 'chase') {
+      v.tx = player.x; v.ty = player.y; speed = 108;
+      if (dist(v.x, v.y, player.x, player.y) < 16) {
+        singeRobe();
+        v.mode = 'return'; villT = 0;
+        v.say = { text: 'Kael: And stay out!', t: 3 };
+      } else if (dist(player.x, player.y, vill.x, vill.y) > 340) {
+        v.mode = 'return'; villT = 0;
+        v.say = { text: 'Kael: Yeah, run! And stay out!', t: 3 };
+      }
+    } else if (v.mode === 'return') {
+      v.tx = v.hx; v.ty = v.hy; speed = 60;
+      if (dist(v.x, v.y, v.hx, v.hy) < 4) v.mode = null;
+    } else if (v.mode === 'burn') {
+      v.tx = vill.x + (v.x < vill.x ? -20 : 20); v.ty = vill.y + 6; speed = 55;
+      if (dist(v.x, v.y, v.tx, v.ty) < 4) {
+        v.mode = null; v.hasDrawing = false; v.burnDay = dayNum(); v.wait = 3;
+        pileFlare = 1.6; burstSparks(vill.x, vill.y - 10, 24); sfx.sizzle();
+        v.say = { text: 'Mira: Into the fire! Ha ha!', t: 3 };
+        setTimeout(() => { if (state === 'play') say('...that was my drawing of the owl.', 3.5); }, 1200);
+      }
+    } else {
+      v.wait -= dt;
+      if (v.wait <= 0) {
+        if (v.teen) {
+          // Wren roams between the edge of the village and the woods
+          for (let k = 0; k < 10; k++) {
+            const a = Math.random() * Math.PI * 2, rr = T * (5 + Math.random() * 6);
+            const nx = vill.x + Math.cos(a) * rr, ny = vill.y + Math.sin(a) * rr, t = tileAtW(nx, ny);
+            if (t !== PEAK && t !== SPRING && t !== CAVE) { v.tx = nx; v.ty = ny; break; }
+          }
+          v.wait = 6 + Math.random() * 8;
+        } else { v.tx = v.hx + (Math.random() - 0.5) * 60; v.ty = v.hy + (Math.random() - 0.5) * 50; v.wait = 2 + Math.random() * 4; }
+      }
+      if (v.teen) speed = 38;
+      if (v.teen && v.say && dist(v.x, v.y, player.x, player.y) < 60) speed = 0;
+    }
     const dx = v.tx - v.x, dy = v.ty - v.y, l = Math.hypot(dx, dy);
-    if (l > 2) { v.x += dx / l * 30 * dt; v.y += dy / l * 30 * dt; v.walk += dt * 5; if (Math.abs(dx) > 1) v.dir = dx > 0 ? 1 : -1; }
+    if (l > 2 && speed) { const st = Math.min(l, speed * dt); v.x += dx / l * st; v.y += dy / l * st; v.walk += dt * (speed > 60 ? 10 : 5); if (Math.abs(dx) > 1) v.dir = dx > 0 ? 1 : -1; }
     if (v.say) { v.say.t -= dt; if (v.say.t <= 0) v.say = null; }
   }
+  pileFlare = Math.max(0, pileFlare - dt);
 
   // particles, footprints, texts
   for (const p of parts) { p.t -= dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.kind === 'drop' || p.kind === 'dust') p.vy += 120 * dt; }
@@ -1374,6 +1462,13 @@ function drawKid(c, x, y, dir, walk, moving, opts = {}) {
   c.strokeStyle = '#e8eef6'; c.lineWidth = 0.8; c.setLineDash([1.6, 1.8]);
   c.beginPath(); c.moveTo(-7.8, -5.2); c.lineTo(7.8, -5.2); c.stroke(); c.setLineDash([]);
   if (rl >= 2) furTrim(c, r, -8.6 - wide, 8.6 + wide, -2.5);
+  if (opts.singed ?? (flags ? flags.singed : false)) {
+    // burn marks from Kael's torch
+    for (const [bx, by, br] of [[-5.5, -4, 2.6], [3.5, -3, 2.2], [6.2, -12, 1.8]]) {
+      c.fillStyle = 'rgba(30,22,18,.75)'; trace(c, ell(bx, by, br, br * 0.8, 7, r, 0.4), true, true); c.fill();
+      c.fillStyle = 'rgba(230,120,40,.7)'; c.beginPath(); c.arc(bx + 0.4, by + 0.2, br * 0.3, 0, 7); c.fill();
+    }
+  }
   // fold lines
   line(c, r, -2.2, -19, -3.6, -8, '#2a5390', 0.8, 0.25);
   line(c, r, 2.6, -19, 4, -8, '#2a5390', 0.8, 0.25);
@@ -1492,12 +1587,29 @@ function drawOwl(c, o) {
   }
   c.fillStyle = '#d98a2b'; c.beginPath(); c.moveTo(o.x - 1 + o.face, y - 10.5); c.lineTo(o.x + 1 + o.face, y - 10.5); c.lineTo(o.x + o.face, y - 8.5); c.fill();
 }
+const VNAMES = ['Borin', 'Mira', 'Kael', 'Old Hesk'];
+const VLINES = [
+  ['Go away, mask kid.', 'That carving of yours made a good log.', 'Nobody wants your junk here.'],
+  ['Got any more drawings? The fire is hungry.', 'Ha! Look at that silly mask.', 'Why are you crying? Oh wait, that is your mask.'],
+  ['What are you looking at?', "Don't touch anything.", 'Leave before I make you.'],
+  ['In my day, children made themselves useful.', 'Hmph. Toys. What a waste of good wood.', 'Why do you even wear that mask?'],
+];
+const WREN_TIPS = [
+  'Hot springs keep you warm. Bugs like them too.',
+  'Cooked fish is way better than raw. It warms you up.',
+  'Robe scraps hide in ice caves and deep forest. Look for a twinkle.',
+  "Don't stay in the village too long. Kael gets mean.",
+  'Something big walks around at night. Stay by your fire.',
+  'I saw someone in a mask like yours, out in the snow. They trade for ice shards.',
+  'Polar bears cannot climb trees. Just so you know.',
+];
 // Each villager looks different: hat, hair, coat, what they carry, and how they glare.
 const VLOOKS = [
   { coat: '#8a5a3c', dark: '#5e3c27', trim: '#efe6d2', hat: 'fur', hatCol: '#5a4030', hair: '#3a2a1e', beard: true, skin: '#e9c9a6', item: 'wood', face: 'smirk' },
   { coat: '#6d4f7a', dark: '#4a3454', trim: null, hat: 'knit', hatCol: '#c8413d', hair: '#c98b3b', braid: true, skin: '#f0d2b4', item: 'drawing', face: 'laugh', scarf: '#e0b84a' },
   { coat: '#4f6d4a', dark: '#354a31', trim: null, hat: 'none', hair: '#2a2420', skin: '#c99a76', item: 'torch', face: 'angry', belt: true },
   { coat: '#8a3c3c', dark: '#5e2626', trim: '#d8cdb8', hat: 'hood', hatCol: '#6a2c2c', hair: '#b0b0b0', skin: '#e9c9a6', item: 'cane', face: 'frown', apron: true },
+  { coat: '#7a8a96', dark: '#56636c', trim: null, hat: 'none', hair: '#4a3a5a', bangs: true, skin: '#f0d2b4', item: null, face: 'shy', scarf: '#9fb7a0', small: true },
 ];
 function drawVillager(c, v) {
   const L = v.look || VLOOKS[(v.line || 0) % VLOOKS.length];
@@ -1505,7 +1617,8 @@ function drawVillager(c, v) {
   const moving = Math.hypot(v.tx - v.x, v.ty - v.y) > 2;
   const f = v.dir || 1;
   c.save();
-  c.translate(v.x, v.y); c.scale(0.92, 0.92);
+  c.translate(v.x, v.y); c.scale(L.small ? 0.84 : 0.92, L.small ? 0.84 : 0.92);
+  const item = L.item === 'drawing' && v.hasDrawing === false ? null : L.item;
   shadow(c, 0, 0, 11, 4, 0.2);
   const step = moving ? Math.sin(v.walk) * 2.6 : 0;
   // boots and trousers
@@ -1540,8 +1653,8 @@ function drawVillager(c, v) {
     c.beginPath(); c.arc(hx, hy + 1.2, 1.9, 0, 7); c.fill(); c.stroke();
   };
   const fh = [f * 8.4, -18 - sw], bh = [-f * 8, -18 + sw];
-  if (L.item === 'drawing') { fh[0] = f * 9.5; fh[1] = -26; }
-  if (L.item === 'torch') { fh[1] = -22; }
+  if (item === 'drawing') { fh[0] = f * 9.5; fh[1] = -26; }
+  if (item === 'torch') { fh[1] = v.mode === 'chase' ? -30 : -22; }
   arm(-f, bh[0], bh[1]);
   if (L.item === 'wood') {
     for (let i = 0; i < 3; i++) shape(c, r, [[-f * 10 - 1, -21 + i * 2.6], [-f * 2, -22.5 + i * 2.6], [-f * 2, -20.3 + i * 2.6], [-f * 10 - 1, -18.8 + i * 2.6]], '#7a5236', '#3a281b', { smooth: false, lw: 0.8, j: 0.2, double: false });
@@ -1577,7 +1690,7 @@ function drawVillager(c, v) {
   for (const s of [-1, 1]) { c.beginPath(); c.arc(ex + s * 2.4, hy - 0.4, 0.95, 0, 7); c.fill(); }
   c.strokeStyle = L.hat === 'none' ? L.hair : '#3a2a1e'; c.lineWidth = 0.9; c.lineCap = 'round';
   for (const s of [-1, 1]) {
-    const inner = L.face === 'laugh' ? -2.6 : -1.4, outer = L.face === 'laugh' ? -3.6 : -3.4;
+    const inner = L.face === 'laugh' ? -2.6 : L.face === 'shy' ? -3.6 : -1.4, outer = L.face === 'laugh' ? -3.6 : L.face === 'shy' ? -2.6 : -3.4;
     c.beginPath(); c.moveTo(ex + s * 0.9, hy + inner); c.lineTo(ex + s * 3.6, hy + outer); c.stroke();
   }
   line(c, r, ex + f * 0.6, hy + 0.4, ex + f * 1.6, hy + 2.2, '#b08466', 0.8, 0.1);
@@ -1588,19 +1701,22 @@ function drawVillager(c, v) {
   if (L.face === 'smirk') { c.moveTo(ex - 2, hy + 3.6); c.quadraticCurveTo(ex, hy + 4.4, ex + 2.4 * f, hy + 2.8); c.stroke(); }
   else if (L.face === 'frown') { c.moveTo(ex - 2, hy + 4.4); c.quadraticCurveTo(ex, hy + 3, ex + 2, hy + 4.4); c.stroke(); }
   else if (L.face === 'angry') { c.moveTo(ex - 2, hy + 4); c.lineTo(ex + 2, hy + 4); c.stroke(); }
+  else if (L.face === 'shy') { c.moveTo(ex - 0.9, hy + 4); c.quadraticCurveTo(ex, hy + 4.6, ex + 0.9, hy + 4); c.stroke(); }
   else { c.fillStyle = '#4a1c1c'; c.moveTo(ex - 2.2, hy + 3); c.quadraticCurveTo(ex, hy + 6.4, ex + 2.2, hy + 3); c.closePath(); c.fill(); }
+  if (L.bangs) shape(c, r, [[-6.8, hy + 1], [-6.4, hy - 6.5], [-2, hy - 8.6], [4, hy - 8], [6.8, hy - 4], [6.8, hy + 1], [f * 3.4 + 0.6, hy + 1.6], [f * 0.6, hy - 2.6], [-f * 3.4, hy - 3.2]], L.hair, '#1e1626', { lw: 1, j: 0.3 });
+  if (L.bangs) for (let i = 0; i < 4; i++) line(c, r, -4 + i * 2.6, hy - 7.6, -4.6 + i * 2.6 + f * 2.2, hy - 1.6 + (i % 2), '#2a2036', 0.7, 0.2);
   if (L.beard) shape(c, r, [[-5, hy + 2.6], [5, hy + 2.6], [3.6, hy + 7.4], [0, hy + 8.6], [-3.6, hy + 7.4]], L.hair, '#140f0c', { lw: 0.8, j: 0.25, double: false });
   if (L.beard) { c.strokeStyle = '#6a2c2c'; c.beginPath(); c.moveTo(ex - 1.6, hy + 4.2); c.quadraticCurveTo(ex, hy + 5, ex + 2 * f, hy + 3.6); c.stroke(); }
   // what they hold in the front hand
-  if (L.item === 'drawing') {
+  if (item === 'drawing') {
     const px = fh[0] + f * 2, py = fh[1] - 7;
     shape(c, r, [[px - 4.5, py - 4], [px + 4.5, py - 4.6], [px + 4.8, py + 4.4], [px - 4.2, py + 4.8]], '#fbf7ec', '#3a3631', { smooth: false, lw: 0.9, j: 0.3, double: false });
     drawStar(c, px - 1, py - 0.6, 2.2, '#f2c230', '#8a6a1c');
     line(c, r, px - 3, py + 2.8, px + 3, py + 2.4, '#4f79a8', 0.9, 0.3);
-  } else if (L.item === 'torch') {
+  } else if (item === 'torch') {
     line(c, r, fh[0], fh[1] + 5, fh[0] + f * 1.5, fh[1] - 9, '#6b4a32', 1.8, 0.2);
     drawFlame(c, fh[0] + f * 1.5, fh[1] - 9, 5, realT + (v.id || 0));
-  } else if (L.item === 'cane') {
+  } else if (item === 'cane') {
     line(c, r, fh[0], fh[1], fh[0] + f * 2.5, -bob, '#6b4a32', 1.5, 0.2);
   }
   arm(f, fh[0], fh[1]);
@@ -1688,7 +1804,7 @@ function drawWorld() {
       const sx = o.shake > 0 ? Math.sin(o.shake * 60) * 2 : 0;
       drawSpr(ctx, name, o.x + sx, o.y);
       if (o.type === 'scrap') { const tw = Math.max(0, Math.sin(realT * 2.3 + o.x)); if (tw > 0.3) drawStar(ctx, o.x + 8, o.y - 14, 2 + tw * 3, '#ffffff', '#8fb3cc'); }
-      if (o.type === 'pile') drawFlame(ctx, o.x, o.y - 8, 15, realT + 1.3);
+      if (o.type === 'pile') drawFlame(ctx, o.x, o.y - 8, 15 + pileFlare * 12, realT + 1.3);
     }
   }
   // particles
@@ -1764,7 +1880,8 @@ function drawWorld() {
     ctx.fillStyle = f.col; ctx.fillText(f.text, sx, sy);
   }
   ctx.globalAlpha = 1;
-  for (const v of villagers) if (v.say) speechBubble(v.say.text, v.x, v.y - 48, '#f3e3df');
+  for (const v of villagers) if (!v.say && dist(v.x, v.y, player.x, player.y) < 90) { const [sx, sy] = toScreen(v.x, v.y + 12); label(v.name, sx, sy, 14); }
+  for (const v of villagers) if (v.say) speechBubble(v.say.text, v.x, v.y - 48, v.teen ? '#e8f2e6' : '#f3e3df');
   if (speech) speechBubble(speech.text, player.x, player.y - 44);
 }
 function drawStar(c, x, y, r, fill, stroke) {
@@ -2040,7 +2157,7 @@ function drawBag() {
   ctx.restore();
   const tx = wide ? rx + 14 : rx + 130, ty = wide ? ry + 196 : ry + 14, tw = wide ? rw - 28 : rw - 144;
   bagText(robe.name, tx, ty, 22);
-  const lines = [robe.info, rl ? `Keeps you ${Math.round((1 - robe.mul) * 100)}% warmer.` : 'No extra warmth yet.'];
+  const lines = [robe.info, ...(flags.singed ? ['Singed by Kael! You get cold faster until you sleep.'] : []), rl ? `Keeps you ${Math.round((1 - robe.mul) * 100)}% warmer.` : 'No extra warmth yet.'];
   if (next) lines.push(`Next: ${next.name}. Needs ${next.scraps} robe scraps (you have ${inv.scraps}).`);
   else lines.push('Your robe is as warm as it gets.');
   ctx.font = `700 16px ${FONT}`;
