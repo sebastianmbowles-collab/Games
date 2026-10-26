@@ -25,4 +25,5 @@ Source lives in `src/ante-up/`; rebuild the file with `npm run build:au`.
 
 `Frostbite.html` is a hand-drawn, top-down survival game, all in one file. Open it in a browser (keyboard or touch).
 You are a masked kid in a blue robe who left a village that burned everything you made. Step 1 has a new random world every game (frozen forest, frozen lake, mountains, ice caves, hot springs), warmth / food / energy / health bars, a 10-minute day and night, gathering, fishing, cooking (cooked food spoils), three cozy camp spots, a camp that grows from tent to hut to cabin, a snow owl, sleeping (you wake up in your bed, without your items, if you die) and a map that draws itself as you explore.
-Coming next: snowmen, the Yeti, polar bears, weapons, masked traders, the five mask pieces and the Frost Spirit.
+Step 2 adds snowmen that hop after you and throw snowballs, polar bears (climb a tree or throw a fish or a carved toy to escape), the Yeti at night (it hunts by sound, fears fire and torches), dead polar bears (meat, fur, bones), weapons (rock snowball, slingshot, icicle spear, bone club, torch), two wandering masked traders who trade ice shards, a camp menu for carving toys and making a bone club, named villagers with babble voices, and Wren, the one kind villager.
+Coming next: the five mask pieces and the Frost Spirit.

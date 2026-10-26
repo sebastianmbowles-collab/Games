@@ -232,6 +232,34 @@ function buildSprites() {
     shape(g, r, [[7, 8], [15, 6], [20, 9], [12, 11]], '#f7f4ec', '#a9a294', { lw: 0.9, j: 0.4, double: false });
     line(g, r, 12, 5, 13, 15, '#8a5f3c', 1.1, 0.3);
   });
+  mkSprite('deadbear', 64, 34, 32, 26, (g, r) => {
+    shadow(g, 32, 26, 28, 6, 0.22);
+    for (const [lx, ly] of [[18, 8], [26, 6], [38, 7], [46, 9]]) shape(g, r, [[lx - 3, ly + 8], [lx + 3, ly + 8], [lx + 3, ly], [lx - 3, ly]], '#e4dfd0', '#7d7466', { smooth: false, lw: 1.1, j: 0.3 });
+    shape(g, r, ell(30, 18, 22, 9, 12, r, 0.06), '#ece7d8', '#7d7466', { lw: 1.5, j: 0.4 });
+    shape(g, r, ell(53, 18, 8, 7, 9), '#ece7d8', '#7d7466', { lw: 1.4, j: 0.3 });
+    g.fillStyle = '#1c1f26'; g.beginPath(); g.arc(60, 19, 1.6, 0, 7); g.fill();
+    g.strokeStyle = '#1c1f26'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(52, 14); g.lineTo(55, 17); g.moveTo(55, 14); g.lineTo(52, 17); g.stroke();
+    shape(g, r, [[14, 12], [24, 9], [40, 9], [46, 12], [34, 13], [22, 14]], '#ffffff', '#b8c4cf', { lw: 0.9, double: false });
+  });
+  mkSprite('bonepile', 40, 22, 20, 16, (g, r) => {
+    shadow(g, 20, 16, 16, 4);
+    for (const [x1, y1, x2, y2] of [[6, 14, 30, 10], [10, 8, 32, 15], [18, 16, 34, 6]]) {
+      line(g, r, x1, y1, x2, y2, '#efe9da', 2.6, 0.4);
+      g.fillStyle = '#efe9da'; g.beginPath(); g.arc(x1, y1, 2.2, 0, 7); g.arc(x2, y2, 2.2, 0, 7); g.fill();
+    }
+  });
+  mkSprite('wsling', 26, 22, 13, 16, (g, r) => {
+    shadow(g, 13, 16, 10, 3);
+    line(g, r, 13, 16, 13, 9, '#6b4a32', 2.4, 0.3);
+    line(g, r, 13, 10, 7, 3, '#6b4a32', 2, 0.3); line(g, r, 13, 10, 19, 3, '#6b4a32', 2, 0.3);
+    g.strokeStyle = '#c8413d'; g.lineWidth = 1; g.beginPath(); g.moveTo(7, 3); g.quadraticCurveTo(13, 9, 19, 3); g.stroke();
+  });
+  mkSprite('wspear', 40, 16, 20, 10, (g, r) => {
+    shadow(g, 20, 10, 16, 3);
+    line(g, r, 4, 10, 26, 6, '#6b4a32', 2.2, 0.3);
+    shape(g, r, [[24, 4], [37, 5], [25, 9]], '#bfeaf7', '#3d8db0', { smooth: false, lw: 1.1, j: 0.3 });
+  });
   mkSprite('stick', 24, 14, 12, 9, (g, r) => {
     line(g, r, 3, 10, 21, 5, '#6b4a32', 2.2, 0.6);
     line(g, r, 12, 7, 16, 2, '#6b4a32', 1.4, 0.4);
@@ -332,6 +360,9 @@ const OT = {
   rock: { r: 11, spr: 'rock', give: 'stones', stock: 3, regrow: 2, verb: 'Dig out stones' },
   log: { r: 10, spr: 'log', give: 'bugs', stock: 2, regrow: 1, verb: 'Look under the log' },
   crystal: { r: 8, spr: 'crystal', empty: 'crystalE', give: 'shards', stock: 2, regrow: 3, verb: 'Chip off an ice shard', glow: true },
+  deadbear: { r: 14, spr: 'deadbear', empty: 'bonepile', give: 'meat', amt: 2, stock: 1, regrow: 0, verb: 'Search the dead polar bear' },
+  wsling: { r: 0, spr: 'wsling', give: 'slingshot', stock: 1, regrow: 0, verb: 'Pick up the slingshot', hideEmpty: true },
+  wspear: { r: 0, spr: 'wspear', give: 'spear', stock: 1, regrow: 0, verb: 'Pick up the icicle spear', hideEmpty: true },
   scrap: { r: 0, spr: 'scrap', give: 'scraps', stock: 1, regrow: 0, verb: 'Pick up a robe scrap', hideEmpty: true },
   stick: { r: 0, spr: 'stick', give: 'sticks', stock: 1, regrow: 1, verb: 'Pick up stick', hideEmpty: true },
   moss: { r: 0, spr: 'moss', give: 'bugs', stock: 2, regrow: 1, verb: 'Search the warm moss' },
@@ -502,6 +533,24 @@ function genWorld(sd) {
       addObj('scrap', x * T + T / 2, y * T + T / 2);
     }
   }
+  // dead polar bears, and weapons someone dropped
+  {
+    const place = (type, n, ok, gap) => {
+      const cand = [];
+      for (let i = 0; i < W * H; i++) if (dst[i] >= 14 && ok(tiles[i])) cand.push(i);
+      const put = [];
+      for (let tries = 0; put.length < n && tries < 1500 && cand.length; tries++) {
+        const i = cand[(R() * cand.length) | 0], x = i % W, y = (i / W) | 0;
+        if (put.some(([px, py]) => Math.hypot(px - x, py - y) < gap)) continue;
+        if (ogrid[i].some(o => OT[o.type].r)) continue;
+        put.push([x, y]);
+        addObj(type, x * T + T / 2, y * T + T / 2);
+      }
+    };
+    place('deadbear', 6, t => t === FOREST || t === SNOW || t === ICE, 22);
+    place('wsling', 2, t => t === FOREST || t === SNOW, 30);
+    place('wspear', 4, t => t === CAVE || t === ICE, 20);
+  }
   // village houses, the burn pile and the villagers
   for (let k = 0; k < 5; k++) {
     const a = k / 5 * Math.PI * 2 + 0.6;
@@ -623,9 +672,17 @@ const ITEMS = {
   ckCod: { name: 'Cooked cod', food: 30, warm: 18, cooked: true },
   ckPerch: { name: 'Cooked perch', food: 26, warm: 16, cooked: true },
   ckChar: { name: 'Cooked char', food: 42, warm: 24, cooked: true },
+  rockball: { name: 'Rock snowball', info: 'A snowball with a big rock inside. Throw it (F), then go pick it back up.', weapon: true },
+  slingshot: { name: 'Slingshot', info: 'Shoots your stones far (F). Each shot uses 1 stone.', weapon: true },
+  spear: { name: 'Icicle spear', info: 'Stab snowmen up close (F). It breaks after a while.', weapon: true },
+  club: { name: 'Bone club', info: 'Slow but very strong (F). It never breaks.', weapon: true },
+  toy: { name: 'Carved toy', info: 'Throw it at a chasing polar bear (F). It will play with the toy instead of you.' },
+  bones: { name: 'Bear bones', info: 'Make a bone club at your camp: 2 bones and 2 sticks.' },
+  meat: { name: 'Bear meat', food: 30, cook: 'ckMeat' },
+  ckMeat: { name: 'Cooked bear meat', food: 55, warm: 25, cooked: true },
 };
-const ORDER = ['sticks', 'stones', 'shards', 'scraps', 'berries', 'bugs', 'cod', 'perch', 'char', 'ckBugs', 'ckCod', 'ckPerch', 'ckChar'];
-const emptyInv = () => ({ sticks: 0, stones: 0, shards: 0, scraps: 0, berries: 0, bugs: 0, cod: 0, perch: 0, char: 0, ckBugs: [], ckCod: [], ckPerch: [], ckChar: [] });
+const ORDER = ['rockball', 'slingshot', 'spear', 'club', 'toy', 'sticks', 'stones', 'shards', 'scraps', 'bones', 'berries', 'bugs', 'cod', 'perch', 'char', 'meat', 'ckBugs', 'ckCod', 'ckPerch', 'ckChar', 'ckMeat'];
+const emptyInv = () => ({ sticks: 0, stones: 0, shards: 0, scraps: 0, berries: 0, bugs: 0, cod: 0, perch: 0, char: 0, ckBugs: [], ckCod: [], ckPerch: [], ckChar: [], rockball: 0, slingshot: 0, spear: 0, spearUses: 0, club: 0, toy: 0, bones: 0, meat: 0, ckMeat: [] });
 const count = k => Array.isArray(inv[k]) ? inv[k].length : inv[k];
 const ROBES = [
   { name: 'Old blue robe', mul: 1, info: 'The robe you sewed yourself.' },
@@ -648,10 +705,12 @@ const fade = { a: 0, phase: 'none', t: 0, text: '', mid: null };
 
 function newGame() {
   genWorld((Math.random() * 4294967296) >>> 0);
-  player = { x: vill.x, y: vill.y + 70, dir: 'down', walk: 0, moving: false, fishing: null, cool: 0, exhausted: false, act: 0, stepD: 0, foot: 0 };
+  player = { x: vill.x, y: vill.y + 70, dir: 'down', walk: 0, moving: false, fishing: null, cool: 0, exhausted: false, act: 0, stepD: 0, foot: 0, torch: 0, weapon: 'rockball', climb: null, atkCool: 0, swing: 0 };
   S = { hp: 100, warm: 100, food: 85, sta: 100 };
-  inv = emptyInv();
+  inv = emptyInv(); inv.rockball = 1;
   camp = null; spawn = null;
+  enemies = []; proj = []; drops = []; baits = []; shopOpen = null; campOpen = false; yetiNight = 0;
+  makeTraders();
   flags = { cold: false, hungry: false, firstFish: false, spotSeen: {}, villTalk: 0, robe: 0 };
   owl = { on: false, x: 0, y: 0, z: 30, flap: 0, still: 0, face: 1, hootT: 8 };
   gameTime = DAY * 0.08;
@@ -679,7 +738,9 @@ function saveGame() {
   if (state !== 'play' && state !== 'dead') return;
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      v: 1, seed, gameTime, p: { x: player.x, y: player.y }, S, inv, camp, spawn, flags, owl: owl.on,
+      v: 1, seed, gameTime, p: { x: player.x, y: player.y }, S, camp, spawn, flags, owl: owl.on,
+      // a rock snowball lying on the ground goes back in the bag when saving
+      inv: Object.assign({}, inv, { rockball: inv.rockball + drops.filter(dr => dr.item === 'rockball').length + proj.filter(q => q.kind === 'rockball').length }),
       ex: packBits(explored), spots: spots.map(s => s.found ? 1 : 0),
       ob: objs.map(o => o.stock + (o.regrowAt ? ',' + Math.round(o.regrowAt) : '')).join(';'),
     }));
@@ -694,6 +755,8 @@ function loadGame() {
   genWorld(d.seed);
   gameTime = d.gameTime; player.x = d.p.x; player.y = d.p.y;
   Object.assign(S, d.S); inv = Object.assign(emptyInv(), d.inv);
+  if (d.inv.rockball === undefined) inv.rockball = 1;
+  makeTraders();
   camp = d.camp; spawn = d.spawn; flags = Object.assign(flags, d.flags);
   owl.on = d.owl; owl.x = player.x; owl.y = player.y;
   explored = unpackBits(d.ex, W * H);
@@ -796,6 +859,14 @@ const sfx = {
   ui: () => tone(660, 880, 0.08, 0.06, 'triangle'),
   hoot: () => { if (!AC) return; const t = AC.currentTime; tone(420, 360, 0.35, 0.09, 'sine', t); tone(400, 340, 0.45, 0.09, 'sine', t + 0.45); },
   crackle: (v) => noise(0.03, 2500, 0.12 * v, 'highpass'),
+  throw: () => noise(0.18, 1200, 0.18, 'bandpass'),
+  swing: () => noise(0.14, 700, 0.22, 'bandpass'),
+  splat: () => { noise(0.12, 500, 0.35, 'lowpass'); noise(0.05, 3000, 0.1, 'highpass'); },
+  poof: () => { noise(0.4, 900, 0.3, 'lowpass'); tone(500, 120, 0.4, 0.06, 'triangle'); },
+  crack: () => { noise(0.08, 4000, 0.3, 'highpass'); tone(1400, 300, 0.12, 0.05, 'square'); },
+  roar: () => { tone(160, 70, 0.9, 0.14, 'sawtooth'); noise(0.8, 300, 0.25, 'lowpass'); },
+  growl: () => { tone(85, 60, 1.2, 0.1, 'sawtooth'); noise(1.1, 200, 0.15, 'lowpass'); },
+  beat: () => { if (!AC) return; const t = AC.currentTime; tone(70, 40, 0.14, 0.18, 'sine', t); tone(65, 38, 0.14, 0.13, 'sine', t + 0.18); },
 };
 // Talking: everyone babbles "bah bah bah" in their own voice, one "bah" per bit of a word.
 const VOICES = {
@@ -805,6 +876,7 @@ const VOICES = {
   Kael: { f: 135, type: 'sawtooth', vol: 0.09, cut: 1600 },
   'Old Hesk': { f: 215, type: 'square', vol: 0.05, cut: 1900, wobble: true },
   Wren: { f: 270, type: 'triangle', vol: 0.08, cut: 2000 },
+  'Masked trader': { f: 112, type: 'triangle', vol: 0.1, cut: 1100, wobble: true },
 };
 let babbleUntil = {};
 function babble(text, voice, loud = 1) {
@@ -905,17 +977,27 @@ function onKey(code) {
   if (state === 'story') { if (code === 'Escape') beginPlay(); else storyNext(); return; }
   if (state === 'dead') { if (code === 'KeyE' || code === 'Space' || code === 'Enter') respawn(); return; }
   if (fade.phase !== 'none') return;
-  if (code === 'Escape' || code === 'KeyP') { if (mapOpen) mapOpen = false; else if (bagOpen) bagOpen = false; else paused = !paused; sfx.ui(); return; }
+  if (code === 'Escape' || code === 'KeyP') { if (mapOpen) mapOpen = false; else if (bagOpen) bagOpen = false; else if (shopOpen) shopOpen = null; else if (campOpen) campOpen = false; else paused = !paused; sfx.ui(); return; }
   if (paused) { if (code === 'KeyM' && false) return; return; }
   if (code === 'KeyM' || code === 'Tab') { mapOpen = !mapOpen; bagOpen = false; sfx.ui(); return; }
   if (code === 'KeyB' || code === 'KeyI') { toggleBag(); return; }
   if (mapOpen) return;
+  if (shopOpen) { const m = /^Digit([1-9])$/.exec(code); if (m && SHOP[+m[1] - 1]) buy(SHOP[+m[1] - 1]); else if (code === 'KeyE') shopOpen = null; return; }
+  if (campOpen) {
+    const m = /^Digit([1-4])$/.exec(code);
+    if (m) { sfx.ui(); [() => upgradeCamp(), () => campCraft('toy'), () => campCraft('club'), () => { campOpen = false; sleep(); }][+m[1] - 1](); }
+    else if (code === 'KeyE') campOpen = false;
+    return;
+  }
   if (bagOpen) { if (/^Digit[1-9]$/.test(code)) { const k = ORDER.filter(k => count(k) > 0)[+code.slice(5) - 1]; if (k) bagSel = k; } else if (code === 'KeyE' && bagSel) useItem(bagSel); return; }
   helpT = Math.min(helpT, 0.6);
   if (code === 'KeyE' || code === 'Space') act();
   else if (code === 'KeyQ') eatBest();
   else if (code === 'KeyC') cook();
   else if (code === 'KeyZ') sleep();
+  else if (code === 'KeyF') attack();
+  else if (code === 'KeyR') cycleWeapon();
+  else if (code === 'KeyT') makeTorch();
   else if (/^Digit[1-9]$/.test(code)) {
     const list = ORDER.filter(k => count(k) > 0), k = list[+code.slice(5) - 1];
     if (k) useItem(k);
@@ -937,7 +1019,7 @@ cv.addEventListener('pointerdown', e => {
   }
   if (state === 'story') { storyNext(); return; }
   if (state === 'dead') { respawn(); return; }
-  if (state === 'play' && !paused && !mapOpen && !bagOpen && e.pointerType !== 'mouse' && x < VW * 0.62) {
+  if (state === 'play' && !paused && !mapOpen && !bagOpen && !shopOpen && !campOpen && e.pointerType !== 'mouse' && x < VW * 0.62) {
     joy = { id: e.pointerId, ox: x, oy: y, x, y };
   }
 });
@@ -972,7 +1054,14 @@ function findTarget() {
   }
   for (const v of villagers) { const d = dist(px, py, v.x, v.y); if (d < 40 && d < bd && v.mode !== 'chase') { best = { kind: 'villager', v }; bd = d; } }
   if (!camp) for (const s of spots) { const d = dist(px, py, s.x, s.y); if (d < 56 && d < bd + 20) { best = { kind: 'spot', s }; bd = d; } }
-  if (tileAtW(px, py) === ICE && (!best || (best.kind === 'obj' && bd > 24))) best = { kind: 'fish' };
+  for (const tr of traders) { const d = dist(px, py, tr.x, tr.y); if (d < 46 && d < bd + 10) { best = { kind: 'trader', tr }; bd = d; } }
+  if (player.climb) return { kind: 'climb' };
+  if (enemies.some(e => e.type === 'bear' && e.state === 'chase')) {
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) for (const o of ogrid[(ty + j) * W + tx + i] || []) {
+      if ((o.type === 'pine' || o.type === 'tree') && !o.gone && dist(px, py, o.x, o.y) < 40) return { kind: 'climb', o };
+    }
+  }
+  if (tileAtW(px, py) === ICE && (!best || (best.kind === 'obj' && best.o.type === 'rock' && bd > 24))) best = { kind: 'fish' };
   return best;
 }
 function verbFor(tg) {
@@ -982,11 +1071,9 @@ function verbFor(tg) {
     case 'fire':
       if (camp.fuel > 0) return inv.sticks > 0 ? 'Add a stick to the fire' : 'Fire needs sticks';
       return inv.sticks >= 2 ? 'Light the fire (2 sticks)' : 'Need 2 sticks to light it';
-    case 'tent': {
-      const up = UPGRADE[camp.level + 1];
-      if (!up) return 'Admire your cabin';
-      return `Build a ${up.name} (${up.sticks} sticks, ${up.stones} stones)`;
-    }
+    case 'tent': return 'Open the camp menu';
+    case 'trader': return 'Trade with the masked stranger';
+    case 'climb': return player.climb ? 'Climb down' : 'Climb the tree!';
     case 'spot': return 'Set up camp here';
     case 'villager': return `Talk to ${tg.v.name}`;
     case 'fish': return player.fishing ? 'Fishing...' : 'Fish through the ice';
@@ -1006,7 +1093,12 @@ function act() {
     } else if (inv.sticks >= 2) {
       inv.sticks -= 2; camp.fuel = 45; sfx.pick(); burstSparks(camp.fx, camp.fy - 6, 16); say('Warm again.');
     } else say('I need 2 sticks to light it.');
-  } else if (tg.kind === 'tent') upgradeCamp();
+  } else if (tg.kind === 'tent') { campOpen = true; sfx.ui(); }
+  else if (tg.kind === 'trader') talkTrader(tg.tr);
+  else if (tg.kind === 'climb') {
+    if (player.climb) { player.climb = null; player.y += 14; }
+    else { player.climb = tg.o; player.fishing = null; sfx.pick(); say('Up the tree! Bears cannot climb.', 2); }
+  }
   else if (tg.kind === 'spot') makeCamp(tg.s);
   else if (tg.kind === 'villager') {
     talkTo(tg.v);
@@ -1063,6 +1155,9 @@ function gather(o) {
   let msg = `+${amt} ${ITEMS[d.give].name.toLowerCase()}`;
   if (o.type === 'rock' && Math.random() < (o.bugc || 0.3)) { inv.bugs++; msg += ', +1 bug'; }
   if (o.type === 'log') { inv.sticks++; msg += ', +1 stick'; }
+  if (o.type === 'deadbear') { inv.scraps++; inv.bones += 2; msg += ', +1 fur (robe scrap), +2 bones'; if (!flags.bearBody) { flags.bearBody = true; setTimeout(() => say('Poor bear... the meat should be cooked. The bones could make a club.', 4), 400); } }
+  if (d.give === 'spear' && inv.spearUses <= 0) inv.spearUses = SPEAR_USES;
+  if (d.give === 'slingshot' || d.give === 'spear') { player.weapon = d.give; say(d.give === 'slingshot' ? 'A slingshot! It shoots stones. (F to shoot, R to switch)' : 'An icicle spear! Sharp. (F to stab, R to switch)', 3.5); }
   floatText(msg, o.x, o.y - 40);
   if (o.stock <= 0 && d.regrow) o.regrowAt = gameTime + d.regrow * DAY;
   if (d.give === 'scraps' && !flags.scrap) { flags.scrap = true; toast(`A robe scrap! Open your bag (${touchUI ? 'Bag button' : 'B'}) at camp to sew it onto your robe.`); }
@@ -1071,7 +1166,8 @@ function gather(o) {
 }
 function useItem(k) {
   const it = ITEMS[k];
-  if (it.food) eat(k);
+  if (it.weapon) equip(k);
+  else if (it.food) eat(k);
   else toast(`${it.name}: ${it.info}`);
 }
 function eat(k) {
@@ -1103,7 +1199,7 @@ function cook() {
   if (!camp || dist(player.x, player.y, camp.fx, camp.fy) > 60) { say('I need to be at my campfire to cook.'); return; }
   if (camp.fuel <= 0) { say('The fire is out.'); return; }
   let n = 0;
-  for (const k of ['bugs', 'cod', 'perch', 'char']) {
+  for (const k of ['bugs', 'cod', 'perch', 'char', 'meat']) {
     while (inv[k] > 0) { inv[k]--; inv[ITEMS[k].cook].push(gameTime + 3 * DAY); n++; }
   }
   if (!n) { say('Nothing to cook. Berries are fine raw.'); return; }
@@ -1129,9 +1225,10 @@ function upgradeCamp() {
   const up = UPGRADE[camp.level + 1];
   if (!up) { say('My cabin. My carvings. My home.'); return; }
   if (inv.sticks < up.sticks || inv.stones < up.stones) {
-    say(`A ${up.name} needs ${up.sticks} sticks and ${up.stones} stones. I have ${inv.sticks} and ${inv.stones}.`, 3.5);
+    toast(`A ${up.name} needs ${up.sticks} sticks and ${up.stones} stones. You have ${inv.sticks} and ${inv.stones}.`);
     return;
   }
+  campOpen = false;
   inv.sticks -= up.sticks; inv.stones -= up.stones;
   camp.level++;
   sfx.build();
@@ -1164,7 +1261,7 @@ function die(cause) {
   deathCause = cause;
   bagOpen = false; mapOpen = false;
   state = 'dead';
-  player.fishing = null;
+  player.fishing = null; player.torch = 0; player.climb = null; shopOpen = null; campOpen = false;
   const scraps = inv.scraps;
   inv = emptyInv();
   inv.scraps = scraps;
@@ -1178,6 +1275,9 @@ function respawn() {
   S.hp = 70; S.warm = 70; S.food = Math.max(S.food, 55); S.sta = 100;
   flags.singed = false; villT = 0;
   for (const v of villagers) if (v.mode === 'chase') v.mode = 'return';
+  enemies = []; proj = []; baits = [];
+  inv.rockball = 1;
+  setTimeout(() => toast('You packed a new rock snowball.'), 4500);
   gameTime = (Math.floor(gameTime / DAY) + 1) * DAY + DAY * 0.06;
   lastNight = false;
   cam.x = player.x; cam.y = player.y;
@@ -1234,7 +1334,7 @@ function update(dt) {
     else { fade.a = Math.max(0, 1 - fade.t / 0.8); if (fade.t >= 0.8) { fade.phase = 'none'; fade.a = 0; } }
   }
   if (state === 'title' || state === 'story') updateSnow(dt, 0, 0);
-  if (state === 'play' && !paused && !mapOpen && !bagOpen && fade.phase !== 'hold') gameUpdate(dt);
+  if (state === 'play' && !paused && !mapOpen && !bagOpen && !shopOpen && !campOpen && fade.phase !== 'hold') gameUpdate(dt);
   updateAudio(dt);
 }
 
@@ -1262,7 +1362,12 @@ function gameUpdate(dt) {
   const sadWalk = S.warm < 30 || S.food < 30;
   const speed = (running ? 165 : player.exhausted ? 70 : sadWalk ? 76 : 95);
   if (moving && player.fishing) { player.fishing = null; say('Oops, scared the fish away.', 1.2); }
-  player.moving = moving && fade.phase === 'none';
+  if (player.climb) {
+    // up a tree: moving climbs back down
+    player.x = player.climb.x; player.y = player.climb.y + 2;
+    if (moving && !enemies.some(e => e.type === 'bear' && e.state === 'wait')) { player.climb = null; player.y += 14; }
+  }
+  player.moving = moving && fade.phase === 'none' && !player.climb;
   if (player.moving) {
     const vx = mx * speed * dt, vy = my * speed * dt;
     const ox = player.x, oy = player.y;
@@ -1301,6 +1406,7 @@ function gameUpdate(dt) {
   const dv = dist(player.x, player.y, vill.x, vill.y);
   if (dv < 110) { heat += 7 * (1 - dv / 110 * 0.6); nearFire = true; }
   if (tile === SPRING) heat += 7;
+  if (player.torch > 0) heat += 2.5;
   S.warm = clamp(S.warm + (warmRate + heat) * dt, 0, 100);
   S.food = clamp(S.food - (running ? 0.5 : 0.33) * dt, 0, 100);
   const cold = S.warm < 30, hungry = S.food < 30;
@@ -1309,6 +1415,10 @@ function gameUpdate(dt) {
   if (S.warm <= 0) { S.hp -= 2.5 * dt; deathCause = 'cold'; }
   if (S.food <= 0) { S.hp -= 1.5 * dt; if (S.warm > 0) deathCause = 'hunger'; }
   if (S.warm > 40 && S.food > 40) S.hp = Math.min(100, S.hp + 0.6 * dt);
+  if (S.hp <= 0) { S.hp = 0; die(deathCause || 'cold'); return; }
+
+  updateCombat(dt);
+  updateEnemies(dt, running);
   if (S.hp <= 0) { S.hp = 0; die(deathCause || 'cold'); return; }
 
   // the kid talks about how they feel
@@ -1357,9 +1467,10 @@ function gameUpdate(dt) {
   tickT += dt;
   if (tickT >= 1) {
     tickT = 0;
+    spawnTick();
     for (const o of objs) if (o.stock <= 0 && o.regrowAt && gameTime >= o.regrowAt && !o.gone) { o.stock = OT[o.type].stock; o.regrowAt = 0; }
     let spoiled = 0;
-    for (const k of ['ckBugs', 'ckCod', 'ckPerch', 'ckChar']) while (inv[k].length && inv[k][0] <= gameTime) { inv[k].shift(); spoiled++; }
+    for (const k of ['ckBugs', 'ckCod', 'ckPerch', 'ckChar', 'ckMeat']) while (inv[k].length && inv[k][0] <= gameTime) { inv[k].shift(); spoiled++; }
     if (spoiled) say(`Ew. ${spoiled} cooked thing${spoiled > 1 ? 's' : ''} went bad.`);
   }
   const ti = Math.floor(player.y / T) * W + Math.floor(player.x / T);
@@ -1369,13 +1480,17 @@ function gameUpdate(dt) {
   if (owl.on) {
     owl.flap += dt * 14;
     const side = player.dir === 'left' ? 1 : -1;
-    const tx = player.x + side * 22, ty = player.y + 6;
+    let tx = player.x + side * 22, ty = player.y + 6;
+    // the owl flies toward danger to show you where it is
+    const danger = enemies.find(e => (e.type === 'yeti' && e.state !== 'leave' && dist(e.x, e.y, player.x, player.y) < 450) || (e.type === 'bear' && (e.state === 'chase' || (e.state === 'wander' && dist(e.x, e.y, player.x, player.y) < 320))));
+    owl.warn = !!danger;
+    if (danger) { tx = lerp(player.x, danger.x, 0.55); ty = lerp(player.y, danger.y, 0.55); owl.still = 0; }
     owl.still = player.moving ? 0 : owl.still + dt;
     const d = dist(owl.x, owl.y, tx, ty);
-    const flying = d > 30 || owl.still < 1.2;
+    const flying = d > 30 || owl.still < 1.2 || owl.warn;
     const sp = Math.min(1, dt * (d > 200 ? 3 : 2.2));
     owl.x = lerp(owl.x, tx, sp); owl.y = lerp(owl.y, ty, sp);
-    owl.z = lerp(owl.z, flying ? 30 : 0, Math.min(1, dt * 3));
+    owl.z = lerp(owl.z, flying ? (owl.warn ? 46 : 30) : 0, Math.min(1, dt * 3));
     if (Math.abs(tx - owl.x) > 2) owl.face = tx > owl.x ? 1 : -1;
     owl.hootT -= dt;
     if (owl.hootT <= 0) { owl.hootT = 25 + Math.random() * 30; if (night > 0.5) sfx.hoot(); }
@@ -1452,6 +1567,611 @@ function gameUpdate(dt) {
   target = fade.phase === 'none' ? findTarget() : null;
   saveT += dt;
   if (saveT > 20) { saveT = 0; saveGame(); }
+}
+
+// ---------- step 2: enemies, weapons, the bear's bait and the masked traders ----------
+const WEAPONS = {
+  torch: { name: 'Torch', reach: 40, dmg: 2, cool: 0.5 },
+  rockball: { name: 'Rock snowball', range: 230, dmg: 1, cool: 0.55, speed: 260 },
+  slingshot: { name: 'Slingshot', range: 330, dmg: 1, cool: 0.45, speed: 390, ammo: 'stones' },
+  spear: { name: 'Icicle spear', reach: 46, dmg: 2, cool: 0.4 },
+  club: { name: 'Bone club', reach: 42, dmg: 3, cool: 0.8 },
+};
+const TORCH_TIME = 90, SPEAR_USES = 12;
+const DIRV = { down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0] };
+const SHOP = [
+  { k: 'slingshot', name: 'Slingshot', price: 6 },
+  { k: 'spear', name: 'Icicle spear', price: 4 },
+  { k: 'scraps', name: 'Robe scrap', price: 5 },
+  { k: 'ckCod', name: 'Cooked fish', price: 2 },
+  { k: 'stones', name: '5 stones', price: 1, amt: 5 },
+];
+const TRADER_LINES = [
+  'Shards... you have shards? Let us trade.',
+  'Five pieces of an old mask hide in the snow. We keep them safe. Not yet, little one.',
+  'Your mask cries. Ours smiles. Both hide something.',
+  'The Yeti hates fire. Carry a torch at night.',
+];
+let enemies = [], proj = [], drops = [], baits = [], traders = [];
+let spawnT = 0, yetiNight = 0, beatT = 0, hurtFlash = 0, frostFlash = 0, camShake = 0;
+let shopOpen = null, campOpen = false;
+const hardness = () => 1 + 0.1 * (flags.pieces || 0);
+
+function fireSafe(x, y, pad = 0) {
+  if (camp && camp.fuel > 0 && dist(x, y, camp.fx, camp.fy) < FIRE_R[camp.level] + pad) return true;
+  return dist(x, y, vill.x, vill.y) < 240 + pad;
+}
+function nearestEnemy(pred, maxD) {
+  let best = null, bd = maxD;
+  for (const e of enemies) { if (!pred(e)) continue; const d = dist(e.x, e.y, player.x, player.y); if (d < bd) { bd = d; best = e; } }
+  return best;
+}
+function moveEnt(e, tx, ty, speed, dt) {
+  const dx = tx - e.x, dy = ty - e.y, l = Math.hypot(dx, dy);
+  if (l < 2) return false;
+  const st = Math.min(l, speed * dt), vx = dx / l * st, vy = dy / l * st;
+  const ok = (x, y) => tileAtW(x, y) !== PEAK && !(camp && dist(x, y, camp.tx, camp.ty) < 30);
+  if (ok(e.x + vx, e.y)) e.x += vx;
+  if (ok(e.x, e.y + vy)) e.y += vy;
+  e.walk = (e.walk || 0) + st * 0.12;
+  if (Math.abs(dx) > 1) e.dir = dx > 0 ? 1 : -1;
+  return true;
+}
+function spawnPoint(minD, maxD, okTiles, awayFromFire) {
+  for (let k = 0; k < 20; k++) {
+    const a = Math.random() * Math.PI * 2, d = minD + Math.random() * (maxD - minD);
+    const x = player.x + Math.cos(a) * d, y = player.y + Math.sin(a) * d;
+    if (x < 3 * T || y < 3 * T || x > (W - 3) * T || y > (H - 3) * T) continue;
+    if (!okTiles.includes(tileAtW(x, y))) continue;
+    if (fireSafe(x, y, awayFromFire)) continue;
+    return [x, y];
+  }
+  return null;
+}
+
+// ---------- spawning (once a second) ----------
+function spawnTick() {
+  const t = dayFrac(), night = t >= 0.62 || t < 0.04;
+  // snowmen
+  const nearSnow = enemies.filter(e => e.type === 'snowman' && dist(e.x, e.y, player.x, player.y) < 1000).length;
+  if (gameTime > DAY * 0.15 && nearSnow < (night ? 5 : 4) && Math.random() < 0.35) {
+    const p = spawnPoint(480, 760, [SNOW, FOREST, ROCK, ICE], 220);
+    if (p) enemies.push({ type: 'snowman', x: p[0], y: p[1], hp: 3, cool: 1.5 + Math.random() * 2, hopT: Math.random(), dir: 1, flash: 0, dead: 0, hat: Math.random() < 0.4 });
+  }
+  // polar bears
+  const nearBears = enemies.filter(e => e.type === 'bear' && dist(e.x, e.y, player.x, player.y) < 1500).length;
+  if (gameTime > DAY * 0.35 && nearBears < 1 && Math.random() < 0.05) {
+    const p = spawnPoint(650, 950, [FOREST, ICE, SNOW, ROCK], 350);
+    if (p) enemies.push({ type: 'bear', x: p[0], y: p[1], state: 'wander', t: 0, tx: p[0], ty: p[1], dir: 1, walk: 0, calm: 0, flash: 0 });
+  }
+  // the Yeti comes once a night
+  if (night && t >= 0.62 && yetiNight !== dayNum() && !enemies.some(e => e.type === 'yeti')) {
+    const p = spawnPoint(650, 850, [SNOW, FOREST, ROCK, ICE, CAVE], 200);
+    if (p) {
+      yetiNight = dayNum();
+      enemies.push({ type: 'yeti', x: p[0], y: p[1], state: 'hunt', t: 0, lx: p[0], ly: p[1], dir: 1, walk: 0, flash: 0, growlT: 3 });
+    }
+  }
+  // forget enemies that are far away
+  enemies = enemies.filter(e => {
+    const d = dist(e.x, e.y, player.x, player.y);
+    if (e.type === 'snowman') return d < 1300 && !(e.hp <= 0 && e.dead <= 0.02);
+    if (e.type === 'bear') return d < 1800 || e.state === 'chase';
+    return !(e.state === 'leave' && d > 950);
+  });
+}
+
+// ---------- enemy brains ----------
+function updateEnemies(dt, running) {
+  const t = dayFrac(), day = t > 0.05 && t < 0.6, hard = hardness();
+  const safe = fireSafe(player.x, player.y);
+  for (const e of enemies) {
+    e.flash = Math.max(0, (e.flash || 0) - dt);
+    const d = dist(e.x, e.y, player.x, player.y);
+    if (e.type === 'snowman') {
+      if (e.hp <= 0) { e.dead = Math.max(0, e.dead - dt * 0.8); continue; }
+      e.hopT += dt * 2.4;
+      e.throwAnim = Math.max(0, (e.throwAnim || 0) - dt);
+      if (d < 320) e.aware = true; else if (d > 700) e.aware = false;
+      if (!e.aware) continue;
+      // hop closer, but keep a little distance, and never into a fire's light
+      let tx = e.x, ty = e.y;
+      if (d > 140) { tx = player.x; ty = player.y; }
+      else if (d < 90) { tx = e.x + (e.x - player.x); ty = e.y + (e.y - player.y); }
+      const sp = 42 * hard * (Math.sin(e.hopT * Math.PI) > 0 ? 1.4 : 0.3);
+      const nx = e.x + Math.sign(tx - e.x) * 3, ny = e.y + Math.sign(ty - e.y) * 3;
+      if (!fireSafe(nx, ny, 40)) moveEnt(e, tx, ty, sp, dt);
+      e.dir = player.x > e.x ? 1 : -1;
+      e.cool -= dt;
+      if (e.cool <= 0 && d < 280 && !player.climb) {
+        e.cool = (2.2 + Math.random() * 1.2) / hard; e.throwAnim = 0.35;
+        const sx = e.x + e.dir * 10, sy = e.y - 30, tx2 = player.x + (Math.random() - 0.5) * 16, ty2 = player.y - 12;
+        const l = dist(sx, sy, tx2, ty2), sp2 = 170;
+        proj.push({ x: sx, y: sy, vx: (tx2 - sx) / l * sp2, vy: (ty2 - sy) / l * sp2, from: 'snowman', kind: 'snowball', life: 2, life0: 2 });
+        sfx.throw();
+      }
+    } else if (e.type === 'bear') {
+      e.calm = Math.max(0, e.calm - dt);
+      if (e.state === 'wander') {
+        if (dist(e.x, e.y, e.tx, e.ty) < 6 || Math.random() < dt * 0.1) { e.tx = e.x + (Math.random() - 0.5) * 300; e.ty = e.y + (Math.random() - 0.5) * 300; }
+        if (!fireSafe(e.tx, e.ty, 120)) moveEnt(e, e.tx, e.ty, 28, dt);
+        if (d < 190 && !e.calm && !player.climb && !safe) {
+          e.state = 'chase'; sfx.roar(); camShake = 0.4;
+          if (!flags.bearTip) { flags.bearTip = true; say('A polar bear! RUN! Climb a tree (E) or throw it a fish (F)!', 4.5); }
+          else say('A polar bear! Run!', 2);
+        }
+      } else if (e.state === 'chase') {
+        moveEnt(e, player.x, player.y, 128 * hard, dt);
+        if (player.climb) { e.state = 'wait'; e.t = 7; }
+        else if (safe) { e.state = 'leave'; e.t = 6; say('It is scared of the fire.', 2); }
+        else if (d > 460) { e.state = 'wander'; e.calm = 20; say('I lost it... phew.', 2); }
+        else if (d < 22) {
+          hurt(50, 'bear'); e.state = 'leave'; e.t = 8; e.calm = 40; sfx.roar();
+          say('Ow! It bit me!', 2.5);
+        }
+      } else if (e.state === 'wait') {
+        // pace under the tree, then give up
+        e.t -= dt;
+        const a = realT * 0.8;
+        moveEnt(e, player.x + Math.cos(a) * 40, player.y + 20 + Math.sin(a) * 14, 40, dt);
+        if (!player.climb) { e.state = 'chase'; }
+        else if (e.t <= 0) { e.state = 'leave'; e.t = 8; e.calm = 30; say('It gave up. I can climb down now.', 3); }
+      } else if (e.state === 'distracted') {
+        e.t -= dt;
+        moveEnt(e, e.tx, e.ty, 90, dt);
+        e.eat = dist(e.x, e.y, e.tx, e.ty) < 8;
+        if (e.t <= 0) { e.state = 'leave'; e.t = 8; e.calm = 45; baits = baits.filter(b => b.bear !== e); }
+      } else if (e.state === 'leave') {
+        e.t -= dt;
+        moveEnt(e, e.x + (e.x - player.x), e.y + (e.y - player.y), 60, dt);
+        if (e.t <= 0) e.state = 'wander';
+      }
+    } else if (e.type === 'yeti') {
+      e.growlT -= dt;
+      if (day && e.state !== 'leave') { e.state = 'leave'; }
+      if (e.state === 'leave') { moveEnt(e, e.x + (e.x - player.x), e.y + (e.y - player.y), 70, dt); continue; }
+      // a torch makes it run, and it stays away until the torch burns out
+      if (player.torch > 0 && d < 170 && e.state !== 'scared') { e.state = 'scared'; sfx.roar(); say('It is scared of my torch!', 2.5); }
+      if (e.state === 'scared') {
+        if (player.torch <= 0) { e.state = 'hunt'; }
+        else if (d < 420) moveEnt(e, e.x + (e.x - player.x), e.y + (e.y - player.y), 115, dt);
+        continue;
+      }
+      if (e.state === 'retreat') {
+        e.t -= dt;
+        moveEnt(e, e.x + (e.x - player.x), e.y + (e.y - player.y), 80, dt);
+        if (e.t <= 0) e.state = 'hunt';
+        continue;
+      }
+      if (safe) {
+        // it waits at the edge of the firelight, watching
+        const fx = camp && camp.fuel > 0 && dist(player.x, player.y, camp.fx, camp.fy) < FIRE_R[camp.level] ? camp.fx : vill.x;
+        const fy = fx === vill.x ? vill.y : camp.fy, R = (fx === vill.x ? 240 : FIRE_R[camp.level]) + 70;
+        const a = Math.atan2(e.y - fy, e.x - fx);
+        moveEnt(e, fx + Math.cos(a) * R, fy + Math.sin(a) * R, 60, dt);
+        if (e.growlT <= 0 && d < 500) { e.growlT = 6 + Math.random() * 5; sfx.growl(); }
+        continue;
+      }
+      // it hunts by sound: running is loud, walking is quieter, standing still is quiet
+      const hears = d < 220 || (running && d < 650) || (player.moving && d < 330);
+      if (hears) { e.lx = player.x; e.ly = player.y; }
+      const sp = (running ? 118 : hears ? 88 : 50) * hard;
+      if (!moveEnt(e, e.lx, e.ly, sp, dt)) { e.lx = e.x + (Math.random() - 0.5) * 200; e.ly = e.y + (Math.random() - 0.5) * 200; }
+      if (e.growlT <= 0 && d < 450) { e.growlT = 5 + Math.random() * 5; sfx.growl(); }
+      if (d < 26) {
+        hurt(60, 'yeti'); S.warm = Math.max(0, S.warm - 20);
+        e.state = 'retreat'; e.t = 25; sfx.roar();
+        say('The Yeti! It hit me so hard...', 3);
+      }
+    }
+  }
+}
+function hurt(n, cause) {
+  S.hp -= n; hurtFlash = 0.8; camShake = 0.5; deathCause = cause;
+  floatText(`-${n} health`, player.x, player.y - 50, '#c8313d');
+  player.fishing = null;
+}
+
+// ---------- the kid's attacks ----------
+function ownedWeapons() {
+  const w = [];
+  if (player.torch > 0) w.push('torch');
+  for (const k of ['rockball', 'slingshot', 'spear', 'club']) if (inv[k] > 0) w.push(k);
+  return w;
+}
+function curWeapon() {
+  const w = player.weapon;
+  if (w && (w === 'torch' ? player.torch > 0 : inv[w] > 0)) return w;
+  player.weapon = ownedWeapons()[0] || null;
+  return player.weapon;
+}
+function equip(k) { player.weapon = k; floatText(`Holding: ${WEAPONS[k].name}`, player.x, player.y - 50, '#2a6a8a'); sfx.ui(); }
+function cycleWeapon() {
+  const w = ownedWeapons();
+  if (!w.length) { say("I don't have anything to throw or swing."); return; }
+  equip(w[(w.indexOf(curWeapon()) + 1) % w.length]);
+}
+function attack() {
+  if (state !== 'play' || paused || mapOpen || bagOpen || shopOpen || campOpen || fade.phase !== 'none' || player.climb) return;
+  if (player.atkCool > 0) return;
+  const bear = nearestEnemy(e => e.type === 'bear' && (e.state === 'chase' || e.state === 'wander'), 260);
+  if (bear && bear.state === 'chase' && throwBait(bear)) return;
+  const w = curWeapon();
+  if (!w) { say('I have nothing to fight with. Where did my rock snowball go?', 2.5); player.atkCool = 0.6; return; }
+  const wp = WEAPONS[w], dv = DIRV[player.dir];
+  player.atkCool = wp.cool; player.swing = 0.25;
+  player.fishing = null;
+  if (wp.reach) {
+    const hx = player.x + dv[0] * 22, hy = player.y - 10 + dv[1] * 18;
+    let hit = false;
+    for (const e of enemies) if ((e.hp === undefined || e.hp > 0) && dist(e.x, e.y - 14, hx, hy) < wp.reach + (e.type === 'snowman' ? 0 : 14)) { hitEnemy(e, wp.dmg, w); hit = true; }
+    sfx.swing();
+    if (w === 'spear' && hit) {
+      inv.spearUses--;
+      if (inv.spearUses <= 0) { inv.spear--; inv.spearUses = inv.spear > 0 ? SPEAR_USES : 0; say('My spear broke!', 2); sfx.crack(); }
+    }
+    return;
+  }
+  if (wp.ammo && inv[wp.ammo] <= 0) { say('No stones for my slingshot.', 2); return; }
+  if (wp.ammo) inv[wp.ammo]--;
+  if (w === 'rockball') inv.rockball--;
+  // aim at the closest snowman in front of the kid, or straight ahead
+  const sx = player.x, sy = player.y - 14;
+  const tg = nearestEnemy(e => e.type === 'snowman' && e.hp > 0 && ((e.x - sx) * dv[0] + (e.y - sy) * dv[1]) > -10, wp.range);
+  let ax = dv[0], ay = dv[1];
+  if (tg) { const l = dist(tg.x, tg.y - 16, sx, sy) || 1; ax = (tg.x - sx) / l; ay = (tg.y - 16 - sy) / l; }
+  const life = wp.range / wp.speed;
+  proj.push({ x: sx, y: sy, vx: ax * wp.speed, vy: ay * wp.speed, from: 'kid', kind: w === 'slingshot' ? 'stone' : 'rockball', dmg: wp.dmg, life, life0: life });
+  sfx.throw();
+}
+function hitEnemy(e, dmg, w) {
+  e.flash = 0.25;
+  if (e.type === 'snowman') {
+    if (w === 'torch') dmg += 1;
+    e.hp -= dmg;
+    const l = dist(e.x, e.y, player.x, player.y) || 1;
+    e.x += (e.x - player.x) / l * 10; e.y += (e.y - player.y) / l * 10;
+    for (let i = 0; i < 6; i++) parts.push({ x: e.x, y: e.y - 20, vx: (Math.random() - 0.5) * 60, vy: -30 - Math.random() * 40, t: 0.6, kind: 'snow' });
+    sfx.splat();
+    if (e.hp <= 0) {
+      e.dead = 1; sfx.poof();
+      if (Math.random() < 0.5) drops.push({ x: e.x, y: e.y, item: 'shards', amt: 1 + (Math.random() < 0.3 ? 1 : 0) });
+      if (!flags.firstSnowman) { flags.firstSnowman = true; say('Got it! It melted.', 2); }
+    }
+  } else if (e.type === 'bear') {
+    if (e.state === 'wander') { e.state = 'chase'; sfx.roar(); }
+    say('That just made it angrier!', 2);
+  } else if (e.type === 'yeti') {
+    if (w === 'torch') { e.state = 'scared'; sfx.roar(); }
+    else say("It didn't even notice...", 2);
+  }
+}
+function throwBait(bear) {
+  let k = null;
+  if (inv.toy > 0) k = 'toy';
+  else for (const f of ['meat', 'char', 'cod', 'perch', 'ckMeat', 'ckChar', 'ckCod', 'ckPerch']) if (count(f) > 0) { k = f; break; }
+  if (!k) return false;
+  if (Array.isArray(inv[k])) inv[k].shift(); else inv[k]--;
+  const bx = lerp(player.x, bear.x, 0.45), by = lerp(player.y, bear.y, 0.45);
+  baits.push({ x: bx, y: by, item: k, bear });
+  bear.state = 'distracted'; bear.t = k === 'toy' ? 14 : 8; bear.tx = bx; bear.ty = by;
+  player.atkCool = 0.5;
+  for (let i = 0; i < 5; i++) parts.push({ x: bx, y: by, vx: (Math.random() - 0.5) * 40, vy: -20 - Math.random() * 20, t: 0.5, kind: 'snow' });
+  sfx.throw();
+  say(k === 'toy' ? 'Here! Play with this instead!' : 'Here! Eat this, not me!', 2.2);
+  return true;
+}
+function makeTorch() {
+  if (state !== 'play' || paused || mapOpen || bagOpen || fade.phase !== 'none') return;
+  const atCampFire = camp && camp.fuel > 0 && dist(player.x, player.y, camp.fx, camp.fy) < 64;
+  const atVillFire = dist(player.x, player.y, vill.x, vill.y) < 70;
+  if (!atCampFire && !atVillFire) { say('I need to hold a stick in a fire to make a torch.', 2.5); return; }
+  if (inv.sticks <= 0) { say('I need a stick for a torch.', 2); return; }
+  inv.sticks--; player.torch = TORCH_TIME; player.weapon = 'torch';
+  sfx.sizzle(); burstSparks(player.x, player.y - 20, 10);
+  if (!flags.torchTip) { flags.torchTip = true; say('A torch! The Yeti hates fire. It will burn for a while.', 3.5); }
+  else say('A new torch.', 1.5);
+}
+const nearLitFire = () => (camp && camp.fuel > 0 && dist(player.x, player.y, camp.fx, camp.fy) < 64) || dist(player.x, player.y, vill.x, vill.y) < 70;
+
+// ---------- projectiles, dropped things, traders ----------
+function updateCombat(dt) {
+  player.atkCool = Math.max(0, (player.atkCool || 0) - dt);
+  player.swing = Math.max(0, (player.swing || 0) - dt);
+  hurtFlash = Math.max(0, hurtFlash - dt);
+  frostFlash = Math.max(0, frostFlash - dt);
+  camShake = Math.max(0, camShake - dt);
+  if (player.torch > 0) {
+    player.torch -= dt;
+    if (Math.random() < dt * 8) parts.push({ x: player.x + (player.dir === 'left' ? -7 : 7), y: player.y - 30, vx: (Math.random() - 0.5) * 10, vy: -30, t: 0.5, kind: 'spark' });
+    if (player.torch <= 0) { player.torch = 0; say('My torch burned out.', 2); }
+  }
+  for (const p of proj) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    if (tileAtW(p.x, p.y) === PEAK) p.life = 0;
+    if (p.from === 'kid') {
+      for (const e of enemies) {
+        if (p.life <= 0) break;
+        if (e.type === 'snowman' && e.hp > 0 && dist(p.x, p.y, e.x, e.y - 16) < 16) { hitEnemy(e, p.dmg, p.kind); p.life = 0; }
+        else if (e.type !== 'snowman' && dist(p.x, p.y, e.x, e.y - 20) < 24) { hitEnemy(e, 0, p.kind); p.life = 0; }
+      }
+      if (p.life <= 0 && p.kind === 'rockball') drops.push({ x: p.x, y: p.y + 10, item: 'rockball', amt: 1 });
+    } else if (!player.climb && dist(p.x, p.y, player.x, player.y - 14) < 13) {
+      p.life = 0;
+      S.warm = Math.max(0, S.warm - 5); frostFlash = 0.5;
+      floatText('-5 warmth', player.x, player.y - 50, '#2a6a8a');
+      sfx.splat();
+      if (!flags.snowTip) { flags.snowTip = true; say('Hey! A snowman! I can throw my rock snowball back (F).', 3.5); }
+    }
+    if (p.life <= 0 && p.kind === 'snowball') for (let i = 0; i < 5; i++) parts.push({ x: p.x, y: p.y, vx: (Math.random() - 0.5) * 50, vy: -20 - Math.random() * 30, t: 0.5, kind: 'snow' });
+  }
+  proj = proj.filter(p => p.life > 0);
+  // walk over dropped things to pick them up
+  for (const dr of drops) if (dist(dr.x, dr.y, player.x, player.y) < 22) {
+    inv[dr.item] += dr.amt;
+    floatText(dr.item === 'rockball' ? 'Got my rock snowball back' : `+${dr.amt} ${ITEMS[dr.item].name.toLowerCase()}`, player.x, player.y - 46, '#2a6a8a');
+    dr.amt = 0;
+    sfx.pick();
+  }
+  drops = drops.filter(dr => dr.amt > 0);
+  if (drops.length > 40) drops.splice(0, drops.length - 40);
+  // the masked traders wander the world
+  for (const tr of traders) {
+    const d = dist(tr.x, tr.y, player.x, player.y);
+    if (d < 70) { tr.dir = player.x > tr.x ? 1 : -1; }
+    else {
+      tr.wait -= dt;
+      if (tr.wait <= 0) {
+        for (let k = 0; k < 12; k++) {
+          const nx = tr.x + (Math.random() - 0.5) * T * 24, ny = tr.y + (Math.random() - 0.5) * T * 24, tt = tileAtW(nx, ny);
+          if (tt !== PEAK && tt !== SPRING && dist(nx, ny, vill.x, vill.y) > 420) { tr.tx = nx; tr.ty = ny; break; }
+        }
+        tr.wait = 10 + Math.random() * 14;
+      }
+      moveEnt(tr, tr.tx, tr.ty, 26, dt);
+    }
+    if (tr.say) { tr.say.t -= dt; if (tr.say.t <= 0) tr.say = null; }
+  }
+  // a heartbeat when something big is hunting you
+  const danger = enemies.some(e => (e.type === 'yeti' && e.state === 'hunt' && dist(e.x, e.y, player.x, player.y) < 400) || (e.type === 'bear' && e.state === 'chase'));
+  beatT -= dt;
+  if (danger && beatT <= 0) { beatT = 0.7; sfx.beat(); }
+}
+function makeTraders() {
+  traders = [];
+  const R = mulberry32(seed + 55);
+  for (let i = 0; i < 2; i++) {
+    for (let k = 0; k < 200; k++) {
+      const x = (6 + R() * (W - 12)) * T, y = (6 + R() * (H - 12)) * T, t = tileAtW(x, y);
+      if (t === PEAK || t === SPRING || t === VILL) continue;
+      const d = dist(x, y, vill.x, vill.y);
+      if (d < 18 * T || d > 50 * T) continue;
+      traders.push({ x, y, tx: x, ty: y, wait: R() * 5, dir: 1, walk: 0, id: i, mask: i ? 'blank' : 'smile', name: 'Masked trader', say: null, line: 0 });
+      break;
+    }
+  }
+}
+function talkTrader(tr) {
+  shopOpen = tr;
+  speak(tr, `Masked trader: ${TRADER_LINES[(tr.line++) % TRADER_LINES.length]}`, 4.5);
+  if (!flags.metTrader) { flags.metTrader = true; }
+}
+function buy(item) {
+  const tr = shopOpen;
+  if (inv.shards < item.price) { speak(tr, 'Masked trader: Not enough shards, little one. Snowmen carry them. Caves too.', 3.5); return; }
+  if (item.k === 'slingshot' && inv.slingshot > 0) { speak(tr, 'Masked trader: You already have one.', 2.5); return; }
+  inv.shards -= item.price;
+  if (item.k === 'ckCod') inv.ckCod.push(gameTime + 3 * DAY);
+  else inv[item.k] += item.amt || 1;
+  if (item.k === 'spear' && inv.spearUses <= 0) inv.spearUses = SPEAR_USES;
+  sfx.pick();
+  floatText(`+ ${item.name}`, player.x, player.y - 46, '#8a5a1c');
+  speak(tr, 'Masked trader: A fair trade.', 2);
+}
+function campCraft(k) {
+  if (k === 'toy') {
+    if (inv.sticks < 3) { toast('A toy needs 3 sticks.'); return; }
+    inv.sticks -= 3; inv.toy++; sfx.build();
+    toast('You carved a little wooden toy. A polar bear would love it.');
+    if (!flags.toyTalk) { flags.toyTalk = true; setTimeout(() => say('I still know how to make things.', 3), 600); }
+  } else if (k === 'club') {
+    if (inv.club > 0) { toast('You already have a bone club.'); return; }
+    if (inv.bones < 2 || inv.sticks < 2) { toast('A bone club needs 2 bear bones and 2 sticks.'); return; }
+    inv.bones -= 2; inv.sticks -= 2; inv.club = 1; player.weapon = 'club'; sfx.build();
+    toast('You made a bone club. Slow, but strong.');
+  }
+}
+
+// ---------- drawing the new things ----------
+function drawSnowman(c, e) {
+  const r = mulberry32(boil * 61 + (e.x | 0));
+  const k = e.hp <= 0 ? e.dead : 1;
+  if (e.hp <= 0) {
+    c.fillStyle = 'rgba(180,215,235,.7)';
+    c.beginPath(); c.ellipse(e.x, e.y, 16 * (1.3 - k * 0.3), 6 * (1.3 - k * 0.3), 0, 0, 7); c.fill();
+    if (k <= 0) return;
+  }
+  const hop = e.hp > 0 && e.aware ? Math.max(0, Math.sin(e.hopT * Math.PI)) * 6 : 0;
+  shadow(c, e.x, e.y, 13 - hop * 0.5, 4, 0.2);
+  c.save(); c.translate(e.x, e.y - hop); c.scale(1, k);
+  const out = e.flash > 0 ? '#c8313d' : '#7a8a9a';
+  // stick arms (the throwing one goes up)
+  const f = e.dir;
+  line(c, r, -f * 7, -24, -f * 16, -30, '#6b4a32', 1.6, 0.4);
+  if (e.throwAnim > 0) { line(c, r, f * 7, -26, f * 10, -40, '#6b4a32', 1.6, 0.4); shape(c, r, ell(f * 10, -42, 3.5, 3.5, 7), '#ffffff', '#8a9aaa', { lw: 0.8, j: 0.2, double: false }); }
+  else line(c, r, f * 7, -24, f * 16, -28, '#6b4a32', 1.6, 0.4);
+  shape(c, r, ell(0, -9, 11.5, 10, 10, r, 0.1), '#fbfdff', out, { lw: 1.5, j: 0.4 });
+  shape(c, r, ell(0, -25, 8.5, 8, 10, r, 0.1), '#fbfdff', out, { lw: 1.5, j: 0.4 });
+  shape(c, r, ell(0, -37, 6.5, 6.5, 9, r, 0.1), '#fbfdff', out, { lw: 1.4, j: 0.3 });
+  c.fillStyle = '#22252b';
+  for (const y of [-27, -22]) { c.beginPath(); c.arc(f * 0.5, y, 1.1, 0, 7); c.fill(); }
+  for (const ex of [-2.2, 2.2]) { c.beginPath(); c.arc(ex + f * 1.2, -38.5, 1.1, 0, 7); c.fill(); }
+  c.strokeStyle = '#22252b'; c.lineWidth = 0.9;
+  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 0.8 + f * 1.2, -40.2); c.lineTo(s * 3.6 + f * 1.2, -41.4); c.stroke(); }
+  for (let i = -1; i <= 1; i++) { c.beginPath(); c.arc(i * 1.6 + f * 1.2, -34.4 + Math.abs(i) * 0.5, 0.6, 0, 7); c.fill(); }
+  c.fillStyle = '#e8762b';
+  c.beginPath(); c.moveTo(f * 1.5, -37.6); c.lineTo(f * 8, -36.6); c.lineTo(f * 1.5, -35.6); c.fill();
+  if (e.hat) shape(c, r, [[-5, -42], [5, -42], [4, -49], [-4, -49]], '#4a4f58', '#22252b', { smooth: false, lw: 1, j: 0.2 });
+  c.restore();
+}
+function drawBear(c, e) {
+  const r = mulberry32(boil * 71 + (e.y | 0));
+  const f = e.dir || 1, chase = e.state === 'chase', step = Math.sin(e.walk || 0) * 3;
+  shadow(c, e.x, e.y, 26, 6, 0.22);
+  c.save(); c.translate(e.x, e.y);
+  const out = e.flash > 0 ? '#c8313d' : '#7d7466';
+  for (const [lx, s] of [[-14, 1], [-6, -1], [8, 1], [15, -1]]) shape(c, r, [[f * lx - 3.5, -12], [f * lx + 3.5, -12], [f * lx + 3.5 + step * s * f * 0.6, 0], [f * lx - 3.5 + step * s * f * 0.6, 0]], '#ece7d8', out, { lw: 1.3, j: 0.3 });
+  shape(c, r, ell(0, -17, 24, 12.5, 12, r, 0.06), '#f4f1e6', out, { lw: 1.6, j: 0.4 });
+  for (let i = 0; i < 4; i++) line(c, r, -12 + i * 7, -24, -10 + i * 7, -19, '#d6cfbd', 0.8, 0.3);
+  const head = e.eat ? -10 : -22;
+  shape(c, r, ell(f * 22, head, 9.5, 8.5, 10), '#f4f1e6', out, { lw: 1.5, j: 0.3 });
+  shape(c, r, ell(f * 30, head + 2.5, 5, 4, 8), '#ece7d8', out, { lw: 1.2, j: 0.2, double: false });
+  c.fillStyle = '#1c1f26'; c.beginPath(); c.arc(f * 34, head + 1.5, 1.8, 0, 7); c.fill();
+  c.beginPath(); c.arc(f * 24.5, head - 2.5, 1.3, 0, 7); c.fill();
+  for (const ex of [16, 22]) shape(c, r, ell(f * ex, head - 8, 2.6, 2.6, 7), '#f4f1e6', out, { lw: 1, j: 0.2, double: false });
+  if (chase) { c.fillStyle = '#8a2a2a'; c.beginPath(); c.ellipse(f * 30, head + 6, 3, 2, 0, 0, 7); c.fill(); c.fillStyle = '#fff'; c.fillRect(f * 29 - 1, head + 4.4, 2, 1.4); }
+  if (e.state === 'wait' || e.state === 'chase') { c.strokeStyle = '#3a2a2a'; c.lineWidth = 1; c.beginPath(); c.moveTo(f * 22, head - 5); c.lineTo(f * 27, head - 3.6); c.stroke(); }
+  c.restore();
+}
+function drawYeti(c, e) {
+  const r = mulberry32(boil * 83 + 7);
+  const f = e.dir || 1, sway = Math.sin(e.walk || 0) * 2;
+  shadow(c, e.x, e.y, 24, 6, 0.28);
+  c.save(); c.translate(e.x, e.y);
+  const out = e.flash > 0 ? '#c8313d' : '#5d6a78';
+  for (const s of [-1, 1]) shape(c, r, [[s * 9 - 5, -16], [s * 9 + 5, -16], [s * 9 + 6 + sway * s, 0], [s * 9 - 6 + sway * s, 0]], '#dfe5ea', out, { lw: 1.4, j: 0.4 });
+  // shaggy body made of spiky fur
+  const body = [];
+  for (let i = 0; i < 22; i++) { const a = i / 22 * Math.PI * 2, rr = i % 2 ? 1 : 1.13; body.push([Math.cos(a) * 21 * rr, -36 + Math.sin(a) * 26 * rr]); }
+  shape(c, r, body, '#e6ebf0', out, { lw: 1.8, j: 0.8, smooth: false });
+  for (let i = 0; i < 6; i++) line(c, r, -12 + i * 5, -30 + (i % 2) * 6, -10 + i * 5, -20 + (i % 2) * 6, '#b9c3cc', 0.9, 0.4);
+  // long arms with claws
+  for (const s of [-1, 1]) {
+    const hx = s * 25, hy = -10 + sway * s;
+    c.lineCap = 'round';
+    c.beginPath(); c.moveTo(s * 16, -48); c.quadraticCurveTo(s * 28, -34, hx, hy);
+    c.strokeStyle = out; c.lineWidth = 9; c.stroke(); c.strokeStyle = '#e6ebf0'; c.lineWidth = 6.6; c.stroke();
+    for (let k = -1; k <= 1; k++) line(c, r, hx + k * 2.2, hy + 2, hx + k * 2.8, hy + 7, '#2b2f36', 1.3, 0.2);
+  }
+  // horns and face
+  for (const s of [-1, 1]) shape(c, r, [[s * 8, -58], [s * 15, -66], [s * 19, -64], [s * 12, -56]], '#8a8378', '#3e3a34', { smooth: false, lw: 1.1, j: 0.3 });
+  shape(c, r, ell(f * 2, -48, 10, 8.5, 10), '#4a5866', '#2b333c', { lw: 1.3, j: 0.3 });
+  c.fillStyle = darkness(dayFrac()) > 0.3 ? '#ffe36b' : '#f4f4f4';
+  for (const s of [-1, 1]) { c.beginPath(); c.ellipse(f * 2 + s * 3.8, -50, 1.8, 1.3, 0, 0, 7); c.fill(); }
+  c.strokeStyle = '#1c1f26'; c.lineWidth = 1.2;
+  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(f * 2 + s * 1.4, -52.2); c.lineTo(f * 2 + s * 6, -53.6); c.stroke(); }
+  c.fillStyle = '#1c1f26'; c.beginPath(); c.ellipse(f * 2, -44.6, 4.4, 2, 0, 0, 7); c.fill();
+  c.fillStyle = '#fff';
+  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(f * 2 + s * 3, -45.4); c.lineTo(f * 2 + s * 2.2, -43); c.lineTo(f * 2 + s * 1.4, -45.4); c.fill(); }
+  c.restore();
+}
+function drawTrader(c, tr) {
+  const r = mulberry32(boil * 37 + tr.id * 11);
+  const f = tr.dir || 1, moving = Math.hypot(tr.tx - tr.x, tr.ty - tr.y) > 3;
+  const bob = moving ? -Math.abs(Math.sin(tr.walk)) * 1.2 : 0;
+  shadow(c, tr.x, tr.y, 13, 4, 0.22);
+  c.save(); c.translate(tr.x, tr.y + bob);
+  // a pack full of shards
+  shape(c, r, [[-f * 6 - 6, -40], [-f * 6 + 6, -40], [-f * 6 + 7, -22], [-f * 6 - 7, -22]], '#5a4632', '#2a1b12', { lw: 1.2, j: 0.3 });
+  for (const [dx, h] of [[-3, 7], [0, 10], [3, 6]]) shape(c, r, [[-f * 6 + dx - 1.6, -40], [-f * 6 + dx, -40 - h], [-f * 6 + dx + 1.6, -40]], '#a8e4f5', '#3d8db0', { smooth: false, lw: 0.8, j: 0.2, double: false });
+  // long cloak
+  shape(c, r, [[-6.5, -42], [6.5, -42], [12, -1], [-12, -1]], '#2e2a3a', '#120f18', { lw: 1.6, j: 0.35 });
+  line(c, r, f * 1, -40, f * 2, -3, '#3e3950', 1, 0.3);
+  shape(c, r, ell(0, -47, 9, 9.5, 10), '#2e2a3a', '#120f18', { lw: 1.5, j: 0.3 });
+  shape(c, r, ell(f * 1.5, -46, 5.6, 6.6, 10), '#f4f0e6', '#4a4640', { lw: 1, j: 0.2, double: false });
+  c.strokeStyle = '#1c1f26'; c.lineWidth = 1.1; c.lineCap = 'round';
+  const mx = f * 1.5;
+  if (tr.mask === 'smile') {
+    for (const s of [-1, 1]) { c.beginPath(); c.arc(mx + s * 2.2, -47, 1.4, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); }
+    c.beginPath(); c.arc(mx, -44.6, 2.6, Math.PI * 0.15, Math.PI * 0.85); c.stroke();
+  } else {
+    for (const s of [-1, 1]) { c.beginPath(); c.moveTo(mx + s * 1.2, -47.5); c.lineTo(mx + s * 3.2, -47.5); c.stroke(); }
+    c.beginPath(); c.moveTo(mx - 1.6, -43.4); c.lineTo(mx + 1.6, -43.4); c.stroke();
+  }
+  // lantern
+  const lx = f * 11, ly = -18;
+  line(c, r, f * 6, -30, lx, ly - 7, '#120f18', 2.4, 0.2);
+  shape(c, r, [[lx - 3, ly - 6], [lx + 3, ly - 6], [lx + 3, ly + 2], [lx - 3, ly + 2]], '#f2c94c', '#3a2a12', { smooth: false, lw: 1, j: 0.2 });
+  c.fillStyle = '#fff3b0'; c.beginPath(); c.arc(lx, ly - 2, 1.4, 0, 7); c.fill();
+  c.restore();
+}
+function drawProjectile(c, p) {
+  const prog = 1 - p.life / p.life0, h = Math.sin(prog * Math.PI) * 10;
+  shadow(c, p.x, p.y + 14, 3, 1.2, 0.2);
+  const y = p.y - h;
+  if (p.kind === 'stone') { c.fillStyle = '#8f949a'; c.beginPath(); c.arc(p.x, y, 2.4, 0, 7); c.fill(); return; }
+  c.fillStyle = '#ffffff'; c.strokeStyle = '#7a8a9a'; c.lineWidth = 1;
+  c.beginPath(); c.arc(p.x, y, 4, 0, 7); c.fill(); c.stroke();
+  if (p.kind === 'rockball') { c.fillStyle = '#8f949a'; c.beginPath(); c.arc(p.x + 1.2, y + 0.8, 1.8, 0, 7); c.fill(); }
+}
+function drawHeldTorch(c) {
+  const hx = player.x + (player.dir === 'left' ? -7 : 7), hy = player.y - 16;
+  const r = mulberry32(boil + 99);
+  line(c, r, hx, hy, hx + (player.dir === 'left' ? -2 : 2), hy - 12, '#6b4a32', 1.8, 0.2);
+  drawFlame(c, hx + (player.dir === 'left' ? -2 : 2), hy - 12, 4 + Math.min(1, player.torch / 30) * 3, realT + 3);
+}
+function drawSwing(c) {
+  const w = curWeapon();
+  if (!w || player.swing <= 0 || !WEAPONS[w].reach || w === 'torch') return;
+  const dv = DIRV[player.dir], k = 1 - player.swing / 0.25;
+  c.save(); c.globalAlpha = 0.9;
+  drawIcon(c, w, player.x + dv[0] * (12 + k * 12), player.y - 14 + dv[1] * (8 + k * 10), 18);
+  c.restore();
+}
+function drawShop() {
+  const tr = shopOpen;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = 'rgba(20,24,34,.6)'; ctx.fillRect(0, 0, VW, VH);
+  hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => { shopOpen = null; } });
+  const w = Math.min(VW - 20, 520), h = Math.min(VH - 20, 150 + SHOP.length * 62), x = VW / 2 - w / 2, y = VH / 2 - h / 2;
+  paper(ctx, x, y, w, h, 10, '#efe8f3');
+  hits.push({ x, y, w, h, fn: () => {} });
+  bagText('Masked Trader', VW / 2, y + 10, 30, '#2b2f36', 'center');
+  ctx.font = `700 16px ${FONT}`;
+  const said = tr && tr.say ? tr.say.text.replace(/^Masked trader: /, '') : '...';
+  wrap(`"${said}"`, w - 60).slice(0, 2).forEach((l, i) => bagText(l, VW / 2, y + 46 + i * 18, 16, '#5a4f6a', 'center'));
+  bagText(`You have ${inv.shards} ice shard${inv.shards === 1 ? '' : 's'}`, VW / 2, y + 86, 18, '#3d6d8a', 'center');
+  hudButton(x + w - 28, y + 28, 18, 'X', () => { shopOpen = null; sfx.ui(); }, { size: 18 });
+  SHOP.forEach((it, i) => {
+    const ry = y + 112 + i * 62;
+    paper(ctx, x + 14, ry, w - 28, 54, 6, '#fbf7ec');
+    drawIcon(ctx, it.k === 'stones' ? 'stones' : it.k, x + 44, ry + 26, 34);
+    bagText(it.name, x + 72, ry + 8, 20);
+    bagText(`${it.price} shard${it.price > 1 ? 's' : ''}${it.k === 'slingshot' && inv.slingshot ? '  (you have one)' : ''}`, x + 72, ry + 30, 15, '#3d6d8a');
+    const can = inv.shards >= it.price && !(it.k === 'slingshot' && inv.slingshot);
+    const bx = x + w - 84, bw = 110;
+    paper(ctx, bx - bw / 2, ry + 8, bw, 38, 6, can ? '#fff0b8' : '#e4e0d8');
+    ctx.fillStyle = can ? '#2b2f36' : '#8a8a8a'; ctx.font = `700 20px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(touchUI ? 'Buy' : `Buy (${i + 1})`, bx, ry + 28);
+    hits.push({ x: bx - bw / 2, y: ry + 8, w: bw, h: 38, fn: () => buy(it) });
+  });
+}
+function drawCampMenu() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = 'rgba(20,24,34,.6)'; ctx.fillRect(0, 0, VW, VH);
+  hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => { campOpen = false; } });
+  const up = UPGRADE[camp.level + 1];
+  const rows = [
+    up ? { label: `Build a ${up.name}`, cost: `${up.sticks} sticks, ${up.stones} stones (you have ${inv.sticks}, ${inv.stones})`, icon: 'sticks', fn: () => { upgradeCamp(); } }
+      : { label: 'Your cabin is finished', cost: 'My cabin. My carvings. My home.', icon: 'sticks', fn: null },
+    { label: 'Carve a toy', cost: `3 sticks. Throw it at a polar bear (F).`, icon: 'toy', fn: () => campCraft('toy') },
+    { label: 'Make a bone club', cost: inv.club ? 'You already have one.' : `2 bear bones, 2 sticks (you have ${inv.bones}, ${inv.sticks})`, icon: 'club', fn: () => campCraft('club') },
+    { label: 'Sleep', cost: isNight() ? 'Sleep until morning.' : 'Set your bed. You wake up here.', icon: 'scraps', fn: () => { campOpen = false; sleep(); } },
+  ];
+  const w = Math.min(VW - 20, 520), h = 80 + rows.length * 66, x = VW / 2 - w / 2, y = VH / 2 - h / 2;
+  paper(ctx, x, y, w, h, 10, '#f3ecda');
+  hits.push({ x, y, w, h, fn: () => {} });
+  bagText('My Camp', VW / 2, y + 10, 30, '#2b2f36', 'center');
+  hudButton(x + w - 28, y + 28, 18, 'X', () => { campOpen = false; sfx.ui(); }, { size: 18 });
+  rows.forEach((row, i) => {
+    const ry = y + 60 + i * 66;
+    paper(ctx, x + 14, ry, w - 28, 58, 6, row.fn ? '#fbf7ec' : '#ece6da');
+    drawIcon(ctx, row.icon, x + 44, ry + 28, 34);
+    bagText(touchUI ? row.label : `${i + 1}. ${row.label}`, x + 72, ry + 8, 20);
+    ctx.font = `700 15px ${FONT}`;
+    bagText(wrap(row.cost, w - 110)[0], x + 72, ry + 32, 15, '#6b6457');
+    if (row.fn) hits.push({ x: x + 14, y: ry, w: w - 28, h: 58, fn: () => { sfx.ui(); row.fn(); } });
+  });
 }
 
 // ---------- snow ----------
@@ -1791,7 +2511,8 @@ function drawFlame(c, x, y, size, t) {
 
 // ---------- world rendering ----------
 function worldTransform() {
-  ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, DPR * (VW / 2 - cam.x * ZOOM), DPR * (VH / 2 - cam.y * ZOOM));
+  const sh = camShake > 0 ? (Math.random() - 0.5) * camShake * 10 : 0;
+  ctx.setTransform(DPR * ZOOM, 0, 0, DPR * ZOOM, DPR * (VW / 2 - cam.x * ZOOM + sh), DPR * (VH / 2 - cam.y * ZOOM + sh));
 }
 const toScreen = (x, y) => [(x - cam.x) * ZOOM + VW / 2, (y - cam.y) * ZOOM + VH / 2];
 
@@ -1837,7 +2558,13 @@ function drawWorld() {
   for (let ty = Math.max(0, ty0); ty <= Math.min(H - 1, ty1); ty++) for (let tx = Math.max(0, tx0); tx <= Math.min(W - 1, tx1); tx++) {
     for (const o of ogrid[ty * W + tx]) if (!o.gone) list.push({ y: o.y, o });
   }
-  list.push({ y: player.y, kid: true });
+  list.push({ y: player.climb ? player.climb.y + 3 : player.y, kid: true });
+  const inView = (x, y, m = 80) => x > x0 - m && x < x1 + m && y > y0 - m && y < y1 + m * 1.5;
+  for (const e of enemies) if (inView(e.x, e.y)) list.push({ y: e.y, e });
+  for (const tr of traders) if (inView(tr.x, tr.y)) list.push({ y: tr.y, tr });
+  for (const dr of drops) if (inView(dr.x, dr.y)) list.push({ y: dr.y - 20, dr });
+  for (const b of baits) if (inView(b.x, b.y)) list.push({ y: b.y - 20, dr: b });
+  for (const p of proj) if (inView(p.x, p.y)) list.push({ y: p.y + 14, p });
   if (owl.on) list.push({ y: owl.y + 1, owl: true });
   for (const v of villagers) if (v.x > x0 - 40 && v.x < x1 + 40 && v.y > y0 - 40 && v.y < y1 + 60) list.push({ y: v.y, v });
   if (camp) { list.push({ y: camp.ty, tent: true }); list.push({ y: camp.fy, fire: true }); }
@@ -1845,9 +2572,17 @@ function drawWorld() {
   for (const it of list) {
     if (it.kid) {
       const rod = player.fishing ? [player.fishing.hx, player.fishing.hy] : null;
+      if (player.climb) { ctx.save(); ctx.translate(0, -34); }
       drawKid(ctx, player.x, player.y, player.dir, player.walk, player.moving, { rod, sad: S.warm < 30 || S.food < 30, shiver: S.warm < 30 });
+      if (player.torch > 0) drawHeldTorch(ctx);
+      drawSwing(ctx);
+      if (player.climb) ctx.restore();
       if (player.fishing && player.fishing.need - player.fishing.t < 0.7) bubbleWorld('!', player.fishing.hx, player.fishing.hy - 16);
-    } else if (it.owl) drawOwl(ctx, owl);
+    } else if (it.owl) { drawOwl(ctx, owl); if (owl.warn) bubbleWorld('!', owl.x, owl.y - owl.z - 22); }
+    else if (it.e) { if (it.e.type === 'snowman') drawSnowman(ctx, it.e); else if (it.e.type === 'bear') drawBear(ctx, it.e); else drawYeti(ctx, it.e); }
+    else if (it.tr) drawTrader(ctx, it.tr);
+    else if (it.dr) { shadow(ctx, it.dr.x, it.dr.y + 4, 7, 2.5); drawIcon(ctx, it.dr.item, it.dr.x, it.dr.y - 4, 16); }
+    else if (it.p) drawProjectile(ctx, it.p);
     else if (it.v) drawVillager(ctx, it.v);
     else if (it.tent) drawSpr(ctx, ['tent', 'hut', 'cabin'][camp.level], camp.tx, camp.ty);
     else if (it.fire) {
@@ -1872,6 +2607,7 @@ function drawWorld() {
       ctx.fillStyle = p.kind === 'smoke' ? '#8a8a90' : '#ffffff';
       ctx.beginPath(); ctx.arc(p.x, p.y, 4 + (2.5 - p.t) * 3, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
     } else if (p.kind === 'drop') { ctx.fillStyle = '#6fb0d4'; ctx.fillRect(p.x - 1, p.y - 1, 2, 2.5); }
+    else if (p.kind === 'snow') { ctx.fillStyle = '#ffffff'; ctx.strokeStyle = 'rgba(110,130,155,.6)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, 7); ctx.fill(); ctx.stroke(); p.vy += 4; }
     else if (p.kind === 'dust') { ctx.globalAlpha = p.t; ctx.fillStyle = '#c9b89a'; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
   }
 
@@ -1898,7 +2634,8 @@ function drawWorld() {
     if (camp && camp.level > 0) lights.push([camp.tx, camp.ty - 20, 55]);
     lights.push([vill.x, vill.y - 8, 150 * flick]);
     for (const h of objs) if (h.type === 'house' && Math.abs(h.x - cam.x) < hw + 100 && Math.abs(h.y - cam.y) < hh + 100) lights.push([h.x, h.y - 18, 50]);
-    lights.push([player.x, player.y - 16, 52]);
+    lights.push([player.x, player.y - 16, player.torch > 0 ? 140 * flick : 52]);
+    for (const tr of traders) lights.push([tr.x, tr.y - 20, 80 * flick]);
     for (let ty = Math.max(0, ty0); ty <= Math.min(H - 1, ty1); ty++) for (let tx = Math.max(0, tx0); tx <= Math.min(W - 1, tx1); tx++)
       for (const o of ogrid[ty * W + tx]) if (o.type === 'crystal' && o.stock > 0) lights.push([o.x, o.y - 14, 42]);
     for (const [lx, ly, lr] of lights) {
@@ -1919,7 +2656,23 @@ function drawWorld() {
     };
     if (camp && camp.fuel > 0) glow(camp.fx, camp.fy - 10, 90 + camp.fuel, 0.35);
     glow(vill.x, vill.y - 8, 120, 0.3);
+    if (player.torch > 0) glow(player.x, player.y - 28, 90, 0.3);
     ctx.globalCompositeOperation = 'source-over';
+    // the Yeti's eyes glow in the dark
+    for (const e of enemies) if (e.type === 'yeti') {
+      const [sx, sy] = toScreen(e.x + (e.dir || 1) * 2, e.y - 50);
+      for (const s of [-1, 1]) {
+        const g = ctx.createRadialGradient(sx + s * 3.8 * ZOOM, sy, 0, sx + s * 3.8 * ZOOM, sy, 7 * ZOOM);
+        g.addColorStop(0, `rgba(255,230,90,${dk})`); g.addColorStop(1, 'rgba(255,230,90,0)');
+        ctx.fillStyle = g; ctx.fillRect(sx + s * 3.8 * ZOOM - 8 * ZOOM, sy - 8 * ZOOM, 16 * ZOOM, 16 * ZOOM);
+      }
+    }
+  }
+  if (hurtFlash > 0 || frostFlash > 0) {
+    const col = hurtFlash > 0 ? `rgba(200,40,40,${hurtFlash * 0.5})` : `rgba(200,230,255,${frostFlash * 0.9})`;
+    const g = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.3, VW / 2, VH / 2, Math.max(VW, VH) * 0.7);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, col);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
   }
   drawSnow(ctx, onCave ? 0.15 : 1);
   // paper vignette
@@ -1939,7 +2692,9 @@ function drawWorld() {
   ctx.globalAlpha = 1;
   for (const v of villagers) if (!v.say && dist(v.x, v.y, player.x, player.y) < 90) { const [sx, sy] = toScreen(v.x, v.y + 12); label(v.name, sx, sy, 14); }
   for (const v of villagers) if (v.say) speechBubble(v.say.text, v.x, v.y - 48, v.teen ? '#e8f2e6' : '#f3e3df');
-  if (speech) speechBubble(speech.text, player.x, player.y - 44);
+  for (const tr of traders) if (tr.say && !shopOpen) speechBubble(tr.say.text, tr.x, tr.y - 58, '#ece6f3');
+  for (const tr of traders) if (!tr.say && dist(tr.x, tr.y, player.x, player.y) < 90) { const [sx, sy] = toScreen(tr.x, tr.y + 12); label('Masked trader', sx, sy, 14); }
+  if (speech) speechBubble(speech.text, player.x, player.y - (player.climb ? 78 : 44));
 }
 function drawStar(c, x, y, r, fill, stroke) {
   const p = [];
@@ -2018,6 +2773,49 @@ function drawIcon(c, k, x, y, s) {
       shape(c, r, [[x - s * 0.2, y - s * 0.12], [x + s * 0.14, y - s * 0.2], [x + s * 0.26, y - s * 0.04], [x - s * 0.06, y + s * 0.04]], '#f7f4ec', '#a9a294', { lw: 1, j: 0.3, double: false });
       line(c, r, x, y - s * 0.26, x + s * 0.04, y + s * 0.28, '#8a5f3c', 1.3, 0.3);
       break;
+    case 'rockball':
+      c.fillStyle = '#ffffff'; c.strokeStyle = '#7a8a9a'; c.lineWidth = 1.3; c.beginPath(); c.arc(x, y, s * 0.3, 0, 7); c.fill(); c.stroke();
+      shape(c, r, ell(x + s * 0.06, y + s * 0.04, s * 0.15, s * 0.12, 7), '#8f949a', '#4d5157', { lw: 1, j: 0.2, double: false });
+      break;
+    case 'slingshot':
+      line(c, r, x, y + s * 0.4, x, y + s * 0.05, '#6b4a32', s * 0.1, 0.3);
+      line(c, r, x, y + s * 0.08, x - s * 0.25, y - s * 0.32, '#6b4a32', s * 0.09, 0.3); line(c, r, x, y + s * 0.08, x + s * 0.25, y - s * 0.32, '#6b4a32', s * 0.09, 0.3);
+      c.strokeStyle = '#c8413d'; c.lineWidth = 1.3; c.beginPath(); c.moveTo(x - s * 0.25, y - s * 0.32); c.quadraticCurveTo(x, y - s * 0.02, x + s * 0.25, y - s * 0.32); c.stroke();
+      break;
+    case 'spear':
+      line(c, r, x - s * 0.38, y + s * 0.38, x + s * 0.12, y - s * 0.12, '#6b4a32', s * 0.08, 0.3);
+      shape(c, r, [[x + s * 0.05, y - s * 0.12], [x + s * 0.42, y - s * 0.42], [x + s * 0.14, y - s * 0.02]], '#bfeaf7', '#3d8db0', { smooth: false, lw: 1.2, j: 0.3 });
+      break;
+    case 'club':
+      line(c, r, x - s * 0.32, y + s * 0.36, x + s * 0.2, y - s * 0.24, '#efe9da', s * 0.14, 0.3);
+      c.fillStyle = '#efe9da'; c.strokeStyle = '#8a8378'; c.lineWidth = 1.1; c.beginPath(); c.arc(x + s * 0.24, y - s * 0.28, s * 0.14, 0, 7); c.fill(); c.stroke();
+      line(c, r, x - s * 0.36, y + s * 0.4, x - s * 0.2, y + s * 0.22, '#6b4a32', s * 0.16, 0.2);
+      break;
+    case 'toy':
+      shape(c, r, ell(x, y + s * 0.1, s * 0.26, s * 0.2, 9), '#c9a27a', '#3a281b', { lw: 1.2, j: 0.3 });
+      shape(c, r, ell(x + s * 0.2, y - s * 0.12, s * 0.13, s * 0.12, 8), '#c9a27a', '#3a281b', { lw: 1.1, j: 0.2 });
+      c.fillStyle = '#3a281b'; c.beginPath(); c.arc(x + s * 0.24, y - s * 0.14, 1.2, 0, 7); c.fill();
+      line(c, r, x - s * 0.24, y + s * 0.04, x - s * 0.38, y - s * 0.1, '#3a281b', 1.2, 0.2);
+      break;
+    case 'bones':
+      for (const a of [-0.3, 0.3]) {
+        line(c, r, x - s * a, y - s * 0.3, x + s * a, y + s * 0.3, '#8a8378', s * 0.14, 0.2);
+        line(c, r, x - s * a, y - s * 0.3, x + s * a, y + s * 0.3, '#f4efe2', s * 0.08, 0.2);
+        c.fillStyle = '#f4efe2'; c.strokeStyle = '#8a8378'; c.lineWidth = 1;
+        for (const [bx3, by3] of [[x - s * a, y - s * 0.3], [x + s * a, y + s * 0.3]]) { c.beginPath(); c.arc(bx3, by3, s * 0.09, 0, 7); c.fill(); c.stroke(); }
+      }
+      break;
+    case 'torch':
+      line(c, r, x - s * 0.1, y + s * 0.4, x + s * 0.06, y - s * 0.05, '#6b4a32', s * 0.11, 0.2);
+      drawFlame(c, x + s * 0.08, y - s * 0.05, s * 0.28, realT + 2);
+      break;
+    case 'meat': case 'ckMeat': {
+      const col = k === 'meat' ? '#d0605a' : '#9a5a2e';
+      shape(c, r, ell(x - s * 0.06, y, s * 0.3, s * 0.22, 9), col, '#4a1c1c', { lw: 1.3, j: 0.3 });
+      line(c, r, x + s * 0.18, y + s * 0.06, x + s * 0.4, y + s * 0.2, '#efe9da', s * 0.09, 0.2);
+      if (k === 'ckMeat') for (let i = 0; i < 2; i++) line(c, r, x - s * 0.2 + i * s * 0.14, y - s * 0.12, x - s * 0.26 + i * s * 0.14, y + s * 0.12, '#4a2a14', 1.3, 0.2);
+      break;
+    }
     case 'cod': fish('#8fa3b5'); break;
     case 'perch': fish('#c9b04a'); break;
     case 'char': fish('#e09a8e'); break;
@@ -2039,7 +2837,7 @@ function goalText() {
   if (camp.fuel <= 0) return 'Your fire is out! Bring 2 sticks to light it.';
   if (camp.level === 0) return 'Keep the fire burning. Collect 12 sticks and 8 stones to build a hut.';
   if (camp.level === 1) return 'Collect 25 sticks and 15 stones to turn your hut into a cabin.';
-  return 'Your cabin is done. Explore the frozen world. (Enemies and mask pieces come in step 2.)';
+  return 'Your cabin is done. Explore, but watch out for polar bears, and the Yeti at night. (Mask pieces come in step 3.)';
 }
 function drawHUD() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2100,16 +2898,30 @@ function drawHUD() {
     hits.push({ x, y, w: ss, h: ss, fn: () => useItem(k) });
   });
 
+  // what you're holding
+  const wpn = curWeapon();
+  const wInfo = !wpn ? 'nothing' : wpn === 'slingshot' ? `${inv.stones} stones` : wpn === 'spear' ? `${inv.spearUses} hits left` : wpn === 'torch' ? `${Math.ceil(player.torch)}s` : wpn === 'rockball' ? 'throw, then pick up' : 'strong';
+  if (!touchUI) {
+    const bw2 = 200, bh2 = 62, bx2 = VW - bw2 - 14, by2 = VH - bh2 - 14;
+    paper(ctx, bx2, by2, bw2, bh2, 6, 'rgba(247,242,230,.95)');
+    if (wpn) drawIcon(ctx, wpn, bx2 + 30, by2 + 30, 36);
+    bagText(wpn ? WEAPONS[wpn].name : 'Empty hands', bx2 + 56, by2 + 7, 18);
+    bagText(wInfo, bx2 + 56, by2 + 26, 14, '#6b6457');
+    bagText('[F] use  [R] switch', bx2 + 56, by2 + 42, 13, '#8a8a8a');
+    hits.push({ x: bx2, y: by2, w: bw2, h: bh2, fn: cycleWeapon });
+  }
   // prompts
   const verb = verbFor(target);
+  const fireTorch = nearLitFire() && inv.sticks > 0;
   const extra = [];
-  const nearFire = camp && dist(player.x, player.y, camp.fx, camp.fy) < 60 && camp.fuel > 0 && ['bugs', 'cod', 'perch', 'char'].some(k => inv[k] > 0);
+  const nearFire = camp && dist(player.x, player.y, camp.fx, camp.fy) < 60 && camp.fuel > 0 && ['bugs', 'cod', 'perch', 'char', 'meat'].some(k => inv[k] > 0);
   const nearBed = camp && dist(player.x, player.y, camp.tx, camp.ty) < 70 + camp.level * 12;
   if (!touchUI) {
     const parts = [];
     if (verb) parts.push(`[E] ${verb}`);
     if (nearFire) parts.push('[C] Cook');
     if (nearBed) parts.push('[Z] Sleep');
+    if (fireTorch) parts.push('[T] Make a torch');
     if (parts.length) {
       const txt = parts.join('     ');
       ctx.font = `700 20px ${FONT}`;
@@ -2120,10 +2932,14 @@ function drawHUD() {
   } else {
     const bx = VW - 72, by = VH - 92;
     hudButton(bx, by, 40, 'E', act, { sub: verb ? shortVerb(verb) : '', size: 26 });
-    hudButton(bx - 92, by + 34, 30, 'Run', null, { hold: 'run', size: 17 });
-    hudButton(bx - 8, by - 92, 28, 'Eat', eatBest, { size: 17 });
-    if (nearFire) hudButton(bx - 84, by - 50, 28, 'Cook', cook, { size: 16 });
-    else if (nearBed) hudButton(bx - 84, by - 50, 28, 'Sleep', sleep, { size: 15 });
+    hudButton(bx - 92, by - 8, 31, 'Hit', attack, { size: 18 });
+    if (wpn) { ctx.save(); ctx.globalAlpha = 0.5; drawIcon(ctx, wpn, bx - 92, by + 9, 16); ctx.restore(); }
+    hudButton(bx - 84, by + 54, 24, 'Run', null, { hold: 'run', size: 15 });
+    hudButton(bx - 34, by + 62, 18, '⟳', cycleWeapon, { size: 18 });
+    hudButton(bx + 2, by - 92, 26, 'Eat', eatBest, { size: 16 });
+    if (nearFire) hudButton(bx - 80, by - 86, 26, 'Cook', cook, { size: 15 });
+    else if (nearBed) hudButton(bx - 80, by - 86, 26, 'Sleep', sleep, { size: 14 });
+    if (fireTorch) hudButton(bx - 148, by - 62, 24, 'Torch', makeTorch, { size: 13 });
     if (verb) {
       ctx.font = `700 18px ${FONT}`;
       const w = ctx.measureText(verb).width + 26, x = clamp(VW / 2 - w / 2, 8, VW - w - 8), y = VH * 0.62;
@@ -2153,8 +2969,8 @@ function drawHUD() {
   if (helpT > 0) {
     ctx.globalAlpha = Math.min(1, helpT);
     const lines = touchUI
-      ? ['Drag on the left side to walk', 'Hold Run to run (uses energy)', 'E: use / pick up / fish on ice', 'Eat, Cook and Sleep buttons', 'Bag: see your things and your robe']
-      : ['WASD or arrows: walk     Shift: run', 'E: use, pick up, fish on ice', 'Q: eat     C: cook at your fire', 'Z: sleep at camp     M: map     B: bag', '1-9: use an item     Esc: pause'];
+      ? ['Drag on the left side to walk', 'Hold Run to run (uses energy)', 'E: use / pick up / talk / fish', 'Hit: throw or swing   ⟳: switch', 'Bag: see your things and your robe']
+      : ['WASD or arrows: walk     Shift: run', 'E: use, pick up, talk, fish on ice', 'F: throw / hit     R: switch weapon', 'Q: eat     C: cook     T: torch (at a fire)', 'Z: sleep     M: map     B: bag     Esc: pause'];
     ctx.font = `700 19px ${FONT}`;
     const w = Math.min(VW - 30, 380), h = lines.length * 24 + 50, x = VW / 2 - w / 2, y = VH / 2 - h / 2 - 60;
     paper(ctx, x, y, w, h, 8);
@@ -2253,11 +3069,13 @@ function drawBag() {
     else if (it.cook) info.push('Cook it at your fire to make it better.');
     else if (bagSel === 'berries') info.push('Fine to eat raw.');
     if (!it.food) info.push(it.info);
-    const btnW = it.food ? 110 : 0;
+    if (bagSel === 'spear') info.push(`${inv.spearUses} hits left on this one.`);
+    const btnW = it.food || it.weapon ? 110 : 0;
     let iy = detailY + 40;
     ctx.font = `700 16px ${FONT}`;
     for (const l of info) for (const wl of wrap(l, gw - 84 - btnW)) { bagText(wl, gx + 70, iy, 16, '#4a4f58'); iy += 19; }
     if (it.food) menuButton(gx + gw - 66, detailY + detailH / 2 - 25 + 10, 104, 'Eat', () => eat(bagSel));
+    if (it.weapon) menuButton(gx + gw - 66, detailY + detailH / 2 - 25 + 10, 104, curWeapon() === bagSel ? 'Held' : 'Hold', () => equip(bagSel));
   }
   if (!touchUI) bagText('B or Esc to close', VW / 2, y + h - 21, 14, '#7a7266', 'center');
 }
@@ -2317,12 +3135,12 @@ function drawPause() {
   ctx.font = `700 34px ${FONT}`; ctx.fillText('Paused', VW / 2, y + 14);
   ctx.font = `700 17px ${FONT}`;
   const lines = touchUI
-    ? ['Drag left side: walk. Hold Run: run.', 'E: use things, fish on the ice.', 'Eat / Cook / Sleep buttons.', 'Tap an item to eat it.']
-    : ['WASD / arrows: walk. Shift: run.', 'E: use things, fish on the ice.', 'Q: eat. C: cook. Z: sleep. M: map. B: bag.', '1-9: use an item.'];
+    ? ['Drag left side: walk. Hold Run: run.', 'E: use things. Hit: throw or swing.', 'Torch button appears at a fire.', 'Tap an item to eat or hold it.']
+    : ['WASD / arrows: walk. Shift: run. E: use.', 'F: throw / hit. R: switch. T: torch at a fire.', 'Q: eat. C: cook. Z: sleep. M: map. B: bag.', '1-9: use an item.'];
   lines.forEach((l, i) => ctx.fillText(l, VW / 2, y + 62 + i * 21));
   ctx.fillStyle = '#6b6457';
-  ctx.fillText('Step 1 of Frostbite. Coming next: enemies,', VW / 2, y + 156);
-  ctx.fillText('mask pieces, traders, and the Frost Spirit.', VW / 2, y + 177);
+  ctx.fillText('Step 2 of Frostbite. Coming next: the five', VW / 2, y + 156);
+  ctx.fillText('mask pieces and the Frost Spirit.', VW / 2, y + 177);
   menuButton(VW / 2, y + 212, 240, 'Resume', () => { paused = false; });
   menuButton(VW / 2, y + 272, 240, muted ? 'Sound: off' : 'Sound: on', () => setMuted(!muted));
   menuButton(VW / 2, y + 332, 240, confirmNew ? 'Really? Tap again' : 'New world', () => {
@@ -2338,9 +3156,13 @@ function drawDead() {
   paper(ctx, x, y, w, h, 10);
   ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.font = `700 38px ${FONT}`;
-  ctx.fillText(deathCause === 'hunger' ? 'You starved.' : 'You froze.', VW / 2, y + 18);
+  ctx.fillText({ hunger: 'You starved.', yeti: 'The Yeti got you.', bear: 'A polar bear got you.' }[deathCause] || 'You froze.', VW / 2, y + 18);
   ctx.font = `700 19px ${FONT}`;
-  const tip = deathCause === 'hunger' ? 'Tip: fish on the frozen lake and cook it at your fire.' : 'Tip: stay near fire at night, and keep sticks for it.';
+  const tip = {
+    hunger: 'Tip: fish on the frozen lake and cook it at your fire.',
+    yeti: "Tip: stay by fire at night, or carry a torch. Don't run near it: it hears you.",
+    bear: 'Tip: climb a tree (E), or throw it a fish or a toy (F).',
+  }[deathCause] || 'Tip: stay near fire at night, and keep sticks for it.';
   wrap(inv.scraps ? 'Everything you were carrying is gone, for good. Your robe scraps are safe.' : 'Everything you were carrying is gone, for good.', w - 40).forEach((l, i) => ctx.fillText(l, VW / 2, y + 74 + i * 22));
   ctx.fillStyle = '#6b6457';
   wrap(tip, w - 40).forEach((l, i) => ctx.fillText(l, VW / 2, y + 122 + i * 22));
@@ -2395,7 +3217,7 @@ function drawTitle() {
   if (hasSave()) { menuButton(VW / 2, by, 240, 'Continue', continueGame); menuButton(VW / 2, by + 62, 240, 'New game', startNew); }
   else menuButton(VW / 2, by, 240, 'New game', startNew);
   ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#6b6457';
-  ctx.fillText('Step 1: survive, explore, and make a camp', VW / 2, VH - 22);
+  ctx.fillText('Step 2: snowmen, polar bears, the Yeti, weapons and traders', VW / 2, VH - 22);
 }
 function drawStory() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -2447,6 +3269,8 @@ function render() {
   drawHUD();
   if (mapOpen) drawMap();
   if (bagOpen) drawBag();
+  if (shopOpen) drawShop();
+  if (campOpen) drawCampMenu();
   if (paused) { hits = []; drawPause(); }
   if (state === 'dead') { hits = []; drawDead(); }
   drawFade();
