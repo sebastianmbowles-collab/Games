@@ -2230,11 +2230,11 @@ function drawCampMenu() {
 
 // ---------- step 3: the five shrines, their guardians, the mask, the castle and the Frost Spirit ----------
 const GUARDIANS = [
-  { kind: 'gsnow', name: 'Giant Snowman', tiles: [SNOW], hp: 24, r: 30 },
+  { kind: 'gsnow', name: 'Giant Snowman', tiles: [SNOW], hp: 30, r: 30 },
   { kind: 'wolf', name: 'Ice Wolf pack', tiles: [FOREST], hp: 14, r: 20 },
   { kind: 'bking', name: 'Old Bear King', tiles: [ICE], hp: 30, r: 34 },
   { kind: 'yking', name: 'King Yeti', tiles: [ROCK], hp: 32, r: 34 },
-  { kind: 'golem', name: 'Ice Golem', tiles: [CAVE], hp: 28, r: 28 },
+  { kind: 'golem', name: 'Ice Golem', tiles: [CAVE], hp: 34, r: 28 },
 ];
 const POWERS = [
   'Your warmth lasts a little longer.',
@@ -2336,6 +2336,14 @@ function updateBosses(dt) {
       continue;
     }
     if (e.kind === 'gsnow') {
+      // too close and it belly-flops onto you
+      if (e.state === 'flop') {
+        e.t -= dt;
+        if (e.t <= 0) { if (d < 70 && !player.climb) hurt(18, 'gsnow'); camShake = 0.5; sfx.poof(); e.state = 'idle'; e.flopCool = 3; for (let i = 0; i < 12; i++) parts.push({ x: e.x, y: e.y, vx: (Math.random() - 0.5) * 120, vy: -30 - Math.random() * 40, t: 0.6, kind: 'snow' }); }
+        continue;
+      }
+      e.flopCool = Math.max(0, (e.flopCool || 0) - dt);
+      if (d < 60 && !e.flopCool) { e.state = 'flop'; e.t = 0.75; sfx.growl(); continue; }
       e.hopT += dt * 1.6;
       if (d > 120) moveEnt(e, player.x, player.y, 30 * hard * (Math.sin(e.hopT * Math.PI) > 0 ? 1.5 : 0.2), dt);
       e.dir = player.x > e.x ? 1 : -1;
@@ -2400,13 +2408,13 @@ function updateBosses(dt) {
     } else if (e.kind === 'golem') {
       if (e.state === 'punch') {
         e.t -= dt;
-        if (e.t <= 0) { if (d < 58 && !player.climb) hurt(25, 'golem'); camShake = 0.4; sfx.poof(); e.state = 'idle'; e.cool = 2; }
+        if (e.t <= 0) { if (d < 66 && !player.climb) hurt(25, 'golem'); camShake = 0.4; sfx.poof(); e.state = 'idle'; e.cool = 1.6; }
         continue;
       }
       if (d > 40) moveEnt(e, player.x, player.y, 36 * hard, dt);
       e.dir = player.x > e.x ? 1 : -1;
       e.cool -= dt;
-      if (e.cool <= 0 && d < 52) { e.state = 'punch'; e.t = 0.9; sfx.growl(); }
+      if (e.cool <= 0 && d < 60) { e.state = 'punch'; e.t = 0.75; sfx.growl(); }
       else if (e.cool <= 0 && d > 140 && d < 400) {
         e.cool = 4.5 / hard;
         const [lx, ly] = toP();
@@ -2634,9 +2642,14 @@ function startSpiritAttack() {
   } else if (type === 'beam') {
     sp.atk = { type, t: 0, dur: 1.8, ax: player.x, ay: player.y };
   } else if (type === 'blizzard') {
+    // each gap is close enough to the last one that you can always run to it in time
     const side = Math.random() < 0.5 ? 1 : -1, rows = [];
-    for (let i = 0; i < 3; i++) rows.push({ at: i * 1.4 * fast, side, gap: (Math.random() * 2 - 1) * (AREA_RY - 50) });
-    sp.atk = { type, t: 0, dur: 3 * 1.4 * fast + 4, rows };
+    let gap = clamp(player.y + (Math.random() * 2 - 1) * 120, -(AREA_RY - 50), AREA_RY - 50);
+    for (let i = 0; i < 3; i++) {
+      rows.push({ at: i * 1.8 * fast, side, gap });
+      gap = clamp(gap + (Math.random() * 2 - 1) * 150, -(AREA_RY - 50), AREA_RY - 50);
+    }
+    sp.atk = { type, t: 0, dur: 3 * 1.8 * fast + 4, rows };
   } else {
     for (const [i, [x, y]] of [[-200, -30], [0, 40], [200, -30]].entries())
       A.mins.push({ type: 'snowman', x, y, hp: 2, cool: 2 + i * 0.6, hopT: 0, dir: 1, flash: 0, dead: 0, aware: true });
@@ -2845,7 +2858,8 @@ function drawBossTele(c, e) {
     if (!e.wave) { c.strokeStyle = 'rgba(200,50,50,.5)'; c.lineWidth = 3; c.beginPath(); c.ellipse(e.x, e.y, 130, 70, 0, 0, 7); c.stroke(); }
     else { c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 8; c.beginPath(); c.ellipse(e.x, e.y, e.wave, e.wave * 0.55, 0, 0, 7); c.stroke(); }
   }
-  if (e.kind === 'golem' && e.state === 'punch') { c.strokeStyle = 'rgba(200,50,50,.6)'; c.lineWidth = 3; c.beginPath(); c.ellipse(e.x, e.y, 58, 32, 0, 0, 7); c.stroke(); }
+  if (e.kind === 'golem' && e.state === 'punch') { c.strokeStyle = 'rgba(200,50,50,.6)'; c.lineWidth = 3; c.beginPath(); c.ellipse(e.x, e.y, 66, 36, 0, 0, 7); c.stroke(); }
+  if (e.kind === 'gsnow' && e.state === 'flop') { c.strokeStyle = 'rgba(200,50,50,.6)'; c.lineWidth = 3; c.beginPath(); c.ellipse(e.x, e.y, 70, 38, 0, 0, 7); c.stroke(); }
 }
 function drawCrown(c, e) {
   const f = e.dir || 1, r = mulberry32(boil + 31);
@@ -4005,7 +4019,7 @@ const GUIDE = [
     'Kael: do not stay in the village longer than a minute.',
   ]],
   ['The guardians', [
-    'Giant Snowman: dodge the 3 big snowballs. A torch hurts it double.',
+    'Giant Snowman: dodge the 3 big snowballs, and leave the red ring before it belly-flops. A torch hurts it double.',
     'Ice Wolf pack: a torch keeps them away. Beat the leader with the white mane.',
     'Old Bear King: step aside from the red arrow, then hit it while it is dizzy.',
     'King Yeti: run out of the red ring before the slam. A torch scares it.',
@@ -4045,7 +4059,7 @@ function drawDead() {
   paper(ctx, x, y, w, h, 10);
   ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.font = `700 38px ${FONT}`;
-  ctx.fillText({ hunger: 'You starved.', yeti: 'The Yeti got you.', bear: 'A polar bear got you.', spirit: 'The Frost Spirit froze you.', wolf: 'The ice wolves got you.', bking: 'The Old Bear King got you.', yking: 'King Yeti got you.', golem: 'The Ice Golem got you.', guardian: 'A guardian got you.' }[deathCause] || 'You froze.', VW / 2, y + 18);
+  ctx.fillText({ hunger: 'You starved.', yeti: 'The Yeti got you.', bear: 'A polar bear got you.', spirit: 'The Frost Spirit froze you.', wolf: 'The ice wolves got you.', bking: 'The Old Bear King got you.', gsnow: 'The Giant Snowman squashed you.', yking: 'King Yeti got you.', golem: 'The Ice Golem got you.', guardian: 'A guardian got you.' }[deathCause] || 'You froze.', VW / 2, y + 18);
   ctx.font = `700 19px ${FONT}`;
   const tip = {
     hunger: 'Tip: fish on the frozen lake and cook it at your fire.',
@@ -4056,6 +4070,7 @@ function drawDead() {
     bking: 'Tip: step aside when it scrapes the ground, then hit it while it is dizzy.',
     yking: 'Tip: when the red ring shows, run out of it. A torch scares it.',
     golem: 'Tip: stay out of the red ring when it punches. Its ice blocks are slow.',
+    gsnow: 'Tip: when the red ring shows, get out before it belly-flops.',
     guardian: 'Tip: watch for its thrown attacks and keep moving.',
   }[deathCause] || 'Tip: stay near fire at night, and keep sticks for it.';
   wrap(inv.scraps ? 'Everything you were carrying is gone, for good. Your robe scraps are safe.' : 'Everything you were carrying is gone, for good.', w - 40).forEach((l, i) => ctx.fillText(l, VW / 2, y + 74 + i * 22));
