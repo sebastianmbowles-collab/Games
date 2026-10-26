@@ -740,6 +740,12 @@ const GEAR_COST = 300, GEAR_SLOT_LVL = [8, 10];
 const SKINS = [
   { id: 'night', name: 'Night', price: { gems: 30 } },
   { id: 'candy', name: 'Candy', price: { gems: 30 } },
+  { id: 'fire', name: 'Inferno', price: { gems: 45 } },
+  { id: 'ice', name: 'Frost', price: { gems: 45 } },
+  { id: 'toxic', name: 'Toxic', price: { gems: 45 } },
+  { id: 'robo', name: 'Robo', price: { coins: 600 } },
+  { id: 'retro', name: 'Game Boy', price: { gems: 60 } },
+  { id: 'royal', name: 'Royal', price: { gems: 80 } },
   { id: 'gold', name: 'Golden', price: { coins: 800 } },
 ];
 const gearSlots = lvl => GEAR_SLOT_LVL.filter(l => lvl >= l).length;
@@ -1405,21 +1411,21 @@ const SPR = {
     '...kbbbbbbbbk...',
     '...kssk..kssk...',
     '...kkkk..kkkk...'] },
-  crow: { pal: { K: '#2a2a3a', P: '#5a3a8a', y: '#ffc020', r: '#ff3030', g: '#8a90a8' }, weapon: null, rows: [
-    '.....kk..kk.....',
-    '....kPPkkPPk....',
-    '...kKKKKKKKKk...',
-    '..kKKrrKKrrKKk..',
-    '..kKKrkKKkrKKk..',
-    '..kKKKyyyyKKKk..',
-    '...kKKKyyKKKk...',
-    '...kKKKKKKKKk...',
-    '.kPkKKggggKKkPk.',
-    'kPPkKKggggKKkPPk',
-    'kPPPkKKKKKKkPPPk',
-    '.kkkkKKKKKKkkkk.',
-    '....kKKKKKKk....',
+  crow: { pal: { K: '#2a2a3a', P: '#6a3aa0', y: '#ffb020', r: '#ff3030', g: '#c0c8d8', w: '#ffffff' }, weapon: 'dagger', rows: [
+    '......kkkk......',
     '.....kKKKKk.....',
+    '....kKKKKKKk....',
+    '...kKKwrKKKKk...',
+    '...kKKrrKKKyyk..',
+    '...kKKKKKKyyyyk.',
+    '....kKKKKKKkkk..',
+    '...kgkgkgkgk....',
+    '..kPKKKKKKKPk...',
+    '.kPPKKKKKKKPPk..',
+    'kPPPKKKKKKKPPPk.',
+    'kPPkKKKKKKKkPPk.',
+    '.kk.kKKKKKk.kk..',
+    '.....kKKKk......',
     '.....kyk.kyk....',
     '....kyyk.kyyk...'] },
   mortis: { pal: { p: '#7a3ab0', s: '#e8e0f0', r: '#c02040', K: '#1a1a2a', w: '#ffffff' }, weapon: 'shovel', rows: [
@@ -1456,13 +1462,13 @@ const SPR = {
     '.kPPPPPPPPPPPPk.',
     '....kssk.kssk...',
     '....kkkk.kkkk...'] },
-  frank: { pal: { G: '#8ab070', g: '#5a7a4a', n: '#6a4a2a', N: '#4a3020', y: '#c0c0d0' }, weapon: 'hammer', rows: [
+  frank: { pal: { G: '#8ab070', g: '#5a7a4a', n: '#6a4a2a', N: '#4a3020', y: '#c0c0d0', K: '#1a1a2a', d: '#3a3a4a' }, weapon: 'hammer', rows: [
     '................',
     '....kkkkkkkk....',
-    '...kGGGGGGGGk...',
-    '..kGGGkGGkGGGk..',
-    '.kyGGGGGGGGGGyk.',
-    '..kGkkGGGGkkGk..',
+    '...kKKKKKKKKk...',
+    '..kGGkGGGGkGGk..',
+    '.kdkGGGGGGGGkdk.',
+    '.kdkGkkGGkkGkdk.',
     '..kGGGGggGGGGk..',
     '..kGkwkwkwkwGk..',
     '...kkGGGGGGkk...',
@@ -1473,21 +1479,21 @@ const SPR = {
     '...knnnnnnnnk...',
     '...kNNNk.kNNNk..',
     '...kkkkk.kkkkk..'] },
-  rosa: { pal: { H: '#e0c890', h: '#c0a060', D: '#9a6040', g: '#4ac040', p: '#8a4ab0', b: '#3a4a8a' }, weapon: null, rows: [
-    '.....kkkkkk.....',
-    '....kHHHHHHk....',
-    '..kkHHHHHHHHkk..',
-    '.khhhhhhhhhhhhk.',
-    '..kkDDDDDDDDkk..',
-    '...kDkkDDkkDk...',
-    '...kDDDDDDDDk...',
-    '....kDDmmDDk....',
-    '.....kkkkkk.....',
-    '.kk.kppppppk.kk.',
-    'kggkkppppppkkggk',
-    'kggkDppppppDkggk',
-    '.kk.kbbbbbbk.kk.',
-    '....kbbbbbbk....',
+  rosa: { pal: { g: '#4ac040', G: '#2a8a2a', H: '#4a2a1a', D: '#9a6040', w: '#f0f0f0', n: '#b09060' }, weapon: null, rows: [
+    '..........gg....',
+    '.....kkkk.gGg...',
+    '....kHHHHkkGk...',
+    '...kHHHHHHHk....',
+    '..kHHDDDDDDHk...',
+    '..kHDkkDDkkDk...',
+    '..kHDDDDDDDDk...',
+    '...kDDDmmDDk....',
+    '....kkkkkkk.....',
+    '.kk.kwwwwwwk.kk.',
+    'kggkkwwwwwwkkggk',
+    'kgGkDwwwwwwDkgGk',
+    '.kk.knnnnnnk.kk.',
+    '....knnnnnnk....',
     '....kDDk.kDDk...',
     '....kkkk.kkkk...'] },
   robot: { pal: { g: '#8a90a8', r: '#ff3030', y: '#ffd23a' }, weapon: null, rows: [
@@ -1524,7 +1530,8 @@ const WEAPONS = {
   launcher: { pal: { g: '#b0b8c8', r: '#c02040' }, rows: ['kkkkkkk', 'kgrgrgk', 'kgggggk', 'kgrgrgk', 'kkkkkkk'], ox: 10, oy: 1 },
   shovel: { pal: { n: '#8a5a2a', g: '#b0b8c8' }, rows: ['kkkkkkkk..', 'knnnnnnggk', 'kkkkkkkggk', '.......kk.'], ox: 10, oy: 9 },
   umbrella: { pal: { p: '#ff9ac8', n: '#6a3a1e', g: '#c0c8d8' }, rows: ['..kkkk.....', '.kppppkkkkk', 'kppppppgggk', '.kppppkkkkk', '..kkkk.....'], ox: 9, oy: 8 },
-  hammer: { pal: { y: '#c0c0d0', n: '#6a4a2a' }, rows: ['kkkkk', 'kyyyk', 'kyyyk', 'kkkkk', '.knk.', '.knk.', '.knk.', '.kkk.'], ox: 13, oy: 3 },
+  hammer: { pal: { g: '#a0a8b8', n: '#6a4a2a' }, rows: ['.kkk.', 'kgggk', 'kgkgk', 'kgggk', 'kgggk', 'kkkkk', '.knk.', '.knk.', '.knk.', '.kkk.'], ox: 13, oy: 2 },
+  dagger: { pal: { g: '#9aff5a', n: '#5a3a8a' }, rows: ['kkkkkkk.', 'knngggk.', 'kkkkkkkk'], ox: 11, oy: 10 },
   dynamite: { pal: { r: '#d83030', y: '#ffe040' }, rows: ['.y.', 'kkk', 'krk', 'krk', 'kkk'], ox: 12, oy: 9 },
 };
 (function finishSprites() {
@@ -1549,7 +1556,9 @@ function walkRows(rows, side) {
   for (let i = 0; i < r.length; i++) if (side === 0 ? i < half : i >= half) r[i] = '.';
   out[n] = r.join(''); return out;
 }
-const SKIN_THEMES = { gold: ['#5a3a08', '#a87010', '#e0a820', '#ffe070'], night: ['#141432', '#2a2a6a', '#5a4ab0', '#9a8ae8'], candy: ['#a02868', '#e05aa0', '#7ae8c8', '#fff0a0'] };
+const SKIN_THEMES = { gold: ['#5a3a08', '#a87010', '#e0a820', '#ffe070'], night: ['#141432', '#2a2a6a', '#5a4ab0', '#9a8ae8'], candy: ['#a02868', '#e05aa0', '#7ae8c8', '#fff0a0'],
+  fire: ['#5a0a0a', '#c02010', '#ff7a10', '#ffe040'], ice: ['#1a3a6a', '#3a8ad8', '#8ad8ff', '#f0ffff'], toxic: ['#1a3a1a', '#3aa020', '#a0ff40', '#e8ff9a'],
+  royal: ['#2a0a4a', '#6a1aa0', '#c08a1a', '#ffe070'], retro: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'], robo: ['#2a2e3a', '#5a6478', '#9aa8c0', '#e0e8f0'] };
 function skinPal(pal, theme) {
   const T_ = SKIN_THEMES[theme], out = {};
   for (const [k, hex] of Object.entries(pal)) {
