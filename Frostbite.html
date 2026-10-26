@@ -718,7 +718,12 @@ function darkness(t) {
 const isNight = () => dayFrac() >= 0.6 || dayFrac() < 0.03;
 
 // ---------- talking and messages ----------
-function say(text, dur = 3.2) { speech = { text, t: dur }; }
+function say(text, dur = 3.2) { speech = { text, t: dur }; babble(text, VOICES.kid, 1); }
+function speak(v, text, dur) {
+  v.say = { text, t: dur };
+  const d = player ? dist(v.x, v.y, player.x, player.y) : 0;
+  babble(text.replace(/^[^:]+: /, ''), VOICES[v.name] || VOICES.Borin, clamp(1 - d / 450, 0.15, 1));
+}
 function toast(text) { toasts.push({ text, t: 3 }); if (toasts.length > 3) toasts.shift(); }
 function floatText(text, x, y, col = '#2b2f36') { floats.push({ text, x, y, t: 1.4, col }); }
 
@@ -792,6 +797,58 @@ const sfx = {
   hoot: () => { if (!AC) return; const t = AC.currentTime; tone(420, 360, 0.35, 0.09, 'sine', t); tone(400, 340, 0.45, 0.09, 'sine', t + 0.45); },
   crackle: (v) => noise(0.03, 2500, 0.12 * v, 'highpass'),
 };
+// Talking: everyone babbles "bah bah bah" in their own voice, one "bah" per bit of a word.
+const VOICES = {
+  kid: { f: 330, type: 'triangle', vol: 0.11, cut: 2400 },
+  Borin: { f: 92, type: 'sawtooth', vol: 0.09, cut: 1300 },
+  Mira: { f: 470, type: 'square', vol: 0.05, cut: 3200 },
+  Kael: { f: 135, type: 'sawtooth', vol: 0.09, cut: 1600 },
+  'Old Hesk': { f: 215, type: 'square', vol: 0.05, cut: 1900, wobble: true },
+  Wren: { f: 270, type: 'triangle', vol: 0.08, cut: 2000 },
+};
+let babbleUntil = {};
+function babble(text, voice, loud = 1) {
+  if (!AC || muted || !text) return;
+  let t = Math.max(AC.currentTime + 0.02, babbleUntil[voice.f] || 0);
+  const words = text.split(/\s+/).filter(Boolean);
+  let n = 0;
+  for (const w of words) {
+    const letters = w.replace(/[^a-z]/gi, '').length;
+    const syl = Math.max(1, Math.round(letters / 3));
+    for (let i = 0; i < syl && n < 18; i++, n++) {
+      let f = voice.f * (1 + (Math.random() - 0.5) * 0.28);
+      const last = i === syl - 1;
+      if (last && /\?$/.test(w)) f *= 1.35;
+      if (last && /[.!]$/.test(w)) f *= 0.85;
+      bah(t, f, voice, loud);
+      t += 0.085 + Math.random() * 0.02;
+    }
+    t += /[.!?,]$/.test(w) ? 0.16 : 0.03;
+    if (n >= 18) break;
+  }
+  babbleUntil[voice.f] = t;
+}
+function bah(when, f, voice, loud) {
+  const o = AC.createOscillator(), flt = AC.createBiquadFilter(), g = AC.createGain();
+  o.type = voice.type;
+  o.frequency.setValueAtTime(f * 1.08, when);
+  o.frequency.exponentialRampToValueAtTime(f * 0.92, when + 0.08);
+  if (voice.wobble) {
+    const lfo = AC.createOscillator(), lg = AC.createGain();
+    lfo.frequency.value = 9; lg.gain.value = f * 0.06;
+    lfo.connect(lg); lg.connect(o.frequency); lfo.start(when); lfo.stop(when + 0.1);
+  }
+  // the filter opens and closes like a mouth going "b-ah"
+  flt.type = 'lowpass'; flt.Q.value = 4;
+  flt.frequency.setValueAtTime(300, when);
+  flt.frequency.exponentialRampToValueAtTime(voice.cut, when + 0.02);
+  flt.frequency.exponentialRampToValueAtTime(500, when + 0.08);
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(voice.vol * loud, when + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.001, when + 0.085);
+  o.connect(flt); flt.connect(g); g.connect(master);
+  o.start(when); o.stop(when + 0.1);
+}
 const DAY_NOTES = [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25];
 const NIGHT_NOTES = [110, 130.81, 146.83, 155.56, 164.81, 196, 207.65, 233.08];
 function updateAudio(dt) {
@@ -963,23 +1020,23 @@ function talkTo(v) {
   if (v.hasDrawing) {
     // Mira walks to the fire and throws the kid's drawing in
     v.mode = 'burn'; v.wait = 0;
-    v.say = { text: 'Mira: Oh, is this yours? Watch this!', t: 2.6 };
+    speak(v, 'Mira: Oh, is this yours? Watch this!', 2.6);
     return;
   }
-  v.say = { text: `${v.name}: ${v.lines[(v.line++) % v.lines.length]}`, t: 3 };
+  speak(v, `${v.name}: ${v.lines[(v.line++) % v.lines.length]}`, 3);
   flags.villTalk++;
   if (flags.villTalk === 2) setTimeout(() => say("...I should go find my own place."), 1800);
 }
 function wrenTalk(v) {
   if (!flags.metWren) {
     flags.metWren = true;
-    v.say = { text: "Wren: Oh! Um... hi. I'm Wren. I liked your toys. I'm sorry they burned them. Here, take these.", t: 6 };
+    speak(v, "Wren: Oh! Um... hi. I'm Wren. I liked your toys. I'm sorry they burned them. Here, take these.", 6);
     inv.berries += 3; floatText('+3 frost berries', player.x, player.y - 40, '#8a5a1c');
     setTimeout(() => say('Someone in this village is... nice?'), 3000);
     v.giftAt = gameTime + 20;
     return;
   }
-  if (gameTime < (v.giftAt || 0)) { v.say = { text: "Wren: I... need to go find more. Come back in a little bit.", t: 3 }; return; }
+  if (gameTime < (v.giftAt || 0)) { speak(v, "Wren: I... need to go find more. Come back in a little bit.", 3); return; }
   v.giftAt = gameTime + 20;
   flags.wrenTalks = (flags.wrenTalks || 0) + 1;
   let gift;
@@ -988,7 +1045,7 @@ function wrenTalk(v) {
   else { inv.berries += 3; gift = '3 frost berries'; }
   floatText(`+ ${gift}`, player.x, player.y - 40, '#8a5a1c');
   sfx.pick();
-  v.say = { text: `Wren: Here, ${gift}. And... ${WREN_TIPS[flags.wrenTalks % WREN_TIPS.length]}`, t: 6 };
+  speak(v, `Wren: Here, ${gift}. And... ${WREN_TIPS[flags.wrenTalks % WREN_TIPS.length]}`, 6);
 }
 function singeRobe() {
   flags.singed = true;
@@ -1327,8 +1384,8 @@ function gameUpdate(dt) {
   const inVill = dist(player.x, player.y, vill.x, vill.y) < 230;
   villT = inVill ? villT + dt : Math.max(0, villT - dt * 3);
   const kael = villagers[2];
-  if (!kael.mode && villT > 45 && !kaelWarned) { kaelWarned = true; kael.say = { text: "Kael: Hey, mask kid. You've been here too long.", t: 3.5 }; }
-  if (!kael.mode && villT > 60) { kael.mode = 'chase'; kael.say = { text: 'Kael: OUT! Get out of our village!', t: 3 }; say('He has a torch! Run! (Shift)', 2.5); }
+  if (!kael.mode && villT > 45 && !kaelWarned) { kaelWarned = true; speak(kael, "Kael: Hey, mask kid. You've been here too long.", 3.5); }
+  if (!kael.mode && villT > 60) { kael.mode = 'chase'; speak(kael, 'Kael: OUT! Get out of our village!', 3); say('He has a torch! Run! (Shift)', 2.5); }
   if (villT === 0) kaelWarned = false;
   const mira = villagers[1];
   if (mira.hasDrawing === false && dayNum() > mira.burnDay) mira.hasDrawing = true;
@@ -1339,10 +1396,10 @@ function gameUpdate(dt) {
       if (dist(v.x, v.y, player.x, player.y) < 16) {
         singeRobe();
         v.mode = 'return'; villT = 0;
-        v.say = { text: 'Kael: And stay out!', t: 3 };
+        speak(v, 'Kael: And stay out!', 3);
       } else if (dist(player.x, player.y, vill.x, vill.y) > 340) {
         v.mode = 'return'; villT = 0;
-        v.say = { text: 'Kael: Yeah, run! And stay out!', t: 3 };
+        speak(v, 'Kael: Yeah, run! And stay out!', 3);
       }
     } else if (v.mode === 'return') {
       v.tx = v.hx; v.ty = v.hy; speed = 60;
@@ -1352,7 +1409,7 @@ function gameUpdate(dt) {
       if (dist(v.x, v.y, v.tx, v.ty) < 4) {
         v.mode = null; v.hasDrawing = false; v.burnDay = dayNum(); v.wait = 3;
         pileFlare = 1.6; burstSparks(vill.x, vill.y - 10, 24); sfx.sizzle();
-        v.say = { text: 'Mira: Into the fire! Ha ha!', t: 3 };
+        speak(v, 'Mira: Into the fire! Ha ha!', 3);
         setTimeout(() => { if (state === 'play') say('...that was my drawing of the owl.', 3.5); }, 1200);
       }
     } else {
