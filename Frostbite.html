@@ -1010,6 +1010,7 @@ function onKey(code) {
   if (state === 'ending') { endingNext(); return; }
   if (state === 'dead') { if (code === 'KeyE' || code === 'Space' || code === 'Enter') respawn(); return; }
   if (fade.phase !== 'none') return;
+  if (guideOpen && paused) { if (code === 'ArrowRight' || code === 'KeyD') guidePage = (guidePage + 1) % GUIDE.length; else if (code === 'ArrowLeft' || code === 'KeyA') guidePage = (guidePage + GUIDE.length - 1) % GUIDE.length; else if (code === 'Escape' || code === 'KeyP') guideOpen = false; return; }
   if (code === 'Escape' || code === 'KeyP') { if (mapOpen) mapOpen = false; else if (bagOpen) bagOpen = false; else if (shopOpen) shopOpen = null; else if (campOpen) campOpen = false; else paused = !paused; sfx.ui(); return; }
   if (paused) { if (code === 'KeyM' && false) return; return; }
   if (code === 'KeyM' || code === 'Tab') { mapOpen = !mapOpen; bagOpen = false; sfx.ui(); return; }
@@ -2965,6 +2966,8 @@ function drawArena() {
     const bx = VW - 72, by = VH - 92;
     hudButton(bx - 20, by + 8, 34, 'Hit', attack, { size: 18 });
     hudButton(bx - 84, by + 54, 24, 'Run', null, { hold: 'run', size: 15 });
+    hudButton(bx + 4, by - 72, 24, 'Eat', eatBest, { size: 14 });
+    hudButton(bx - 74, by - 40, 20, 'II', () => { paused = true; sfx.ui(); }, { size: 15 });
     if (joy) {
       const rr = mulberry32(boil + 4);
       shape(ctx, rr, ell(joy.ox, joy.oy, 50, 50, 14), 'rgba(247,242,230,.25)', 'rgba(43,47,54,.6)', { lw: 2 });
@@ -3966,7 +3969,8 @@ function menuButton(cx, y, w, text, fn) {
 function drawPause() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = 'rgba(20,24,34,.6)'; ctx.fillRect(0, 0, VW, VH);
-  const w = Math.min(VW - 30, 420), h = 430, x = VW / 2 - w / 2, y = Math.max(10, VH / 2 - h / 2);
+  if (guideOpen) { drawGuide(); return; }
+  const w = Math.min(VW - 30, 420), h = 490, x = VW / 2 - w / 2, y = Math.max(10, VH / 2 - h / 2);
   paper(ctx, x, y, w, h, 10);
   ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.font = `700 34px ${FONT}`; ctx.fillText('Paused', VW / 2, y + 14);
@@ -3980,12 +3984,60 @@ function drawPause() {
   ctx.fillText('pieces are safe even if you die.', VW / 2, y + 177);
   menuButton(VW / 2, y + 212, 240, 'Resume', () => { paused = false; });
   menuButton(VW / 2, y + 272, 240, muted ? 'Sound: off' : 'Sound: on', () => setMuted(!muted));
-  menuButton(VW / 2, y + 332, 240, confirmNew ? 'Really? Tap again' : 'New world', () => {
+  menuButton(VW / 2, y + 332, 240, 'Guide', () => { guideOpen = true; });
+  menuButton(VW / 2, y + 392, 240, confirmNew ? 'Really? Tap again' : 'New world', () => {
     if (!confirmNew) { confirmNew = true; setTimeout(() => confirmNew = false, 3000); return; }
     confirmNew = false; paused = false; startNew();
   });
 }
-let confirmNew = false;
+let confirmNew = false, guideOpen = false, guidePage = 0;
+const GUIDE = [
+  ['Staying alive', [
+    'Warmth: fires, hot springs, hot food, your robe and a torch keep you warm.',
+    'Food: fish on the ice, bugs under rocks and logs, berries, bear meat. Cook it at your fire.',
+    'Night is cold and the Yeti walks. Stay in your fire\'s light, or carry a torch.',
+    'If you die, you wake in your bed. Your items are lost, but robe scraps and mask pieces are safe.',
+  ]],
+  ['Enemies', [
+    'Snowmen: throw your rock snowball back (F), then pick it up again.',
+    'Polar bears: you cannot fight them. Climb a tree (E), throw a fish or a toy (F), or reach a fire.',
+    'The Yeti: it hears you run. Walk quietly, stay by fire, or scare it with a torch.',
+    'Kael: do not stay in the village longer than a minute.',
+  ]],
+  ['The guardians', [
+    'Giant Snowman: dodge the 3 big snowballs. A torch hurts it double.',
+    'Ice Wolf pack: a torch keeps them away. Beat the leader with the white mane.',
+    'Old Bear King: step aside from the red arrow, then hit it while it is dizzy.',
+    'King Yeti: run out of the red ring before the slam. A torch scares it.',
+    'Ice Golem: stay out of the red ring when it punches.',
+  ]],
+  ['The Frost Spirit', [
+    'Weapons do not hurt it. Only the old mask can.',
+    'Dodge a whole attack without getting hit, and the mask throws it back.',
+    'Red circles: icicles will fall there. Dashed red line: the freeze beam.',
+    'Blizzard: find the gap in each row of snowballs. Snowmen: melt them all with F.',
+  ]],
+];
+function drawGuide() {
+  const w = Math.min(VW - 30, 560), h = Math.min(VH - 20, 470), x = VW / 2 - w / 2, y = VH / 2 - h / 2;
+  paper(ctx, x, y, w, h, 10);
+  hits.push({ x, y, w, h, fn: () => {} });
+  const [title, lines] = GUIDE[guidePage];
+  bagText(title, VW / 2, y + 14, 30, '#2b2f36', 'center');
+  bagText(`${guidePage + 1} / ${GUIDE.length}`, VW / 2, y + 50, 15, '#7a7266', 'center');
+  ctx.font = `700 18px ${FONT}`;
+  let ly = y + 82;
+  for (const l of lines) {
+    const wl = wrap(l, w - 60);
+    wl.forEach((t, i) => { bagText((i ? '   ' : '• ') + t, x + 26, ly, 18, '#3a3f48'); ly += 22; });
+    ly += 8;
+  }
+  const by = y + h - 64;
+  const sw = w < 460 ? 70 : 120;
+  menuButton(x + 16 + sw / 2, by, sw, '<', () => { guidePage = (guidePage + GUIDE.length - 1) % GUIDE.length; });
+  menuButton(VW / 2, by, w < 460 ? 120 : 140, 'Back', () => { guideOpen = false; });
+  menuButton(x + w - 16 - sw / 2, by, sw, '>', () => { guidePage = (guidePage + 1) % GUIDE.length; });
+}
 function drawDead() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = 'rgba(14,18,30,.72)'; ctx.fillRect(0, 0, VW, VH);
