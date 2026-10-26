@@ -2877,7 +2877,7 @@ function drawBossBar(name, hp, max, y) {
 }
 function drawArena() {
   const A = arena, sp = A.spirit;
-  const az = Math.min(VW / 700, VH / 470) * 0.98;
+  const az = Math.min(VW / 640, VH / 470) * 0.98;
   const saveZ = ZOOM; ZOOM = az; cam.x = 0; cam.y = 0;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   const bg = ctx.createLinearGradient(0, 0, 0, VH); bg.addColorStop(0, '#1a2440'); bg.addColorStop(1, '#2c3d5c');
@@ -2957,7 +2957,7 @@ function drawArena() {
   bar(14, 14, bw, 'Health', S.hp, '#d9534f', S.hp < 25);
   bar(14, 38, bw, 'Warmth', S.warm, S.warm > 50 ? '#f08a3c' : '#5b8fd1', S.warm < 20);
   bar(14, 62, bw, 'Energy', S.sta, player.exhausted ? '#a8a8a8' : '#7bbf5a', false);
-  drawBossBar('THE FROST SPIRIT', sp.hp, 100, VH < 600 ? 120 : 40);
+  drawBossBar('THE FROST SPIRIT', sp.hp, 100, VW < 640 ? 160 : 40);
   ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
   const tip = 'Dodge every attack. The mask throws back what you survive.';
   ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(247,242,230,.9)';
@@ -3696,7 +3696,7 @@ function drawHUD() {
   ctx.font = `700 14px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#4a4f58';
   ctx.fillText(`${piecesN()}/5`, VW - 42, 166);
   const boss = enemies.find(e => e.type === 'boss' && e.hp > 0 && dist(e.x, e.y, player.x, player.y) < 650);
-  if (boss) drawBossBar(boss.name, boss.hp, boss.max, small ? 196 : 40);
+  if (boss) drawBossBar(boss.name, boss.hp, boss.max, VW < 640 ? 196 : 40);
   // where am I
   const tl = tileAtW(player.x, player.y);
   ctx.font = `700 16px ${FONT}`; ctx.textAlign = 'right';
