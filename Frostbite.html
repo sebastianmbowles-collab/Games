@@ -226,6 +226,12 @@ function buildSprites() {
   };
   mkSprite('crystal', 30, 38, 15, 34, crystal(true));
   mkSprite('crystalE', 30, 38, 15, 34, crystal(false));
+  mkSprite('scrap', 26, 20, 13, 15, (g, r) => {
+    shadow(g, 13, 15, 10, 3);
+    shape(g, r, [[3, 13], [6, 6], [19, 5], [23, 12], [17, 15], [8, 15]], '#5d8ccc', '#1f3c66', { lw: 1.2, j: 0.5 });
+    shape(g, r, [[7, 8], [15, 6], [20, 9], [12, 11]], '#f7f4ec', '#a9a294', { lw: 0.9, j: 0.4, double: false });
+    line(g, r, 12, 5, 13, 15, '#8a5f3c', 1.1, 0.3);
+  });
   mkSprite('stick', 24, 14, 12, 9, (g, r) => {
     line(g, r, 3, 10, 21, 5, '#6b4a32', 2.2, 0.6);
     line(g, r, 12, 7, 16, 2, '#6b4a32', 1.4, 0.4);
@@ -326,6 +332,7 @@ const OT = {
   rock: { r: 11, spr: 'rock', give: 'stones', stock: 3, regrow: 2, verb: 'Dig out stones' },
   log: { r: 10, spr: 'log', give: 'bugs', stock: 2, regrow: 1, verb: 'Look under the log' },
   crystal: { r: 8, spr: 'crystal', empty: 'crystalE', give: 'shards', stock: 2, regrow: 3, verb: 'Chip off an ice shard', glow: true },
+  scrap: { r: 0, spr: 'scrap', give: 'scraps', stock: 1, regrow: 0, verb: 'Pick up a robe scrap', hideEmpty: true },
   stick: { r: 0, spr: 'stick', give: 'sticks', stock: 1, regrow: 1, verb: 'Pick up stick', hideEmpty: true },
   moss: { r: 0, spr: 'moss', give: 'bugs', stock: 2, regrow: 1, verb: 'Search the warm moss' },
   peak: { r: 0, spr: 'peak' },
@@ -478,6 +485,23 @@ function genWorld(sd) {
       if (t !== PEAK && t !== SPRING) addObj(k % 3 === 2 ? 'bush' : 'moss', x, y);
     }
   }
+  // rare robe scraps, mostly hidden in caves and deep forest
+  {
+    const cand = [];
+    for (let i = 0; i < W * H; i++) {
+      if (dst[i] < 10) continue;
+      const t = tiles[i];
+      if (t === CAVE || (t === FOREST && R() < 0.5) || (t === ROCK && R() < 0.15)) cand.push(i);
+    }
+    const placed = [];
+    for (let tries = 0; placed.length < 16 && tries < 2000 && cand.length; tries++) {
+      const i = cand[(R() * cand.length) | 0], x = i % W, y = (i / W) | 0;
+      if (placed.some(([px, py]) => Math.hypot(px - x, py - y) < 12)) continue;
+      if (ogrid[i].some(o => OT[o.type].r)) continue;
+      placed.push([x, y]);
+      addObj('scrap', x * T + T / 2, y * T + T / 2);
+    }
+  }
   // village houses, the burn pile and the villagers
   for (let k = 0; k < 5; k++) {
     const a = k / 5 * Math.PI * 2 + 0.6;
@@ -585,7 +609,8 @@ function buildChunk(cx, cy) {
 const ITEMS = {
   sticks: { name: 'Sticks', info: 'For the fire and for building.' },
   stones: { name: 'Stones', info: 'For building a hut and a cabin.' },
-  shards: { name: 'Ice shards', info: 'Masked traders will want these someday...' },
+  shards: { name: 'Ice shards', info: 'Shiny and cold. Masked traders will want these someday...' },
+  scraps: { name: 'Robe scraps', info: 'Old cloth and fur. Sew them onto your robe at camp (open your bag).' },
   berries: { name: 'Frost berries', food: 7 },
   bugs: { name: 'Bugs', food: 5, cook: 'ckBugs' },
   cod: { name: 'Ice cod', food: 14, cook: 'ckCod' },
@@ -596,14 +621,20 @@ const ITEMS = {
   ckPerch: { name: 'Cooked perch', food: 26, warm: 16, cooked: true },
   ckChar: { name: 'Cooked char', food: 42, warm: 24, cooked: true },
 };
-const ORDER = ['sticks', 'stones', 'shards', 'berries', 'bugs', 'cod', 'perch', 'char', 'ckBugs', 'ckCod', 'ckPerch', 'ckChar'];
-const emptyInv = () => ({ sticks: 0, stones: 0, shards: 0, berries: 0, bugs: 0, cod: 0, perch: 0, char: 0, ckBugs: [], ckCod: [], ckPerch: [], ckChar: [] });
+const ORDER = ['sticks', 'stones', 'shards', 'scraps', 'berries', 'bugs', 'cod', 'perch', 'char', 'ckBugs', 'ckCod', 'ckPerch', 'ckChar'];
+const emptyInv = () => ({ sticks: 0, stones: 0, shards: 0, scraps: 0, berries: 0, bugs: 0, cod: 0, perch: 0, char: 0, ckBugs: [], ckCod: [], ckPerch: [], ckChar: [] });
 const count = k => Array.isArray(inv[k]) ? inv[k].length : inv[k];
+const ROBES = [
+  { name: 'Old blue robe', mul: 1, info: 'The robe you sewed yourself.' },
+  { name: 'Patched robe', mul: 0.85, scraps: 2, info: 'More patches, fewer holes.' },
+  { name: 'Fur-trimmed robe', mul: 0.72, scraps: 3, info: 'Soft fur around the hood and the hem.' },
+  { name: 'Winter robe', mul: 0.6, scraps: 4, info: 'Thick, warm, and a red scarf.' },
+];
 const UPGRADE = [null, { name: 'hut', sticks: 12, stones: 8 }, { name: 'cabin', sticks: 25, stones: 15 }];
 const FIRE_LIFE = [200, 260, 330];   // seconds a full fire lasts at each camp level
 const FIRE_R = [120, 150, 185];      // how far the fire's warmth reaches
 
-let state = 'title', paused = false, mapOpen = false;
+let state = 'title', paused = false, mapOpen = false, bagOpen = false, bagSel = null;
 let gameTime = 0, realT = 0;
 let player, S, inv, camp, spawn, flags, owl;
 let speech = null, toasts = [], floats = [], parts = [], prints = [];
@@ -618,7 +649,7 @@ function newGame() {
   S = { hp: 100, warm: 100, food: 85, sta: 100 };
   inv = emptyInv();
   camp = null; spawn = null;
-  flags = { cold: false, hungry: false, firstFish: false, spotSeen: {}, villTalk: 0 };
+  flags = { cold: false, hungry: false, firstFish: false, spotSeen: {}, villTalk: 0, robe: 0 };
   owl = { on: false, x: 0, y: 0, z: 30, flap: 0, still: 0, face: 1, hootT: 8 };
   gameTime = DAY * 0.08;
   speech = null; toasts = []; floats = []; parts = []; prints = [];
@@ -814,10 +845,12 @@ function onKey(code) {
   if (state === 'story') { if (code === 'Escape') beginPlay(); else storyNext(); return; }
   if (state === 'dead') { if (code === 'KeyE' || code === 'Space' || code === 'Enter') respawn(); return; }
   if (fade.phase !== 'none') return;
-  if (code === 'Escape' || code === 'KeyP') { if (mapOpen) mapOpen = false; else paused = !paused; sfx.ui(); return; }
+  if (code === 'Escape' || code === 'KeyP') { if (mapOpen) mapOpen = false; else if (bagOpen) bagOpen = false; else paused = !paused; sfx.ui(); return; }
   if (paused) { if (code === 'KeyM' && false) return; return; }
-  if (code === 'KeyM' || code === 'Tab') { mapOpen = !mapOpen; sfx.ui(); return; }
+  if (code === 'KeyM' || code === 'Tab') { mapOpen = !mapOpen; bagOpen = false; sfx.ui(); return; }
+  if (code === 'KeyB' || code === 'KeyI') { toggleBag(); return; }
   if (mapOpen) return;
+  if (bagOpen) { if (/^Digit[1-9]$/.test(code)) { const k = ORDER.filter(k => count(k) > 0)[+code.slice(5) - 1]; if (k) bagSel = k; } else if (code === 'KeyE' && bagSel) useItem(bagSel); return; }
   helpT = Math.min(helpT, 0.6);
   if (code === 'KeyE' || code === 'Space') act();
   else if (code === 'KeyQ') eatBest();
@@ -844,7 +877,7 @@ cv.addEventListener('pointerdown', e => {
   }
   if (state === 'story') { storyNext(); return; }
   if (state === 'dead') { respawn(); return; }
-  if (state === 'play' && !paused && !mapOpen && e.pointerType !== 'mouse' && x < VW * 0.62) {
+  if (state === 'play' && !paused && !mapOpen && !bagOpen && e.pointerType !== 'mouse' && x < VW * 0.62) {
     joy = { id: e.pointerId, ox: x, oy: y, x, y };
   }
 });
@@ -873,7 +906,7 @@ function findTarget() {
     if (!list) continue;
     for (const o of list) {
       if (!OT[o.type].give || o.stock <= 0) continue;
-      const d = dist(px, py, o.x, o.y);
+      const d = dist(px, py, o.x, o.y) - (o.type === 'scrap' ? 14 : 0);
       if (d < bd) { best = { kind: 'obj', o }; bd = d; }
     }
   }
@@ -901,7 +934,7 @@ function verbFor(tg) {
   return '';
 }
 function act() {
-  if (state !== 'play' || paused || mapOpen || fade.phase !== 'none' || player.cool > 0) return;
+  if (state !== 'play' || paused || mapOpen || bagOpen || fade.phase !== 'none' || player.cool > 0) return;
   const tg = target;
   if (!tg) { say(['Nothing here.', 'Hmm.', '...'][(Math.random() * 3) | 0], 1.2); return; }
   player.cool = 0.3; player.act = 0.25;
@@ -934,7 +967,8 @@ function gather(o) {
   if (o.type === 'rock' && Math.random() < (o.bugc || 0.3)) { inv.bugs++; msg += ', +1 bug'; }
   if (o.type === 'log') { inv.sticks++; msg += ', +1 stick'; }
   floatText(msg, o.x, o.y - 40);
-  if (o.stock <= 0) o.regrowAt = gameTime + d.regrow * DAY;
+  if (o.stock <= 0 && d.regrow) o.regrowAt = gameTime + d.regrow * DAY;
+  if (d.give === 'scraps' && !flags.scrap) { flags.scrap = true; toast(`A robe scrap! Open your bag (${touchUI ? 'Bag button' : 'B'}) at camp to sew it onto your robe.`); }
   sfx.pick();
   if (d.give === 'shards' && !flags.shard) { flags.shard = true; say("Shiny. I bet someone would trade for these."); }
 }
@@ -968,7 +1002,7 @@ function eatBest() {
   if (best) eat(best); else say('I have no food. Fish, bugs, berries...');
 }
 function cook() {
-  if (state !== 'play' || paused || mapOpen) return;
+  if (state !== 'play' || paused || mapOpen || bagOpen) return;
   if (!camp || dist(player.x, player.y, camp.fx, camp.fy) > 60) { say('I need to be at my campfire to cook.'); return; }
   if (camp.fuel <= 0) { say('The fire is out.'); return; }
   let n = 0;
@@ -1009,7 +1043,7 @@ function upgradeCamp() {
   saveGame();
 }
 function sleep() {
-  if (state !== 'play' || paused || mapOpen || fade.phase !== 'none') return;
+  if (state !== 'play' || paused || mapOpen || bagOpen || fade.phase !== 'none') return;
   if (!camp || dist(player.x, player.y, camp.tx, camp.ty) > 70 + camp.level * 12) { say('I can only sleep at my camp.'); return; }
   spawn = { x: camp.tx, y: camp.ty + 18 };
   if (!isNight()) { say("I'm not sleepy. But this is my bed now. If something happens, I'll wake up here.", 4); saveGame(); return; }
@@ -1030,6 +1064,7 @@ function sleep() {
 function fadeTo(text, mid) { fade.phase = 'out'; fade.t = 0; fade.text = text; fade.mid = mid; }
 function die(cause) {
   deathCause = cause;
+  bagOpen = false; mapOpen = false;
   state = 'dead';
   player.fishing = null;
   inv = emptyInv();
@@ -1097,7 +1132,7 @@ function update(dt) {
     else { fade.a = Math.max(0, 1 - fade.t / 0.8); if (fade.t >= 0.8) { fade.phase = 'none'; fade.a = 0; } }
   }
   if (state === 'title' || state === 'story') updateSnow(dt, 0, 0);
-  if (state === 'play' && !paused && !mapOpen && fade.phase !== 'hold') gameUpdate(dt);
+  if (state === 'play' && !paused && !mapOpen && !bagOpen && fade.phase !== 'hold') gameUpdate(dt);
   updateAudio(dt);
 }
 
@@ -1152,7 +1187,7 @@ function gameUpdate(dt) {
   const tile = tileAtW(player.x, player.y);
   const night = darkness(t) / 0.8;
   const biomeMul = { [SNOW]: 1, [FOREST]: 0.85, [ICE]: 1.25, [ROCK]: 1.35, [PEAK]: 1.35, [CAVE]: 0.6, [VILL]: 0.9, [SPRING]: 0 }[tile];
-  let warmRate = -0.62 * (1 + night * 0.75) * biomeMul * (1 + windNow() * 0.3);
+  let warmRate = -0.62 * (1 + night * 0.75) * biomeMul * (1 + windNow() * 0.3) * ROBES[flags.robe || 0].mul;
   if (running) warmRate *= 0.8;
   let heat = 0, nearFire = false;
   if (camp && camp.fuel > 0) {
@@ -1293,6 +1328,12 @@ function drawSnow(c, amount = 1) {
 }
 
 // ---------- drawing characters ----------
+function furTrim(c, r, x0, x1, y) {
+  for (let x = x0 + 1; x <= x1 - 1; x += 2.6) {
+    c.fillStyle = '#f7f4ec'; c.strokeStyle = '#a9a294'; c.lineWidth = 0.5;
+    c.beginPath(); c.arc(x, y - (r() - 0.5) * 0.6, 1.9, 0, 7); c.fill(); c.stroke();
+  }
+}
 // The kid: blue robe they sewed themselves, blue hood, a mask, mittens, boots and the small bag they left with.
 const KID_SCALE = 0.8;
 function drawKid(c, x, y, dir, walk, moving, opts = {}) {
@@ -1319,12 +1360,15 @@ function drawKid(c, x, y, dir, walk, moving, opts = {}) {
   };
   if (dir === 'right') satchel();
   // robe
-  const robe = [[-7, -22], [7, -22], [11.5, -3], [5, -1], [-5, -1], [-11.5, -3]];
-  shape(c, r, robe, '#3b6db3', '#1f3c66', { lw: 1.5, j: 0.4 });
+  const rl = opts.robe ?? (flags ? flags.robe || 0 : 0);
+  const robeCol = rl >= 3 ? '#2f5ea3' : '#3b6db3', wide = rl >= 3 ? 1 : 0;
+  const robe = [[-7 - wide, -22], [7 + wide, -22], [11.5 + wide, -3], [5, -1], [-5, -1], [-11.5 - wide, -3]];
+  shape(c, r, robe, robeCol, '#1f3c66', { lw: 1.5, j: 0.4 });
   // hem band with stitches
   shape(c, r, [[-11, -6.5], [11, -6.5], [11.5, -3], [5, -1], [-5, -1], [-11.5, -3]], '#2c5596', null, { j: 0.3 });
   c.strokeStyle = '#e8eef6'; c.lineWidth = 0.8; c.setLineDash([1.6, 1.8]);
   c.beginPath(); c.moveTo(-10.5, -5.2); c.lineTo(10.5, -5.2); c.stroke(); c.setLineDash([]);
+  if (rl >= 2) furTrim(c, r, -11.5 - wide, 11.5 + wide, -2.5);
   // fold lines
   line(c, r, -3, -19, -5, -8, '#2a5390', 0.8, 0.3);
   line(c, r, 3.5, -19, 5.5, -8, '#2a5390', 0.8, 0.3);
@@ -1334,6 +1378,13 @@ function drawKid(c, x, y, dir, walk, moving, opts = {}) {
     shape(c, r, [[px, -15.5], [px + 5, -15.5], [px + 5, -10.5], [px, -10.5]], '#5d8ccc', '#1f3c66', { smooth: false, lw: 0.8, j: 0.25, double: false });
     c.strokeStyle = '#f2f2f2'; c.lineWidth = 0.6;
     for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(px - 0.6, -15 + i * 2); c.lineTo(px + 0.6, -14.2 + i * 2); c.stroke(); }
+  }
+  if (rl >= 1) {
+    // more patches, each a different scrap
+    const px = dir === 'right' ? -4 : -7.5;
+    shape(c, r, [[px, -9.5], [px + 4.5, -10], [px + 4.8, -6.8], [px + 0.2, -6.6]], '#7a5fa8', '#1f3c66', { smooth: false, lw: 0.8, j: 0.25, double: false });
+    c.strokeStyle = '#f2f2f2'; c.lineWidth = 0.6;
+    for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(px + 1 + i * 1.4, -10.6); c.lineTo(px + 1.4 + i * 1.4, -9.4); c.stroke(); }
   }
   // bag strap across the chest
   if (dir === 'down') line(c, r, 6, -21, -8, -12, '#6b4a32', 1.6, 0.3);
@@ -1359,27 +1410,55 @@ function drawKid(c, x, y, dir, walk, moving, opts = {}) {
   const hx = -side * 1.5;
   shape(c, r, [[hx, -44], [9 + hx * 0.4, -35], [10.5, -25], [0, -20.5], [-10.5, -25], [-9 + hx * 0.4, -35]], '#3b6db3', '#1f3c66', { lw: 1.5, j: 0.35 });
   line(c, r, -8, -24, 8, -24, '#2a5390', 0.8, 0.2);
+  if (rl >= 1 && dir !== 'up') {
+    const qx = -side * 5 + (dir === 'down' ? -5.5 : 0);
+    shape(c, r, [[qx - 2, -40], [qx + 2, -40.5], [qx + 2.3, -37], [qx - 1.8, -36.8]], '#5d8ccc', '#1f3c66', { smooth: false, lw: 0.7, j: 0.2, double: false });
+  }
+  if (rl >= 3) {
+    // a red scarf with a tail
+    shape(c, r, [[-9, -24.5], [9, -24.5], [8.5, -21], [-8.5, -21]], '#c8413d', '#6a1c1a', { lw: 1, j: 0.25 });
+    const tl = dir === 'left' ? 5 : -5;
+    shape(c, r, [[tl - 2, -22], [tl + 2, -22], [tl + 2.6 - side, -14], [tl - 1.4 - side, -14.4]], '#b8373a', '#6a1c1a', { smooth: false, lw: 0.9, j: 0.25, double: false });
+    c.strokeStyle = '#f2d27a'; c.lineWidth = 0.6;
+    for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(tl - 1.2 + i * 1.2 - side, -14.2); c.lineTo(tl - 1.2 + i * 1.2 - side, -12.6); c.stroke(); }
+  }
   if (dir === 'up') {
     line(c, r, 0, -43, 0, -23, '#2a5390', 0.9, 0.2);
     c.strokeStyle = '#e8eef6'; c.lineWidth = 0.6; c.setLineDash([1.4, 1.6]);
     c.beginPath(); c.moveTo(1.4, -41); c.lineTo(1.4, -25); c.stroke(); c.setLineDash([]);
   } else {
     const mx = side * 3, rx = dir === 'down' ? 6 : 4.6;
-    // shadow inside the hood around the face
+    // fur around the face, then the shadow inside the hood
+    if (rl >= 2) for (let i = 0; i < 12; i++) {
+      const a = i / 12 * Math.PI * 2;
+      c.fillStyle = '#f7f4ec'; c.strokeStyle = '#a9a294'; c.lineWidth = 0.5;
+      c.beginPath(); c.arc(mx + Math.cos(a) * (rx + 2.4), -30.5 + Math.sin(a) * 9.2, 1.9, 0, 7); c.fill(); c.stroke();
+    }
     shape(c, r, ell(mx, -30.5, rx + 1.8, 8.4, 10), '#1a2f52', null, { j: 0.2 });
     // the mask
     shape(c, r, ell(mx, -30, rx, 7, 10), '#f6f2e8', '#4a4640', { lw: 1, j: 0.25, double: false });
-    c.fillStyle = '#1c1f26';
-    const eyes = dir === 'down' ? [-2.4, 2.4] : [side * 1.6];
+    // sad black eyes that droop at the outside, and tears streaming down to the chin
+    const eyes = dir === 'down' ? [-2.5, 2.5] : [side * 1.4];
     for (const ex of eyes) {
-      c.beginPath(); c.ellipse(mx + ex, -31.4, 1.05, 1.8, 0, 0, 7); c.fill();
-      // painted tear marks
-      c.strokeStyle = '#5b8fd1'; c.lineWidth = 0.8;
-      c.beginPath(); c.moveTo(mx + ex, -29); c.quadraticCurveTo(mx + ex + 0.4, -27.5, mx + ex - 0.2, -26); c.stroke();
+      const ox = dir === 'down' ? Math.sign(ex) : side, ew = dir === 'down' ? 1.9 : 1.5;
+      const tx = mx + ex - ox * 0.2;
+      c.fillStyle = '#5b8fd1';
+      c.beginPath();
+      c.moveTo(tx - 0.9, -30.5);
+      c.quadraticCurveTo(tx - 1.4 + ox * 0.3, -27, tx - 0.8, -23.6);
+      c.lineTo(tx + 0.9, -23.4);
+      c.quadraticCurveTo(tx + 1.2 + ox * 0.3, -27, tx + 0.9, -30.5);
+      c.fill();
+      c.fillStyle = '#ffffff'; c.fillRect(tx - 0.3, -29, 0.5, 2.2);
+      c.fillStyle = '#121418';
+      c.beginPath();
+      c.moveTo(mx + ex - ew * ox, -33.2 + 0.2);
+      c.quadraticCurveTo(mx + ex, -34.6, mx + ex + ew * ox, -31.6);
+      c.quadraticCurveTo(mx + ex + ew * 0.4 * ox, -29.2, mx + ex - ew * 0.4 * ox, -29.4);
+      c.quadraticCurveTo(mx + ex - ew * 1.1 * ox, -30.4, mx + ex - ew * ox, -33.2 + 0.2);
+      c.fill();
     }
-    // a little crack and the string ties
-    c.strokeStyle = '#8a8378'; c.lineWidth = 0.55;
-    c.beginPath(); c.moveTo(mx + rx * 0.55, -36); c.lineTo(mx + rx * 0.3, -34); c.lineTo(mx + rx * 0.45, -32.5); c.stroke();
+    // string ties
     if (dir === 'down') { line(c, r, -rx, -31, -rx - 2.4, -32, '#d8cdb8', 0.7, 0.2); line(c, r, rx, -31, rx + 2.4, -32, '#d8cdb8', 0.7, 0.2); }
     else line(c, r, mx - side * rx, -31, mx - side * (rx + 3), -32, '#d8cdb8', 0.7, 0.2);
   }
@@ -1496,6 +1575,7 @@ function drawWorld() {
       if (o.stock <= 0 && d.give) { if (d.hideEmpty) continue; if (d.empty) name = d.empty; }
       const sx = o.shake > 0 ? Math.sin(o.shake * 60) * 2 : 0;
       drawSpr(ctx, name, o.x + sx, o.y);
+      if (o.type === 'scrap') { const tw = Math.max(0, Math.sin(realT * 2.3 + o.x)); if (tw > 0.3) drawStar(ctx, o.x + 8, o.y - 14, 2 + tw * 3, '#ffffff', '#8fb3cc'); }
       if (o.type === 'pile') drawFlame(ctx, o.x, o.y - 8, 15, realT + 1.3);
     }
   }
@@ -1647,6 +1727,11 @@ function drawIcon(c, k, x, y, s) {
       shape(c, r, ell(x, y, s * 0.18, s * 0.28, 8), col, '#111', { lw: 1.3, j: 0.3 });
       break;
     }
+    case 'scraps':
+      shape(c, r, [[x - s * 0.38, y + s * 0.2], [x - s * 0.26, y - s * 0.2], [x + s * 0.3, y - s * 0.24], [x + s * 0.4, y + s * 0.14], [x + s * 0.1, y + s * 0.28]], '#5d8ccc', '#1f3c66', { lw: 1.4, j: 0.4 });
+      shape(c, r, [[x - s * 0.2, y - s * 0.12], [x + s * 0.14, y - s * 0.2], [x + s * 0.26, y - s * 0.04], [x - s * 0.06, y + s * 0.04]], '#f7f4ec', '#a9a294', { lw: 1, j: 0.3, double: false });
+      line(c, r, x, y - s * 0.26, x + s * 0.04, y + s * 0.28, '#8a5f3c', 1.3, 0.3);
+      break;
     case 'cod': fish('#8fa3b5'); break;
     case 'perch': fish('#c9b04a'); break;
     case 'char': fish('#e09a8e'); break;
@@ -1698,6 +1783,7 @@ function drawHUD() {
   hudButton(VW - 104, 34, 20, 'II', () => { paused = true; sfx.ui(); }, { size: 18 });
   hudButton(VW - 104, 82, 20, 'Map', () => { mapOpen = true; sfx.ui(); }, { size: 15 });
   hudButton(VW - 150, 34, 20, muted ? 'x' : '♪', () => setMuted(!muted), { size: 18 });
+  hudButton(VW - 150, 82, 20, 'Bag', toggleBag, { size: 15 });
 
   // where am I
   const tl = tileAtW(player.x, player.y);
@@ -1781,8 +1867,8 @@ function drawHUD() {
   if (helpT > 0) {
     ctx.globalAlpha = Math.min(1, helpT);
     const lines = touchUI
-      ? ['Drag on the left side to walk', 'Hold Run to run (uses energy)', 'E: use / pick up / fish on ice', 'Eat, Cook and Sleep buttons', 'Tap an item to eat it']
-      : ['WASD or arrows: walk     Shift: run', 'E: use, pick up, fish on ice', 'Q: eat     C: cook at your fire', 'Z: sleep at camp     M: map', '1-9: use an item     Esc: pause'];
+      ? ['Drag on the left side to walk', 'Hold Run to run (uses energy)', 'E: use / pick up / fish on ice', 'Eat, Cook and Sleep buttons', 'Bag: see your things and your robe']
+      : ['WASD or arrows: walk     Shift: run', 'E: use, pick up, fish on ice', 'Q: eat     C: cook at your fire', 'Z: sleep at camp     M: map     B: bag', '1-9: use an item     Esc: pause'];
     ctx.font = `700 19px ${FONT}`;
     const w = Math.min(VW - 30, 380), h = lines.length * 24 + 50, x = VW / 2 - w / 2, y = VH / 2 - h / 2 - 60;
     paper(ctx, x, y, w, h, 8);
@@ -1796,6 +1882,98 @@ function drawHUD() {
 function shortVerb(v) {
   const w = v.split(' ');
   return w.length > 2 ? w.slice(0, 2).join(' ') : v;
+}
+
+// ---------- the bag ----------
+function toggleBag() {
+  if (state !== 'play' || paused || fade.phase !== 'none') return;
+  bagOpen = !bagOpen; mapOpen = false;
+  if (bagOpen && (!bagSel || count(bagSel) <= 0)) bagSel = ORDER.find(k => count(k) > 0) || null;
+  sfx.ui();
+}
+const atCamp = () => camp && dist(player.x, player.y, camp.x, camp.y) < 130;
+function sewRobe() {
+  const next = ROBES[(flags.robe || 0) + 1];
+  if (!next) return;
+  if (!atCamp()) { toast('You can only sew at your camp.'); return; }
+  if (inv.scraps < next.scraps) { toast(`You need ${next.scraps} robe scraps. You have ${inv.scraps}.`); return; }
+  inv.scraps -= next.scraps; flags.robe++;
+  sfx.build();
+  toast(`You sewed a ${next.name}! You stay warm longer now.`);
+  saveGame();
+}
+function bagText(text, x, y, size, col = '#2b2f36', align = 'left') {
+  ctx.font = `700 ${size}px ${FONT}`; ctx.fillStyle = col; ctx.textAlign = align; ctx.textBaseline = 'top';
+  ctx.fillText(text, x, y);
+}
+function drawBag() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = 'rgba(20,24,34,.6)'; ctx.fillRect(0, 0, VW, VH);
+  hits.push({ x: 0, y: 0, w: VW, h: VH, fn: () => { bagOpen = false; } });
+  const wide = VW >= 640;
+  const w = Math.min(VW - 20, 780), h = Math.min(VH - 20, wide ? 520 : 780);
+  const x = VW / 2 - w / 2, y = VH / 2 - h / 2;
+  paper(ctx, x, y, w, h, 10, '#f3ecda');
+  hits.push({ x, y, w, h, fn: () => {} });
+  bagText('My Bag', VW / 2, y + 10, 32, '#2b2f36', 'center');
+  hudButton(x + w - 28, y + 28, 18, 'X', () => { bagOpen = false; sfx.ui(); }, { size: 18 });
+
+  // the robe
+  const rl = flags.robe || 0, robe = ROBES[rl], next = ROBES[rl + 1];
+  const rx = wide ? x + 18 : x + 14, ry = y + 54, rw = wide ? 240 : w - 28, rh = wide ? h - 72 : 200;
+  paper(ctx, rx, ry, rw, rh, 6, '#fbf7ec');
+  const ps = wide ? 3.4 : 2.7, pcx = wide ? rx + rw / 2 : rx + 64, pcy = wide ? ry + 175 : ry + 150;
+  ctx.save(); ctx.translate(pcx, pcy); ctx.scale(ps, ps);
+  drawKid(ctx, 0, 0, 'down', 0, false);
+  ctx.restore();
+  const tx = wide ? rx + 14 : rx + 130, ty = wide ? ry + 196 : ry + 14, tw = wide ? rw - 28 : rw - 144;
+  bagText(robe.name, tx, ty, 22);
+  const lines = [robe.info, rl ? `Keeps you ${Math.round((1 - robe.mul) * 100)}% warmer.` : 'No extra warmth yet.'];
+  if (next) lines.push(`Next: ${next.name}. Needs ${next.scraps} robe scraps (you have ${inv.scraps}).`);
+  else lines.push('Your robe is as warm as it gets.');
+  ctx.font = `700 16px ${FONT}`;
+  let ly = ty + 28;
+  for (const l of lines) for (const wl of wrap(l, tw)) { bagText(wl, tx, ly, 16, '#4a4f58'); ly += 19; }
+  if (next) {
+    if (atCamp() && inv.scraps >= next.scraps) menuButton(tx + Math.min(tw, 200) / 2, ly + 6, Math.min(tw, 200), 'Sew it', sewRobe);
+    else bagText(atCamp() ? 'Find more robe scraps.' : 'Sew it at your camp.', tx, ly + 4, 16, '#8a5a1c');
+  }
+
+  // the things in the bag
+  const gx = wide ? rx + rw + 16 : x + 14, gy = wide ? ry : ry + rh + 12, gw = wide ? x + w - 18 - gx : w - 28;
+  const detailH = 112, detailY = y + h - 26 - detailH;
+  const list = ORDER.filter(k => count(k) > 0);
+  if (bagSel && count(bagSel) <= 0) bagSel = list[0] || null;
+  const ss = 58, gap = 8, perRow = Math.max(1, Math.floor((gw + gap) / (ss + gap)));
+  if (!list.length) bagText('Your bag is empty.', gx + 8, gy + 10, 20, '#6b6457');
+  list.forEach((k, i) => {
+    const sx = gx + (i % perRow) * (ss + gap), sy = gy + Math.floor(i / perRow) * (ss + gap);
+    const rr = mulberry32(boil * 7 + i + 40);
+    shape(ctx, rr, [[sx, sy], [sx + ss, sy], [sx + ss, sy + ss], [sx, sy + ss]], k === bagSel ? '#fff0b8' : '#fbf7ec', k === bagSel ? '#8a6a1c' : '#2b2f36', { smooth: false, lw: k === bagSel ? 2.6 : 1.8, j: 0.8 });
+    drawIcon(ctx, k, sx + ss / 2, sy + ss / 2 - 4, ss * 0.62);
+    ctx.font = `700 17px ${FONT}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#2b2f36';
+    ctx.fillText(String(count(k)), sx + ss - 5, sy + ss - 2);
+    hits.push({ x: sx, y: sy, w: ss, h: ss, fn: () => { bagSel = k; sfx.ui(); } });
+  });
+  // details of the chosen thing
+  if (bagSel) {
+    const it = ITEMS[bagSel];
+    paper(ctx, gx, detailY, gw, detailH, 6, '#fbf7ec');
+    drawIcon(ctx, bagSel, gx + 36, detailY + 40, 44);
+    bagText(`${it.name}  x${count(bagSel)}`, gx + 70, detailY + 10, 22);
+    const info = [];
+    if (it.food) info.push(`Fills ${it.food} food${it.warm ? ` and warms you ${it.warm}` : ''}.`);
+    if (it.cooked) info.push(`Spoils in ${Math.max(0, (inv[bagSel][0] - gameTime) / DAY).toFixed(1)} days.`);
+    else if (it.cook) info.push('Cook it at your fire to make it better.');
+    else if (bagSel === 'berries') info.push('Fine to eat raw.');
+    if (!it.food) info.push(it.info);
+    const btnW = it.food ? 110 : 0;
+    let iy = detailY + 40;
+    ctx.font = `700 16px ${FONT}`;
+    for (const l of info) for (const wl of wrap(l, gw - 84 - btnW)) { bagText(wl, gx + 70, iy, 16, '#4a4f58'); iy += 19; }
+    if (it.food) menuButton(gx + gw - 66, detailY + detailH / 2 - 25 + 10, 104, 'Eat', () => eat(bagSel));
+  }
+  if (!touchUI) bagText('B or Esc to close', VW / 2, y + h - 21, 14, '#7a7266', 'center');
 }
 
 // ---------- map screen ----------
@@ -1854,7 +2032,7 @@ function drawPause() {
   ctx.font = `700 17px ${FONT}`;
   const lines = touchUI
     ? ['Drag left side: walk. Hold Run: run.', 'E: use things, fish on the ice.', 'Eat / Cook / Sleep buttons.', 'Tap an item to eat it.']
-    : ['WASD / arrows: walk. Shift: run.', 'E: use things, fish on the ice.', 'Q: eat. C: cook. Z: sleep. M: map.', '1-9: use an item.'];
+    : ['WASD / arrows: walk. Shift: run.', 'E: use things, fish on the ice.', 'Q: eat. C: cook. Z: sleep. M: map. B: bag.', '1-9: use an item.'];
   lines.forEach((l, i) => ctx.fillText(l, VW / 2, y + 62 + i * 21));
   ctx.fillStyle = '#6b6457';
   ctx.fillText('Step 1 of Frostbite. Coming next: enemies,', VW / 2, y + 156);
@@ -1982,6 +2160,7 @@ function render() {
   drawWorld();
   drawHUD();
   if (mapOpen) drawMap();
+  if (bagOpen) drawBag();
   if (paused) { hits = []; drawPause(); }
   if (state === 'dead') { hits = []; drawDead(); }
   drawFade();
