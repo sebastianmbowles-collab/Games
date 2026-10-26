@@ -512,7 +512,7 @@ function genWorld(sd) {
   villagers = [];
   for (let k = 0; k < 4; k++) {
     const a = k / 4 * Math.PI * 2 + 1.3, x = vill.x + Math.cos(a) * T * 2.3, y = vill.y + Math.sin(a) * T * 2.1;
-    villagers.push({ x, y, hx: x, hy: y, tx: x, ty: y, wait: R() * 3, dir: 1, walk: 0, say: null, line: k, lines, coat: ['#8a5a3c', '#6d4f7a', '#4f6d4a', '#8a3c3c'][k] });
+    villagers.push({ x, y, hx: x, hy: y, tx: x, ty: y, wait: R() * 3, dir: 1, walk: 0, say: null, line: k, lines, id: k, look: VLOOKS[k] });
   }
 
   // the map the kid draws while walking
@@ -610,7 +610,7 @@ const ITEMS = {
   sticks: { name: 'Sticks', info: 'For the fire and for building.' },
   stones: { name: 'Stones', info: 'For building a hut and a cabin.' },
   shards: { name: 'Ice shards', info: 'Shiny and cold. Masked traders will want these someday...' },
-  scraps: { name: 'Robe scraps', info: 'Old cloth and fur. Sew them onto your robe at camp (open your bag).' },
+  scraps: { name: 'Robe scraps', info: 'Old cloth and fur. Sew them onto your robe at camp. You keep them even if you die.' },
   berries: { name: 'Frost berries', food: 7 },
   bugs: { name: 'Bugs', food: 5, cook: 'ckBugs' },
   cod: { name: 'Ice cod', food: 14, cook: 'ckCod' },
@@ -1067,7 +1067,9 @@ function die(cause) {
   bagOpen = false; mapOpen = false;
   state = 'dead';
   player.fishing = null;
+  const scraps = inv.scraps;
   inv = emptyInv();
+  inv.scraps = scraps;
   saveGame();
 }
 function respawn() {
@@ -1157,7 +1159,8 @@ function gameUpdate(dt) {
   if (player.exhausted && S.sta > 30) player.exhausted = false;
   const wantRun = keys.ShiftLeft || keys.ShiftRight || hold.run;
   const running = moving && wantRun && !player.exhausted;
-  const speed = (running ? 165 : player.exhausted ? 70 : 95);
+  const sadWalk = S.warm < 30 || S.food < 30;
+  const speed = (running ? 165 : player.exhausted ? 70 : sadWalk ? 76 : 95);
   if (moving && player.fishing) { player.fishing = null; say('Oops, scared the fish away.', 1.2); }
   player.moving = moving && fade.phase === 'none';
   if (player.moving) {
@@ -1341,8 +1344,10 @@ function drawKid(c, x, y, dir, walk, moving, opts = {}) {
   const K = KID_SCALE;
   c.save();
   c.translate(x, y); c.scale(K, K);
-  const bob = moving ? -Math.abs(Math.sin(walk)) * 2 : 0;
-  const step = moving ? Math.sin(walk) * 3 : 0;
+  const sad = !!opts.sad;
+  if (opts.shiver) c.translate(Math.sin(realT * 55) * 0.5, 0);
+  const bob = moving ? -Math.abs(Math.sin(walk)) * (sad ? 0.6 : 2) : 0;
+  const step = moving ? Math.sin(walk) * (sad ? 1.3 : 3) : 0;
   const side = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
   shadow(c, 0, 0, 9.5, 3.4, 0.22);
   // boots
@@ -1392,14 +1397,14 @@ function drawKid(c, x, y, dir, walk, moving, opts = {}) {
   else line(c, r, side * 2, -21, -side * 1, -13, '#6b4a32', 1.6, 0.3);
   if (dir !== 'right') satchel();
   // smooth bent sleeves with round mittens
-  const sw = moving ? Math.sin(walk) * 2.5 : 0;
+  const sw = moving ? Math.sin(walk) * (sad ? 0.8 : 2.5) : 0;
   c.lineCap = 'round'; c.lineJoin = 'round';
   for (const s of [-1, 1]) {
     if ((s === -1 && dir === 'right') || (s === 1 && dir === 'left')) continue;
-    const hx = s * 7.4, hy = -10 + sw * s;
+    const hx = s * (sad ? 6.6 : 7.4), hy = (sad ? -8.8 : -10) + sw * s;
     c.beginPath(); c.moveTo(s * 4.4, -20); c.quadraticCurveTo(s * 8, -17.5, hx, hy);
     c.strokeStyle = '#1f3c66'; c.lineWidth = 4.6; c.stroke();
-    c.strokeStyle = '#3462a3'; c.lineWidth = 2.9; c.stroke();
+    c.strokeStyle = '#7fabe3'; c.lineWidth = 2.9; c.stroke();
     c.fillStyle = '#efe6d2'; c.strokeStyle = '#6b6457'; c.lineWidth = 0.8;
     c.beginPath(); c.arc(hx, hy + 1.4, 1.9, 0, 7); c.fill(); c.stroke();
   }
@@ -1410,7 +1415,8 @@ function drawKid(c, x, y, dir, walk, moving, opts = {}) {
     c.strokeStyle = 'rgba(40,40,40,.7)'; c.lineWidth = 0.7;
     c.beginPath(); c.moveTo(rx, ry - 14); c.lineTo(rx, ry); c.stroke();
   }
-  // hood
+  // hood (droops when the kid is sad)
+  if (sad) c.translate(side * 0.6, 1.8);
   const hx = -side * 1.5;
   shape(c, r, [[hx, -44], [8.2 + hx * 0.4, -35], [9.2, -25], [0, -21], [-9.2, -25], [-8.2 + hx * 0.4, -35]], '#3b6db3', '#1f3c66', { lw: 1.5, j: 0.3 });
   line(c, r, -6.8, -24, 6.8, -24, '#2a5390', 0.8, 0.2);
@@ -1486,17 +1492,119 @@ function drawOwl(c, o) {
   }
   c.fillStyle = '#d98a2b'; c.beginPath(); c.moveTo(o.x - 1 + o.face, y - 10.5); c.lineTo(o.x + 1 + o.face, y - 10.5); c.lineTo(o.x + o.face, y - 8.5); c.fill();
 }
+// Each villager looks different: hat, hair, coat, what they carry, and how they glare.
+const VLOOKS = [
+  { coat: '#8a5a3c', dark: '#5e3c27', trim: '#efe6d2', hat: 'fur', hatCol: '#5a4030', hair: '#3a2a1e', beard: true, skin: '#e9c9a6', item: 'wood', face: 'smirk' },
+  { coat: '#6d4f7a', dark: '#4a3454', trim: null, hat: 'knit', hatCol: '#c8413d', hair: '#c98b3b', braid: true, skin: '#f0d2b4', item: 'drawing', face: 'laugh', scarf: '#e0b84a' },
+  { coat: '#4f6d4a', dark: '#354a31', trim: null, hat: 'none', hair: '#2a2420', skin: '#c99a76', item: 'torch', face: 'angry', belt: true },
+  { coat: '#8a3c3c', dark: '#5e2626', trim: '#d8cdb8', hat: 'hood', hatCol: '#6a2c2c', hair: '#b0b0b0', skin: '#e9c9a6', item: 'cane', face: 'frown', apron: true },
+];
 function drawVillager(c, v) {
-  const r = mulberry32(boil * 51 + v.line);
+  const L = v.look || VLOOKS[(v.line || 0) % VLOOKS.length];
+  const r = mulberry32(boil * 51 + (v.id || 0) * 7 + 3);
   const moving = Math.hypot(v.tx - v.x, v.ty - v.y) > 2;
-  shadow(c, v.x, v.y, 11, 4, 0.2);
-  const b = moving ? -Math.abs(Math.sin(v.walk)) * 2 : 0, y = v.y + b;
-  shape(c, r, [[v.x - 8, y - 24], [v.x + 8, y - 24], [v.x + 11, y - 2], [v.x - 11, y - 2]], v.coat, '#2a1b12', { lw: 1.5, j: 0.6 });
-  shape(c, r, ell(v.x, y - 31, 7, 7.5, 9), '#e9c9a6', '#5a4030', { lw: 1.3, j: 0.4 });
-  shape(c, r, [[v.x - 8, y - 33], [v.x - 5, y - 41], [v.x + 5, y - 41], [v.x + 8, y - 33]], '#4a3a33', '#1e1612', { smooth: false, lw: 1.2 });
-  c.fillStyle = '#222';
-  c.fillRect(v.x - 3 + v.dir, y - 31, 1.6, 1.6); c.fillRect(v.x + 2 + v.dir, y - 31, 1.6, 1.6);
-  line(c, r, v.x - 2.5 + v.dir, y - 27, v.x + 2.5 + v.dir, y - 28, '#7a3b33', 1, 0.3);
+  const f = v.dir || 1;
+  c.save();
+  c.translate(v.x, v.y); c.scale(0.92, 0.92);
+  shadow(c, 0, 0, 11, 4, 0.2);
+  const step = moving ? Math.sin(v.walk) * 2.6 : 0;
+  // boots and trousers
+  for (const [lx, s] of [[-3.6, 1], [3.6, -1]]) {
+    const ly = step * s * 0.5;
+    shape(c, r, [[lx - 2, -9], [lx + 2, -9], [lx + 2, -2 + ly], [lx - 2, -2 + ly]], '#3e3a40', '#1e1a1c', { smooth: false, lw: 1, j: 0.2, double: false });
+    shape(c, r, [[lx - 2.8, -3 + ly], [lx + 2.6, -3 + ly], [lx + 3 + f, 0.6 + ly], [lx - 2.8, 0.8 + ly]], '#2f2520', '#140e0b', { lw: 1, j: 0.2, double: false });
+  }
+  const bob = moving ? -Math.abs(Math.sin(v.walk)) * 1.6 : 0;
+  c.translate(0, bob);
+  // coat
+  shape(c, r, [[-7, -33], [7, -33], [9.6, -7], [-9.6, -7]], L.coat, '#2a1b12', { lw: 1.5, j: 0.35 });
+  if (L.apron) shape(c, r, [[-5, -24], [5, -24], [6.4, -8], [-6.4, -8]], '#d8c8a8', '#6b5a42', { lw: 1, j: 0.25, double: false });
+  if (L.trim) {
+    for (let x = -8.8; x <= 8.8; x += 2.5) { c.fillStyle = L.trim; c.strokeStyle = '#9a8f7c'; c.lineWidth = 0.5; c.beginPath(); c.arc(x, -7.2, 1.8, 0, 7); c.fill(); c.stroke(); }
+  }
+  line(c, r, f * 0.8, -32, f * 1.2, -9, L.dark, 0.9, 0.2);
+  if (!L.apron) for (let i = 0; i < 3; i++) { c.fillStyle = '#d9b54a'; c.beginPath(); c.arc(f * 2.4, -27 + i * 5.5, 0.9, 0, 7); c.fill(); }
+  if (L.belt) {
+    shape(c, r, [[-8.4, -20], [8.4, -20], [8.6, -17.6], [-8.6, -17.6]], '#4a3121', null, { smooth: false, j: 0.15 });
+    c.strokeStyle = '#d9b54a'; c.lineWidth = 0.8; c.strokeRect(f * 2 - 1.4, -20.2, 2.8, 2.8);
+  }
+  for (let i = 0; i < 2; i++) line(c, r, -4 + i * 8, -22, -5 + i * 10, -10, L.dark, 0.7, 0.3);
+  // arms: the back arm, then whatever they carry, then the front arm
+  const sw = moving ? Math.sin(v.walk) * 2 : 0;
+  const arm = (s, hx, hy) => {
+    c.lineCap = 'round';
+    c.beginPath(); c.moveTo(s * 5.6, -31); c.quadraticCurveTo(s * 9.5, -26, hx, hy);
+    c.strokeStyle = '#2a1b12'; c.lineWidth = 4.8; c.stroke();
+    c.strokeStyle = L.coat; c.lineWidth = 3.1; c.stroke();
+    c.fillStyle = L.skin; c.strokeStyle = '#5a4030'; c.lineWidth = 0.8;
+    c.beginPath(); c.arc(hx, hy + 1.2, 1.9, 0, 7); c.fill(); c.stroke();
+  };
+  const fh = [f * 8.4, -18 - sw], bh = [-f * 8, -18 + sw];
+  if (L.item === 'drawing') { fh[0] = f * 9.5; fh[1] = -26; }
+  if (L.item === 'torch') { fh[1] = -22; }
+  arm(-f, bh[0], bh[1]);
+  if (L.item === 'wood') {
+    for (let i = 0; i < 3; i++) shape(c, r, [[-f * 10 - 1, -21 + i * 2.6], [-f * 2, -22.5 + i * 2.6], [-f * 2, -20.3 + i * 2.6], [-f * 10 - 1, -18.8 + i * 2.6]], '#7a5236', '#3a281b', { smooth: false, lw: 0.8, j: 0.2, double: false });
+  }
+  // scarf and head
+  if (L.scarf) shape(c, r, [[-6.4, -35], [6.4, -35], [6.2, -31.5], [-6.2, -31.5]], L.scarf, '#7a5a1c', { lw: 0.9, j: 0.2 });
+  const hy = -40.5;
+  if (L.braid) { line(c, r, -f * 4.5, hy, -f * 7, hy + 11, L.hair, 2.6, 0.3); c.fillStyle = '#c8413d'; c.fillRect(-f * 7 - 1.2, hy + 10.5, 2.4, 1.6); }
+  if (L.hat === 'hood') shape(c, r, ell(0, hy - 0.5, 8.4, 8.6, 10), L.hatCol, '#2a1414', { lw: 1.2, j: 0.3 });
+  shape(c, r, ell(0, hy, 6.4, 7, 10), L.skin, '#5a4030', { lw: 1.2, j: 0.3 });
+  c.fillStyle = L.skin; c.strokeStyle = '#5a4030'; c.lineWidth = 0.8;
+  c.beginPath(); c.arc(-f * 6, hy + 0.5, 1.5, 0, 7); c.fill(); c.stroke();
+  // hair
+  if (L.hat === 'none') {
+    shape(c, r, [[-6.6, hy - 1], [-5, hy - 7.5], [0, hy - 9], [5.2, hy - 7.4], [6.6, hy - 1], [3, hy - 4.5], [-1, hy - 3.6], [-4, hy - 5]], L.hair, '#140f0c', { lw: 1, j: 0.35 });
+  } else if (L.hat !== 'hood') {
+    line(c, r, -6, hy - 1, -5.6, hy + 3, L.hair, 2, 0.2); line(c, r, 6, hy - 1, 5.6, hy + 3, L.hair, 2, 0.2);
+  } else {
+    line(c, r, -f * 5, hy - 4, f * 3, hy - 5.5, L.hair, 2.2, 0.3);
+  }
+  if (L.hat === 'fur') {
+    shape(c, r, [[-7.6, hy - 3], [-6.6, hy - 11], [6.6, hy - 11], [7.6, hy - 3]], L.hatCol, '#2a1b12', { lw: 1.1, j: 0.25 });
+    for (let x = -7; x <= 7; x += 2.3) { c.fillStyle = '#8a6e52'; c.beginPath(); c.arc(x, hy - 3.2, 1.7, 0, 7); c.fill(); }
+  } else if (L.hat === 'knit') {
+    shape(c, r, [[-6.8, hy - 3], [-5.8, hy - 9.5], [0, hy - 11.5], [5.8, hy - 9.5], [6.8, hy - 3]], L.hatCol, '#5a1414', { lw: 1.1, j: 0.25 });
+    c.strokeStyle = '#f2d27a'; c.lineWidth = 0.7;
+    c.beginPath(); c.moveTo(-6.6, hy - 5.5); c.lineTo(6.6, hy - 5.5); c.stroke();
+    shape(c, r, ell(0, hy - 12.5, 2.4, 2.2, 7), '#f7f4ec', '#a9a294', { lw: 0.7, j: 0.2, double: false });
+  }
+  // the mean face
+  const ex = f * 1.2;
+  c.fillStyle = '#1c1f26';
+  for (const s of [-1, 1]) { c.beginPath(); c.arc(ex + s * 2.4, hy - 0.4, 0.95, 0, 7); c.fill(); }
+  c.strokeStyle = L.hat === 'none' ? L.hair : '#3a2a1e'; c.lineWidth = 0.9; c.lineCap = 'round';
+  for (const s of [-1, 1]) {
+    const inner = L.face === 'laugh' ? -2.6 : -1.4, outer = L.face === 'laugh' ? -3.6 : -3.4;
+    c.beginPath(); c.moveTo(ex + s * 0.9, hy + inner); c.lineTo(ex + s * 3.6, hy + outer); c.stroke();
+  }
+  line(c, r, ex + f * 0.6, hy + 0.4, ex + f * 1.6, hy + 2.2, '#b08466', 0.8, 0.1);
+  c.fillStyle = 'rgba(220,110,110,.35)';
+  for (const s of [-1, 1]) { c.beginPath(); c.arc(ex + s * 3.6, hy + 2.4, 1.2, 0, 7); c.fill(); }
+  c.strokeStyle = '#6a2c2c'; c.lineWidth = 0.9;
+  c.beginPath();
+  if (L.face === 'smirk') { c.moveTo(ex - 2, hy + 3.6); c.quadraticCurveTo(ex, hy + 4.4, ex + 2.4 * f, hy + 2.8); c.stroke(); }
+  else if (L.face === 'frown') { c.moveTo(ex - 2, hy + 4.4); c.quadraticCurveTo(ex, hy + 3, ex + 2, hy + 4.4); c.stroke(); }
+  else if (L.face === 'angry') { c.moveTo(ex - 2, hy + 4); c.lineTo(ex + 2, hy + 4); c.stroke(); }
+  else { c.fillStyle = '#4a1c1c'; c.moveTo(ex - 2.2, hy + 3); c.quadraticCurveTo(ex, hy + 6.4, ex + 2.2, hy + 3); c.closePath(); c.fill(); }
+  if (L.beard) shape(c, r, [[-5, hy + 2.6], [5, hy + 2.6], [3.6, hy + 7.4], [0, hy + 8.6], [-3.6, hy + 7.4]], L.hair, '#140f0c', { lw: 0.8, j: 0.25, double: false });
+  if (L.beard) { c.strokeStyle = '#6a2c2c'; c.beginPath(); c.moveTo(ex - 1.6, hy + 4.2); c.quadraticCurveTo(ex, hy + 5, ex + 2 * f, hy + 3.6); c.stroke(); }
+  // what they hold in the front hand
+  if (L.item === 'drawing') {
+    const px = fh[0] + f * 2, py = fh[1] - 7;
+    shape(c, r, [[px - 4.5, py - 4], [px + 4.5, py - 4.6], [px + 4.8, py + 4.4], [px - 4.2, py + 4.8]], '#fbf7ec', '#3a3631', { smooth: false, lw: 0.9, j: 0.3, double: false });
+    drawStar(c, px - 1, py - 0.6, 2.2, '#f2c230', '#8a6a1c');
+    line(c, r, px - 3, py + 2.8, px + 3, py + 2.4, '#4f79a8', 0.9, 0.3);
+  } else if (L.item === 'torch') {
+    line(c, r, fh[0], fh[1] + 5, fh[0] + f * 1.5, fh[1] - 9, '#6b4a32', 1.8, 0.2);
+    drawFlame(c, fh[0] + f * 1.5, fh[1] - 9, 5, realT + (v.id || 0));
+  } else if (L.item === 'cane') {
+    line(c, r, fh[0], fh[1], fh[0] + f * 2.5, -bob, '#6b4a32', 1.5, 0.2);
+  }
+  arm(f, fh[0], fh[1]);
+  c.restore();
 }
 function drawFlame(c, x, y, size, t) {
   const r = mulberry32(boil * 7 + 3);
@@ -1564,7 +1672,7 @@ function drawWorld() {
   for (const it of list) {
     if (it.kid) {
       const rod = player.fishing ? [player.fishing.hx, player.fishing.hy] : null;
-      drawKid(ctx, player.x, player.y, player.dir, player.walk, player.moving, { rod });
+      drawKid(ctx, player.x, player.y, player.dir, player.walk, player.moving, { rod, sad: S.warm < 30 || S.food < 30, shiver: S.warm < 30 });
       if (player.fishing && player.fishing.need - player.fishing.t < 0.7) bubbleWorld('!', player.fishing.hx, player.fishing.hy - 16);
     } else if (it.owl) drawOwl(ctx, owl);
     else if (it.v) drawVillager(ctx, it.v);
@@ -2052,14 +2160,14 @@ let confirmNew = false;
 function drawDead() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = 'rgba(14,18,30,.72)'; ctx.fillRect(0, 0, VW, VH);
-  const w = Math.min(VW - 30, 440), h = 230, x = VW / 2 - w / 2, y = VH / 2 - h / 2;
+  const w = Math.min(VW - 30, 440), h = 252, x = VW / 2 - w / 2, y = VH / 2 - h / 2;
   paper(ctx, x, y, w, h, 10);
   ctx.fillStyle = '#2b2f36'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.font = `700 38px ${FONT}`;
   ctx.fillText(deathCause === 'hunger' ? 'You starved.' : 'You froze.', VW / 2, y + 18);
   ctx.font = `700 19px ${FONT}`;
   const tip = deathCause === 'hunger' ? 'Tip: fish on the frozen lake and cook it at your fire.' : 'Tip: stay near fire at night, and keep sticks for it.';
-  wrap('Everything you were carrying is gone, for good.', w - 40).forEach((l, i) => ctx.fillText(l, VW / 2, y + 74 + i * 22));
+  wrap(inv.scraps ? 'Everything you were carrying is gone, for good. Your robe scraps are safe.' : 'Everything you were carrying is gone, for good.', w - 40).forEach((l, i) => ctx.fillText(l, VW / 2, y + 74 + i * 22));
   ctx.fillStyle = '#6b6457';
   wrap(tip, w - 40).forEach((l, i) => ctx.fillText(l, VW / 2, y + 122 + i * 22));
   menuButton(VW / 2, y + h - 64, 240, spawn ? 'Wake up in bed' : 'Wake up', respawn);
@@ -2134,7 +2242,7 @@ function drawStory() {
     for (const ex of [-5, 5]) { ctx.fillStyle = '#3a281b'; ctx.beginPath(); ctx.arc(10 + ex, -16, 2.4, 0, 7); ctx.fill(); }
     shape(ctx, r, [[60, 0], [80, -38], [100, 0]], '#d64545', '#3a1c18', { smooth: false, lw: 1.6 });
     line(ctx, r, 80, 0, 80, 10, '#3a1c18', 2, 0.5);
-  } else if (storyI === 2) { drawSpr(ctx, 'pile', 0, 10); drawFlame(ctx, 0, 0, 30, realT); drawVillager(ctx, { x: -70, y: 10, tx: -70, ty: 10, walk: 0, dir: 1, line: 0, coat: '#8a5a3c' }); drawVillager(ctx, { x: 70, y: 12, tx: 70, ty: 12, walk: 0, dir: -1, line: 1, coat: '#6d4f7a' }); }
+  } else if (storyI === 2) { drawSpr(ctx, 'pile', 0, 10); drawFlame(ctx, 0, 0, 30, realT); drawVillager(ctx, { x: -70, y: 10, tx: -70, ty: 10, walk: 0, dir: 1, id: 0, look: VLOOKS[0] }); drawVillager(ctx, { x: 70, y: 12, tx: 70, ty: 12, walk: 0, dir: -1, id: 1, look: VLOOKS[1] }); }
   else { ctx.fillStyle = '#b9c4cf'; for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.ellipse(-100 + i * 14, 14 + (i % 2) * 6, 3, 2, 0, 0, 7); ctx.fill(); } drawKid(ctx, 20, 14, 'right', realT * 6, true); drawSpr(ctx, 'pine', 110, 14); }
   ctx.restore();
   ctx.fillStyle = '#2b2f36'; ctx.font = `700 ${VW < 500 ? 21 : 25}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
