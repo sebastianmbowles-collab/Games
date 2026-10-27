@@ -374,6 +374,7 @@ input[type=text]{font-size:13px}
 .ble{display:flex;gap:10px;align-items:center;padding:6px 8px;border:3px solid var(--ink);background:#e8e4ff;font-size:10px;line-height:1.6}
 .ble canvas{width:40px;height:40px;flex:none} .ble small{font-size:8px;opacity:.8}
 .ble.win{border-left:10px solid #3ad13a} .ble.lose,.ble.quit{border-left:10px solid #ff4a5a} .ble.draw{border-left:10px solid #9aa0b8}
+.evtag{color:#fff;padding:4px 6px;border:2px solid var(--ink);font-size:8px;line-height:1.6;text-shadow:1px 1px 0 #000}
 </style>
 </head>
 <body>
@@ -1545,6 +1546,17 @@ function buildMap(key) {
   return m;
 }
 
+// ---------------- daily event modifiers ----------------
+const EVENT_MODS = { meteor: { name: 'Meteor Shower', desc: 'Meteors fall from the sky. Watch for the red circles!', col: '#ff7a1a' },
+  mushroom: { name: 'Healing Mushrooms', desc: 'Mushrooms pop up. Grab one to heal 2,000.', col: '#e8303a' },
+  energy: { name: 'Energy Drinks', desc: 'Drinks appear. Grab one to move faster and hit 30% harder for 10 seconds.', col: '#3ad13a' } };
+function eventMod(mode) {
+  if (mode === 'training') return null;
+  const day = Math.floor(Date.now() / 86400000), i = Object.keys(MODES).indexOf(mode);
+  const h = Math.abs(Math.sin(day * 12.9898 + i * 78.233) * 43758.5453) % 1;
+  return h < 0.5 ? null : h < 0.67 ? 'meteor' : h < 0.84 ? 'mushroom' : 'energy';
+}
+
 // ---------------- modes ----------------
 const MODES = {
   showdown: { name: 'Showdown', tag: 'Solo · 6 brawlers', color: '#5fbf2f', color2: '#2f8a1c', maps: ['cactus', 'lily', 'dune', 'frostpeak'], team: false,
@@ -1839,6 +1851,8 @@ const SPR = {
   // small items
   gem: { pal: { p: '#c063ff', P: '#7a2bd0', w: '#f2d2ff' }, rows: ['...k...', '..kwk..', '.kwppk.', 'kppppPk', 'kpppPPk', '.kpPPk.', '..kPk..', '...k...'] },
   cube: { pal: { l: '#9dff6b', g: '#4fd145' }, rows: ['kkkkkkk', 'kllllgk', 'kgggwgk', 'kggwwgk', 'kgwwggk', 'kgwgggk', 'kkkkkkk'] },
+  mushroom: { pal: { r: '#e8303a' }, rows: ['..kkk..', '.krwrk.', 'krrrwrk', 'kkkkkkk', '..kwk..', '..kwk..', '..kkk..'] },
+  drink: { pal: { c: '#c0c8d8', g: '#3ad13a', G: '#1a8a1a', y: '#ffd23a' }, rows: ['.kkk.', 'kcwck', 'kgggk', 'kyGyk', 'kgggk', 'kgggk', '.kkk.'] },
   star: { pal: { y: '#ffe040', Y: '#e0a000' }, rows: ['...k...', '..kyk..', 'kkkyykk', 'kyyyyYk', '.kyyYk.', 'kyykYYk', 'kkk.kkk'] },
   ball: { pal: {}, rows: ['.kkkk.', 'kwwkwk', 'kkwwwk', 'kwwwkk', 'kwkwwk', '.kkkk.'] },
   coin: { pal: { y: '#ffd23a', Y: '#e09a00' }, rows: ['..kkkk..', '.kyyyyk.', 'kyyYYyyk', 'kyYyyyYk', 'kyYyyyYk', 'kyyYYyyk', '.kyyyyk.', '..kkkk..'] },
@@ -2354,6 +2368,7 @@ function startBattle(modeKey) {
       if (modeKey === 'basket') G.hoops = { 1: mid(map.goals[2]), 2: mid(map.goals[1]) };
     }
   }
+  G.mod = eventMod(modeKey); G.modT = 5; G.meteors = [];
   const p = G.player; G.cam.x = p.x; G.cam.y = p.y;
 }
 const isSD = m => m === 'showdown' || m === 'duo';
@@ -2670,7 +2685,7 @@ function updateBrawler(b, dt) {
   if (b.dash) updateDash(b, dt);
   else {
     let mx = b.mx, my = b.my; const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
-    let sp = b.def.speed * (b.slowT > 0 ? 0.55 : 1) * (G.ball && G.ball.holder === b ? 0.93 : 1) * (b.star && b.id === 'colt' ? 1.1 : 1) * (b.hyperT > 0 ? 1.25 : 1) * (b.inBush && b.gears.has('speed') ? 1.15 : 1) * (b.boostT > 0 ? 1.5 : 1);
+    let sp = b.def.speed * (b.slowT > 0 ? 0.55 : 1) * (G.ball && G.ball.holder === b ? 0.93 : 1) * (b.star && b.id === 'colt' ? 1.1 : 1) * (b.hyperT > 0 ? 1.25 : 1) * (b.inBush && b.gears.has('speed') ? 1.15 : 1) * (b.boostT > 0 ? 1.5 : 1) * (b.energyT > 0 ? 1.2 : 1);
     if (b.stunT > 0 || G.intro > 0 || G.goalPause > 0 || G.over) sp = 0;
     const ox = b.x, oy = b.y;
     moveCircle(b, mx * sp * dt + b.kx * dt, my * sp * dt + b.ky * dt, b.r);
@@ -2808,6 +2823,8 @@ function updatePickups(dt) {
     p.taken = true;
     if (p.type === 'bolt') { G.bolts[taker.team]++; if (taker.isPlayer) G.stats.bolts++; Sound.play('coin', vol(taker)); burst(p.x, p.y, '#c0c8d8', 6, 120, 4, 0.3); }
     else if (p.type === 'gem') { taker.gems++; if (taker.isPlayer) { G.stats.gems++; } Sound.play('gem', vol(taker)); burst(p.x, p.y, '#e6a2ff', 6, 120, 4, 0.3); }
+    else if (p.type === 'mushroom') { heal(taker, 2000); textFx(taker.x, taker.y - 50, '+2000', '#7aff6a', 20); Sound.play('cube', vol(taker)); burst(p.x, p.y, '#ff6a6a', 8, 140, 4, 0.35); }
+    else if (p.type === 'energy') { taker.energyT = 10; textFx(taker.x, taker.y - 50, 'ENERGY!', '#7aff4a', 22); Sound.play('superReady', vol(taker)); burst(p.x, p.y, '#7aff4a', 10, 160, 4, 0.4); }
     else { taker.cubes++; const add = taker.baseHp * 0.1; taker.hpMax += add; taker.hp += add; if (taker.isPlayer) { G.stats.cubes++; textFx(taker.x, taker.y - 50, '+POWER', '#9dff6b', 22); } Sound.play('cube', vol(taker)); burst(p.x, p.y, '#9dff6b', 8, 140, 4, 0.35); }
   }
   G.pickups = G.pickups.filter(p => !p.taken);
@@ -2979,6 +2996,33 @@ function updateParts(dt) {
   if (G.parts.length > 700) G.parts.splice(0, G.parts.length - 700);
 }
 
+function randomFloor() {
+  const m = G.map;
+  for (let k = 0; k < 40; k++) { const tx = randi(1, m.w - 2), ty = randi(1, m.h - 2), t = m.t[ty * m.w + tx]; if (t === TILE.FLOOR || t === TILE.BUSH) return { x: tx * T + T / 2, y: ty * T + T / 2 }; }
+  return { x: m.w * T / 2, y: m.h * T / 2 };
+}
+function updateEventMod(dt) {
+  if (!G.mod || G.over) return;
+  G.modT -= dt;
+  if (G.modT <= 0) {
+    if (G.mod === 'meteor') {
+      G.modT = rand(3.5, 5.5); const tg = pick(G.brawlers.filter(b => b.alive)); if (tg) G.meteors.push({ x: tg.x + rand(-2, 2) * T, y: tg.y + rand(-2, 2) * T, t: 1.6, max: 1.6, r: 1.4 * T });
+    } else {
+      const type = G.mod === 'mushroom' ? 'mushroom' : 'energy'; G.modT = G.mod === 'mushroom' ? 8 : 11;
+      if (G.pickups.filter(q => q.type === type).length < 3) { const f = randomFloor(); spawnPickup(type, f.x, f.y, false); burst(f.x, f.y, '#ffffff', 6, 100, 4, 0.3); }
+    }
+  }
+  for (const me of G.meteors) {
+    me.t -= dt; if (me.t > 0) continue; me.done = true;
+    for (const b of G.brawlers) if (b.alive && !b.leap && dist(b.x, b.y, me.x, me.y) < me.r + b.r * 0.5) {
+      const d = Math.min(b.hp, 1500 * (b.guardT > 0 ? 0.3 : 1)); b.hp -= d; b.flash = 0.15; textFx(b.x, b.y - 40, '-' + Math.round(d), '#ff7a1a', 16); if (b.isPlayer) G.hurtFlash = 0.35;
+      if (b.hp <= 0) killBrawler(b, null);
+    }
+    burst(me.x, me.y, '#ff7a1a', 16, 260, 6, 0.5); burst(me.x, me.y, '#ffd23a', 10, 180, 5, 0.4); ringFx(me.x, me.y, me.r, '#ff7a1a', 0.4, 6); puff(me.x, me.y, 10);
+    Sound.play('explode', volAt(me.x, me.y)); shake(6 * volAt(me.x, me.y));
+  }
+  G.meteors = G.meteors.filter(me => !me.done);
+}
 function stepBattle(dt) {
   G.time += dt;
   for (const b of G.brawlers) if (b.pin) { b.pin.t -= dt; if (b.pin.t <= 0) b.pin = null; }
@@ -2996,7 +3040,7 @@ function stepBattle(dt) {
   for (const s of G.safes) s.flash -= dt;
   if (G.tempWalls) { let ch = false; for (const w of G.tempWalls) { w.life -= dt; if (w.life <= 0 && G.map.t[w.i] === TILE.WALL) { G.map.t[w.i] = w.prev; ch = true; } } G.tempWalls = G.tempWalls.filter(w => w.life > 0); if (ch) G.mapVer++; }
   if (G.boosters) { for (const q of G.boosters) q.life -= dt; G.boosters = G.boosters.filter(q => q.life > 0); }
-  updateProjs(dt); updateAreas(dt); updateTurrets(dt); updatePets(dt); updatePickups(dt);
+  updateProjs(dt); updateAreas(dt); updateTurrets(dt); updatePets(dt); updatePickups(dt); updateEventMod(dt);
   if (G.ball && G.goalPause <= 0 && !G.over) updateBall(dt);
   if (!G.over && G.intro <= 0 && G.goalPause <= 0) updateMode(dt);
   updateParts(dt);
@@ -3011,7 +3055,7 @@ function stepBattle(dt) {
 // explosions, healing, burning and knockout rounds
 // ===================================================================
 const boosted = b => G && G.boosters && b.kind === 'brawler' && G.boosters.some(q => q.team === b.team && dist(q.x, q.y, b.x, b.y) < q.r);
-const dmgNow = b => (b.dmgMult || 1) * cubeMult(b) * (b.hyperT > 0 ? 1.15 : 1) * (boosted(b) ? 1.3 : 1) * (b.gears && b.gears.has('damage') && b.hp < b.hpMax * 0.5 ? 1.15 : 1);
+const dmgNow = b => (b.dmgMult || 1) * cubeMult(b) * (b.hyperT > 0 ? 1.15 : 1) * (boosted(b) ? 1.3 : 1) * (b.energyT > 0 ? 1.3 : 1) * (b.gears && b.gears.has('damage') && b.hp < b.hpMax * 0.5 ? 1.15 : 1);
 function superStats(b) {
   const A = { ...b.def.super, isSuper: true }, hy = b.hyperT > 0;
   if (b.star && b.id === 'brock') A.rockets = 13;
@@ -3089,7 +3133,7 @@ function ikeShoot(s, dt) {
   Sound.play('turretShot', volAt(s.x, s.y));
 }
 function updateStatus(b, dt) {
-  b.invisT = Math.max(0, (b.invisT || 0) - dt); b.guardT = Math.max(0, (b.guardT || 0) - dt); b.boostT = Math.max(0, (b.boostT || 0) - dt); b.unstopT = Math.max(0, (b.unstopT || 0) - dt);
+  b.invisT = Math.max(0, (b.invisT || 0) - dt); b.guardT = Math.max(0, (b.guardT || 0) - dt); b.boostT = Math.max(0, (b.boostT || 0) - dt); b.energyT = Math.max(0, (b.energyT || 0) - dt); b.unstopT = Math.max(0, (b.unstopT || 0) - dt);
   if (b.unstopT > 0) { b.stunT = 0; b.slowT = 0; b.kx = 0; b.ky = 0; }
   if (b.invisT > 0 && b.star && b.id === 'leon') heal(b, 1000 * dt, true);
   if (b.star && b.id === 'rosa' && b.inBush) heal(b, 300 * dt, true);
@@ -3846,7 +3890,7 @@ function render() {
   for (const it of list) {
     if (it.k === 0) { const px = it.tx * 16, py = it.ty * 16; if (it.tt === TILE.WALL) lx.drawImage(T_.wall, px, py - 4); else if (it.tt === TILE.CRATE) { lx.drawImage(T_.crate, px, py - 2); if (m.hp[it.ty * m.w + it.tx] < 800) { lx.fillStyle = INK; lx.fillRect(px + 5, py + 2, 1, 4); lx.fillRect(px + 6, py + 5, 2, 1); } } else { lx.drawImage(T_.box, px, py - 3); if (m.hp[it.ty * m.w + it.tx] < 1800) { lx.fillStyle = INK; lx.fillRect(px + 2, py, 1, 3); lx.fillRect(px + 12, py + 8, 2, 1); } } }
     else if (it.k === 1) drawBrawlerPix(it.b, t);
-    else if (it.k === 2) { const p = it.p, bob = Math.round(Math.sin(t * 4 + p.x) * 1.5); lx.fillStyle = 'rgba(13,11,30,.3)'; lx.fillRect(A3(p.x) - 3, A3(p.y) + 3, 6, 2); const S_ = getSpr(p.type === 'gem' ? 'gem' : p.type === 'bolt' ? 'bolt' : 'cube'); lx.drawImage(S_.n[0], A3(p.x) - (S_.w >> 1), A3(p.y) - S_.h + bob); }
+    else if (it.k === 2) { const p = it.p, bob = Math.round(Math.sin(t * 4 + p.x) * 1.5); lx.fillStyle = 'rgba(13,11,30,.3)'; lx.fillRect(A3(p.x) - 3, A3(p.y) + 3, 6, 2); const S_ = getSpr(p.type === 'energy' ? 'drink' : ['gem', 'bolt', 'mushroom'].includes(p.type) ? p.type : 'cube'); lx.drawImage(S_.n[0], A3(p.x) - (S_.w >> 1), A3(p.y) - S_.h + bob); }
     else if (it.k === 3) { const tr = it.tr; const nm = tr.team === G.player.team ? 'scrappy' : 'scrappyR'; pixRing(A3(tr.x), A3(tr.y) + 2, tr.team === G.player.team ? '#2f9bff' : '#ff4659'); drawChar(nm, A3(tr.x), A3(tr.y) + 3, Math.cos(tr.ang) < 0 ? -1 : 1, 0, { flash: tr.flash > 0 }); }
     else if (it.k === 7) { const pt = it.pt; pixRing(A3(pt.x), A3(pt.y) + 2, pt.team === G.player.team ? '#2f9bff' : '#ff4659'); drawChar(pt.id, A3(pt.x), A3(pt.y) + 2 - (pt.swipe > 0 ? 1 : 0), Math.cos(pt.aim) < 0 ? -1 : 1, pt.moving ? Math.floor(pt.walk) % 4 : 0, { flash: pt.flash > 0 }); }
     else if (it.k === 4) drawSafePix(it.s);
@@ -3863,6 +3907,13 @@ function render() {
   }
   for (const pr of G.projs) drawProjPix(pr, t);
   drawPartsPix();
+  for (const me of G.meteors || []) {
+    const k = 1 - me.t / me.max, cx = A3(me.x), cy = A3(me.y), rr = Math.round(A3(me.r));
+    lx.fillStyle = `rgba(255,60,40,${0.15 + 0.25 * k})`; for (let a = 0; a < 40; a++) { const an = a / 40 * Math.PI * 2; lx.fillRect(Math.round(cx + Math.cos(an) * rr * k), Math.round(cy + Math.sin(an) * rr * k * 0.6), 2, 1); }
+    lx.fillStyle = '#ff3a2a'; for (let a = 0; a < 48; a++) { const an = a / 48 * Math.PI * 2; lx.fillRect(Math.round(cx + Math.cos(an) * rr), Math.round(cy + Math.sin(an) * rr * 0.6), 1, 1); }
+    const my = cy - Math.round((1 - k) * 90); lx.fillStyle = INK; lx.fillRect(cx - 4, my - 4, 8, 8); lx.fillStyle = '#ff7a1a'; lx.fillRect(cx - 3, my - 3, 6, 6); lx.fillStyle = '#ffd23a'; lx.fillRect(cx - 2, my - 3, 3, 3);
+    lx.fillStyle = 'rgba(255,160,40,.6)'; lx.fillRect(cx - 1, my - 12, 2, 8);
+  }
   if (G.poison && G.poison.inset > 0) drawPoisonPix(t);
   // bars
   for (const b of G.brawlers) if (b.alive && isVisibleToPlayer(b)) {
@@ -4049,7 +4100,9 @@ function drawHUD(c) {
   } else if (m === 'gemgrab') {
     twoSide(teamGems(1), teamGems(2), '#7cc4ff', '#ff8a96'); drawSpr(c, 'gem', cx - 130, top + 25, 2); drawSpr(c, 'gem', cx + 130, top + 25, 2);
     if (G.gemCd) { const mine = G.gemCd.team === 1; panel(c, cx - 125, top + 64, 250, 44, mine ? 'rgba(30,90,200,.9)' : 'rgba(200,40,60,.9)'); txt(c, mine ? 'YOUR TEAM WINS IN' : 'ENEMIES WIN IN', cx, top + 76, 8, '#fff'); txt(c, Math.ceil(G.gemCd.t), cx, top + 96, 14, '#ffe040'); }
-  } else if (m === 'training') {
+  }
+  if (G.mod && G.time < 6) txt(c, EVENT_MODS[G.mod].name.toUpperCase() + '!', cx, top + 90, 9, EVENT_MODS[G.mod].col);
+  if (m === 'training') {
     panel(c, cx - 170, top, 340, 56); txt(c, 'TRAINING CAVE', cx, top + 15, 10, '#ffe040');
     txt(c, `DAMAGE ${fmt(Math.round(G.stats.damage))}`, cx, top + 36, 10, '#fff'); txt(c, 'PAUSE TO LEAVE', cx, top + 72, 8, '#c9d2ff');
   } else if (m === 'duels') {
@@ -4283,7 +4336,7 @@ function renderFeatured(dt) {
 function renderHome() {
   const id = S.selected, d = BR[id], st = S.brawlers[id], md = MODES[S.mode];
   $('#featName').textContent = d.name; $('#featLevel').textContent = `Power ${st.level}`; $('#featTrophies').textContent = fmt(st.trophies);
-  $('#modeName').textContent = md.name; $('#modeMap').textContent = md.maps.map(k => MAPS[k].name).join(' / ');
+  const ev = eventMod(S.mode); $('#modeName').textContent = md.name; $('#modeMap').textContent = (ev ? `★ ${EVENT_MODS[ev].name} · ` : '') + md.maps.map(k => MAPS[k].name).join(' / ');
   const mb = $('#modeBtn'); mb.style.background = `linear-gradient(180deg, ${md.color}, ${md.color2})`;
   const mi = $('#modeIcon'), mc = mi.getContext('2d'); mc.clearRect(0, 0, 112, 112); mc.fillStyle = INK; mc.fillRect(4, 4, 104, 104); mc.fillStyle = 'rgba(255,255,255,.18)'; mc.fillRect(8, 8, 96, 96); drawModeIcon(mc, S.mode, 56, 56, 1.9);
   const tier = passTier(); $('#passTierMini').textContent = Math.min(PASS_TIERS, tier + 1);
@@ -4457,7 +4510,7 @@ function renderModes() {
     if (md.hidden) continue;
     const el = document.createElement('button'); el.className = 'mode' + (S.mode === k ? ' sel' : '');
     el.style.background = `linear-gradient(180deg, ${md.color}, ${md.color2})`;
-    el.innerHTML = `<canvas class="mi" width="128" height="128"></canvas><span class="mtag">${md.tag}</span><b class="stroke-sm">${md.name}</b><p>${md.desc}</p><p style="opacity:.85">Map${md.maps.length > 1 ? 's' : ''}: ${md.maps.map(m => MAPS[m].name).join(', ')} · Wins: ${S.stats.modeWins[k] || 0}</p>`;
+    el.innerHTML = `<canvas class="mi" width="128" height="128"></canvas><span class="mtag">${md.tag}</span><b class="stroke-sm">${md.name}</b><p>${md.desc}</p>${eventMod(k) ? `<p class="evtag" style="background:${EVENT_MODS[eventMod(k)].col}">Today: ${EVENT_MODS[eventMod(k)].name}. ${EVENT_MODS[eventMod(k)].desc}</p>` : ''}<p style="opacity:.85">Map${md.maps.length > 1 ? 's' : ''}: ${md.maps.map(m => MAPS[m].name).join(', ')} · Wins: ${S.stats.modeWins[k] || 0}</p>`;
     const c = el.querySelector('canvas').getContext('2d'); rr(c, 4, 4, 120, 120, 24); fs(c, 'rgba(0,0,0,.25)', 4); drawModeIcon(c, k, 64, 64, 2.2);
     el.onclick = () => { S.mode = k; save(); show('menu'); };
     L.appendChild(el);
