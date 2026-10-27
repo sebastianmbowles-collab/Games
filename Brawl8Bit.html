@@ -708,7 +708,7 @@ function defaultSave() {
     v: 1, name: 'Player', avatar: 0, coins: 150, gems: 20, selected: 'shelly', mode: 'showdown',
     brawlers: Object.fromEntries(BR_LIST.map(b => b.id).map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [], skins: [], skin: '', mastery: 0 }])),
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
-    stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0, basket: 0, duels: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
+    stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0, basket: 0, duels: 0, robo: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
     lastGift: '', boxesOpened: 0, seenHelp: false, tutDone: false, log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
     club: { name: 'Pixel Pals', members: [], chat: [], claimed: [] },
@@ -955,6 +955,9 @@ const BR_LIST = [
     hyper: { name: 'Big Hug', desc: 'Hypercharged Super heals even more.' } },
 ];
 const BR = Object.fromEntries(BR_LIST.map(b => [b.id, b]));
+// Robo Rumble enemies (not playable)
+BR.robo = { ...BR.primo, id: 'robo', name: 'Robot', role: 'Robot', hp: 2400, speed: 135, superCost: 1e9, bg: '#6a7088', bg2: '#2a2e3a', attack: { ...BR.primo.attack, dmg: 260, shots: 3 } };
+BR.robobig = { ...BR.brock, id: 'robobig', name: 'Big Robot', role: 'Robot', hp: 7000, speed: 95, superCost: 1e9, bg: '#a03a3a', bg2: '#4a1a1a', attack: { ...BR.brock.attack, dmg: 700, range: 6.5 } };
 // practice robot for the Training Cave (not a playable brawler)
 BR.dummy = { ...BR_LIST[0], id: 'dummy', name: 'Robot', role: 'Target', hp: 15000, speed: 90, bg: '#6a7088', bg2: '#2a2e3a' };
 const UNLOCK = {
@@ -1235,6 +1238,25 @@ const MAPS = {
     '.....BB....',
     '...........',
     '..........O',
+  ] },
+  roboyard: { name: 'Robo Yard', mode: 'robo', theme: 'stadium', kind: 'half', rows: [
+    '...........',
+    '......2...2',
+    '..........H',
+    '..##.....BB',
+    '..#......BB',
+    '.......C...',
+    'BB.....C...',
+    'BB.........',
+    '....##.....',
+    '...........',
+    '.WW......##',
+    '.WW........',
+    '.......#...',
+    'BB.....#...',
+    'BB.........',
+    '...........',
+    '..........H',
   ] },
   cave: { name: 'Training Cave', mode: 'training', theme: 'canyon', kind: 'half', rows: [
     '...........',
@@ -1607,6 +1629,8 @@ const MODES = {
     desc: 'Collect gems from the mine. Hold 10 or more and the lead for 15 seconds to win. Defeated brawlers drop their gems!' },
   basket: { name: 'Basket Brawl', tag: '3 vs 3', color: '#ff8a1f', color2: '#c0500a', maps: ['court', 'streetcourt'], team: true,
     desc: 'Grab the ball and shoot it into the enemy hoop at the top. You have to shoot or pass it in, you can not carry it. First to 3 points wins.' },
+  robo: { name: 'Robo Rumble', tag: 'Co-op · 3 players', color: '#7a8aa8', color2: '#2a3a5a', maps: ['roboyard'], team: true,
+    desc: 'Team up against waves of robots trying to smash your safe! Survive all 10 waves to win. Big red robots fire rockets.' },
   training: { name: 'Training Cave', tag: 'Practice', hidden: true, color: '#6a7088', color2: '#2a2e3a', maps: ['cave'], team: true,
     desc: 'Try any brawler at full power on practice robots. No trophies won or lost.' },
   duels: { name: 'Duels', tag: '1 vs 1 · 3 brawlers', color: '#e0405a', color2: '#8a1a3a', maps: ['duelpit', 'rockyring'], team: true,
@@ -2310,7 +2334,7 @@ const WEAPONS = {
   dynamite: { pal: { r: '#d83030', y: '#ffe040' }, rows: ['.y.', 'kkk', 'krk', 'krk', 'kkk'], ox: 12, oy: 9 },
 };
 (function finishSprites() {
-  SPR.dummy = SPR.robot;
+  SPR.dummy = SPR.robot; SPR.robo = SPR.robot; SPR.robobig = { ...SPR.robot, pal: { ...SPR.robot.pal, g: '#c05050', y: '#ffd23a', r: '#ffffff' } };
   SPR.scrappyR.rows = SPR.scrappy.rows;
 })();
 
@@ -2509,6 +2533,12 @@ function startBattle(modeKey) {
     if (modeKey === 'hotzone') G.zone = { x: map.zone.x, y: map.zone.y, r: 2.3 * T, p: { 1: 0, 2: 0 } };
     if (modeKey === 'knockout') G.poison = { delay: 40, inset: 0, t: 0, max: Math.min(map.w, map.h) * T / 2 - 2.8 * T, speed: 10 };
     if (modeKey === 'siege') for (const s of map.safes) G.safes.push({ kind: 'safe', ike: true, team: s.team, x: s.x, y: s.y, cy: s.y - 6, r: 34, hp: 14000, maxHp: 14000, flash: 0, cd: 0, dmgMult: 1, cubes: 0 });
+    if (modeKey === 'robo') {
+      for (const b of G.brawlers.filter(x => x.team === 2)) b.alive = false;
+      G.brawlers = G.brawlers.filter(x => x.team === 1);
+      const s = map.safes.find(q => q.team === 1); G.safes.push({ kind: 'safe', team: 1, x: s.x, y: s.y, cy: s.y - 6, r: 34, hp: 30000, maxHp: 30000, flash: 0 });
+      G.robo = { wave: 0, t: 4, skill };
+    }
     if (modeKey === 'heist') for (const s of map.safes) G.safes.push({ kind: 'safe', team: s.team, x: s.x, y: s.y, cy: s.y - 6, r: 34, hp: 20000, maxHp: 20000, flash: 0 });
     if (modeKey === 'brawlball' || modeKey === 'basket') {
       G.ball = { x: map.ball.x, y: map.ball.y, vx: 0, vy: 0, r: 12, holder: null, noPickT: 0, noPickBy: null, lastTouch: null, spin: 0, breakWalls: false };
@@ -2809,6 +2839,7 @@ function killBrawler(b, killer) {
     if (mate) b.respawnT = 7;
     else { const teams = new Set(G.brawlers.filter(x => x.alive).map(x => x.team)); const rank = teams.size + 1; for (const x of G.brawlers) if (x.team === b.team) { x.rank = rank; x.respawnT = 0; } }
   } else if (G.mode === 'knockout') b.respawnT = 0;
+  else if (G.mode === 'robo' && b.team === 2) b.respawnT = 0;
   else if (G.mode === 'duels') { b.respawnT = 0; G.duel.idx[b.team]++; if (G.duel.idx[b.team] < 3) G.duel.spawnT[b.team] = 2; }
   else b.respawnT = 3.5;
 }
@@ -3099,6 +3130,19 @@ function updateMode(dt) {
     else if (!G.gemCd || G.gemCd.team !== lead) G.gemCd = { team: lead, t: 15, beep: 15 };
     else { G.gemCd.t -= dt; if (Math.ceil(G.gemCd.t) < G.gemCd.beep) { G.gemCd.beep = Math.ceil(G.gemCd.t); Sound.play('beep', 0.6); } if (G.gemCd.t <= 0) endMatch(lead === 1 ? 'win' : 'lose'); }
     if (G.timeLeft <= 0 && !G.over) endMatch(g1 > g2 ? 'win' : g2 > g1 ? 'lose' : 'draw');
+  } else if (m === 'robo') {
+    const R_ = G.robo, safe = G.safes[0], left = G.brawlers.filter(b => b.alive && b.team === 2).length;
+    if (safe.hp <= 0) endMatch(R_.wave >= 6 ? 'draw' : 'lose');
+    else if (!left) {
+      if (R_.wave >= 10) endMatch('win');
+      else { R_.t -= dt; if (R_.t <= 0) {
+        R_.wave++; R_.t = 5; G.brawlers = G.brawlers.filter(b => b.team === 1 || b.alive);
+        const n = 2 + R_.wave, big = Math.floor(R_.wave / 3), lvl = clamp(1 + R_.wave, 1, MAX_LEVEL);
+        for (let k = 0; k < n + big; k++) { const sp = G.map.teamSpawns[2][k % 3], pos = freeSpot(sp.x + rand(-1.5, 1.5) * T, sp.y + rand(0, 1.5) * T, 19);
+          const r = addBrawler(k < big ? 'robobig' : 'robo', 2, pos, { level: lvl, name: k < big ? 'Big Robot' : 'Robot', skill: R_.skill, slot: k, gears: [] }); r.skin = ''; }
+        G.bigText = { text: R_.wave === 10 ? 'FINAL WAVE!' : `WAVE ${R_.wave}`, color: '#ffd23a', t: 1.8 }; Sound.play('goal');
+      } }
+    }
   } else if (m === 'training') {
     for (const b of G.brawlers) if (b.trainMove && b.alive) { b.mx = Math.sin(G.time * 0.9) > 0 ? 1 : -1; b.my = 0; }
     const P_ = G.player; if (P_.alive) P_.gadgets = Math.max(P_.gadgets, 1);
@@ -3548,6 +3592,11 @@ function aiDecide(b) {
     if (gem) { ai.goal = { x: gem.x, y: gem.y }; return; }
     const off = (ai.slot - 1) * 2.2 * T;
     ai.goal = { x: mineP.x + off, y: mineP.y + (b.team === 1 ? 1.4 : -1.4) * T };
+  } else if (m === 'robo') {
+    const safe = G.safes[0];
+    if (b.team === 2) { if (!tgt || dist(b.x, b.y, tgt.x, tgt.y) > 3.5 * T) { ai.target = null; ai.structTarget = safe; ai.goal = { x: safe.x, y: safe.y }; ai.goalFirst = true; } return; }
+    if (!tgt) ai.goal = { x: safe.x + (ai.slot - 1) * 2.5 * T, y: safe.y - 4 * T };
+    return;
   } else if (m === 'brawlball' || m === 'basket') {
     const B = G.ball, eg = enemyGoal(b.team), og = ownGoal(b.team);
     if (B.holder === b) { ai.goal = eg; ai.goalFirst = true; return; }
@@ -3915,7 +3964,7 @@ function drawBall(c, b) { drawSpr(c, 'ball', b.x, b.y, 3); }
 function drawCoinIcon(c, x, y, r) { drawSpr(c, 'coin', x, y, Math.max(1, Math.round(r / 4))); }
 function drawModeIcon(c, mode, x, y, s) {
   const k = Math.max(2, Math.round(s * 3));
-  const map = { showdown: 'skull', duo: 'skull', gemgrab: 'gem', brawlball: 'ball', basket: 'ball', duels: 'skull', training: 'bolt', heist: 'safeIcon', bounty: 'star', hotzone: 'fire', knockout: 'trophy', wipeout: 'skull', siege: 'bolt' };
+  const map = { showdown: 'skull', duo: 'skull', gemgrab: 'gem', brawlball: 'ball', basket: 'ball', duels: 'skull', training: 'bolt', robo: 'bolt', heist: 'safeIcon', bounty: 'star', hotzone: 'fire', knockout: 'trophy', wipeout: 'skull', siege: 'bolt' };
   const n = map[mode];
   if (n === 'safeIcon') { c.fillStyle = INK; c.fillRect(x - 6 * k, y - 6 * k, 12 * k, 12 * k); c.fillStyle = '#c9cfe0'; c.fillRect(x - 5 * k, y - 5 * k, 10 * k, 10 * k); c.fillStyle = '#ff4659'; c.fillRect(x - 5 * k, y - 5 * k, 10 * k, 3 * k); c.fillStyle = '#8a91aa'; c.fillRect(x - 2 * k, y, 4 * k, 4 * k); return; }
   if (n === 'fire') { const P = [[0, -5], [-1, -3], [1, -3], [-2, -1], [0, -1], [2, -1], [-3, 1], [-1, 1], [1, 1], [3, 1], [-3, 3], [-1, 3], [1, 3], [3, 3], [-2, 5], [0, 5], [2, 5]]; for (const [dx, dy] of P) { c.fillStyle = dy > 1 ? '#ffe040' : '#ff6a1f'; c.fillRect(x + dx * k - k, y + dy * k - k, 2 * k, 2 * k); } return; }
@@ -4290,6 +4339,11 @@ function drawHUD(c) {
     if (G.gemCd) { const mine = G.gemCd.team === 1; panel(c, cx - 125, top + 64, 250, 44, mine ? 'rgba(30,90,200,.9)' : 'rgba(200,40,60,.9)'); txt(c, mine ? 'YOUR TEAM WINS IN' : 'ENEMIES WIN IN', cx, top + 76, 8, '#fff'); txt(c, Math.ceil(G.gemCd.t), cx, top + 96, 14, '#ffe040'); }
   }
   if (G.mod && G.time < 6) txt(c, EVENT_MODS[G.mod].name.toUpperCase() + '!', cx, top + 64, 9, EVENT_MODS[G.mod].col);
+  if (m === 'robo') {
+    const s = G.safes[0]; panel(c, cx - 160, top, 320, 56); txt(c, `WAVE ${G.robo.wave} / 10`, cx, top + 14, 10, '#ffd23a');
+    txt(c, 'YOUR SAFE', cx - 90, top + 36, 8, '#bfe2ff'); hudBar(c, cx - 40, top + 31, 180, 10, s.hp / s.maxHp, '#2f9bff');
+    const left = G.brawlers.filter(b => b.alive && b.team === 2).length; if (!left && G.robo.wave < 10 && G.robo.wave > 0) txt(c, `NEXT WAVE IN ${Math.ceil(G.robo.t)}`, cx, top + 72, 9, '#fff');
+  }
   if (m === 'training') {
     panel(c, cx - 170, top, 340, 56); txt(c, 'TRAINING CAVE', cx, top + 15, 10, '#ffe040');
     txt(c, `DAMAGE ${fmt(Math.round(G.stats.damage))}`, cx, top + 36, 10, '#fff'); txt(c, 'PAUSE TO LEAVE', cx, top + 72, 8, '#c9d2ff');
@@ -4465,7 +4519,7 @@ function show(name) {
   App.screen = name;
   for (const [k, sel] of Object.entries(SCREENS)) $(sel).hidden = k !== name;
   const battle = name === 'battle'; cv.hidden = !battle; $('#hud').hidden = !battle; if (R3.gl) R3.gl.hidden = !battle;
-  if (!battle) { updateWallet(); $('#pinBar').hidden = true; }
+  if (!battle) { updateWallet(); $('#pinBar').hidden = true; if (FX.length && !fxOpen) setTimeout(() => { if (!fxOpen && !fxBlocked()) fxNext(); }, 0); }
   const r = { menu: renderHome, brawlers: renderBrawlers, detail: renderDetail, modes: renderModes, shop: renderShop, quests: renderQuests, pass: renderPass, road: renderRoad, profile: renderProfile, ranked: renderRanked, club: renderClub }[name];
   if (r) r();
   const sc = SCREENS[name] && $(SCREENS[name] + ' .scroll'); if (sc) sc.scrollTop = 0;
@@ -4923,6 +4977,7 @@ function finishMatch() {
   let tro, coins, xp; const rank = g.over.rank;
   if (g.mode === 'duo') { const i = clamp(rank, 1, 3) - 1; tro = [9, 3, -3][i]; coins = [45, 25, 10][i]; xp = [50, 30, 15][i]; }
   else if (g.mode === 'showdown') { const i = clamp(rank, 1, 6) - 1; tro = [10, 7, 4, 1, -2, -4][i]; coins = [45, 35, 25, 15, 10, 5][i]; xp = [50, 40, 30, 20, 15, 10][i]; }
+  else if (g.mode === 'robo') { tro = res === 'win' ? 10 : 0; coins = 10 + g.robo.wave * 8; xp = 15 + g.robo.wave * 6; }
   else { tro = res === 'win' ? 8 : res === 'draw' ? 0 : -4; coins = res === 'win' ? 40 : res === 'draw' ? 20 : 10; xp = res === 'win' ? 40 : res === 'draw' ? 25 : 15; }
   if (g.quit) { coins = 0; xp = 0; tro = Math.min(tro, -2); }
   coins += g.quit ? 0 : g.stats.kills * 3;
@@ -4957,8 +5012,8 @@ function finishMatch() {
   save();
   const banner = isSD(g.mode) ? (rank === 1 ? 'VICTORY!' : `RANK #${rank}`) : res === 'win' ? 'VICTORY!' : res === 'lose' ? 'DEFEAT' : 'DRAW';
   const sub = g.quit ? 'You left the match' : g.mode === 'duo' ? (rank === 1 ? 'Last team standing!' : `Your team finished #${rank} of 3.`) : g.mode === 'showdown' ? (win ? `${rank === 1 ? 'Last brawler standing!' : 'Top 2 finish. That counts as a win!'}` : 'Knocked out. Better luck next time!') :
-    { gemgrab: () => `Gems: ${teamGems(1)} vs ${teamGems(2)}`, brawlball: () => `Score: ${g.score[1]} - ${g.score[2]}`, basket: () => `Score: ${g.score[1]} - ${g.score[2]}`, duels: () => `Brawlers left: ${3 - g.duel.idx[1]} vs ${3 - g.duel.idx[2]}`, heist: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `Safes: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; }, bounty: () => `Stars: ${g.stars[1]} vs ${g.stars[2]}`, hotzone: () => `Zone: ${Math.floor(g.zone.p[1])}% vs ${Math.floor(g.zone.p[2])}%`, knockout: () => `Rounds: ${g.rounds[1]} - ${g.rounds[2]}`, wipeout: () => `KOs: ${g.kos[1]} vs ${g.kos[2]}`, siege: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `IKE: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; } }[g.mode]();
-  const extra = { showdown: `Cubes ${gs.cubes}`, duo: `Cubes ${gs.cubes}`, wipeout: `KOs ${gs.kills}`, siege: `Bolts ${gs.bolts}`, gemgrab: `Gems ${gs.gems}`, brawlball: `Goals ${gs.goals}`, basket: `Points ${gs.goals}`, duels: `KOs ${gs.kills}`, heist: `Safe damage ${fmt(gs.safeDmg)}`, bounty: `Stars ${gs.stars}`, hotzone: `Zone time ${Math.round(gs.zone)}s`, knockout: `Rounds won ${gs.rounds}` }[g.mode];
+    { gemgrab: () => `Gems: ${teamGems(1)} vs ${teamGems(2)}`, brawlball: () => `Score: ${g.score[1]} - ${g.score[2]}`, basket: () => `Score: ${g.score[1]} - ${g.score[2]}`, robo: () => `Waves survived: ${Math.max(0, g.robo.wave - (res === 'win' ? 0 : 1))} of 10`, duels: () => `Brawlers left: ${3 - g.duel.idx[1]} vs ${3 - g.duel.idx[2]}`, heist: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `Safes: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; }, bounty: () => `Stars: ${g.stars[1]} vs ${g.stars[2]}`, hotzone: () => `Zone: ${Math.floor(g.zone.p[1])}% vs ${Math.floor(g.zone.p[2])}%`, knockout: () => `Rounds: ${g.rounds[1]} - ${g.rounds[2]}`, wipeout: () => `KOs: ${g.kos[1]} vs ${g.kos[2]}`, siege: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `IKE: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; } }[g.mode]();
+  const extra = { showdown: `Cubes ${gs.cubes}`, duo: `Cubes ${gs.cubes}`, wipeout: `KOs ${gs.kills}`, siege: `Bolts ${gs.bolts}`, gemgrab: `Gems ${gs.gems}`, brawlball: `Goals ${gs.goals}`, basket: `Points ${gs.goals}`, duels: `KOs ${gs.kills}`, robo: `Robots ${gs.kills}`, heist: `Safe damage ${fmt(gs.safeDmg)}`, bounty: `Stars ${gs.stars}`, hotzone: `Zone time ${Math.round(gs.zone)}s`, knockout: `Rounds won ${gs.rounds}` }[g.mode];
   if (g.mode !== 'training') {
     S.log.unshift({ t: Date.now(), mode: g.mode, map: g.map.name, id: pid, res: g.quit ? 'quit' : res, rank: rank || 0, tro: dTro, kos: gs.kills, ranked: !!g.ranked });
     S.log.length = Math.min(S.log.length, 25); save();
@@ -4995,11 +5050,13 @@ function finishMatch() {
 }
 // ---------------- unlock + Star Drop animations ----------------
 const FX = []; let fxOpen = false;
-function fxQueue(item) { FX.push(item); if (!fxOpen) fxNext(); }
+const fxBlocked = () => App.screen === 'battle' && G && !G.over;
+function fxQueue(item) { FX.push(item); if (!fxOpen && !fxBlocked()) fxNext(); }
 function fxNext() {
   const ov = $('#ov-fx'); const it = FX.shift();
   if (!it) { fxOpen = false; ov.hidden = true; if (App.screen !== 'battle') { updateWallet(); const r = { brawlers: renderBrawlers, road: renderRoad, menu: renderHome }[App.screen]; if (r) r(); } return; }
   fxOpen = true; ov.hidden = false; Sound.init(); Sound.resume();
+  if (fxBlocked()) { FX.unshift(it); fxOpen = false; ov.hidden = true; return; }
   if (it.type === 'unlock') fxUnlock(it.id); else if (it.type === 'level') fxLevel(it.id, it.lvl); else fxDrop(it.min || 0);
 }
 function fxUnlock(id) {
