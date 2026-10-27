@@ -280,6 +280,32 @@ input[type=text]{font-size:13px}
 .msg{font-size:9px;line-height:1.7;color:#fff;max-width:85%}
 .msg b{color:#ffe040} .msg.me{align-self:flex-end;text-align:right} .msg.me b{color:#7cc4ff}
 .rankbadge{width:120px;height:120px;border:4px solid var(--ink);display:grid;place-items:center;font-family:var(--display);font-size:14px;text-align:center;color:#1a1a3a;box-shadow:0 4px 0 var(--ink)}
+
+.brbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.brsort{font-family:var(--display);font-size:10px;color:#fff;display:flex;align-items:center;gap:8px;background:#0d0b1e;padding:8px 10px;border:3px solid var(--ink)}
+.brsort select,#brSearch{font-family:var(--display);font-size:10px;padding:6px;border:3px solid var(--ink);background:#fff;color:#1a1a3a}
+#brSearch{flex:1;min-width:120px;max-width:260px}
+.brcount{font-family:var(--display);font-size:13px;color:#fff;margin:4px 0 10px} .brcount span{color:#7cc4ff}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.bcard{position:relative;display:flex;border:4px solid var(--ink);background:#0d0b1e;padding:0;cursor:pointer;box-shadow:0 5px 0 var(--ink);height:132px;text-align:left;color:#fff}
+.bcard:active{transform:translateY(3px);box-shadow:0 2px 0 var(--ink)}
+.bcard.sel{outline:4px solid #fff;outline-offset:2px}
+.bcard .bface{position:relative;flex:1;overflow:hidden}
+.bcard canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+.bcard .bname{position:absolute;right:6px;bottom:24px;font-family:var(--display);font-size:13px;color:#fff;text-shadow:2px 0 #000,-2px 0 #000,0 2px #000,0 -2px #000,2px 2px #000;text-transform:uppercase}
+.bcard .btro{position:absolute;left:0;right:0;bottom:0;height:20px;background:rgba(13,11,30,.85);display:flex;align-items:center;gap:4px;padding:0 6px;font-family:var(--display);font-size:10px;color:#ffc93a}
+.bcard .btro svg{width:14px;height:14px}
+.bcard .bside{width:46px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 0;background:#3a3f5a;border-left:4px solid var(--ink)}
+.bcard .bside.up{background:#3ad13a}
+.bcard .blvl{width:32px;height:32px;border-radius:50%;background:#c02a9a;border:3px solid var(--ink);display:grid;place-items:center;font-family:var(--display);font-size:11px;color:#fff;position:relative}
+.bcard .barrow{position:absolute;top:-10px;left:-12px;width:18px;height:18px;border-radius:50%;background:#3ad13a;border:2px solid var(--ink);color:#fff;font-size:10px;display:grid;place-items:center;font-family:var(--display)}
+.bcard .bab{width:22px;height:22px;display:grid;place-items:center;font-size:12px;border:2px solid var(--ink);background:rgba(0,0,0,.25);color:rgba(255,255,255,.45)}
+.bcard .bab.g{background:#5ad84a;color:#fff;border-radius:6px} .bcard .bab.s{background:#ffb020;color:#fff;border-radius:50%} .bcard .bab.h{background:#8a3ad8;color:#fff;border-radius:50% 50% 50% 0}
+.bcard.locked canvas{filter:grayscale(1) brightness(.5)}
+.bcard .block{position:absolute;top:6px;left:6px;right:6px;font-family:var(--display);font-size:7px;line-height:1.5;background:rgba(0,0,0,.7);padding:4px;color:#fff}
+.bcard .bnew{position:absolute;top:0;left:0;background:#e02a2a;color:#fff;font-family:var(--display);font-size:8px;padding:3px 5px;border:2px solid var(--ink)}
+.bcard .blvl,.bcard .bab.s{clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%);border:none;box-shadow:inset 0 0 0 3px #0d0b1e}
+.bcard .bside{position:relative;overflow:visible} .bcard .barrow{left:-12px;top:-10px;z-index:2;width:22px;height:22px;border:3px solid #0d0b1e;font-size:11px}
 </style>
 </head>
 <body>
@@ -337,7 +363,11 @@ input[type=text]{font-size:13px}
 <!-- BRAWLERS -->
 <div id="scr-brawlers" class="screen sub" hidden>
   <header class="subbar"><button class="iconbtn back" aria-label="Back" data-icon="back"></button><h2 class="stroke">Brawlers</h2><div class="wallet mini"></div></header>
-  <div class="scroll"><div class="wrap"><div class="grid" id="brGrid"></div></div></div>
+  <div class="scroll"><div class="wrap">
+    <div class="brbar"><label class="brsort">Sort by <select id="brSort"><option value="rarity">Rarity</option><option value="name">Name</option><option value="trophies">Trophies</option><option value="power">Power level</option><option value="upgrade">Can upgrade</option></select></label>
+      <input type="search" id="brSearch" placeholder="Search" maxlength="20" aria-label="Search brawlers"></div>
+    <h3 class="brcount stroke-sm">Brawlers <span id="brCount"></span></h3>
+    <div class="bgrid" id="brGrid"></div></div></div>
 </div>
 
 <!-- DETAIL -->
@@ -3841,13 +3871,44 @@ function unlockText(id) {
   if (u.coins) parts.push(`${u.coins} coins`); if (u.gems) parts.push(`${u.gems} gems`);
   return 'Unlock: ' + parts.join(' or ');
 }
+const RARITY_ORDER = ['Starting', 'Rare', 'Super Rare', 'Epic', 'Mythic', 'Legendary'];
+const RARITY_BG = { Starting: ['#5ab8ff', '#3a8ad8'], Rare: ['#3ad13a', '#22a022'], 'Super Rare': ['#1e8cff', '#1060d0'], Epic: ['#b02dff', '#8018d0'], Mythic: ['#ff2a3a', '#c8101e'], Legendary: ['#ffe11a', '#f0b000'] };
+const canUpgrade = st => st.owned && st.level < MAX_LEVEL && S.coins >= UPGRADE_COST[st.level];
+// Zoomed head-and-shoulders portrait on a rarity-coloured background, like the real brawler cards.
+function drawCardFace(cv, id, skin) {
+  const c = cv.getContext('2d'), w = cv.width, h = cv.height, [c1, c2] = RARITY_BG[BR[id].rarity] || RARITY_BG.Rare;
+  c.imageSmoothingEnabled = false; c.fillStyle = c1; c.fillRect(0, 0, w, h);
+  c.fillStyle = c2; c.beginPath(); c.moveTo(w * 0.55, 0); c.lineTo(w, 0); c.lineTo(w, h); c.lineTo(w * 0.35, h); c.fill();
+  const S_ = getSpr(id, skin), sc = Math.floor(h / 12.8), px = Math.round(w * 0.12), py = 4;
+  const k = silhouette(id, INK).n; for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) c.drawImage(k, px + dx * sc, py + dy * sc, S_.w * sc, S_.h * sc);
+  c.drawImage(S_.n[0], px, py, S_.w * sc, S_.h * sc);
+  if (S_.weapon) { const W = S_.weapon; c.drawImage(W.n, px + W.ox * sc, py + W.oy * sc, W.w * sc, W.n.height * sc); }
+}
 function renderBrawlers() {
   const g = $('#brGrid'); g.innerHTML = '';
-  for (const d of BR_LIST) {
-    const st = S.brawlers[d.id];
-    const el = document.createElement('button'); el.className = 'card' + (st.owned ? '' : ' locked') + (S.selected === d.id ? ' sel' : '');
-    el.innerHTML = `<canvas width="240" height="240"></canvas>${st.owned ? '' : `<span class="lock">${unlockText(d.id)}</span>`}<span class="cinfo"><span class="cname stroke-sm">${d.name}</span><span class="csub"><span style="color:${RARITY_COL[d.rarity]}">${d.rarity}</span><span>Rank ${brawlerRank(st.trophies)}</span></span><span class="csub"><span>${d.role}</span><span>${st.owned ? 'Power ' + st.level : 'Locked'}</span></span><span class="csub"><span class="trophy-line">${icon('trophy')} ${st.trophies}</span>${S.selected === d.id ? '<span>Selected</span>' : ''}</span></span>`;
-    drawPortrait(el.querySelector('canvas'), d.id, { skin: st.owned ? st.skin : '' });
+  const sort = S.brSort || 'rarity', q = ($('#brSearch').value || '').trim().toLowerCase();
+  $('#brSort').value = sort;
+  $('#brSort').onchange = e => { S.brSort = e.target.value; save(); renderBrawlers(); };
+  $('#brSearch').oninput = () => renderBrawlers();
+  const list = BR_LIST.filter(d => !q || d.name.toLowerCase().includes(q)).slice().sort((a, b) => {
+    const A = S.brawlers[a.id], B = S.brawlers[b.id];
+    if (A.owned !== B.owned) return A.owned ? -1 : 1;
+    if (sort === 'name') return a.name.localeCompare(b.name);
+    if (sort === 'trophies') return B.trophies - A.trophies || a.name.localeCompare(b.name);
+    if (sort === 'power') return B.level - A.level || B.trophies - A.trophies;
+    if (sort === 'upgrade') return (canUpgrade(B) - canUpgrade(A)) || B.level - A.level;
+    return RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity) || BR_LIST.indexOf(a) - BR_LIST.indexOf(b);
+  });
+  $('#brCount').textContent = `${BR_LIST.filter(d => S.brawlers[d.id].owned).length}/${BR_LIST.length}`;
+  for (const d of list) {
+    const st = S.brawlers[d.id], up = canUpgrade(st);
+    const el = document.createElement('button'); el.className = 'bcard' + (st.owned ? '' : ' locked') + (S.selected === d.id ? ' sel' : '');
+    el.setAttribute('aria-label', `${d.name}, ${d.rarity}, ${st.owned ? 'power ' + st.level : 'locked'}`);
+    const ab = (cls, ch, ok, tip) => `<span class="bab ${ok ? cls : ''}" title="${tip}">${ok ? ch : '🔒'}</span>`;
+    el.innerHTML = `<div class="bface"><canvas width="184" height="128"></canvas>${!st.owned ? `<span class="block">${unlockText(d.id)}</span>` : st.trophies === 0 && st.level === 1 && d.id !== 'shelly' ? '<span class="bnew">NEW</span>' : ''}<span class="bname">${d.name}</span><span class="btro">${icon('trophy')} ${st.trophies}</span></div>
+      <div class="bside${up ? ' up' : ''}">${up ? '<span class="barrow" title="Can be upgraded">▲</span>' : ''}<span class="blvl">${st.owned ? st.level : '?'}</span>
+      ${ab('g', '◆', st.owned && st.level >= 7, 'Gadget at power 7')}${ab('s', '★', st.owned && st.level >= 9, 'Star power at power 9')}${ab('h', '⚡', st.owned && st.level >= 11, 'Hypercharge at power 11')}</div>`;
+    drawCardFace(el.querySelector('canvas'), d.id, st.owned ? st.skin || '' : '');
     el.onclick = () => { App.detailId = d.id; show('detail'); };
     g.appendChild(el);
   }
