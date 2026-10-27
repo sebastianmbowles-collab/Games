@@ -1043,6 +1043,17 @@ const SPECIAL_SKINS = {
   eightbit: [{ id: 'classic8', name: 'Classic', pal: { W: '#9a7ae8', G: '#6a4ab8', c: '#5aff7a' }, price: { gems: 80 } }],
   gene: [{ id: 'goldgene', name: 'Gold', pal: { u: '#ffd030', U: '#c09010', p: '#3a8ad8' }, price: { gems: 100 } }],
   max: [{ id: 'maxneon', name: 'Neon', pal: { y: '#5ef0ff', Y: '#2ab0d0', r: '#ff4ab0' }, price: { gems: 80 } }],
+  bibi: [{ id: 'retrobibi', name: 'Retro', pal: { H: '#e8b020', h: '#ffd84a', j: '#e03040', t: '#ffffff' }, price: { gems: 80 } }],
+  tick: [{ id: 'redtick', name: 'Red Alert', pal: { b: '#a02a2a', B: '#6a1a1a', r: '#3a8ad8' }, price: { gems: 60 } }],
+  barley: [{ id: 'wizard', name: 'Wizard', pal: { H: '#2a3a9a', h: '#ffd030', r: '#3a2a8a', c: '#c8a8f0' }, price: { gems: 80 } }],
+  sprout: [{ id: 'hotsauce', name: 'Hot Sauce', pal: { l: '#e03030', L: '#a01a1a', y: '#ff8a2a' }, price: { gems: 60 } }],
+  emz: [{ id: 'friendzoner', name: 'Friendzoner', pal: { P: '#ff6ab0', Q: '#c0307a', p: '#3a3a5a', v: '#1a1a2a' }, price: { gems: 80 } }],
+  rico: [{ id: 'popcorn', name: 'Popcorn', pal: { b: '#e03030', B: '#a01a1a', r: '#ffffff', c: '#fff4c0' }, price: { gems: 60 } }],
+  darryl: [{ id: 'ducky', name: 'Ducky', pal: { n: '#ffd030', N: '#d8a010', g: '#ff8a2a', r: '#3a8ad8' }, price: { gems: 80 } }],
+  penny: [{ id: 'bunny', name: 'Bunny', pal: { K: '#f0e8f0', o: '#ff9ac8', c: '#ff6ab0', C: '#c0307a' }, price: { gems: 80 } }],
+  carl: [{ id: 'hotrod', name: 'Hot Rod', pal: { y: '#e03030', Y: '#a01a1a', b: '#2a2a3a', B: '#1a1a2a' }, price: { gems: 80 } }],
+  bo: [{ id: 'mecha', name: 'Mecha', pal: { n: '#5a6a8a', N: '#3a4a6a', w: '#c8d8f0', r: '#3ad8ff', y: '#ff6ab0' }, price: { gems: 100 } }],
+  pam: [{ id: 'nurse', name: 'Nurse', pal: { r: '#ffd030', R: '#d8a010', j: '#f0f0f8', J: '#c8ccd8', b: '#ff6ab0' }, price: { gems: 80 } }],
 };
 const skinName = (id, sk) => !sk ? 'Classic' : ((SPECIAL_SKINS[id] || []).find(x => x.id === sk) || SKINS.find(x => x.id === sk) || { name: sk }).name;
 // mastery
