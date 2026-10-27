@@ -717,9 +717,9 @@ const MAX_LEVEL = 11;
 // ---------------- brawlers ----------------
 // Fan-made versions of Brawl Stars brawlers. Ranges are in tiles, speeds in px/s.
 const BR_LIST = [
-  { id: 'shelly', name: 'Shelly', rarity: 'Starting', role: 'Damage Dealer', bg: '#9b4be0', bg2: '#5a2a90', hp: 3800, speed: 150, reload: 1.5, superCost: 3300,
+  { id: 'shelly', name: 'Shelly', rarity: 'Starting', role: 'Damage Dealer', bg: '#9b4be0', bg2: '#5a2a90', hp: 4000, speed: 150, reload: 1.5, superCost: 3300,
     blurb: 'Shelly’s shotgun shreds anyone up close and still pokes at mid range.',
-    attack: { kind: 'spread', name: 'Buckshot', desc: 'Fires 5 shells in a wide fan. Point-blank hits hurt the most.', pellets: 5, spread: 0.5, range: 7.2, dmg: 320, speed: 760, r: 7, color: '#ffe066', sfx: 'shotgun' },
+    attack: { kind: 'spread', name: 'Buckshot', desc: 'Fires 5 shells in a wide fan. Point-blank hits hurt the most.', pellets: 5, spread: 0.5, range: 7.2, dmg: 340, speed: 760, r: 7, color: '#ffe066', sfx: 'shotgun' },
     super: { kind: 'spread', name: 'Super Shell', desc: '9 big shells that knock enemies back and smash walls.', pellets: 9, spread: 0.75, range: 8, dmg: 330, speed: 820, r: 8, knock: 340, breakWalls: true, color: '#ff9a2a', sfx: 'shotgun' },
     gadget: { name: 'Fast Forward', desc: 'Dash a short distance forward.' },
     star: { name: 'Shell Shock', desc: 'Super Shell slows every enemy it hits for 1.5 seconds.' },
@@ -738,14 +738,14 @@ const BR_LIST = [
     gadget: { name: 'Speedloader', desc: 'Instantly reloads 2 ammo.' },
     star: { name: 'Slick Boots', desc: 'Colt moves 10% faster.' },
     hyper: { name: 'Bullet Hell', desc: 'Hypercharged Super fires 18 bullets.' } },
-  { id: 'bull', name: 'Bull', rarity: 'Rare', role: 'Tank', bg: '#d8483c', bg2: '#7a2b2b', hp: 5200, speed: 165, reload: 1.5, superCost: 3900,
+  { id: 'bull', name: 'Bull', rarity: 'Rare', role: 'Tank', bg: '#d8483c', bg2: '#7a2b2b', hp: 4700, speed: 165, reload: 1.5, superCost: 3900,
     blurb: 'Bull charges in and blasts you point-blank with his double-barrel.',
     attack: { kind: 'spread', name: 'Double-Barrel', desc: 'A short-range blast of 5 heavy shells.', pellets: 5, spread: 0.3, range: 5, dmg: 400, speed: 800, r: 8, color: '#ffd35a', sfx: 'shotgun' },
     super: { kind: 'dash', name: 'Bulldozer', desc: 'Charges forward, trampling enemies and breaking walls.', range: 10, dmg: 900, knock: 380, speed: 640, sfx: 'super' },
     gadget: { name: 'T-Bone Injector', desc: 'Instantly heals 1,500 health.' },
     star: { name: 'Berserker', desc: 'Reloads twice as fast when below 60% health.' },
     hyper: { name: 'Steamroller', desc: 'Hypercharged Super charges 50% farther and hits harder.' } },
-  { id: 'primo', name: 'El Primo', rarity: 'Rare', role: 'Tank', bg: '#2f7bff', bg2: '#b83a1a', hp: 6000, speed: 165, reload: 1.25, superCost: 3000,
+  { id: 'primo', name: 'El Primo', rarity: 'Rare', role: 'Tank', bg: '#2f7bff', bg2: '#b83a1a', hp: 5700, speed: 165, reload: 1.25, superCost: 3000,
     blurb: 'El Primo is a champion luchador. He punches fast and lands even harder.',
     attack: { kind: 'punch', name: 'Fists of Fury', desc: 'A flurry of 4 short-range punches.', shots: 4, interval: 0.085, range: 3, dmg: 350, speed: 950, r: 13, color: '#ff7a2a', sfx: 'punch' },
     super: { kind: 'leap', name: 'Flying Elbow Drop', desc: 'Leaps over walls and slams down on everyone nearby.', range: 8, radius: 2.3, dmg: 1100, knock: 330, dur: 0.7, sfx: 'super' },
@@ -761,7 +761,7 @@ const BR_LIST = [
     hyper: { name: 'Grand Finale', desc: 'Hypercharged Super heals 50% more and reaches farther.' } },
   { id: 'brock', name: 'Brock', rarity: 'Rare', role: 'Artillery', bg: '#ff8a2a', bg2: '#8a3a1a', hp: 2600, speed: 150, reload: 2.1, superCost: 3300,
     blurb: 'Brock launches rockets that explode on impact. Stay out of his range!',
-    attack: { kind: 'rocket', name: 'Rocket No. 4', desc: 'A long-range rocket that explodes and hurts everyone nearby.', range: 9.5, dmg: 1050, speed: 700, r: 9, splash: 1.0, color: '#ff6a3a', sfx: 'throw' },
+    attack: { kind: 'rocket', name: 'Rocket No. 4', desc: 'A long-range rocket that explodes and hurts everyone nearby.', range: 9.5, dmg: 1150, speed: 700, r: 9, splash: 1.0, color: '#ff6a3a', sfx: 'throw' },
     super: { kind: 'rain', name: 'Rocket Rain', desc: 'A barrage of 9 rockets that blow up an area and its walls.', range: 9, radius: 2.5, rockets: 9, dmg: 900, splash: 1.0, breakWalls: true, sfx: 'super' },
     gadget: { name: 'Rocket Laces', desc: 'Blasts off the ground to jump a short way, hurting enemies where he took off.' },
     star: { name: 'More Rockets!', desc: 'Rocket Rain fires 13 rockets instead of 9.' },
@@ -775,21 +775,21 @@ const BR_LIST = [
     hyper: { name: 'Turret Overload', desc: 'Hypercharged Scrappy has double health.' } },
   { id: 'dynamike', name: 'Dynamike', rarity: 'Super Rare', role: 'Artillery', bg: '#e0b040', bg2: '#8a5a1a', hp: 2800, speed: 150, reload: 1.7, superCost: 2600,
     blurb: 'Dynamike lobs dynamite over walls. Nobody is safe behind cover.',
-    attack: { kind: 'dyna', name: 'Short Fuse', desc: 'Throws 2 sticks of dynamite over walls. They explode where they land.', range: 7, dmg: 760, splash: 1.0, sfx: 'throw' },
+    attack: { kind: 'dyna', name: 'Short Fuse', desc: 'Throws 2 sticks of dynamite over walls. They explode where they land.', range: 7, dmg: 851, splash: 1.0, sfx: 'throw' },
     super: { kind: 'barrel', name: 'Big Barrel Boom', desc: 'Lobs a huge barrel of dynamite that blows up walls and knocks enemies back.', range: 8, radius: 2.0, dmg: 2000, knock: 300, breakWalls: true, sfx: 'throw' },
     gadget: { name: 'Fidget Spinner', desc: 'Spins around with lit dynamite, hurting enemies close to him.' },
     star: { name: 'Demolition', desc: 'Big Barrel Boom deals 1,000 extra damage.' },
     hyper: { name: 'Mega Barrel', desc: 'Hypercharged barrel has a much bigger blast.' } },
   { id: 'spike', name: 'Spike', rarity: 'Legendary', role: 'Damage Dealer', bg: '#50c048', bg2: '#1f7a3a', hp: 2600, speed: 150, reload: 2.0, superCost: 2600,
     blurb: 'Spike doesn’t talk, he just throws needle grenades. Hugging is not advised.',
-    attack: { kind: 'bomb', name: 'Needle Grenade', desc: 'A cactus grenade that bursts into 6 needles.', range: 7.5, dmg: 540, speed: 620, r: 11, spikes: 6, spikeRange: 2.6, spikeDmg: 300, color: '#8ee05f', sfx: 'throw' },
+    attack: { kind: 'bomb', name: 'Needle Grenade', desc: 'A cactus grenade that bursts into 6 needles.', range: 7.5, dmg: 600, speed: 620, r: 11, spikes: 6, spikeRange: 2.6, spikeDmg: 340, color: '#8ee05f', sfx: 'throw' },
     super: { kind: 'area', name: 'Stick Around!', desc: 'A field of spikes that slows and damages enemies inside it.', range: 8, radius: 2.3, life: 4.5, tick: 0.5, dmg: 300, color: '#9be862', sfx: 'throw' },
     gadget: { name: 'Popping Pincushion', desc: 'Shoots 12 needles in every direction.' },
     star: { name: 'Fertilize', desc: 'Heals 600 health per second while standing in his own Stick Around!' },
     hyper: { name: 'Thorn Garden', desc: 'Hypercharged Super makes a bigger, nastier field.' } },
-  { id: 'rosa', name: 'Rosa', rarity: 'Rare', role: 'Tank', bg: '#4ac040', bg2: '#2a6a2a', hp: 5400, speed: 165, reload: 1.4, superCost: 3000,
+  { id: 'rosa', name: 'Rosa', rarity: 'Rare', role: 'Tank', bg: '#4ac040', bg2: '#2a6a2a', hp: 5100, speed: 165, reload: 1.4, superCost: 3000,
     blurb: 'Rosa is a boxing botanist. Her plant shield lets her punch through anything.',
-    attack: { kind: 'punch', name: 'Hands of Stone', desc: '3 wide punches that hit everyone in front of her.', shots: 3, interval: 0.1, range: 3.2, dmg: 460, speed: 900, r: 16, color: '#7aff6a', sfx: 'punch' },
+    attack: { kind: 'punch', name: 'Hands of Stone', desc: '3 wide punches that hit everyone in front of her.', shots: 3, interval: 0.1, range: 3.2, dmg: 420, speed: 900, r: 16, color: '#7aff6a', sfx: 'punch' },
     super: { kind: 'rshield', name: 'Strong Stuff', desc: 'A shield of plants that blocks 70% of damage for 3.5 seconds.', dur: 3.5, sfx: 'super' },
     gadget: { name: 'Grow Light', desc: 'Instantly heals 1,000 health.' },
     star: { name: 'Plant Life', desc: 'Heals 300 health per second while in a bush.' },
@@ -829,9 +829,9 @@ const BR_LIST = [
     gadget: { name: 'Defense Booster', desc: 'Takes 40% less damage for 3 seconds.' },
     star: { name: 'Extra Toxic', desc: 'Poison deals 50% more damage.' },
     hyper: { name: 'Toxic Swoop', desc: 'Hypercharged Swoop throws 24 daggers.' } },
-  { id: 'edgar', name: 'Edgar', rarity: 'Epic', role: 'Assassin', bg: '#4a2a3a', bg2: '#1a0a1a', hp: 3600, speed: 180, reload: 0.9, superCost: 2600,
+  { id: 'edgar', name: 'Edgar', rarity: 'Epic', role: 'Assassin', bg: '#4a2a3a', bg2: '#1a0a1a', hp: 3800, speed: 180, reload: 0.9, superCost: 2600,
     blurb: 'Edgar jumps over walls and heals himself with every punch.',
-    attack: { kind: 'punch', name: 'Fisticuffs', desc: 'Two quick punches. Each hit heals Edgar for 25% of the damage.', shots: 2, interval: 0.12, range: 2.3, dmg: 520, speed: 900, r: 14, color: '#ff5a6a', drain: 0.25, sfx: 'punch' },
+    attack: { kind: 'punch', name: 'Fisticuffs', desc: 'Two quick punches. Each hit heals Edgar for 30% of the damage.', shots: 2, interval: 0.12, range: 2.3, dmg: 520, speed: 900, r: 14, color: '#ff5a6a', drain: 0.3, sfx: 'punch' },
     super: { kind: 'leap', name: 'Vault', desc: 'Jumps a long way over walls and lands on enemies.', range: 7, radius: 1.2, dmg: 300, knock: 100, dur: 0.6, sfx: 'super' },
     gadget: { name: 'Let’s Fly', desc: 'Instantly charges half of his Super.' },
     star: { name: 'Hard Landing', desc: 'Vault deals 900 extra damage where he lands.' },
@@ -845,21 +845,21 @@ const BR_LIST = [
     hyper: { name: 'Bubble Trouble', desc: 'Hypercharged Spitball is bigger and stronger.' } },
   { id: 'max', name: 'Max', rarity: 'Mythic', role: 'Support', bg: '#ffc020', bg2: '#c04a10', hp: 3300, speed: 200, reload: 1.3, superCost: 3400,
     blurb: 'Max is the fastest brawler of all, and her Super makes the whole team zoom.',
-    attack: { kind: 'burst', name: 'Pew Pew Pew!', desc: 'Fires 4 quick shots in a line.', shots: 4, interval: 0.08, range: 8.5, dmg: 330, speed: 1000, r: 6, jitter: 0.03, color: '#ffe066', sfx: 'pistol' },
+    attack: { kind: 'burst', name: 'Pew Pew Pew!', desc: 'Fires 4 quick shots in a line.', shots: 4, interval: 0.08, range: 8.5, dmg: 305, speed: 1000, r: 6, jitter: 0.03, color: '#ffe066', sfx: 'pistol' },
     super: { kind: 'teamboost', name: 'Let’s Go!', desc: 'Max and every teammate nearby run 50% faster for 4 seconds.', radius: 6, dur: 4, sfx: 'super' },
     gadget: { name: 'Phase Shifter', desc: 'Cannot be hurt for 1.2 seconds.' },
     star: { name: 'Super Charged', desc: 'Her Super slowly charges while she runs.' },
     hyper: { name: 'Turbo', desc: 'Hypercharged speed boost lasts 6 seconds.' } },
   { id: 'tick', name: 'Tick', rarity: 'Super Rare', role: 'Artillery', bg: '#6a7088', bg2: '#2a2e3a', hp: 2200, speed: 150, reload: 1.8, superCost: 2600,
     blurb: 'Tick lobs little mines over walls, and his head runs after enemies and explodes.',
-    attack: { kind: 'dyna', name: 'Minimines', desc: 'Throws 3 mines over walls that explode where they land.', range: 7.5, dmg: 520, splash: 1.0, count: 3, sfx: 'throw' },
+    attack: { kind: 'dyna', name: 'Minimines', desc: 'Throws 3 mines over walls that explode where they land.', range: 7.5, dmg: 580, splash: 1.0, count: 3, sfx: 'throw' },
     super: { kind: 'pet', name: 'Headfirst', desc: 'Throws his head, which chases the nearest enemy and explodes.', range: 5, hp: 2000, petDmg: 1800, petRate: 1, petSpeed: 220, kamikaze: true, sfx: 'super' },
     gadget: { name: 'Backup Mine', desc: 'Drops a mine at his feet that explodes after a second.' },
     star: { name: 'Well Oiled', desc: 'Heals 50% faster when out of combat.' },
     hyper: { name: 'Big Head', desc: 'Hypercharged head is tougher and explodes harder.' } },
-  { id: 'barley', name: 'Barley', rarity: 'Rare', role: 'Artillery', bg: '#b0b8c8', bg2: '#4a4a6a', hp: 2400, speed: 150, reload: 1.6, superCost: 2700,
+  { id: 'barley', name: 'Barley', rarity: 'Rare', role: 'Artillery', bg: '#b0b8c8', bg2: '#4a4a6a', hp: 2700, speed: 150, reload: 1.6, superCost: 2700,
     blurb: 'Barley throws bottles over walls that leave burning puddles behind.',
-    attack: { kind: 'bottle', name: 'Undiluted', desc: 'A bottle that leaves a damaging puddle for 1.6 seconds.', range: 7.5, radius: 1.1, life: 1.6, tick: 0.4, dmg: 340, sfx: 'throw' },
+    attack: { kind: 'bottle', name: 'Undiluted', desc: 'A bottle that leaves a damaging puddle for 1.6 seconds.', range: 7.5, radius: 1.3, life: 1.6, tick: 0.4, dmg: 400, sfx: 'throw' },
     super: { kind: 'barrage', name: 'Last Call', desc: 'Throws 5 bottles at once, covering a big area in puddles.', range: 8, count: 5, radius: 1.2, life: 2.5, tick: 0.4, dmg: 360, sfx: 'throw' },
     gadget: { name: 'Sticky Syrup Mixer', desc: 'Pours a puddle at his feet that slows enemies.' },
     star: { name: 'Medical Use', desc: 'Heals 300 health every time he throws a bottle.' },
@@ -873,14 +873,14 @@ const BR_LIST = [
     hyper: { name: 'Big Hedge', desc: 'Hypercharged Hedge is 5 tiles long.' } },
   { id: 'eightbit', name: '8-Bit', rarity: 'Epic', role: 'Damage Dealer', bg: '#7a4ad8', bg2: '#2a1a5a', hp: 5000, speed: 120, reload: 1.5, superCost: 3600,
     blurb: '8-Bit is a slow arcade machine with big damage and a booster that powers up his team.',
-    attack: { kind: 'burst', name: 'Blaster Beams', desc: 'Fires 6 long-range laser beams.', shots: 6, interval: 0.06, range: 9.5, dmg: 340, speed: 1100, r: 6, jitter: 0.03, color: '#ff4a6a', sfx: 'pistol' },
+    attack: { kind: 'burst', name: 'Blaster Beams', desc: 'Fires 6 long-range laser beams.', shots: 6, interval: 0.06, range: 9.5, dmg: 310, speed: 1100, r: 6, jitter: 0.03, color: '#ff4a6a', sfx: 'pistol' },
     super: { kind: 'booster', name: 'Damage Booster', desc: 'Places a booster that makes teammates near it deal 30% more damage.', range: 3, radius: 4.5, life: 12, sfx: 'super' },
     gadget: { name: 'Cheat Cartridge', desc: 'Teleports to his Damage Booster.' },
     star: { name: 'Boosted Booster', desc: 'The booster reaches farther.' },
     hyper: { name: 'Extra Credits', desc: 'Hypercharged booster reaches much farther.' } },
   { id: 'emz', name: 'Emz', rarity: 'Epic', role: 'Controller', bg: '#8a3ad8', bg2: '#3a1a6a', hp: 3600, speed: 150, reload: 1.6, superCost: 3000,
     blurb: 'Emz sprays a slow cloud of hairspray and surrounds herself with a toxic aura.',
-    attack: { kind: 'wave', name: 'Spray', desc: 'A slow cloud of hairspray that hurts everyone it passes.', range: 5.5, dmg: 720, speed: 380, r: 30, color: '#d0a0ff', sfx: 'orb' },
+    attack: { kind: 'wave', name: 'Spray', desc: 'A slow cloud of hairspray that hurts everyone it passes.', range: 5.5, dmg: 800, speed: 380, r: 30, color: '#d0a0ff', sfx: 'orb' },
     super: { kind: 'aura', name: 'Toxic Aura', desc: 'A cloud around her that slows and hurts nearby enemies for 5 seconds.', radius: 3, life: 5, tick: 0.5, dmg: 300, sfx: 'super' },
     gadget: { name: 'Friendzoner', desc: 'Pushes away and hurts every enemy close to her.' },
     star: { name: 'Hype', desc: 'Heals 300 for every enemy hurt by her aura.' },
@@ -2497,7 +2497,14 @@ function updateAreas(dt) {
     const inside = G.brawlers.filter(b => b.alive && b.team !== a.team && !b.leap && dist(a.x, a.y, b.x, b.y) < a.r + b.r * 0.5);
     if (!a.puddle) for (const b of inside) b.slowT = Math.max(b.slowT, 0.25);
     const ow = a.owner; if (ow.star && ow.id === 'spike' && ow.alive && dist(a.x, a.y, ow.x, ow.y) < a.r) heal(ow, 600 * dt, true);
-    if (a.tick <= 0) { a.tick = a.A.tick; for (const b of inside) damage(b, a.dmg, a.owner, { isSuper: !a.attack }); if (a.aura && ow.star && ow.id === 'emz' && ow.alive) heal(ow, 300 * inside.length, true); }
+    if (a.tick <= 0) { a.tick = a.A.tick; for (const b of inside) damage(b, a.dmg, a.owner, { isSuper: !a.attack }); if (a.aura && ow.star && ow.id === 'emz' && ow.alive) heal(ow, 300 * inside.length, true);
+      // ground puddles also hurt boxes, crates and the enemy safe
+      if (a.puddle || a.attack) {
+        const m = G.map, r = Math.ceil(a.r / T);
+        for (let ty = Math.floor(a.y / T) - r; ty <= Math.floor(a.y / T) + r; ty++) for (let tx = Math.floor(a.x / T) - r; tx <= Math.floor(a.x / T) + r; tx++)
+          if (tx >= 0 && ty >= 0 && tx < m.w && ty < m.h && dist(a.x, a.y, tx * T + T / 2, ty * T + T / 2) < a.r + T * 0.5) damageTile(tx, ty, a.dmg);
+        for (const sf of targetsFor(a.team)) if (sf.kind === 'safe' && dist(a.x, a.y, sf.x, sf.y) < a.r + (sf.r || 30)) damage(sf, a.dmg, a.owner, {});
+      } }
   }
   G.areas = G.areas.filter(a => a.t < a.life);
 }
@@ -3150,7 +3157,9 @@ function aiUpdate(b, dt) {
     else {
       const ux = (tgt.x - b.x) / d, uy = (tgt.y - b.y) / d;
       const lowHp = b.hp < b.hpMax * 0.3 && b.ammo < 1;
-      const f = lowHp ? -1 : d > ai.want + 25 ? 1 : d < ai.want - 35 ? -0.8 : 0;
+      // long-range brawlers back away from close-range attackers instead of trading hits
+      const tr = tgt.kind === 'brawler' && tgt.def ? attackRange(tgt) : 0, danger = tr && tr < ai.want * 0.8 && d < tr + 70 && ai.skill > 0.3;
+      const f = lowHp || danger ? -1 : d > ai.want + 25 ? 1 : d < ai.want - 35 ? -0.8 : 0;
       mx = ux * f - uy * ai.strafeDir * 0.75; my = uy * f + ux * ai.strafeDir * 0.75;
     }
   } else if (ai.structTarget) {
@@ -3186,7 +3195,9 @@ function aiUpdate(b, dt) {
     const px = tx + (shootAt.vx || 0) * lead, py = ty + (shootAt.vy || 0) * lead;
     const ang = Math.atan2(py - b.y, px - b.x) + gauss() * ai.err;
     b.aim = ang;
-    const los = shootAt.kind === 'tile' ? losClear(b.x, b.y, tx, ty, true) : losClear(b.x, b.y, tx, ty);
+    // thrown attacks fly over walls, so throwers don't need a clear line
+    const lob = ['dyna', 'bottle', 'seed'].includes(b.def.attack.kind);
+    const los = lob || (shootAt.kind === 'tile' ? losClear(b.x, b.y, tx, ty, true) : losClear(b.x, b.y, tx, ty));
     const reach = range * 0.95 + (shootAt.r || 19) * 0.6;
     if (d <= reach && los && ai.fireT <= 0 && ai.reactT <= 0 && b.ammo >= 1) { if (doAttack(b, ang, d)) ai.fireT = rand(0.12, 0.35) + (1 - ai.skill) * 0.7; }
     if (b.charge >= 1 && ai.superT <= 0 && shootAt.kind !== 'tile' && aiWantsSuper(b, shootAt, d, los)) {
