@@ -1378,7 +1378,7 @@ const STAR_DROPS = [
   { name: 'Super Rare', col: '#3a8aff', w: 28, rewards: [{ coins: 70 }, { gems: 5 }, { coins: 90 }] },
   { name: 'Epic', col: '#c050ff', w: 15, rewards: [{ coins: 150 }, { gems: 12 }] },
   { name: 'Mythic', col: '#ff4a6a', w: 5, rewards: [{ coins: 300 }, { gems: 25 }, { brawlerRandom: true }] },
-  { name: 'Legendary', col: '#ffe040', w: 2, rewards: [{ brawlerRandom: true }, { coins: 600 }] },
+  { name: 'Legendary', col: '#ffb81a', w: 2, rewards: [{ brawlerRandom: true }, { coins: 600 }] },
 ];
 
 function makeQuest() {
@@ -4199,7 +4199,7 @@ function renderQuests() {
 }
 
 // ---------------- pass / road ----------------
-function rewardCanvas(c, r) { const x = 22, y = 22; if (r.drop !== undefined) { c.setTransform(1, 0, 0, 1, 0, 0); drawDropStar(c.canvas, STAR_DROPS[r.drop].col, 0); } else if (r.brawler) { c.setTransform(1, 0, 0, 1, 0, 0); drawPortrait(c.canvas, r.brawler, { scale: 2.4 }); } else if (r.coins) drawCoinIcon(c, x, y, 16); else drawGem(c, x, y, 1.6, 0); }
+function rewardCanvas(c, r) { const x = 22, y = 22; if (r.drop !== undefined) { c.setTransform(1, 0, 0, 1, 0, 0); drawDropStar(c.canvas, STAR_DROPS[r.drop].col); } else if (r.brawler) { c.setTransform(1, 0, 0, 1, 0, 0); drawPortrait(c.canvas, r.brawler, { scale: 2.4 }); } else if (r.coins) drawCoinIcon(c, x, y, 16); else drawGem(c, x, y, 1.6, 0); }
 function renderPass() {
   const B = $('#passBody'), tab = App.passTab;
   $('#passTitle').textContent = tab === 'pass' ? 'Brawl Pass' : 'Trophy Road';
@@ -4425,24 +4425,36 @@ function rollDrop(min) {
   for (let i = 0; i < ds.length; i++) { r -= ds[i].w; if (r <= 0) return min + i; }
   return min;
 }
-// a chunky pixel star drawn on a tiny canvas and scaled up
-function drawDropStar(cv, col, glow) {
-  const c = cv.getContext('2d'), w = cv.width, h = cv.height, n = 24, sc = Math.floor(Math.min(w, h) / n);
+// Star Drop: a 6-point star with shiny facets and a smiley face, drawn small and scaled up for a pixel look
+function drawDropStar(cv, col) {
+  const c = cv.getContext('2d'), w = cv.width, h = cv.height, n = 32, sc = Math.max(1, Math.floor(Math.min(w, h) / n));
   c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false; c.clearRect(0, 0, w, h);
-  const o = document.createElement('canvas'); o.width = o.height = n; const x = o.getContext('2d');
-  const star = (R_, r_) => { x.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r_ : R_; x.lineTo(n / 2 + Math.cos(a) * rr, n / 2 + 1 + Math.sin(a) * rr); } x.closePath(); x.fill(); };
-  x.fillStyle = '#0d0b1e'; star(11.5, 5.4); x.fillStyle = col; star(9.6, 4.2); x.fillStyle = 'rgba(255,255,255,.6)'; x.fillRect(10, 9, 2, 3); x.fillRect(9, 11, 1, 2);
-  x.fillStyle = 'rgba(0,0,0,.2)'; x.fillRect(12, 14, 5, 3);
-  const d = x.getImageData(0, 0, n, n); for (let i = 3; i < d.data.length; i += 4) d.data[i] = d.data[i] > 100 ? 255 : 0; x.putImageData(d, 0, 0);
-  const ox = Math.round((w - n * sc) / 2), oy = Math.round((h - n * sc) / 2);
-  c.drawImage(o, ox, oy, n * sc, n * sc);
+  const o = document.createElement('canvas'); o.width = o.height = n; const x = o.getContext('2d'), cx = n / 2, cy = n / 2;
+  const P = (a, r) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r], rad = d => d * Math.PI / 180;
+  const poly = (pts, fill) => { x.fillStyle = fill; x.beginPath(); pts.forEach(([px, py], k) => k ? x.lineTo(px, py) : x.moveTo(px, py)); x.closePath(); x.fill(); };
+  const star = (R_, r_) => Array.from({ length: 12 }, (_, k) => P(rad(-90 + k * 30), k % 2 ? r_ : R_));
+  poly(star(15.6, 12), '#0d0b1e');
+  for (let k = 0; k < 6; k++) {
+    const a = -90 + k * 60, tip = P(rad(a), 13.8), l = P(rad(a - 30), 10.4), r = P(rad(a + 30), 10.4);
+    const lit = k === 0 || k === 4 || k === 5;
+    poly([[cx, cy], l, tip], shade(col, lit ? 1.35 : 1.05)); poly([[cx, cy], tip, r], shade(col, lit ? 1.0 : 0.72));
+  }
+  // smiley face
+  x.fillStyle = '#0d0b1e'; x.beginPath(); x.arc(cx, cy, 8, 0, 7); x.fill();
+  x.fillStyle = '#ffd23a'; x.beginPath(); x.arc(cx, cy, 6.9, 0, 7); x.fill();
+  x.fillStyle = '#ffe98a'; x.beginPath(); x.arc(cx - 1.5, cy - 2, 3.2, 0, 7); x.fill();
+  x.fillStyle = '#0d0b1e';
+  x.beginPath(); x.arc(cx - 2.6, cy - 1.2, 1.5, 0, 7); x.fill(); x.beginPath(); x.arc(cx + 2.6, cy - 1.2, 1.5, 0, 7); x.fill();
+  x.beginPath(); x.arc(cx, cy + 1.6, 2.4, 0, Math.PI); x.fill();
+  const d = x.getImageData(0, 0, n, n); for (let k = 3; k < d.data.length; k += 4) d.data[k] = d.data[k] > 110 ? 255 : 0; x.putImageData(d, 0, 0);
+  c.drawImage(o, Math.round((w - n * sc) / 2), Math.round((h - n * sc) / 2), n * sc, n * sc);
 }
 function fxDrop(min) {
   const ov = $('#ov-fx'); let lvl = rollDrop(min), taps = 0; const need = 4;
   ov.innerHTML = `<div class="fxrays"></div><div class="fxbox"><div class="fxtag">STAR DROP</div><button class="fxstar" id="fxStar" aria-label="Tap the Star Drop"><canvas width="216" height="216"></canvas></button>
     <div class="fxname" id="fxRar"></div><p class="fxinfo" id="fxHint">Tap the star ${need} times!</p><div id="fxOut"></div></div>`;
   const cvs = ov.querySelector('.fxstar canvas'), btn = $('#fxStar');
-  const paint = () => { const D = STAR_DROPS[lvl]; ov.style.setProperty('--fx', D.col); drawDropStar(cvs, D.col, taps); $('#fxRar').textContent = D.name.toUpperCase(); $('#fxRar').style.color = D.col; };
+  const paint = () => { const D = STAR_DROPS[lvl]; ov.style.setProperty('--fx', D.col); drawDropStar(cvs, D.col); $('#fxRar').textContent = D.name.toUpperCase(); $('#fxRar').style.color = D.col; };
   paint(); Sound.play('superReady');
   btn.onclick = () => {
     if (taps >= need) return;
