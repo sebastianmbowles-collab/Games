@@ -375,6 +375,11 @@ input[type=text]{font-size:13px}
 .ble canvas{width:40px;height:40px;flex:none} .ble small{font-size:8px;opacity:.8}
 .ble.win{border-left:10px solid #3ad13a} .ble.lose,.ble.quit{border-left:10px solid #ff4a5a} .ble.draw{border-left:10px solid #9aa0b8}
 .evtag{color:#fff;padding:4px 6px;border:2px solid var(--ink);font-size:8px;line-height:1.6;text-shadow:1px 1px 0 #000}
+.ldays{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.lday{border:3px solid var(--ink);background:#e8e4ff;display:flex;flex-direction:column;align-items:center;padding:4px 2px;font-size:7px;line-height:1.5;text-align:center;min-width:0}
+.lday canvas{width:100%;max-width:56px;aspect-ratio:1}
+.lday.done{opacity:.45} .lday.today{background:#ffd23a;animation:rpulse 1s ease-in-out infinite}
+.bcard .bfav{position:absolute;top:2px;right:6px;color:#ff4a8a;font-size:22px;text-shadow:2px 2px 0 #000}
 </style>
 </head>
 <body>
@@ -435,7 +440,7 @@ input[type=text]{font-size:13px}
 <div id="scr-brawlers" class="screen sub" hidden>
   <header class="subbar"><button class="iconbtn back" aria-label="Back" data-icon="back"></button><h2 class="stroke">Brawlers</h2><div class="wallet mini"></div></header>
   <div class="scroll"><div class="wrap">
-    <div class="brbar"><label class="brsort">Sort by <select id="brSort"><option value="rarity">Rarity</option><option value="name">Name</option><option value="trophies">Trophies</option><option value="power">Power level</option><option value="upgrade">Can upgrade</option></select></label>
+    <div class="brbar"><label class="brsort">Sort by <select id="brSort"><option value="rarity">Rarity</option><option value="name">Name</option><option value="trophies">Trophies</option><option value="power">Power level</option><option value="upgrade">Can upgrade</option><option value="favs">Favourites</option></select></label>
       <input type="search" id="brSearch" placeholder="Search" maxlength="20" aria-label="Search brawlers"><button class="btn small blue" id="brTrain">Training Cave</button></div>
     <h3 class="brcount stroke-sm">Brawlers <span id="brCount"></span></h3>
     <div class="bgrid" id="brGrid"></div></div></div>
@@ -531,6 +536,14 @@ input[type=text]{font-size:13px}
   <div class="modal result" role="dialog" aria-label="Match result" id="resultBody"></div>
 </div>
 
+<div id="ov-login" class="overlay" hidden>
+  <div class="modal" role="dialog" aria-label="Daily login reward" style="max-width:620px">
+    <h2>Daily Reward</h2>
+    <p id="loginText" style="text-align:center;margin:0 0 10px;font-size:10px;line-height:1.7"></p>
+    <div id="loginDays" class="ldays"></div>
+    <div class="btns"><button class="btn green" id="loginClaim">Claim</button></div>
+  </div>
+</div>
 <div id="ov-confirm" class="overlay" hidden>
   <div class="modal" role="dialog" aria-label="Confirm">
     <h2 id="cTitle">Are you sure?</h2>
@@ -710,7 +723,7 @@ function defaultSave() {
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
     stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0, basket: 0, duels: 0, robo: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
-    lastGift: '', boxesOpened: 0, seenHelp: false, tutDone: false, log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
+    lastGift: '', boxesOpened: 0, seenHelp: false, tutDone: false, login: { day: '', streak: 0, claimed: '' }, favs: [], log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
     club: { name: 'Pixel Pals', members: [], chat: [], claimed: [] },
   };
 }
@@ -1610,6 +1623,7 @@ function buildMap(key) {
   return m;
 }
 
+const LOGIN_REWARDS = [{ coins: 50 }, { gems: 5 }, { coins: 100 }, { drop: 0 }, { coins: 150 }, { gems: 15 }, { drop: 2 }];
 // ---------------- daily event modifiers ----------------
 const EVENT_MODS = { meteor: { name: 'Meteor Shower', desc: 'Meteors fall from the sky. Watch for the red circles!', col: '#ff7a1a' },
   mushroom: { name: 'Healing Mushrooms', desc: 'Mushrooms pop up. Grab one to heal 2,000.', col: '#e8303a' },
@@ -4623,6 +4637,7 @@ function renderBrawlers() {
     if (sort === 'name') return a.name.localeCompare(b.name);
     if (sort === 'trophies') return B.trophies - A.trophies || a.name.localeCompare(b.name);
     if (sort === 'power') return B.level - A.level || B.trophies - A.trophies;
+    if (sort === 'favs') return (S.favs.includes(b.id) - S.favs.includes(a.id)) || BR_LIST.indexOf(a) - BR_LIST.indexOf(b);
     if (sort === 'upgrade') return (canUpgrade(B) - canUpgrade(A)) || B.level - A.level;
     return RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity) || BR_LIST.indexOf(a) - BR_LIST.indexOf(b);
   });
@@ -4632,7 +4647,7 @@ function renderBrawlers() {
     const el = document.createElement('button'); el.className = 'bcard' + (st.owned ? '' : ' locked') + (S.selected === d.id ? ' sel' : '');
     el.setAttribute('aria-label', `${d.name}, ${d.rarity}, ${st.owned ? 'power ' + st.level : 'locked'}`);
     const ab = (cls, ch, ok, tip) => `<span class="bab ${ok ? cls : ''}" title="${tip}">${ok ? ch : '🔒'}</span>`;
-    el.innerHTML = `<div class="bface"><canvas width="184" height="128"></canvas>${!st.owned ? `<span class="block">${unlockText(d.id)}</span>` : st.trophies === 0 && st.level === 1 && d.id !== 'shelly' ? '<span class="bnew">NEW</span>' : ''}<span class="bname">${d.name}</span><span class="btro">${icon('trophy')} ${st.trophies}</span></div>
+    el.innerHTML = `<div class="bface"><canvas width="184" height="128"></canvas>${!st.owned ? `<span class="block">${unlockText(d.id)}</span>` : st.trophies === 0 && st.level === 1 && d.id !== 'shelly' ? '<span class="bnew">NEW</span>' : ''}${S.favs.includes(d.id) ? '<span class="bfav">♥</span>' : ''}<span class="bname">${d.name}</span><span class="btro">${icon('trophy')} ${st.trophies}</span></div>
       <div class="bside${up ? ' up' : ''}">${up ? '<span class="barrow" title="Can be upgraded">▲</span>' : ''}<span class="blvl">${st.owned ? st.level : '?'}</span>
       ${ab('g', '◆', st.owned && st.level >= 7, 'Gadget at power 7')}${ab('s', '★', st.owned && st.level >= 9, 'Star power at power 9')}${ab('h', '⚡', st.owned && st.level >= 11, 'Hypercharge at power 11')}</div>`;
     drawCardFace(el.querySelector('canvas'), d.id, st.owned ? st.skin || '' : '');
@@ -4690,6 +4705,7 @@ function renderDetail() {
   renderGears(id, st); renderSkins(id, st);
   const btns = $('#dBtns');
   const mk = (label, cls, fn, dis) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.innerHTML = label; b.onclick = fn; if (dis) b.disabled = true; btns.appendChild(b); return b; };
+  mk(S.favs.includes(id) ? '♥ Favourite' : '♡ Add to favourites', S.favs.includes(id) ? 'red' : 'grey', () => { if (S.favs.includes(id)) S.favs = S.favs.filter(x => x !== id); else S.favs.push(id); save(); renderDetail(); });
   mk('Try in Training Cave', 'blue', () => startTraining(id));
   if (st.owned) {
     if (S.selected === id) mk('Selected', 'grey', () => {}, true);
@@ -5217,9 +5233,20 @@ function loop(ts) {
     else if (App.screen === 'menu') renderFeatured(dt);
   } catch (err) { console.error(err); }
 }
+function checkLogin() {
+  const today = new Date().toDateString(), L = S.login;
+  if (L.claimed === today) return;
+  if (L.day !== today) { const y = new Date(Date.now() - 86400000).toDateString(); L.streak = L.day === y ? L.streak % 7 + 1 : 1; L.day = today; save(); }
+  const idx = L.streak - 1, box = $('#loginDays'); box.innerHTML = '';
+  $('#loginText').textContent = `Day ${L.streak} of 7. Come back every day for bigger rewards! Miss a day and you start again.`;
+  LOGIN_REWARDS.forEach((r, i) => { const d = document.createElement('div'); d.className = 'lday' + (i < idx ? ' done' : i === idx ? ' today' : '');
+    d.innerHTML = `<b>Day ${i + 1}</b><canvas width="88" height="88"></canvas><span>${rewardLabel(r)}</span>`; const c = d.querySelector('canvas').getContext('2d'); c.scale(2, 2); rewardCanvas(c, r); box.appendChild(d); });
+  $('#ov-login').hidden = false;
+  $('#loginClaim').onclick = () => { $('#ov-login').hidden = true; L.claimed = today; save(); const r = LOGIN_REWARDS[idx]; grant(r, r.drop !== undefined); };
+}
 function boot() {
   loadSave(); init3D(); fillIcons(); bindUI(); resize();
-  show('menu'); $('#loading').hidden = true;
+  show('menu'); $('#loading').hidden = true; checkLogin();
   requestAnimationFrame(loop);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (App.screen === 'menu') renderHome(); }).catch(() => {});
 }
