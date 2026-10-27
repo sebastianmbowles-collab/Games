@@ -357,6 +357,11 @@ input[type=text]{font-size:13px}
 @keyframes fxshake{0%,100%{transform:rotate(0)}25%{transform:rotate(-10deg) scale(1.06)}75%{transform:rotate(10deg) scale(1.06)}}
 @keyframes fxup{0%{transform:scale(1)}40%{transform:scale(1.35);filter:brightness(2)}100%{transform:scale(1)}}
 @keyframes fxburst{0%{transform:scale(1)}50%{transform:scale(1.4);filter:brightness(3)}100%{transform:scale(2.2);opacity:0}}
+.fxlvl{font-family:var(--display);font-size:22px;color:#fff;text-shadow:3px 3px 0 #000;animation:fxdrop .5s .4s both}
+.fxlvl span{color:#aaa} .fxlvl b{color:#ff6ad0;font-weight:400;display:inline-block;animation:fxpop .6s .6s cubic-bezier(.2,1.7,.4,1) both}
+.fxab{display:flex;gap:10px;align-items:center;text-align:left;background:#1a1440;border:4px solid var(--ab);padding:10px;font-size:10px;line-height:1.6;color:#fff;animation:fxpop .6s .8s cubic-bezier(.2,1.7,.4,1) both;box-shadow:0 0 24px var(--ab)}
+.fxab b{color:var(--ab);font-family:var(--display);font-weight:400}
+.fxabi{font-size:28px;width:44px;height:44px;display:grid;place-items:center;background:var(--ab);color:#fff;flex:none}
 @media (prefers-reduced-motion:reduce){.fxrays,.fxstar,.rnode.ready .rcard{animation:none}}
 </style>
 </head>
@@ -4084,7 +4089,7 @@ function renderDetail() {
     if (maxed) mk('Max power', 'grey', () => {}, true);
     else mk(`Upgrade to ${st.level + 1} · ${icon('coin')} ${cost}`, 'purple', () => {
       if (S.coins < cost) { Sound.play('error'); toast(`You need ${cost - S.coins} more coins. Win matches and claim quests to earn more.`); return; }
-      S.coins -= cost; st.level++; save(); Sound.play('buy'); toast(`${d.name} is now Power ${st.level}!`); updateWallet(); renderDetail();
+      S.coins -= cost; st.level++; save(); updateWallet(); renderDetail(); fxQueue({ type: 'level', id, lvl: st.level });
     });
   } else {
     if (u.coins) mk(`Unlock · ${icon('coin')} ${u.coins}`, 'green', () => buyBrawler(id, 'coins', u.coins));
@@ -4419,7 +4424,7 @@ function fxNext() {
   const ov = $('#ov-fx'); const it = FX.shift();
   if (!it) { fxOpen = false; ov.hidden = true; if (App.screen !== 'battle') { updateWallet(); const r = { brawlers: renderBrawlers, road: renderRoad, menu: renderHome }[App.screen]; if (r) r(); } return; }
   fxOpen = true; ov.hidden = false; Sound.init(); Sound.resume();
-  if (it.type === 'unlock') fxUnlock(it.id); else fxDrop(it.min || 0);
+  if (it.type === 'unlock') fxUnlock(it.id); else if (it.type === 'level') fxLevel(it.id, it.lvl); else fxDrop(it.min || 0);
 }
 function fxUnlock(id) {
   const d = BR[id], col = RARITY_COL[d.rarity], ov = $('#ov-fx');
@@ -4428,6 +4433,19 @@ function fxUnlock(id) {
     <div class="fxname">${d.name}</div><div class="fxrar" style="color:${col}">${d.rarity} · ${d.role}</div>
     <p class="fxinfo">Attack: ${d.attack.name}<br>Super: ${d.super.name}</p><button class="btn green" id="fxGo">Awesome!</button></div>`;
   drawPortrait(ov.querySelector('canvas'), id, { scale: 2.6 });
+  Sound.play('reveal');
+  $('#fxGo').onclick = () => { Sound.play('click'); fxNext(); };
+}
+function fxLevel(id, lvl) {
+  const d = BR[id], ov = $('#ov-fx'), m0 = levelMult(lvl - 1), m1 = levelMult(lvl);
+  const ab = lvl === 7 ? ['GADGET UNLOCKED!', d.gadget, '#5ad84a', '◆'] : lvl === 9 ? ['STAR POWER UNLOCKED!', d.star, '#ffb020', '★'] : lvl === 11 ? ['HYPERCHARGE UNLOCKED!', d.hyper, '#b45bff', '⚡'] : null;
+  ov.style.setProperty('--fx', ab ? ab[2] : '#ff4ab0');
+  ov.innerHTML = `<div class="fxrays"></div><div class="fxbox"><div class="fxtag">LEVEL UP!</div><canvas class="fxpic" width="160" height="160" style="width:160px;height:160px"></canvas>
+    <div class="fxname">${d.name}</div><div class="fxlvl"><span>${lvl - 1}</span> ▶ <b>${lvl}</b></div>
+    <p class="fxinfo">Health ${fmt(d.hp * m0)} ▶ <b style="color:#7aff6a">${fmt(d.hp * m1)}</b><br>Damage +${Math.round((m1 / m0 - 1) * 100)}%</p>
+    ${ab && ab[1] ? `<div class="fxab" style="--ab:${ab[2]}"><span class="fxabi">${ab[3]}</span><div><b>${ab[0]}</b><br>${ab[1].name}: ${ab[1].desc}</div></div>` : ''}
+    <button class="btn green" id="fxGo">Great!</button></div>`;
+  drawPortrait(ov.querySelector('canvas'), id, { scale: 2.4, skin: S.brawlers[id].skin || '' });
   Sound.play('reveal');
   $('#fxGo').onclick = () => { Sound.play('click'); fxNext(); };
 }
