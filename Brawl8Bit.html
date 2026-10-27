@@ -232,6 +232,10 @@ input[type=range]{width:160px;accent-color:#ff9a1f}
 /* ---------- battle ---------- */
 #game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:#20203a}
 #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+#btnPin{position:absolute;pointer-events:auto;top:max(10px,env(safe-area-inset-top,0px));left:calc(max(12px,env(safe-area-inset-left,0px)) + 62px);background:rgba(20,15,60,.7);color:#ffd23a;font-size:24px}
+#pinBar{position:absolute;pointer-events:auto;top:calc(max(10px,env(safe-area-inset-top,0px)) + 60px);left:max(12px,env(safe-area-inset-left,0px));display:flex;gap:6px;background:rgba(13,11,30,.85);padding:6px;border:3px solid #0d0b1e}
+#pinBar button{width:48px;height:48px;background:#fff;border:3px solid #0d0b1e;padding:0;cursor:pointer;display:grid;place-items:center;font-family:var(--display);font-size:12px;color:#2a8a2a}
+#pinBar canvas{width:36px;height:36px;image-rendering:pixelated}
 #btnPause{position:absolute;pointer-events:auto;top:max(10px,env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));background:rgba(20,15,60,.7)}
 #loading{position:fixed;inset:0;z-index:90;display:grid;place-items:center;background:var(--sky-deep);font-family:var(--display);font-size:34px}
 @media (prefers-reduced-motion:reduce){ .btn.play{animation:none} .modal{animation:none} }
@@ -363,6 +367,9 @@ input[type=text]{font-size:13px}
 .fxab b{color:var(--ab);font-family:var(--display);font-weight:400}
 .fxabi{font-size:28px;width:44px;height:44px;display:grid;place-items:center;background:var(--ab);color:#fff;flex:none}
 @media (prefers-reduced-motion:reduce){.fxrays,.fxstar,.rnode.ready .rcard{animation:none}}
+.starp{display:flex;align-items:center;gap:10px;justify-content:center;margin:10px auto 0;padding:6px 12px;background:rgba(0,0,0,.25);border:3px solid #ffd23a;font-size:9px;line-height:1.7;width:max-content;max-width:100%}
+.starp b{color:#ffd23a;font-family:var(--display);font-weight:400} .starp canvas{width:48px;height:48px}
+.starp.me{background:rgba(255,210,58,.25)}
 </style>
 </head>
 <body>
@@ -371,6 +378,8 @@ input[type=text]{font-size:13px}
 <canvas id="game" hidden></canvas>
 <div id="hud" hidden>
   <button id="btnPause" class="iconbtn" aria-label="Pause" data-icon="pause"></button>
+  <button id="btnPin" class="iconbtn" aria-label="Pins" title="Pins (T)">☺</button>
+  <div id="pinBar" hidden></div>
 </div>
 
 <!-- HOME -->
@@ -2422,12 +2431,25 @@ function damage(tg, amount, src, o = {}) {
     else if (tg.kind === 'safe') { tg.hp = 0; burst(tg.x, tg.y - 10, '#ffd23a', 40, 340, 7, 1, 300); puff(tg.x, tg.y, 20); Sound.play('explode'); shake(14); }
   }
 }
+function sendPin(b, k) { if (!b || !b.alive || (b.pinCd || 0) > G.time) return false; b.pin = { k, t: 2.2 }; b.pinCd = G.time + 3; if (b.isPlayer || isVisibleToPlayer(b)) Sound.play('click', 0.6); return true; }
 function killBrawler(b, killer) {
   b.alive = false; b.hp = 0; b.burst = b.dash = b.leap = null; b.z = 0; b.kx = b.ky = 0;
   puff(b.x, b.y, 14); burst(b.x, b.y, '#ffffff', 10, 220, 5, 0.5); ringFx(b.x, b.y, 50, '#ffffff', 0.35, 5);
   G.parts.push({ type: 'ghost', id: b.id, x: b.x, y: b.y, life: 0.9, max: 0.9, ang: b.aim });
   Sound.play('defeat', vol(b)); shake(b.isPlayer ? 10 : 2);
-  if (killer && killer !== b && killer.kind === 'brawler') { killer.kills++; if (killer.isPlayer) { G.stats.kills++; textFx(b.x, b.y - 50, 'KO!', '#ffd23a', 30); } }
+  if (killer && killer !== b && killer.kind === 'brawler') {
+    killer.kills++;
+    if (killer.isPlayer) {
+      G.stats.kills++;
+      // KO streaks: kills close together get a bigger shout
+      killer.streak = G.time - (killer.lastKO || -99) < 5 ? (killer.streak || 1) + 1 : 1; killer.lastKO = G.time;
+      const st = ['KO!', 'DOUBLE KO!', 'TRIPLE KO!', 'RAMPAGE!'][Math.min(3, killer.streak - 1)];
+      textFx(b.x, b.y - 50, st, killer.streak > 1 ? '#ff7a1a' : '#ffd23a', 30 + Math.min(3, killer.streak - 1) * 6);
+      if (killer.streak > 1) { G.bigText = { text: st, color: '#ff7a1a', t: 1.2 }; Sound.play('superReady'); }
+    }
+    if (killer.ai && Math.random() < 0.3) sendPin(killer, pick(['happy', 'laugh', 'gg']));
+  }
+  if (b.ai && Math.random() < 0.3) sendPin(b, pick(['sad', 'angry']));
   if (G.mode === 'bounty') {
     if (killer && killer.kind === 'brawler' && killer.team !== b.team) { G.stars[killer.team] += b.bounty; if (killer.isPlayer) G.stats.stars += b.bounty; textFx(b.x, b.y - 70, '+' + b.bounty + ' STARS', '#ffe040', 18); killer.bounty = Math.min(7, killer.bounty + 1); Sound.play('coin', vol(b)); }
     b.bounty = 2;
@@ -2784,6 +2806,7 @@ function updateParts(dt) {
 
 function stepBattle(dt) {
   G.time += dt;
+  for (const b of G.brawlers) if (b.pin) { b.pin.t -= dt; if (b.pin.t <= 0) b.pin = null; }
   if (G.intro > -1) {
     const was = G.intro; G.intro -= dt;
     const n = Math.ceil(G.intro / 0.6);
@@ -3362,6 +3385,8 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Escape' || e.code === 'KeyP') { if (!e.repeat) togglePause(); return; }
   if ((e.code === 'Space' || e.code === 'KeyE') && !e.repeat) Input.superPress = true;
   if (e.code === 'KeyQ' && !e.repeat) Input.gadgetPress = true;
+  if (e.code === 'KeyT' && !e.repeat) togglePins();
+  if (!$('#pinBar').hidden && /^Digit[1-6]$/.test(e.code)) playerPin(PIN_LIST[+e.code.slice(5) - 1]);
   if (e.code === 'KeyF' && !e.repeat) Input.hyperPress = true;
   Input.keys.add(e.code);
   if (S.settings.touch === 'auto' && Input.touchMode && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) Input.touchMode = false;
@@ -3688,6 +3713,13 @@ function render() {
     if (!b.isPlayer) txt(ctx, b.name, s.x, s.y - 16, 7, b.team === p.team ? '#bfe2ff' : '#ffc2c8', 'center', 3);
     if (G.mode === 'gemgrab' && b.gems > 0) txt(ctx, b.gems, s.x + 4 * k, s.y - 29, 8, '#f2d2ff', 'left', 3);
     if (G.mode === 'bounty') txt(ctx, b.bounty, s.x + 4 * k, s.y - 28, 8, '#ffe040', 'left', 3);
+    if (b.pin && b.pin.t > 0) {
+      const pop = Math.min(1, (2.2 - b.pin.t) * 6), sz = Math.round(40 * pop), py = s.y - (b.isPlayer ? 22 : 34) - sz;
+      ctx.fillStyle = '#0d0b1e'; ctx.fillRect(s.x - sz / 2 - 3, py - 3, sz + 6, sz + 6); ctx.fillStyle = '#fff'; ctx.fillRect(s.x - sz / 2, py, sz, sz);
+      ctx.fillStyle = '#0d0b1e'; ctx.fillRect(s.x - 4, py + sz + 3, 8, 4); ctx.fillStyle = '#fff'; ctx.fillRect(s.x - 2, py + sz, 4, 4);
+      if (b.pin.k === 'gg') { if (pop > 0.6) txt(ctx, 'GG', s.x, py + sz / 2 + 1, 11, '#2a8a2a', 'center', 0); }
+      else { const pc = pinCanvas(b.pin.k), ps = Math.max(1, Math.floor((sz - 6) / pc.width)); ctx.imageSmoothingEnabled = false; ctx.drawImage(pc, s.x - pc.width * ps / 2, py + (sz - pc.height * ps) / 2, pc.width * ps, pc.height * ps); }
+    }
   }
   for (const s of G.safes) if (s.hp > 0) { const q = worldToScreen(s.x, s.y - 66); txt(ctx, `${Math.ceil(s.hp / s.maxHp * 100)}%`, q.x, q.y - 6, 9, '#fff'); }
   for (const g of G.parts) if (g.type === 'num' || g.type === 'text') { const kk = g.life / g.max, q = worldToScreen(g.x, g.y); ctx.globalAlpha = Math.min(1, kk * 2.2); txt(ctx, g.text, q.x, q.y, g.type === 'num' ? 10 : Math.min(16, Math.round(g.size * 0.6)), g.color, 'center', 3); ctx.globalAlpha = 1; }
@@ -3943,6 +3975,17 @@ function drawDesktopHud(c) {
 
 // ---------------- menu portraits ----------------
 // Personality poses for profile pictures: body lean, weapon angle and a little pixel emote.
+const PINS = {
+  happy: ['..kkkkkk..', '.kyyyyyyk.', 'kyykyykyyk', 'kyykyykyyk', 'kyyyyyyyyk', 'kykyyyykyk', 'kyykkkkyyk', '.kyyyyyyk.', '..kkkkkk..'],
+  laugh: ['..kkkkkk..', '.kyyyyyyk.', 'kykykykyyk', 'kyyyyyyyyk', 'kykkkkkkyk', 'kykrrrrkyk', 'kyykkkkyyk', '.kyyyyyyk.', '..kkkkkk..'],
+  angry: ['..kkkkkk..', '.krrrrrrk.', 'krkrrrrkrk', 'krrkrrkrrk', 'krrrrrrrrk', 'krrrrrrrrk', 'krrkkkkrrk', '.krrrrrrk.', '..kkkkkk..'],
+  sad: ['..kkkkkk..', '.kyyyyyyk.', 'kyykyykyyk', 'kyykyykyyk', 'kbyyyyyyyk', 'kbyykkyyyk', 'kyykyykyyk', '.kyyyyyyk.', '..kkkkkk..'],
+  heart: ['.kk..kk.', 'kppkkppk', 'kpwppppk', 'kppppppk', '.kppppk.', '..kppk..', '...kk...'],
+  gg: null,
+};
+const PIN_LIST = ['happy', 'laugh', 'gg', 'heart', 'angry', 'sad'];
+const PINC = {};
+const pinCanvas = n => PINC[n] || (PINC[n] = compileRows(PINS[n], EMOTE_PAL));
 const EMOTES = {
   heart: ['.kk..kk.', 'kppkkppk', 'kpwppppk', 'kppppppk', '.kppppk.', '..kppk..', '...kk...'],
   anger: ['.rr.rr.', 'rrr.rrr', 'rr...rr', '.......', 'rr...rr', 'rrr.rrr', '.rr.rr.'],
@@ -4004,7 +4047,7 @@ function show(name) {
   App.screen = name;
   for (const [k, sel] of Object.entries(SCREENS)) $(sel).hidden = k !== name;
   const battle = name === 'battle'; cv.hidden = !battle; $('#hud').hidden = !battle; if (R3.gl) R3.gl.hidden = !battle;
-  if (!battle) { updateWallet(); }
+  if (!battle) { updateWallet(); $('#pinBar').hidden = true; }
   const r = { menu: renderHome, brawlers: renderBrawlers, detail: renderDetail, modes: renderModes, shop: renderShop, quests: renderQuests, pass: renderPass, road: renderRoad, profile: renderProfile, ranked: renderRanked, club: renderClub }[name];
   if (r) r();
   const sc = SCREENS[name] && $(SCREENS[name] + ' .scroll'); if (sc) sc.scrollTop = 0;
@@ -4439,6 +4482,8 @@ function startMatch(ranked = false) {
   show('battle'); resize();
   Sound.music('battle');
 }
+function togglePins(force) { const bar = $('#pinBar'); bar.hidden = force !== undefined ? !force : !bar.hidden; }
+function playerPin(k) { if (G && sendPin(G.player, k)) togglePins(false); }
 function togglePause(force) {
   if (!G || G.over) return;
   G.paused = force !== undefined ? force : !G.paused;
@@ -4494,6 +4539,10 @@ function finishMatch() {
   const sub = g.quit ? 'You left the match' : g.mode === 'duo' ? (rank === 1 ? 'Last team standing!' : `Your team finished #${rank} of 3.`) : g.mode === 'showdown' ? (win ? `${rank === 1 ? 'Last brawler standing!' : 'Top 2 finish. That counts as a win!'}` : 'Knocked out. Better luck next time!') :
     { gemgrab: () => `Gems: ${teamGems(1)} vs ${teamGems(2)}`, brawlball: () => `Score: ${g.score[1]} - ${g.score[2]}`, basket: () => `Score: ${g.score[1]} - ${g.score[2]}`, duels: () => `Brawlers left: ${3 - g.duel.idx[1]} vs ${3 - g.duel.idx[2]}`, heist: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `Safes: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; }, bounty: () => `Stars: ${g.stars[1]} vs ${g.stars[2]}`, hotzone: () => `Zone: ${Math.floor(g.zone.p[1])}% vs ${Math.floor(g.zone.p[2])}%`, knockout: () => `Rounds: ${g.rounds[1]} - ${g.rounds[2]}`, wipeout: () => `KOs: ${g.kos[1]} vs ${g.kos[2]}`, siege: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `IKE: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; } }[g.mode]();
   const extra = { showdown: `Cubes ${gs.cubes}`, duo: `Cubes ${gs.cubes}`, wipeout: `KOs ${gs.kills}`, siege: `Bolts ${gs.bolts}`, gemgrab: `Gems ${gs.gems}`, brawlball: `Goals ${gs.goals}`, basket: `Points ${gs.goals}`, duels: `KOs ${gs.kills}`, heist: `Safe damage ${fmt(gs.safeDmg)}`, bounty: `Stars ${gs.stars}`, hotzone: `Zone time ${Math.round(gs.zone)}s`, knockout: `Rounds won ${gs.rounds}` }[g.mode];
+  // Star Player: best brawler on the winning side (or the last one standing in Showdown)
+  const pool = isSD(g.mode) ? g.brawlers.filter(b => b.rank === 1 || b.alive).slice(0, 1) : g.brawlers.filter(b => b.id !== 'dummy' && (res === 'draw' || b.team === (win ? 1 : 2)));
+  const star = pool.sort((a, b) => (b.kills * 1500 + b.dmgDealt) - (a.kills * 1500 + a.dmgDealt))[0];
+  if (star && star.isPlayer && !g.quit) { S.coins += 10; extraLines.push('Star Player bonus: +10 coins'); save(); updateWallet(); }
   const cls = win ? 'win' : res === 'draw' ? 'draw' : 'lose';
   $('#resultBody').innerHTML = `
     <p class="result-banner stroke ${cls}">${banner}</p>
@@ -4505,6 +4554,7 @@ function finishMatch() {
         <div class="rw-line">${icon('pass')} <span>+${xp} pass XP</span></div>
         ${extraLines.map(l => `<div class="rw-line" style="font-size:9px;line-height:1.6">${l}</div>`).join('')}
       </div></div>
+    ${star && !g.quit ? `<div class="starp${star.isPlayer ? ' me' : ''}"><canvas width="64" height="64"></canvas><div><b>★ STAR PLAYER</b><br>${star.isPlayer ? 'YOU!' : star.name.replace(/[<>]/g, '')} · ${BR[star.id].name} · ${star.kills} KOs</div></div>` : ''}
     <div class="rstats"><span>KOs ${gs.kills}</span><span>Damage ${fmt(gs.damage)}</span><span>Supers ${gs.supers}</span><span>${extra}</span></div>
     ${win && !g.quit ? `<div style="text-align:center;margin-top:10px" class="qnote">You earned a Star Drop for winning!</div>` : ''}
     ${finished.length ? `<p class="qnote">Quest complete: ${finished.join(', ')}. Claim it in Quests!</p>` : ''}
@@ -4512,6 +4562,7 @@ function finishMatch() {
       <button class="btn green" id="rAgain">Play again</button><button class="btn blue" id="rHome">Home</button>
     </div>`;
   drawPortrait($('#resultBody canvas'), pid, { scale: 2.6, ang: win ? 0.4 : 2.6 });
+  if (star && $('.starp canvas')) drawPortrait($('.starp canvas'), star.id, { scale: 2.2, skin: star.skin || '' });
   $('#ov-result').hidden = false;
   Sound.play(win ? 'win' : 'lose');
   if (win && !g.quit) setTimeout(() => fxQueue({ type: 'drop', min: 0 }), 700);
@@ -4648,6 +4699,10 @@ function bindUI() {
   $('#featured').onclick = () => { App.detailId = S.selected; show('detail'); };
   $('#playBtn').onclick = startMatch;
   $('#btnPause').onclick = () => togglePause(true);
+  $('#btnPin').onclick = () => togglePins();
+  PIN_LIST.forEach((k, i) => { const b = document.createElement('button'); b.setAttribute('aria-label', 'Pin ' + k); b.title = `${k} (${i + 1})`;
+    if (k === 'gg') b.textContent = 'GG'; else { const c = document.createElement('canvas'), pc = pinCanvas(k); c.width = pc.width * 4; c.height = pc.height * 4; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(pc, 0, 0, c.width, c.height); b.appendChild(c); }
+    b.onclick = () => playerPin(k); $('#pinBar').appendChild(b); });
   $('#pResume').onclick = () => togglePause(false);
   $('#pSound').onclick = () => { S.settings.muted = !S.settings.muted; save(); syncSettings(); };
   $('#pSettings').onclick = openSettings;
