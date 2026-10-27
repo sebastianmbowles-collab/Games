@@ -4199,7 +4199,7 @@ function renderQuests() {
 }
 
 // ---------------- pass / road ----------------
-function rewardCanvas(c, r) { const x = 22, y = 22; if (r.drop !== undefined) { c.setTransform(1, 0, 0, 1, 0, 0); drawDropStar(c.canvas, STAR_DROPS[r.drop].col); } else if (r.brawler) { c.setTransform(1, 0, 0, 1, 0, 0); drawPortrait(c.canvas, r.brawler, { scale: 2.4 }); } else if (r.coins) drawCoinIcon(c, x, y, 16); else drawGem(c, x, y, 1.6, 0); }
+function rewardCanvas(c, r) { const x = 22, y = 22; if (r.drop !== undefined) { c.setTransform(1, 0, 0, 1, 0, 0); drawDropStar(c.canvas); } else if (r.brawler) { c.setTransform(1, 0, 0, 1, 0, 0); drawPortrait(c.canvas, r.brawler, { scale: 2.4 }); } else if (r.coins) drawCoinIcon(c, x, y, 16); else drawGem(c, x, y, 1.6, 0); }
 function renderPass() {
   const B = $('#passBody'), tab = App.passTab;
   $('#passTitle').textContent = tab === 'pass' ? 'Brawl Pass' : 'Trophy Road';
@@ -4426,7 +4426,8 @@ function rollDrop(min) {
   return min;
 }
 // Star Drop: a 6-point star with shiny facets and a smiley face, drawn small and scaled up for a pixel look
-function drawDropStar(cv, col) {
+const STAR_GOLD = '#ffb81a';
+function drawDropStar(cv, col = STAR_GOLD) {
   const c = cv.getContext('2d'), w = cv.width, h = cv.height, n = 32, sc = Math.max(1, Math.floor(Math.min(w, h) / n));
   c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false; c.clearRect(0, 0, w, h);
   const o = document.createElement('canvas'); o.width = o.height = n; const x = o.getContext('2d'), cx = n / 2, cy = n / 2;
@@ -4451,10 +4452,9 @@ function drawDropStar(cv, col) {
 }
 function fxDrop(min) {
   const ov = $('#ov-fx'); let lvl = rollDrop(min), taps = 0; const need = 4;
-  ov.innerHTML = `<div class="fxrays"></div><div class="fxbox"><div class="fxtag">STAR DROP</div><button class="fxstar" id="fxStar" aria-label="Tap the Star Drop"><canvas width="216" height="216"></canvas></button>
-    <div class="fxname" id="fxRar"></div><p class="fxinfo" id="fxHint">Tap the star ${need} times!</p><div id="fxOut"></div></div>`;
+  ov.innerHTML = `<div class="fxrays"></div><div class="fxbox"><div class="fxtag">STAR DROP</div><div class="fxname" id="fxRar"></div><button class="fxstar" id="fxStar" aria-label="Tap the Star Drop"><canvas width="216" height="216"></canvas></button><p class="fxinfo" id="fxHint">Tap the star ${need} times!</p><div id="fxOut"></div></div>`;
   const cvs = ov.querySelector('.fxstar canvas'), btn = $('#fxStar');
-  const paint = () => { const D = STAR_DROPS[lvl]; ov.style.setProperty('--fx', D.col); drawDropStar(cvs, D.col); $('#fxRar').textContent = D.name.toUpperCase(); $('#fxRar').style.color = D.col; };
+  const paint = () => { const D = STAR_DROPS[lvl]; ov.style.setProperty('--fx', D.col); drawDropStar(cvs); $('#fxRar').textContent = D.name.toUpperCase(); $('#fxRar').style.color = D.col; };
   paint(); Sound.play('superReady');
   btn.onclick = () => {
     if (taps >= need) return;
