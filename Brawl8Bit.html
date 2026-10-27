@@ -422,7 +422,7 @@ input[type=text]{font-size:13px}
   <header class="subbar"><button class="iconbtn back" aria-label="Back" data-icon="back"></button><h2 class="stroke">Brawlers</h2><div class="wallet mini"></div></header>
   <div class="scroll"><div class="wrap">
     <div class="brbar"><label class="brsort">Sort by <select id="brSort"><option value="rarity">Rarity</option><option value="name">Name</option><option value="trophies">Trophies</option><option value="power">Power level</option><option value="upgrade">Can upgrade</option></select></label>
-      <input type="search" id="brSearch" placeholder="Search" maxlength="20" aria-label="Search brawlers"></div>
+      <input type="search" id="brSearch" placeholder="Search" maxlength="20" aria-label="Search brawlers"><button class="btn small blue" id="brTrain">Training Cave</button></div>
     <h3 class="brcount stroke-sm">Brawlers <span id="brCount"></span></h3>
     <div class="bgrid" id="brGrid"></div></div></div>
 </div>
@@ -899,6 +899,8 @@ const BR_LIST = [
     hyper: { name: 'Long Arm', desc: 'Hypercharged Magic Hand reaches farther.' } },
 ];
 const BR = Object.fromEntries(BR_LIST.map(b => [b.id, b]));
+// practice robot for the Training Cave (not a playable brawler)
+BR.dummy = { ...BR_LIST[0], id: 'dummy', name: 'Robot', role: 'Target', hp: 15000, speed: 90, bg: '#6a7088', bg2: '#2a2e3a' };
 const UNLOCK = {
   bull: { coins: 150, road: 25 }, primo: { coins: 200, road: 75 }, poco: { coins: 250, pass: 4 }, brock: { coins: 300, road: 150 },
   jessie: { coins: 400, pass: 10 }, dynamike: { coins: 450, road: 300 }, spike: { gems: 120, road: 500 },
@@ -1178,6 +1180,18 @@ const MAPS = {
     '...........',
     '..........O',
   ] },
+  cave: { name: 'Training Cave', mode: 'training', theme: 'canyon', kind: 'half', rows: [
+    '...........',
+    '.##........',
+    '.#.........',
+    '...........',
+    '......2...2',
+    '...........',
+    '..BB.......',
+    '..BB...C...',
+    '.......C...',
+    '...........',
+  ] },
   duelpit: { name: 'Duel Pit', mode: 'duels', theme: 'canyon', kind: 'half', rows: [
     '...........',
     '..........2',
@@ -1355,6 +1369,8 @@ const MODES = {
     desc: 'Collect gems from the mine. Hold 10 or more and the lead for 15 seconds to win. Defeated brawlers drop their gems!' },
   basket: { name: 'Basket Brawl', tag: '3 vs 3', color: '#ff8a1f', color2: '#c0500a', maps: ['court'], team: true,
     desc: 'Grab the ball and shoot it into the enemy hoop at the top. You have to shoot or pass it in, you can not carry it. First to 3 points wins.' },
+  training: { name: 'Training Cave', tag: 'Practice', hidden: true, color: '#6a7088', color2: '#2a2e3a', maps: ['cave'], team: true,
+    desc: 'Try any brawler at full power on practice robots. No trophies won or lost.' },
   duels: { name: 'Duels', tag: '1 vs 1 · 3 brawlers', color: '#e0405a', color2: '#8a1a3a', maps: ['duelpit', 'rockyring'], team: true,
     desc: 'You against one enemy. You both bring 3 brawlers. When one is knocked out, the next one jumps in. Knock out all 3 enemy brawlers to win.' },
   brawlball: { name: 'Brawl Ball', tag: '3 vs 3', color: '#2f8fff', color2: '#1a55c9', maps: ['stadium', 'pinball'], team: true,
@@ -1947,6 +1963,7 @@ const WEAPONS = {
   dynamite: { pal: { r: '#d83030', y: '#ffe040' }, rows: ['.y.', 'kkk', 'krk', 'krk', 'kkk'], ox: 12, oy: 9 },
 };
 (function finishSprites() {
+  SPR.dummy = SPR.robot;
   SPR.scrappyR.rows = SPR.scrappy.rows;
 })();
 
@@ -2125,6 +2142,10 @@ function startBattle(modeKey) {
     G.player = addBrawler(pid, 1, sp[0], { player: true, level: plvl, name: S.name, gears: myGears() });
     for (let i = 0; i < 5; i++) addBrawler(others[i % others.length], i + 2, sp[i + 1], { level: bl(), name: names[i], skill, slot: i });
     G.poison = { delay: 20, inset: 0, t: 0, max: Math.min(map.w, map.h) * T / 2 - 2.6 * T, speed: 6 };
+  } else if (modeKey === 'training') {
+    G.player = addBrawler(pid, 1, map.teamSpawns[1][1], { player: true, level: MAX_LEVEL, name: S.name, slot: 1, gears: [] });
+    map.teamSpawns[2].forEach((sp, i) => { const d = addBrawler('dummy', 2, sp, { level: 1, name: i === 1 ? 'Moving robot' : 'Robot', slot: i, gears: [] }); d.skin = ''; d.trainMove = i === 1; });
+    G.timeLeft = Infinity;
   } else if (modeKey === 'duels') {
     // each side brings 3 brawlers; the next one jumps in after a knockout
     const owned = BR_LIST.map(b => b.id).filter(i => i !== pid && S.brawlers[i].owned);
@@ -2708,6 +2729,9 @@ function updateMode(dt) {
     else if (!G.gemCd || G.gemCd.team !== lead) G.gemCd = { team: lead, t: 15, beep: 15 };
     else { G.gemCd.t -= dt; if (Math.ceil(G.gemCd.t) < G.gemCd.beep) { G.gemCd.beep = Math.ceil(G.gemCd.t); Sound.play('beep', 0.6); } if (G.gemCd.t <= 0) endMatch(lead === 1 ? 'win' : 'lose'); }
     if (G.timeLeft <= 0 && !G.over) endMatch(g1 > g2 ? 'win' : g2 > g1 ? 'lose' : 'draw');
+  } else if (m === 'training') {
+    for (const b of G.brawlers) if (b.trainMove && b.alive) { b.mx = Math.sin(G.time * 0.9) > 0 ? 1 : -1; b.my = 0; }
+    const P_ = G.player; if (P_.alive) P_.gadgets = Math.max(P_.gadgets, 1);
   } else if (m === 'duels') {
     const D = G.duel;
     for (const t of [1, 2]) if (D.spawnT[t] > 0) { D.spawnT[t] -= dt; if (D.spawnT[t] <= 0) { const nb = duelSpawn(t); if (t === 1) G.player = nb; burst(nb.x, nb.y, t === 1 ? '#7cc4ff' : '#ff8a96', 14, 220, 5, 0.5); Sound.play('superReady'); } }
@@ -3474,7 +3498,7 @@ function drawBall(c, b) { drawSpr(c, 'ball', b.x, b.y, 3); }
 function drawCoinIcon(c, x, y, r) { drawSpr(c, 'coin', x, y, Math.max(1, Math.round(r / 4))); }
 function drawModeIcon(c, mode, x, y, s) {
   const k = Math.max(2, Math.round(s * 3));
-  const map = { showdown: 'skull', duo: 'skull', gemgrab: 'gem', brawlball: 'ball', basket: 'ball', duels: 'skull', heist: 'safeIcon', bounty: 'star', hotzone: 'fire', knockout: 'trophy', wipeout: 'skull', siege: 'bolt' };
+  const map = { showdown: 'skull', duo: 'skull', gemgrab: 'gem', brawlball: 'ball', basket: 'ball', duels: 'skull', training: 'bolt', heist: 'safeIcon', bounty: 'star', hotzone: 'fire', knockout: 'trophy', wipeout: 'skull', siege: 'bolt' };
   const n = map[mode];
   if (n === 'safeIcon') { c.fillStyle = INK; c.fillRect(x - 6 * k, y - 6 * k, 12 * k, 12 * k); c.fillStyle = '#c9cfe0'; c.fillRect(x - 5 * k, y - 5 * k, 10 * k, 10 * k); c.fillStyle = '#ff4659'; c.fillRect(x - 5 * k, y - 5 * k, 10 * k, 3 * k); c.fillStyle = '#8a91aa'; c.fillRect(x - 2 * k, y, 4 * k, 4 * k); return; }
   if (n === 'fire') { const P = [[0, -5], [-1, -3], [1, -3], [-2, -1], [0, -1], [2, -1], [-3, 1], [-1, 1], [1, 1], [3, 1], [-3, 3], [-1, 3], [1, 3], [3, 3], [-2, 5], [0, 5], [2, 5]]; for (const [dx, dy] of P) { c.fillStyle = dy > 1 ? '#ffe040' : '#ff6a1f'; c.fillRect(x + dx * k - k, y + dy * k - k, 2 * k, 2 * k); } return; }
@@ -3817,6 +3841,9 @@ function drawHUD(c) {
   } else if (m === 'gemgrab') {
     twoSide(teamGems(1), teamGems(2), '#7cc4ff', '#ff8a96'); drawSpr(c, 'gem', cx - 130, top + 25, 2); drawSpr(c, 'gem', cx + 130, top + 25, 2);
     if (G.gemCd) { const mine = G.gemCd.team === 1; panel(c, cx - 125, top + 64, 250, 44, mine ? 'rgba(30,90,200,.9)' : 'rgba(200,40,60,.9)'); txt(c, mine ? 'YOUR TEAM WINS IN' : 'ENEMIES WIN IN', cx, top + 76, 8, '#fff'); txt(c, Math.ceil(G.gemCd.t), cx, top + 96, 14, '#ffe040'); }
+  } else if (m === 'training') {
+    panel(c, cx - 170, top, 340, 56); txt(c, 'TRAINING CAVE', cx, top + 15, 10, '#ffe040');
+    txt(c, `DAMAGE ${fmt(Math.round(G.stats.damage))}`, cx, top + 36, 10, '#fff'); txt(c, 'PAUSE TO LEAVE', cx, top + 72, 8, '#c9d2ff');
   } else if (m === 'duels') {
     const D = G.duel; panel(c, cx - 210, top, 420, 56); txt(c, timer, cx, top + 28, 12, '#fff');
     for (const t of [1, 2]) for (let k = 0; k < 3; k++) {
@@ -4074,6 +4101,7 @@ function renderBrawlers() {
   $('#brSort').value = sort;
   $('#brSort').onchange = e => { S.brSort = e.target.value; save(); renderBrawlers(); };
   $('#brSearch').oninput = () => renderBrawlers();
+  $('#brTrain').onclick = () => startTraining(S.selected);
   const list = BR_LIST.filter(d => !q || d.name.toLowerCase().includes(q)).slice().sort((a, b) => {
     const A = S.brawlers[a.id], B = S.brawlers[b.id];
     if (A.owned !== B.owned) return A.owned ? -1 : 1;
@@ -4147,6 +4175,7 @@ function renderDetail() {
   renderGears(id, st); renderSkins(id, st);
   const btns = $('#dBtns');
   const mk = (label, cls, fn, dis) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.innerHTML = label; b.onclick = fn; if (dis) b.disabled = true; btns.appendChild(b); return b; };
+  mk('Try in Training Cave', 'blue', () => startTraining(id));
   if (st.owned) {
     if (S.selected === id) mk('Selected', 'grey', () => {}, true);
     else mk('Select', 'green', () => { S.selected = id; save(); toast(`${d.name} is ready to brawl`); renderDetail(); });
@@ -4206,6 +4235,7 @@ function buyBrawler(id, cur, price) {
 function renderModes() {
   const L = $('#modeList'); L.innerHTML = '';
   for (const [k, md] of Object.entries(MODES)) {
+    if (md.hidden) continue;
     const el = document.createElement('button'); el.className = 'mode' + (S.mode === k ? ' sel' : '');
     el.style.background = `linear-gradient(180deg, ${md.color}, ${md.color2})`;
     el.innerHTML = `<canvas class="mi" width="128" height="128"></canvas><span class="mtag">${md.tag}</span><b class="stroke-sm">${md.name}</b><p>${md.desc}</p><p style="opacity:.85">Map${md.maps.length > 1 ? 's' : ''}: ${md.maps.map(m => MAPS[m].name).join(', ')} · Wins: ${S.stats.modeWins[k] || 0}</p>`;
@@ -4395,6 +4425,12 @@ function openSettings() { syncSettings(); $('#ov-settings').hidden = false; }
 
 // ---------------- matches ----------------
 let rankedNext = false;
+function startTraining(id) {
+  Sound.init(); Sound.resume();
+  Input.keys.clear(); Input.joy = Input.atk = Input.sup = null; Input.queue.length = 0; Input.mouse.down = false; Input.superPress = false;
+  const prev = S.selected; S.selected = id; startBattle('training'); S.selected = prev;
+  show('battle'); resize(); Sound.music('battle');
+}
 function startMatch(ranked = false) {
   Sound.init(); Sound.resume(); rankedNext = !!ranked;
   if (!S.seenHelp) { S.seenHelp = true; save(); $('#ov-help').hidden = false; $('#ov-help').dataset.then = 'play'; return; }
@@ -4412,6 +4448,7 @@ function togglePause(force) {
 function quitMatch() {
   $('#ov-pause').hidden = true;
   if (!G) return show('menu');
+  if (G.mode === 'training') { G.paused = false; return goHome(); }
   G.paused = false; G.quit = true;
   const rank = G.mode === 'showdown' ? G.brawlers.filter(b => b.alive).length : G.mode === 'duo' ? new Set(G.brawlers.filter(b => b.alive).map(b => b.team)).size : 0;
   endMatch('lose', rank); G.resultShown = true; finishMatch();
@@ -4614,7 +4651,7 @@ function bindUI() {
   $('#pResume').onclick = () => togglePause(false);
   $('#pSound').onclick = () => { S.settings.muted = !S.settings.muted; save(); syncSettings(); };
   $('#pSettings').onclick = openSettings;
-  $('#pQuit').onclick = () => confirmBox('Leave match?', 'Leaving counts as a loss and earns no coins.', 'Leave', quitMatch);
+  $('#pQuit').onclick = () => G && G.mode === 'training' ? quitMatch() : confirmBox('Leave match?', 'Leaving counts as a loss and earns no coins.', 'Leave', quitMatch);
   $('#cYes').onclick = () => { $('#ov-confirm').hidden = true; const cb = confirmCb; confirmCb = null; if (cb) cb(); };
   $('#cNo').onclick = () => { $('#ov-confirm').hidden = true; confirmCb = null; };
   $('#setClose').onclick = () => { $('#ov-settings').hidden = true; };
