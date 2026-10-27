@@ -384,6 +384,12 @@ input[type=text]{font-size:13px}
 .ach{display:flex;gap:8px;align-items:center;border:3px solid var(--ink);background:#e8e4ff;padding:8px;font-size:9px;line-height:1.6}
 .ach small{font-size:7px;opacity:.85} .ach.ready{background:#c8ffb8} .ach.got{opacity:.55}
 .profile{position:relative} .profile .pdot{position:absolute;top:-6px;right:-6px}
+.dpicked{display:flex;gap:8px;justify-content:center;margin-bottom:10px}
+.dpicked div{width:64px;height:64px;border:3px dashed #8a80c0;display:grid;place-items:center;font-family:var(--display);font-size:16px;color:#8a80c0}
+.dpicked canvas,.dlist canvas{width:100%;height:100%}
+.dlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;max-height:300px;overflow-y:auto;touch-action:pan-y}
+.dlist button{aspect-ratio:1;padding:0;border:3px solid var(--ink);background:#2a2a6a;cursor:pointer;position:relative}
+.dlist button.on{outline:3px solid #ffd23a} .dlist button b{position:absolute;top:0;left:2px;color:#ffd23a;font-family:var(--display);font-size:12px;text-shadow:1px 1px 0 #000}
 </style>
 </head>
 <body>
@@ -547,6 +553,15 @@ input[type=text]{font-size:13px}
     <p id="loginText" style="text-align:center;margin:0 0 10px;font-size:10px;line-height:1.7"></p>
     <div id="loginDays" class="ldays"></div>
     <div class="btns"><button class="btn green" id="loginClaim">Claim</button></div>
+  </div>
+</div>
+<div id="ov-duel" class="overlay" hidden>
+  <div class="modal" role="dialog" aria-label="Pick your Duels team" style="max-width:720px">
+    <h2>Pick 3 brawlers</h2>
+    <p style="text-align:center;margin:0 0 8px;font-size:10px">They fight in this order. Tap again to remove.</p>
+    <div id="duelPicked" class="dpicked"></div>
+    <div id="duelList" class="dlist"></div>
+    <div class="btns" style="flex-direction:row;justify-content:center"><button class="btn green" id="duelGo">Fight!</button><button class="btn grey" id="duelCancel">Back</button></div>
   </div>
 </div>
 <div id="ov-confirm" class="overlay" hidden>
@@ -728,7 +743,7 @@ function defaultSave() {
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
     stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0, basket: 0, duels: 0, robo: 0, biggame: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
-    lastGift: '', boxesOpened: 0, seenHelp: false, tutDone: false, login: { day: '', streak: 0, claimed: '' }, passBonus: 0, achClaimed: [], favs: [], log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
+    lastGift: '', boxesOpened: 0, seenHelp: false, tutDone: false, login: { day: '', streak: 0, claimed: '' }, passBonus: 0, achClaimed: [], duelTeam: [], favs: [], log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
     club: { name: 'Pixel Pals', members: [], chat: [], claimed: [] },
   };
 }
@@ -2573,7 +2588,8 @@ function startBattle(modeKey) {
   } else if (modeKey === 'duels') {
     // each side brings 3 brawlers; the next one jumps in after a knockout
     const owned = BR_LIST.map(b => b.id).filter(i => i !== pid && S.brawlers[i].owned);
-    const mine = [pid, ...shuffle(owned)].slice(0, 3); while (mine.length < 3) mine.push(mine[mine.length % Math.max(1, mine.length)]);
+    const pickd = (S.duelTeam || []).filter(i => S.brawlers[i] && S.brawlers[i].owned);
+    const mine = (pickd.length === 3 ? pickd : [pid, ...shuffle(owned)]).slice(0, 3); while (mine.length < 3) mine.push(mine[mine.length % Math.max(1, mine.length)]);
     G.duel = { skill, botLevel: plvl, line: { 1: mine, 2: shuffle(BR_LIST.map(b => b.id)).slice(0, 3) }, idx: { 1: 0, 2: 0 }, spawnT: { 1: 0, 2: 0 }, foe: names[0] };
     G.player = duelSpawn(1); duelSpawn(2, skill, bl);
   } else {
@@ -3397,6 +3413,7 @@ function ikeShoot(s, dt) {
 }
 function updateStatus(b, dt) {
   b.invisT = Math.max(0, (b.invisT || 0) - dt); b.guardT = Math.max(0, (b.guardT || 0) - dt); b.boostT = Math.max(0, (b.boostT || 0) - dt); b.energyT = Math.max(0, (b.energyT || 0) - dt);
+  if (b.hyperT > 0 && b.alive && Math.random() < dt * 18) G.parts.push({ type: 'p', x: b.x + rand(-18, 18), y: b.y - rand(0, 40), vx: rand(-20, 20), vy: -rand(40, 90), life: 0.5, max: 0.5, size: 4, color: pick(['#ff6af0', '#c050ff']), grav: 0, drag: 0 });
   if (b.id === 'darryl' && b.alive && b.charge < 1) b.charge = Math.min(1, b.charge + dt / 16); b.unstopT = Math.max(0, (b.unstopT || 0) - dt);
   if (b.unstopT > 0) { b.stunT = 0; b.slowT = 0; b.kx = 0; b.ky = 0; }
   if (b.invisT > 0 && b.star && b.id === 'leon') heal(b, 1000 * dt, true);
@@ -3488,6 +3505,7 @@ function doHyper(b) {
   b.hyper = 0; b.hyperT = 5; b.charge = 1;
   Sound.play('super', vol(b)); ringFx(b.x, b.y, 70, '#c050ff', 0.5, 8); shake(b.isPlayer ? 5 : 1);
   textFx(b.x, b.y - 66, 'HYPERCHARGE!', '#ff6af0', 13, 1.2);
+  if (b.isPlayer) { G.bigText = { text: 'HYPERCHARGED!', color: '#ff6af0', t: 1.1 }; for (let i = 0; i < 24; i++) burst(b.x, b.y, pick(['#ff6af0', '#c050ff', '#ffffff']), 1, 320, 5, 0.7); }
   return true;
 }
 
@@ -4650,7 +4668,7 @@ function renderFeatured(dt) {
 function renderHome() {
   const id = S.selected, d = BR[id], st = S.brawlers[id], md = MODES[S.mode];
   $('#featName').textContent = d.name; $('#featLevel').textContent = `Power ${st.level}`; $('#featTrophies').textContent = fmt(st.trophies);
-  const ev = eventMod(S.mode); $('#modeName').textContent = md.name; $('#modeMap').textContent = (ev ? `★ ${EVENT_MODS[ev].name} · ` : '') + md.maps.map(k => MAPS[k].name).join(' / ');
+  const ev = eventMod(S.mode); $('#modeName').textContent = md.name; $('#modeMap').textContent = (ev ? `${EVENT_MODS[ev].name}! · ` : '') + md.maps.map(k => MAPS[k].name).join(' / ');
   const mb = $('#modeBtn'); mb.style.background = `linear-gradient(180deg, ${md.color}, ${md.color2})`;
   const mi = $('#modeIcon'), mc = mi.getContext('2d'); mc.clearRect(0, 0, 112, 112); mc.fillStyle = INK; mc.fillRect(4, 4, 104, 104); mc.fillStyle = 'rgba(255,255,255,.18)'; mc.fillRect(8, 8, 96, 96); drawModeIcon(mc, S.mode, 56, 56, 1.9);
   const tier = passTier(); $('#passTierMini').textContent = Math.min(PASS_TIERS, tier + 1);
@@ -5029,7 +5047,25 @@ function startTraining(id) {
   const prev = S.selected; S.selected = id; startBattle('training'); S.selected = prev;
   show('battle'); resize(); Sound.music('battle');
 }
-function startMatch(ranked = false) {
+function openDuelPicker() {
+  const ov = $('#ov-duel'); let team = (S.duelTeam || []).filter(i => S.brawlers[i] && S.brawlers[i].owned).slice(0, 3);
+  if (!team.length) team = [S.selected];
+  const draw = () => {
+    const P_ = $('#duelPicked'); P_.innerHTML = '';
+    for (let k = 0; k < 3; k++) { const d = document.createElement('div'); if (team[k]) { const c = document.createElement('canvas'); c.width = c.height = 64; d.appendChild(c); drawPortrait(c, team[k], { scale: 2 }); d.style.border = '3px solid #0d0b1e'; } else d.textContent = k + 1; P_.appendChild(d); }
+    const L = $('#duelList'); L.innerHTML = '';
+    for (const b of BR_LIST.filter(x => S.brawlers[x.id].owned)) { const e = document.createElement('button'); const at = team.indexOf(b.id); e.className = at >= 0 ? 'on' : ''; e.setAttribute('aria-label', b.name);
+      const c = document.createElement('canvas'); c.width = c.height = 64; e.appendChild(c); drawPortrait(c, b.id, { scale: 2 }); if (at >= 0) { const n = document.createElement('b'); n.textContent = at + 1; e.appendChild(n); }
+      e.onclick = () => { Sound.play('click'); if (at >= 0) team.splice(at, 1); else if (team.length < 3) team.push(b.id); draw(); }; L.appendChild(e); }
+    const need = Math.min(3, BR_LIST.filter(x => S.brawlers[x.id].owned).length);
+    $('#duelGo').disabled = team.length < need; $('#duelGo').textContent = team.length < need ? `Pick ${need - team.length} more` : 'Fight!';
+  };
+  draw(); ov.hidden = false;
+  $('#duelCancel').onclick = () => { ov.hidden = true; };
+  $('#duelGo').onclick = () => { ov.hidden = true; S.duelTeam = team.slice(); if (team.length === 3) { S.selected = team[0]; } save(); startMatch(false, true); };
+}
+function startMatch(ranked = false, picked = false) {
+  if (!ranked && !picked && S.mode === 'duels' && S.seenHelp) return openDuelPicker();
   Sound.init(); Sound.resume(); rankedNext = !!ranked;
   if (!S.seenHelp) { S.seenHelp = true; save(); $('#ov-help').hidden = false; $('#ov-help').dataset.then = 'play'; return; }
   Input.keys.clear(); Input.joy = Input.atk = Input.sup = null; Input.queue.length = 0; Input.mouse.down = false; Input.superPress = false;
@@ -5127,7 +5163,7 @@ function finishMatch() {
   $('#ov-result').hidden = false;
   Sound.play(win ? 'win' : 'lose');
   if (win && !g.quit) setTimeout(() => fxQueue({ type: 'drop', min: 0 }), 700);
-  $('#rAgain').onclick = () => { $('#ov-result').hidden = true; startMatch(g.ranked); };
+  $('#rAgain').onclick = () => { $('#ov-result').hidden = true; startMatch(g.ranked, g.mode === 'duels'); };
   $('#rHome').onclick = () => { $('#ov-result').hidden = true; goHome(); };
 }
 // ---------------- unlock + Star Drop animations ----------------
