@@ -380,6 +380,10 @@ input[type=text]{font-size:13px}
 .lday canvas{width:100%;max-width:56px;aspect-ratio:1}
 .lday.done{opacity:.45} .lday.today{background:#ffd23a;animation:rpulse 1s ease-in-out infinite}
 .bcard .bfav{position:absolute;top:2px;right:6px;color:#ff4a8a;font-size:22px;text-shadow:2px 2px 0 #000}
+.achs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.ach{display:flex;gap:8px;align-items:center;border:3px solid var(--ink);background:#e8e4ff;padding:8px;font-size:9px;line-height:1.6}
+.ach small{font-size:7px;opacity:.85} .ach.ready{background:#c8ffb8} .ach.got{opacity:.55}
+.profile{position:relative} .profile .pdot{position:absolute;top:-6px;right:-6px}
 </style>
 </head>
 <body>
@@ -396,6 +400,7 @@ input[type=text]{font-size:13px}
 <div id="menu" class="screen" hidden>
   <header class="topbar">
     <button class="profile" id="profileBtn" aria-label="Open profile">
+      <span class="badge pdot" id="profileDot" hidden>!</span>
       <canvas class="avatar" id="avatarTop" width="88" height="88"></canvas>
       <span class="pinfo"><b id="pName">Player</b><span class="trophy-line"><span class="ico" data-icon="trophy"></span><span id="pTrophies">0</span></span></span>
     </button>
@@ -723,7 +728,7 @@ function defaultSave() {
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
     stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0, basket: 0, duels: 0, robo: 0, biggame: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
-    lastGift: '', boxesOpened: 0, seenHelp: false, tutDone: false, login: { day: '', streak: 0, claimed: '' }, passBonus: 0, favs: [], log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
+    lastGift: '', boxesOpened: 0, seenHelp: false, tutDone: false, login: { day: '', streak: 0, claimed: '' }, passBonus: 0, achClaimed: [], favs: [], log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
     club: { name: 'Pixel Pals', members: [], chat: [], claimed: [] },
   };
 }
@@ -1623,6 +1628,23 @@ function buildMap(key) {
   return m;
 }
 
+// Records: long-term goals with gem rewards. v(S) returns progress, n is the goal.
+const ACHIEVEMENTS = [
+  { id: 'win10', name: 'Winner', text: 'Win 10 matches', n: 10, v: S => S.stats.wins, gems: 10 },
+  { id: 'win50', name: 'Champion', text: 'Win 50 matches', n: 50, v: S => S.stats.wins, gems: 30 },
+  { id: 'ko100', name: 'Knockout King', text: 'Knock out 100 enemies', n: 100, v: S => S.stats.kills, gems: 20 },
+  { id: 'own10', name: 'Collector', text: 'Unlock 10 brawlers', n: 10, v: S => BR_LIST.filter(b => S.brawlers[b.id].owned).length, gems: 20 },
+  { id: 'own20', name: 'Super Collector', text: 'Unlock 20 brawlers', n: 20, v: S => BR_LIST.filter(b => S.brawlers[b.id].owned).length, gems: 40 },
+  { id: 'tro500', name: 'Climber', text: 'Reach 500 total trophies', n: 500, v: S => S.bestTrophies, gems: 20 },
+  { id: 'tro1500', name: 'Mountain Top', text: 'Reach 1,500 total trophies', n: 1500, v: S => S.bestTrophies, gems: 50 },
+  { id: 'drops25', name: 'Lucky Star', text: 'Open 25 Star Drops', n: 25, v: S => S.stats.starDrops || 0, gems: 15 },
+  { id: 'goals10', name: 'Striker', text: 'Score 10 goals', n: 10, v: S => S.stats.goals, gems: 15 },
+  { id: 'boss', name: 'Giant Slayer', text: 'Win a Big Game', n: 1, v: S => S.stats.modeWins.biggame || 0, gems: 15 },
+  { id: 'robo', name: 'Robot Wrecker', text: 'Survive all 10 Robo Rumble waves', n: 1, v: S => S.stats.modeWins.robo || 0, gems: 15 },
+  { id: 'max', name: 'Maxed Out', text: 'Upgrade a brawler to Power 11', n: 1, v: S => BR_LIST.some(b => S.brawlers[b.id].level >= 11) ? 1 : 0, gems: 25 },
+  { id: 'diamond', name: 'Shiny', text: 'Reach Diamond in Ranked', n: 900, v: S => S.ranked.best, gems: 30 },
+  { id: 'master', name: 'True Master', text: 'Reach Master on any brawler', n: 1, v: S => BR_LIST.some(b => masteryLvl(S.brawlers[b.id].mastery || 0) >= 10) ? 1 : 0, gems: 50 },
+];
 const LOGIN_REWARDS = [{ coins: 50 }, { gems: 5 }, { coins: 100 }, { drop: 0 }, { coins: 150 }, { gems: 15 }, { drop: 2 }];
 // ---------------- daily event modifiers ----------------
 const EVENT_MODS = { meteor: { name: 'Meteor Shower', desc: 'Meteors fall from the sky. Watch for the red circles!', col: '#ff7a1a' },
@@ -2522,6 +2544,7 @@ function startBattle(modeKey) {
     pets: [], stars: { 1: 0, 2: 0 }, zone: null, rounds: { 1: 0, 2: 0 }, roundNo: 1, afterPause: null, kos: { 1: 0, 2: 0 }, bolts: { 1: 0, 2: 0 }, siegeT: 40, robotNo: 0,
   };
   const names = shuffle(BOT_NAMES.slice());
+  const mates = S.club && S.club.members.length ? shuffle(S.club.members.map(m => m.name)) : null; // your club members join as teammates
   const others = shuffle(BR_LIST.map(b => b.id).filter(i => i !== pid));
   if (modeKey === 'duo') {
     const sp = shuffle(map.spawns.slice()).slice(0, 3), off = (p, k) => freeSpotOn(map, p.x + k * T, p.y);
@@ -2555,9 +2578,9 @@ function startBattle(modeKey) {
     G.player = duelSpawn(1); duelSpawn(2, skill, bl);
   } else {
     const blue = map.teamSpawns[1], red = map.teamSpawns[2];
-    addBrawler(others[0], 1, blue[0], { level: bl(), name: names[0], skill, slot: 0 });
+    addBrawler(others[0], 1, blue[0], { level: bl(), name: mates ? mates[0] : names[0], skill, slot: 0 });
     G.player = addBrawler(pid, 1, blue[1], { player: true, level: plvl, name: S.name, slot: 1, gears: myGears() });
-    addBrawler(others[1], 1, blue[2], { level: bl(), name: names[1], skill, slot: 2 });
+    addBrawler(others[1], 1, blue[2], { level: bl(), name: mates ? mates[1] : names[1], skill, slot: 2 });
     const reds = shuffle(BR_LIST.map(b => b.id)).slice(0, 3);
     for (let i = 0; i < 3; i++) addBrawler(reds[i], 2, red[i], { level: bl(), name: names[2 + i], skill, slot: i });
     if (modeKey === 'hotzone') G.zone = { x: map.zone.x, y: map.zone.y, r: 2.3 * T, p: { 1: 0, 2: 0 } };
@@ -4635,6 +4658,7 @@ function renderHome() {
   const n = counts();
   const setB = (sel, v) => { const e = $(sel); e.hidden = !v; e.textContent = v === true ? '!' : v; };
   setB('#clubBadge', CLUB_GOALS.some((g, i) => clubTrophies() >= g.t && !ensureClub().claimed.includes(i)));
+  setB('#profileDot', ACHIEVEMENTS.some(a => a.v(S) >= a.n && !S.achClaimed.includes(a.id)));
   setB('#questBadge', n.q); setB('#passBadge', n.p); setB('#roadBadge', n.r); setB('#shopBadge', n.gift);
   resizeFeatured(); updateWallet();
 }
@@ -4922,6 +4946,7 @@ function renderProfile() {
       ${[['Trophies', fmt(totalTrophies())], ['Highest trophies', fmt(S.bestTrophies)], ['Matches', fmt(st.matches)], ['Wins', `${fmt(st.wins)} (${rate}%)`], ['Enemies defeated', fmt(st.kills)], ['Damage dealt', fmt(st.damage)], ['Goals scored', fmt(st.goals)], ['Gems collected', fmt(st.gems)], ['Supers used', fmt(st.supers)],
         ...Object.keys(MODES).filter(k => !MODES[k].hidden).map(k => [`${MODES[k].name} wins`, fmt(st.modeWins[k] || 0)])].map(([k, v]) => `<div class="stat"><small>${k}</small><b>${v}</b></div>`).join('')}
     </div></div>
+    <div class="panel"><h3>Records</h3><div class="achs" id="achs"></div></div>
     <div class="panel"><h3>Battle log</h3>${S.log.length ? `<div class="blog">${S.log.map(e => `<div class="ble ${e.res}"><canvas width="40" height="40" data-id="${e.id}"></canvas><div><b>${e.res === 'win' ? (isSD(e.mode) && e.rank ? '#' + e.rank : 'Victory') : e.res === 'lose' ? (isSD(e.mode) && e.rank ? '#' + e.rank : 'Defeat') : e.res === 'quit' ? 'Left' : 'Draw'}</b> · ${MODES[e.mode] ? MODES[e.mode].name : e.mode}${e.ranked ? ' (Ranked)' : ''}<br><small>${e.map} · ${BR[e.id].name} · ${e.kos} KOs · ${e.ranked ? 'no trophies' : (e.tro >= 0 ? '+' : '') + e.tro + ' trophies'}</small></div></div>`).join('')}</div>` : '<p>Play a match and it will show up here.</p>'}</div>
     <div class="panel"><h3>Brawler trophies</h3><div class="kv">${BR_LIST.map(d => `<div class="stat"><small>${d.name}${S.brawlers[d.id].owned ? '' : ' (locked)'}</small><b>${S.brawlers[d.id].trophies} · Power ${S.brawlers[d.id].level}</b></div>`).join('')}</div></div>`;
   $('#nameIn').value = S.name;
@@ -4930,6 +4955,12 @@ function renderProfile() {
   const avs = $('#avs');
   BR_LIST.forEach((d, i) => { const b = document.createElement('button'); b.className = S.avatar === i ? 'on' : ''; b.setAttribute('aria-label', d.name + ' icon'); b.innerHTML = '<canvas width="128" height="128"></canvas>'; drawPortrait(b.querySelector('canvas'), d.id, { scale: 2.9 }); b.onclick = () => { S.avatar = i; save(); updateWallet(); renderProfile(); }; avs.appendChild(b); });
   $$('.ble canvas').forEach(c => drawPortrait(c, c.dataset.id, { scale: 2 }));
+  for (const a of ACHIEVEMENTS) {
+    const v = Math.min(a.n, a.v(S)), done = v >= a.n, got = S.achClaimed.includes(a.id), el = document.createElement('div'); el.className = 'ach' + (got ? ' got' : done ? ' ready' : '');
+    el.innerHTML = `<div style="flex:1;min-width:0"><b>${a.name}</b><br><small>${a.text}</small><div class="bar green" style="margin-top:4px"><i style="width:${v / a.n * 100}%"></i></div><small>${fmt(v)} / ${fmt(a.n)}</small></div><button class="btn small ${done && !got ? 'green' : 'grey'}"${done && !got ? '' : ' disabled'}>${got ? '✓' : `${icon('gem')} ${a.gems}`}</button>`;
+    el.querySelector('button').onclick = () => { S.achClaimed.push(a.id); grant({ gems: a.gems }); save(); renderProfile(); };
+    $('#achs').appendChild(el);
+  }
 }
 
 // ---------------- ranked ----------------
