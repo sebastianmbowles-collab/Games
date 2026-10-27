@@ -3767,6 +3767,45 @@ function drawDesktopHud(c) {
 }
 
 // ---------------- menu portraits ----------------
+// Personality poses for profile pictures: body lean, weapon angle and a little pixel emote.
+const EMOTES = {
+  heart: ['.kk..kk.', 'kppkkppk', 'kpwppppk', 'kppppppk', '.kppppk.', '..kppk..', '...kk...'],
+  anger: ['.rr.rr.', 'rrr.rrr', 'rr...rr', '.......', 'rr...rr', 'rrr.rrr', '.rr.rr.'],
+  note: ['..kkkk.', '..kbbbk', '..kbkkk', '..kbk..', 'kkkbk..', 'kbbbk..', 'kbbbk..', 'kkkk...'],
+  sparkle: ['...y...', '...y...', '..yWy..', 'yyWWWyy', '..yWy..', '...y...', '...y...'],
+  drop: ['..k...', '.kgk..', 'kgggk.', 'kgWgk.', 'kgggk.', '.kkk..'],
+  dots: ['kkkkkkkkkk', 'kWWkWWkWWk', 'kWWkWWkWWk', 'kkkkkkkkkk'],
+  bang: ['kkk', 'kyk', 'kyk', 'kyk', 'kkk', 'kyk', 'kkk'],
+  leaf: ['...kkk.', '..kggLk', '.kggLgk', 'kggLggk', 'kgLggk.', 'kLkkk..', 'k......'],
+  bolt: ['..kkkk', '.kyyk.', 'kyyk..', 'kyyyyk', '.kyyk.', '.kyk..', 'kyk...', 'kk....'],
+  bubble: ['.kkkk.', 'kppppk', 'kpWppk', 'kppppk', 'kppppk', '.kkkk.'],
+  bat: ['k.......k', 'kk.kkk.kk', 'kvkvvvkvk', 'kvvvrvvvk', '.kvkvkvk.', '..k.k.k..'],
+  fire: ['..k....', '.kok.k.', '.kookok', 'koyyook', 'koyyyok', '.koyok.', '..kkk..'],
+};
+const EMOTE_PAL = { k: '#0d0b1e', r: '#ff3a3a', p: '#ff6ab0', w: '#ffffff', W: '#ffffff', y: '#ffd030', b: '#3a8ad8', g: '#7aff4a', L: '#2a9a2a', o: '#ff7a1a', v: '#7a3ad8' };
+const POSES = {
+  shelly: { rot: -5, wrot: -35, em: 'sparkle' }, nita: { rot: 7, em: 'heart' }, colt: { rot: -6, wrot: -70, em: 'sparkle' }, bull: { rot: 0, em: 'anger' },
+  primo: { rot: -8, em: 'fire' }, poco: { rot: 6, em: 'note' }, brock: { rot: -4, wrot: -30, em: 'fire' }, jessie: { rot: 8, em: 'bolt' },
+  dynamike: { rot: -10, em: 'fire' }, spike: { rot: 6, em: 'leaf' }, rosa: { rot: -4, em: 'leaf' }, piper: { rot: 5, wrot: -60, em: 'heart' },
+  frank: { rot: -3, em: 'note' }, mortis: { rot: -10, wrot: 30, em: 'bat' }, leon: { rot: 6, flip: true, em: 'dots' }, crow: { rot: -6, em: 'drop' },
+  edgar: { rot: 4, em: 'dots' }, bibi: { rot: -6, wrot: -80, em: 'bubble' }, max: { rot: 12, em: 'bolt' }, tick: { rot: -8, em: 'bang' },
+  barley: { rot: 3, wrot: -40, em: 'sparkle' }, sprout: { rot: 6, em: 'leaf' }, eightbit: { rot: -4, em: 'anger' }, emz: { rot: 8, wrot: -45, em: 'dots' }, gene: { rot: -6, em: 'sparkle' },
+};
+const EMC = {};
+function emoteCanvas(n) { return EMC[n] || (EMC[n] = compileRows(EMOTES[n], EMOTE_PAL)); }
+function drawPosed(c, id, skin, px, py, sc, flip) {
+  const S_ = getSpr(id, skin), P = POSES[id] || {}, fl = !!(flip ^ !!P.flip), W_ = S_.w * sc, H_ = S_.h * sc;
+  c.save(); c.translate(px + W_ / 2, py + H_); c.rotate((P.rot || 0) * Math.PI / 180 * (fl ? -1 : 1)); c.translate(-W_ / 2, -H_);
+  const k = silhouette(id, INK)[fl ? 'f' : 'n']; for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) c.drawImage(k, dx * sc, dy * sc, W_, H_);
+  c.drawImage((fl ? S_.f : S_.n)[0], 0, 0, W_, H_);
+  if (S_.weapon) {
+    const W = S_.weapon, gx = fl ? (S_.w - W.ox) * sc : W.ox * sc, gy = (W.oy + 1) * sc;
+    c.save(); c.translate(gx, gy); c.rotate((P.wrot || 0) * Math.PI / 180 * (fl ? -1 : 1));
+    c.drawImage(fl ? W.f : W.n, fl ? -W.w * sc : 0, -sc, W.w * sc, W.n.height * sc); c.restore();
+  }
+  c.restore();
+  if (P.em) { const e = emoteCanvas(P.em), es = Math.max(1, Math.round(sc * 0.7)); c.drawImage(e, fl ? px - e.width * es * 0.2 : px + W_ - e.width * es * 0.8, Math.max(2, py - es * 2), e.width * es, e.height * es); }
+}
 function drawPortrait(cv, id, opts = {}) {
   const c = cv.getContext('2d'), w = cv.width, h = cv.height, d = BR[id];
   c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false;
@@ -3778,9 +3817,7 @@ function drawPortrait(cv, id, opts = {}) {
   const flip = opts.ang !== undefined && opts.ang > 1.5;
   const px = Math.round((w - S_.w * sc) / 2), py = Math.round(h - S_.h * sc - sc * 2);
   c.fillStyle = 'rgba(13,11,30,.4)'; c.fillRect(px + 2 * sc, h - 3 * sc, (S_.w - 4) * sc, 2 * sc);
-  const k = silhouette(id, INK)[flip ? 'f' : 'n']; for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) c.drawImage(k, px + dx * sc, py + dy * sc, S_.w * sc, S_.h * sc);
-  c.drawImage((flip ? S_.f : S_.n)[0], px, py, S_.w * sc, S_.h * sc);
-  if (S_.weapon) { const W = S_.weapon; c.drawImage(flip ? W.f : W.n, flip ? px + (S_.w - W.ox - W.w) * sc : px + W.ox * sc, py + W.oy * sc, W.w * sc, W.n.height * sc); }
+  drawPosed(c, id, opts.skin || '', px, py, sc, flip);
 }
 
 // ===================================================================
@@ -3880,9 +3917,7 @@ function drawCardFace(cv, id, skin) {
   c.imageSmoothingEnabled = false; c.fillStyle = c1; c.fillRect(0, 0, w, h);
   c.fillStyle = c2; c.beginPath(); c.moveTo(w * 0.55, 0); c.lineTo(w, 0); c.lineTo(w, h); c.lineTo(w * 0.35, h); c.fill();
   const S_ = getSpr(id, skin), sc = Math.floor(h / 12.8), px = Math.round(w * 0.12), py = 4;
-  const k = silhouette(id, INK).n; for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) c.drawImage(k, px + dx * sc, py + dy * sc, S_.w * sc, S_.h * sc);
-  c.drawImage(S_.n[0], px, py, S_.w * sc, S_.h * sc);
-  if (S_.weapon) { const W = S_.weapon; c.drawImage(W.n, px + W.ox * sc, py + W.oy * sc, W.w * sc, W.n.height * sc); }
+  drawPosed(c, id, skin, px, py, sc, false);
 }
 function renderBrawlers() {
   const g = $('#brGrid'); g.innerHTML = '';
