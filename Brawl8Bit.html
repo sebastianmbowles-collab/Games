@@ -694,7 +694,7 @@ function defaultSave() {
     v: 1, name: 'Player', avatar: 0, coins: 150, gems: 20, selected: 'shelly', mode: 'showdown',
     brawlers: Object.fromEntries(['shelly', 'nita', 'colt', 'bull', 'primo', 'poco', 'brock', 'jessie', 'dynamike', 'spike', 'rosa', 'piper', 'frank', 'mortis', 'leon', 'crow', 'edgar', 'bibi', 'max', 'tick', 'barley', 'sprout', 'eightbit', 'emz', 'gene'].map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [], skins: [], skin: '', mastery: 0 }])),
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
-    stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
+    stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0, basket: 0, duels: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
     lastGift: '', boxesOpened: 0, seenHelp: false, ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
     club: { name: 'Pixel Pals', members: [], chat: [], claimed: [] },
@@ -1159,6 +1159,38 @@ const MAPS = {
     '..C.......B',
     '..C.......M',
   ] },
+  court: { name: 'Hoop Hangout', mode: 'basket', theme: 'stadium', kind: 'half', rows: [
+    '...........',
+    '.......####',
+    '.........gg',
+    '......2...2',
+    '...........',
+    'BB.........',
+    'BB...#.....',
+    '.....#.....',
+    '...........',
+    '..WW....BB.',
+    '..WW....BB.',
+    '...........',
+    '.#.....#...',
+    '.#.....#...',
+    '.....BB....',
+    '...........',
+    '..........O',
+  ] },
+  duelpit: { name: 'Duel Pit', mode: 'duels', theme: 'canyon', kind: 'half', rows: [
+    '...........',
+    '..........2',
+    '...........',
+    '..BB...##..',
+    '..BB.......',
+    '.......C...',
+    '.##....C...',
+    '.....#.....',
+    '.....#..BB.',
+    '........BB.',
+    '...........',
+  ] },
   pinball: { name: 'Pinball Park', mode: 'brawlball', theme: 'meadow', kind: 'half', rows: [
     '########ggg',
     '...........',
@@ -1321,6 +1353,10 @@ const MODES = {
     desc: 'Every brawler for themselves. Break power boxes for power cubes, stay out of the poison and be the last one standing. Top 2 counts as a win.' },
   gemgrab: { name: 'Gem Grab', tag: '3 vs 3', color: '#a54bff', color2: '#6a1fc9', maps: ['oasis', 'mineshaft'], team: true,
     desc: 'Collect gems from the mine. Hold 10 or more and the lead for 15 seconds to win. Defeated brawlers drop their gems!' },
+  basket: { name: 'Basket Brawl', tag: '3 vs 3', color: '#ff8a1f', color2: '#c0500a', maps: ['court'], team: true,
+    desc: 'Grab the ball and shoot it into the enemy hoop at the top. You have to shoot or pass it in, you can not carry it. First to 3 points wins.' },
+  duels: { name: 'Duels', tag: '1 vs 1 · 3 brawlers', color: '#e0405a', color2: '#8a1a3a', maps: ['duelpit', 'rockyring'], team: true,
+    desc: 'You against one enemy. You both bring 3 brawlers. When one is knocked out, the next one jumps in. Knock out all 3 enemy brawlers to win.' },
   brawlball: { name: 'Brawl Ball', tag: '3 vs 3', color: '#2f8fff', color2: '#1a55c9', maps: ['stadium', 'pinball'], team: true,
     desc: 'Grab the ball and kick it into the enemy goal at the top. First to 2 goals wins. Attack passes, Super shoots.' },
   heist: { name: 'Heist', tag: '3 vs 3', color: '#ff5a4a', color2: '#c92a2a', maps: ['vault', 'safezone'], team: true,
@@ -2089,6 +2125,12 @@ function startBattle(modeKey) {
     G.player = addBrawler(pid, 1, sp[0], { player: true, level: plvl, name: S.name, gears: myGears() });
     for (let i = 0; i < 5; i++) addBrawler(others[i % others.length], i + 2, sp[i + 1], { level: bl(), name: names[i], skill, slot: i });
     G.poison = { delay: 20, inset: 0, t: 0, max: Math.min(map.w, map.h) * T / 2 - 2.6 * T, speed: 6 };
+  } else if (modeKey === 'duels') {
+    // each side brings 3 brawlers; the next one jumps in after a knockout
+    const owned = BR_LIST.map(b => b.id).filter(i => i !== pid && S.brawlers[i].owned);
+    const mine = [pid, ...shuffle(owned)].slice(0, 3); while (mine.length < 3) mine.push(mine[mine.length % Math.max(1, mine.length)]);
+    G.duel = { skill, botLevel: plvl, line: { 1: mine, 2: shuffle(BR_LIST.map(b => b.id)).slice(0, 3) }, idx: { 1: 0, 2: 0 }, spawnT: { 1: 0, 2: 0 }, foe: names[0] };
+    G.player = duelSpawn(1); duelSpawn(2, skill, bl);
   } else {
     const blue = map.teamSpawns[1], red = map.teamSpawns[2];
     addBrawler(others[0], 1, blue[0], { level: bl(), name: names[0], skill, slot: 0 });
@@ -2100,15 +2142,22 @@ function startBattle(modeKey) {
     if (modeKey === 'knockout') G.poison = { delay: 40, inset: 0, t: 0, max: Math.min(map.w, map.h) * T / 2 - 2.8 * T, speed: 10 };
     if (modeKey === 'siege') for (const s of map.safes) G.safes.push({ kind: 'safe', ike: true, team: s.team, x: s.x, y: s.y, cy: s.y - 6, r: 34, hp: 14000, maxHp: 14000, flash: 0, cd: 0, dmgMult: 1, cubes: 0 });
     if (modeKey === 'heist') for (const s of map.safes) G.safes.push({ kind: 'safe', team: s.team, x: s.x, y: s.y, cy: s.y - 6, r: 34, hp: 20000, maxHp: 20000, flash: 0 });
-    if (modeKey === 'brawlball') {
+    if (modeKey === 'brawlball' || modeKey === 'basket') {
       G.ball = { x: map.ball.x, y: map.ball.y, vx: 0, vy: 0, r: 12, holder: null, noPickT: 0, noPickBy: null, lastTouch: null, spin: 0, breakWalls: false };
       G.goalSets = { 1: new Set(map.goals[1]), 2: new Set(map.goals[2]) };
+      const mid = list => { let x = 0, y = 0; for (const i of list) { x += (i % map.w + 0.5) * T; y += (Math.floor(i / map.w) + 0.5) * T; } return { x: x / list.length, y: y / list.length }; };
+      if (modeKey === 'basket') G.hoops = { 1: mid(map.goals[2]), 2: mid(map.goals[1]) };
     }
   }
   const p = G.player; G.cam.x = p.x; G.cam.y = p.y;
 }
 const isSD = m => m === 'showdown' || m === 'duo';
 function freeSpotOn(map, x, y) { const tx = Math.floor(x / T), ty = Math.floor(y / T), t = map.t[ty * map.w + tx]; return t === TILE.WALL || t === TILE.WATER || t === TILE.CRATE || t === TILE.BOX ? { x: Math.floor(x / T) * T + T / 2 + (x < map.w * T / 2 ? T : -T), y } : { x, y }; }
+function duelSpawn(team, skill, bl) {
+  const D = G.duel, id = D.line[team][D.idx[team]], sp = G.map.teamSpawns[team][1] || G.map.teamSpawns[team][0];
+  if (team === 1) return addBrawler(id, 1, sp, { player: true, level: S.brawlers[id].level, name: S.name, slot: 1, gears: id === S.selected ? myGears() : [] });
+  return addBrawler(id, 2, sp, { level: bl ? bl() : D.botLevel, name: D.foe, skill: skill ?? D.skill, slot: 1 });
+}
 function myGears() { const st = S.brawlers[S.selected]; return (st.equipped || []).filter(g => (st.gears || []).includes(g)).slice(0, gearSlots(st.level)); }
 function botGears(lvl) { return shuffle(GEARS.map(g => g.id)).slice(0, gearSlots(lvl)); }
 function addBrawler(id, team, pos, o) {
@@ -2376,6 +2425,7 @@ function killBrawler(b, killer) {
     if (mate) b.respawnT = 7;
     else { const teams = new Set(G.brawlers.filter(x => x.alive).map(x => x.team)); const rank = teams.size + 1; for (const x of G.brawlers) if (x.team === b.team) { x.rank = rank; x.respawnT = 0; } }
   } else if (G.mode === 'knockout') b.respawnT = 0;
+  else if (G.mode === 'duels') { b.respawnT = 0; G.duel.idx[b.team]++; if (G.duel.idx[b.team] < 3) G.duel.spawnT[b.team] = 2; }
   else b.respawnT = 3.5;
 }
 function respawn(b) {
@@ -2588,7 +2638,7 @@ function checkGoal() {
   let team = 0;
   if (G.goalSets[2].has(i)) team = 1; else if (G.goalSets[1].has(i)) team = 2;
   if (!team) return false;
-  if (B.holder && B.holder.team !== team) return false;
+  if (B.holder && (B.holder.team !== team || G.mode === 'basket')) return false;
   scoreGoal(team); return true;
 }
 function scoreGoal(team) {
@@ -2597,8 +2647,8 @@ function scoreGoal(team) {
   G.goalPause = 2.6; G.afterPause = resetBallRound; B.holder = null; B.vx = B.vy = 0;
   Sound.play('goal'); shake(8);
   for (let i = 0; i < 40; i++) burst(B.x, B.y, pick(['#ffd23a', '#ff4659', '#2f9bff', '#4fd145', '#ffffff']), 1, 420, 6, 1.2, 300);
-  G.bigText = { text: team === 1 ? 'GOAL!' : 'THEY SCORED', color: team === 1 ? '#ffd23a' : '#ff6a6a', t: 2.2 };
-  if (G.score[team] >= 2) endMatch(team === 1 ? 'win' : 'lose');
+  G.bigText = { text: team === 1 ? (G.mode === 'basket' ? 'SWISH!' : 'GOAL!') : 'THEY SCORED', color: team === 1 ? '#ffd23a' : '#ff6a6a', t: 2.2 };
+  if (G.score[team] >= (G.mode === 'basket' ? 3 : 2)) endMatch(team === 1 ? 'win' : 'lose');
 }
 function resetBallRound() {
   const B = G.ball; B.x = G.map.ball.x; B.y = G.map.ball.y; B.vx = B.vy = 0; B.holder = null; B.noPickT = 0; B.lastTouch = null;
@@ -2658,7 +2708,12 @@ function updateMode(dt) {
     else if (!G.gemCd || G.gemCd.team !== lead) G.gemCd = { team: lead, t: 15, beep: 15 };
     else { G.gemCd.t -= dt; if (Math.ceil(G.gemCd.t) < G.gemCd.beep) { G.gemCd.beep = Math.ceil(G.gemCd.t); Sound.play('beep', 0.6); } if (G.gemCd.t <= 0) endMatch(lead === 1 ? 'win' : 'lose'); }
     if (G.timeLeft <= 0 && !G.over) endMatch(g1 > g2 ? 'win' : g2 > g1 ? 'lose' : 'draw');
-  } else if (m === 'brawlball') {
+  } else if (m === 'duels') {
+    const D = G.duel;
+    for (const t of [1, 2]) if (D.spawnT[t] > 0) { D.spawnT[t] -= dt; if (D.spawnT[t] <= 0) { const nb = duelSpawn(t); if (t === 1) G.player = nb; burst(nb.x, nb.y, t === 1 ? '#7cc4ff' : '#ff8a96', 14, 220, 5, 0.5); Sound.play('superReady'); } }
+    if (D.idx[2] >= 3) endMatch('win'); else if (D.idx[1] >= 3) endMatch('lose');
+    else if (G.timeLeft <= 0) { const h = t => { const b = G.brawlers.find(x => x.alive && x.team === t); return b ? b.hp / b.hpMax : 0; }; const a = 3 - D.idx[1] + h(1), b = 3 - D.idx[2] + h(2); endMatch(a > b + 0.01 ? 'win' : b > a + 0.01 ? 'lose' : 'draw'); }
+  } else if (m === 'brawlball' || m === 'basket') {
     if (G.timeLeft <= 0 && !G.over) endMatch(G.score[1] > G.score[2] ? 'win' : G.score[2] > G.score[1] ? 'lose' : 'draw');
   } else if (m === 'heist') {
     const mine = G.safes.find(s => s.team === 1), theirs = G.safes.find(s => s.team === 2);
@@ -2996,7 +3051,7 @@ function pathDir(b, gx, gy) {
   return [(cx - b.x) / d, (cy - b.y) / d];
 }
 
-const enemyGoal = team => team === 1 ? { x: G.map.w * T / 2, y: T * 0.6 } : { x: G.map.w * T / 2, y: G.map.h * T - T * 0.6 };
+const enemyGoal = team => G.hoops ? G.hoops[team] : team === 1 ? { x: G.map.w * T / 2, y: T * 0.6 } : { x: G.map.w * T / 2, y: G.map.h * T - T * 0.6 };
 const ownGoal = team => enemyGoal(team === 1 ? 2 : 1);
 const teamHome = team => { const s = G.map.teamSpawns[team]; return { x: s.reduce((a, p) => a + p.x, 0) / s.length, y: s.reduce((a, p) => a + p.y, 0) / s.length }; };
 
@@ -3059,7 +3114,7 @@ function aiDecide(b) {
     if (gem) { ai.goal = { x: gem.x, y: gem.y }; return; }
     const off = (ai.slot - 1) * 2.2 * T;
     ai.goal = { x: mineP.x + off, y: mineP.y + (b.team === 1 ? 1.4 : -1.4) * T };
-  } else if (m === 'brawlball') {
+  } else if (m === 'brawlball' || m === 'basket') {
     const B = G.ball, eg = enemyGoal(b.team), og = ownGoal(b.team);
     if (B.holder === b) { ai.goal = eg; ai.goalFirst = true; return; }
     if (!B.holder) {
@@ -3099,7 +3154,7 @@ function aiDecide(b) {
     if (es && dist(b.x, b.y, es.x, es.cy) < range) ai.structTarget = es;
     return;
   }
-  if (m === 'bounty' || m === 'knockout' || m === 'wipeout') {
+  if (m === 'bounty' || m === 'knockout' || m === 'wipeout' || m === 'duels') {
     const home = teamHome(b.team), foe = teamHome(b.team === 1 ? 2 : 1);
     if (lowHp && tgt) { ai.goal = home; ai.goalFirst = true; return; }
     if (tgt) return;
@@ -3419,7 +3474,7 @@ function drawBall(c, b) { drawSpr(c, 'ball', b.x, b.y, 3); }
 function drawCoinIcon(c, x, y, r) { drawSpr(c, 'coin', x, y, Math.max(1, Math.round(r / 4))); }
 function drawModeIcon(c, mode, x, y, s) {
   const k = Math.max(2, Math.round(s * 3));
-  const map = { showdown: 'skull', duo: 'skull', gemgrab: 'gem', brawlball: 'ball', heist: 'safeIcon', bounty: 'star', hotzone: 'fire', knockout: 'trophy', wipeout: 'skull', siege: 'bolt' };
+  const map = { showdown: 'skull', duo: 'skull', gemgrab: 'gem', brawlball: 'ball', basket: 'ball', duels: 'skull', heist: 'safeIcon', bounty: 'star', hotzone: 'fire', knockout: 'trophy', wipeout: 'skull', siege: 'bolt' };
   const n = map[mode];
   if (n === 'safeIcon') { c.fillStyle = INK; c.fillRect(x - 6 * k, y - 6 * k, 12 * k, 12 * k); c.fillStyle = '#c9cfe0'; c.fillRect(x - 5 * k, y - 5 * k, 10 * k, 10 * k); c.fillStyle = '#ff4659'; c.fillRect(x - 5 * k, y - 5 * k, 10 * k, 3 * k); c.fillStyle = '#8a91aa'; c.fillRect(x - 2 * k, y, 4 * k, 4 * k); return; }
   if (n === 'fire') { const P = [[0, -5], [-1, -3], [1, -3], [-2, -1], [0, -1], [2, -1], [-3, 1], [-1, 1], [1, 1], [3, 1], [-3, 3], [-1, 3], [1, 3], [3, 3], [-2, 5], [0, 5], [2, 5]]; for (const [dx, dy] of P) { c.fillStyle = dy > 1 ? '#ffe040' : '#ff6a1f'; c.fillRect(x + dx * k - k, y + dy * k - k, 2 * k, 2 * k); } return; }
@@ -3489,10 +3544,11 @@ function buildGround() {
     }
     // mode markings
     if (!isSD(G.mode)) for (const team of [1, 2]) for (const sp of m.teamSpawns[team]) { x.fillStyle = team === 1 ? 'rgba(47,155,255,.4)' : 'rgba(255,70,89,.4)'; x.fillRect(A3(sp.x) - 6, A3(sp.y) - 1, 12, 6); }
-    if (G.mode === 'brawlball') {
+    if (G.mode === 'brawlball' || G.mode === 'basket') {
       x.fillStyle = 'rgba(255,255,255,.6)'; x.fillRect(16, H / 2, W - 32, 1);
       for (let a = 0; a < 64; a++) { const an = a / 64 * Math.PI * 2; x.fillRect(Math.round(W / 2 + Math.cos(an) * 34), Math.round(H / 2 + Math.sin(an) * 34), 1, 1); }
     }
+    if (G.hoops) for (const t of [1, 2]) { const h = G.hoops[t], hx = A3(h.x), hy = A3(h.y); for (let a = 0; a < 48; a++) { const an = a / 48 * Math.PI * 2; x.fillStyle = a % 2 ? '#ff7a1a' : '#c04a0a'; x.fillRect(Math.round(hx + Math.cos(an) * 13), Math.round(hy + Math.sin(an) * 7), 2, 2); } }
     if (G.mode === 'gemgrab' || G.mode === 'siege') { const cx = A3(m.mine.x), cy = A3(m.mine.y); x.fillStyle = INK; x.fillRect(cx - 10, cy - 5, 20, 12); x.fillStyle = '#5a3a2a'; x.fillRect(cx - 9, cy - 4, 18, 10); x.fillStyle = '#2a1a14'; x.fillRect(cx - 6, cy - 2, 12, 6); }
     x.fillStyle = INK; x.fillRect(-1, -1, W + 2, 1); x.fillRect(-1, H, W + 2, 1); x.fillRect(-1, 0, 1, H); x.fillRect(W, 0, 1, H);
   }));
@@ -3761,8 +3817,16 @@ function drawHUD(c) {
   } else if (m === 'gemgrab') {
     twoSide(teamGems(1), teamGems(2), '#7cc4ff', '#ff8a96'); drawSpr(c, 'gem', cx - 130, top + 25, 2); drawSpr(c, 'gem', cx + 130, top + 25, 2);
     if (G.gemCd) { const mine = G.gemCd.team === 1; panel(c, cx - 125, top + 64, 250, 44, mine ? 'rgba(30,90,200,.9)' : 'rgba(200,40,60,.9)'); txt(c, mine ? 'YOUR TEAM WINS IN' : 'ENEMIES WIN IN', cx, top + 76, 8, '#fff'); txt(c, Math.ceil(G.gemCd.t), cx, top + 96, 14, '#ffe040'); }
-  } else if (m === 'brawlball') {
-    twoSide(G.score[1], G.score[2], '#7cc4ff', '#ff8a96');
+  } else if (m === 'duels') {
+    const D = G.duel; panel(c, cx - 210, top, 420, 56); txt(c, timer, cx, top + 28, 12, '#fff');
+    for (const t of [1, 2]) for (let k = 0; k < 3; k++) {
+      const x0 = t === 1 ? cx - 190 + k * 46 : cx + 98 + k * 46, out = k < D.idx[t], cur = k === D.idx[t];
+      c.fillStyle = t === 1 ? 'rgba(47,155,255,.35)' : 'rgba(255,70,89,.35)'; if (cur) c.fillRect(x0 - 2, top + 6, 44, 44);
+      c.globalAlpha = out ? 0.35 : 1; drawSpr(c, D.line[t][k], x0 + 20, top + 28, 2); c.globalAlpha = 1;
+      if (out) txt(c, 'X', x0 + 20, top + 30, 18, '#ff4a5a');
+    }
+  } else if (m === 'brawlball' || m === 'basket') {
+    twoSide(G.score[1], G.score[2], '#7cc4ff', '#ff8a96'); if (m === 'basket') txt(c, 'FIRST TO 3 · SHOOT IT IN!', cx, top + 66, 8, '#fff');
     if (G.ball.holder === p) txt(c, 'ATTACK: PASS   SUPER: SHOOT', cx, top + 72, 9, '#fff');
   } else if (m === 'heist') {
     const a = G.safes.find(s => s.team === 1), b = G.safes.find(s => s.team === 2);
@@ -4391,8 +4455,8 @@ function finishMatch() {
   save();
   const banner = isSD(g.mode) ? (rank === 1 ? 'VICTORY!' : `RANK #${rank}`) : res === 'win' ? 'VICTORY!' : res === 'lose' ? 'DEFEAT' : 'DRAW';
   const sub = g.quit ? 'You left the match' : g.mode === 'duo' ? (rank === 1 ? 'Last team standing!' : `Your team finished #${rank} of 3.`) : g.mode === 'showdown' ? (win ? `${rank === 1 ? 'Last brawler standing!' : 'Top 2 finish. That counts as a win!'}` : 'Knocked out. Better luck next time!') :
-    { gemgrab: () => `Gems: ${teamGems(1)} vs ${teamGems(2)}`, brawlball: () => `Score: ${g.score[1]} - ${g.score[2]}`, heist: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `Safes: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; }, bounty: () => `Stars: ${g.stars[1]} vs ${g.stars[2]}`, hotzone: () => `Zone: ${Math.floor(g.zone.p[1])}% vs ${Math.floor(g.zone.p[2])}%`, knockout: () => `Rounds: ${g.rounds[1]} - ${g.rounds[2]}`, wipeout: () => `KOs: ${g.kos[1]} vs ${g.kos[2]}`, siege: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `IKE: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; } }[g.mode]();
-  const extra = { showdown: `Cubes ${gs.cubes}`, duo: `Cubes ${gs.cubes}`, wipeout: `KOs ${gs.kills}`, siege: `Bolts ${gs.bolts}`, gemgrab: `Gems ${gs.gems}`, brawlball: `Goals ${gs.goals}`, heist: `Safe damage ${fmt(gs.safeDmg)}`, bounty: `Stars ${gs.stars}`, hotzone: `Zone time ${Math.round(gs.zone)}s`, knockout: `Rounds won ${gs.rounds}` }[g.mode];
+    { gemgrab: () => `Gems: ${teamGems(1)} vs ${teamGems(2)}`, brawlball: () => `Score: ${g.score[1]} - ${g.score[2]}`, basket: () => `Score: ${g.score[1]} - ${g.score[2]}`, duels: () => `Brawlers left: ${3 - g.duel.idx[1]} vs ${3 - g.duel.idx[2]}`, heist: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `Safes: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; }, bounty: () => `Stars: ${g.stars[1]} vs ${g.stars[2]}`, hotzone: () => `Zone: ${Math.floor(g.zone.p[1])}% vs ${Math.floor(g.zone.p[2])}%`, knockout: () => `Rounds: ${g.rounds[1]} - ${g.rounds[2]}`, wipeout: () => `KOs: ${g.kos[1]} vs ${g.kos[2]}`, siege: () => { const a = g.safes.find(s => s.team === 1), b = g.safes.find(s => s.team === 2); return `IKE: ${Math.ceil(a.hp / a.maxHp * 100)}% vs ${Math.ceil(b.hp / b.maxHp * 100)}%`; } }[g.mode]();
+  const extra = { showdown: `Cubes ${gs.cubes}`, duo: `Cubes ${gs.cubes}`, wipeout: `KOs ${gs.kills}`, siege: `Bolts ${gs.bolts}`, gemgrab: `Gems ${gs.gems}`, brawlball: `Goals ${gs.goals}`, basket: `Points ${gs.goals}`, duels: `KOs ${gs.kills}`, heist: `Safe damage ${fmt(gs.safeDmg)}`, bounty: `Stars ${gs.stars}`, hotzone: `Zone time ${Math.round(gs.zone)}s`, knockout: `Rounds won ${gs.rounds}` }[g.mode];
   const cls = win ? 'win' : res === 'draw' ? 'draw' : 'lose';
   $('#resultBody').innerHTML = `
     <p class="result-banner stroke ${cls}">${banner}</p>
