@@ -710,7 +710,7 @@ function defaultSave() {
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
     stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0, basket: 0, duels: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
-    lastGift: '', boxesOpened: 0, seenHelp: false, log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
+    lastGift: '', boxesOpened: 0, seenHelp: false, tutDone: false, log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
     club: { name: 'Pixel Pals', members: [], chat: [], claimed: [] },
   };
 }
@@ -2393,6 +2393,7 @@ function doAttack(b, ang, aimDist) {
   if (!canAct(b)) return false;
   if (G.ball && G.ball.holder === b) { if (b.cd > 0) return false; kickBall(b, ang, false); b.cd = 0.45; return true; }
   if (b.cd > 0 || b.ammo < 1 || b.burst) return false;
+  if (b.isPlayer) G.tutAtk = (G.tutAtk || 0) + 1;
   b.ammo -= 1; b.cd = 0.32; b.atkT = 0; b.revealT = 1.2; b.atkAnim = 1; b.aim = ang; b.invisT = 0;
   fireAbility(b, b.def.attack, ang, aimDist, false);
   return true;
@@ -4074,8 +4075,23 @@ function pixPie(c, x, y, r, frac, fill, cell = 4) {
   const n = Math.ceil(r / cell); c.fillStyle = fill;
   for (let j = -n; j < n; j++) for (let i = -n; i < n; i++) { const cx = (i + 0.5) * cell, cy = (j + 0.5) * cell; if (cx * cx + cy * cy > r * r) continue; let a = Math.atan2(cx, -cy); if (a < 0) a += Math.PI * 2; if (a / (Math.PI * 2) <= frac) c.fillRect(Math.round(x + i * cell), Math.round(y + j * cell), cell, cell); }
 }
+// First-match coach: move, attack, then Super
+function drawTutorial(c, p) {
+  if (S.tutDone || S.stats.matches >= 3 || G.mode === 'training' || G.over || G.intro > 0 || !p.alive) return;
+  const T_ = G.tut || (G.tut = { step: 0, t: 0, sx: p.x, sy: p.y }), touch = Input.touchMode;
+  if (T_.step === 0 && dist(p.x, p.y, T_.sx, T_.sy) > 2.5 * T) { T_.step = 1; Sound.play('coin'); }
+  if (T_.step === 1 && (G.tutAtk || 0) >= 3) { T_.step = 2; Sound.play('coin'); }
+  if (T_.step === 2 && G.stats.supers > 0) { T_.step = 3; T_.t = 0; Sound.play('superReady'); }
+  if (T_.step === 3) { T_.t += 1 / 60; if (T_.t > 4) { S.tutDone = true; save(); return; } }
+  const msg = [touch ? 'DRAG THE LEFT STICK TO MOVE' : 'MOVE WITH W A S D', touch ? 'TAP THE RED BUTTON TO ATTACK' : 'CLICK TO ATTACK (MOUSE AIMS)',
+    p.charge >= 1 ? (touch ? 'YOUR SUPER IS READY! TAP SUPER' : 'YOUR SUPER IS READY! PRESS SPACE') : 'HIT ENEMIES TO CHARGE YOUR SUPER', 'GREAT! NOW WIN THE MATCH!'][T_.step];
+  const w = Math.min(VW - 40, 460), y = VH * 0.62, pulse = 1 + Math.sin(G.time * 6) * 0.04;
+  panel(c, VW / 2 - w / 2, y, w, 46, 'rgba(255,210,58,.95)'); txt(c, `TIP ${Math.min(3, T_.step + 1)}/3`, VW / 2, y + 12, 7, '#1a1440', 'center', 0);
+  txt(c, msg, VW / 2, y + 30, Math.round(10 * pulse), '#1a1440', 'center', 0);
+}
 function drawHUD(c) {
   const top = INSET.t + 12, cx = VW / 2, p = G.player;
+  drawTutorial(c, p);
   if (G.hurtFlash > 0) { c.fillStyle = `rgba(255,30,30,${G.hurtFlash * 0.6})`; c.fillRect(0, 0, VW, 10); c.fillRect(0, VH - 10, VW, 10); c.fillRect(0, 0, 10, VH); c.fillRect(VW - 10, 0, 10, VH); }
   else if (p.alive && p.hp < p.hpMax * 0.3 && Math.floor(G.time * 4) % 2) { c.fillStyle = 'rgba(255,30,30,.35)'; c.fillRect(0, 0, VW, 6); c.fillRect(0, VH - 6, VW, 6); c.fillRect(0, 0, 6, VH); c.fillRect(VW - 6, 0, 6, VH); }
   const m = G.mode, timer = G.timeLeft !== Infinity ? mmss(G.timeLeft) : '';
@@ -4101,7 +4117,7 @@ function drawHUD(c) {
     twoSide(teamGems(1), teamGems(2), '#7cc4ff', '#ff8a96'); drawSpr(c, 'gem', cx - 130, top + 25, 2); drawSpr(c, 'gem', cx + 130, top + 25, 2);
     if (G.gemCd) { const mine = G.gemCd.team === 1; panel(c, cx - 125, top + 64, 250, 44, mine ? 'rgba(30,90,200,.9)' : 'rgba(200,40,60,.9)'); txt(c, mine ? 'YOUR TEAM WINS IN' : 'ENEMIES WIN IN', cx, top + 76, 8, '#fff'); txt(c, Math.ceil(G.gemCd.t), cx, top + 96, 14, '#ffe040'); }
   }
-  if (G.mod && G.time < 6) txt(c, EVENT_MODS[G.mod].name.toUpperCase() + '!', cx, top + 90, 9, EVENT_MODS[G.mod].col);
+  if (G.mod && G.time < 6) txt(c, EVENT_MODS[G.mod].name.toUpperCase() + '!', cx, top + 64, 9, EVENT_MODS[G.mod].col);
   if (m === 'training') {
     panel(c, cx - 170, top, 340, 56); txt(c, 'TRAINING CAVE', cx, top + 15, 10, '#ffe040');
     txt(c, `DAMAGE ${fmt(Math.round(G.stats.damage))}`, cx, top + 36, 10, '#fff'); txt(c, 'PAUSE TO LEAVE', cx, top + 72, 8, '#c9d2ff');
