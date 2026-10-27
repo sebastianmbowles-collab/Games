@@ -706,7 +706,7 @@ let S = null;
 function defaultSave() {
   return {
     v: 1, name: 'Player', avatar: 0, coins: 150, gems: 20, selected: 'shelly', mode: 'showdown',
-    brawlers: Object.fromEntries(['shelly', 'nita', 'colt', 'bull', 'primo', 'poco', 'brock', 'jessie', 'dynamike', 'spike', 'rosa', 'piper', 'frank', 'mortis', 'leon', 'crow', 'edgar', 'bibi', 'max', 'tick', 'barley', 'sprout', 'eightbit', 'emz', 'gene'].map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [], skins: [], skin: '', mastery: 0 }])),
+    brawlers: Object.fromEntries(BR_LIST.map(b => b.id).map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [], skins: [], skin: '', mastery: 0 }])),
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
     stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0, basket: 0, duels: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
     settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
@@ -911,6 +911,48 @@ const BR_LIST = [
     gadget: { name: 'Lamp Blowout', desc: 'Pushes away and hurts every enemy close to him.' },
     star: { name: 'Magic Puffs', desc: 'Heals himself and teammates near him for 250 per second.' },
     hyper: { name: 'Long Arm', desc: 'Hypercharged Magic Hand reaches farther.' } },
+  { id: 'rico', name: 'Rico', rarity: 'Super Rare', role: 'Damage Dealer', bg: '#3a8ad8', bg2: '#1a3a7a', hp: 2700, speed: 165, reload: 1.3, superCost: 3600,
+    blurb: 'Rico’s bouncy bullets ricochet off walls, so he can hit enemies around corners.',
+    attack: { kind: 'burst', name: 'Bouncy Castle', desc: 'Fires 5 bullets that bounce off walls once.', shots: 5, interval: 0.08, range: 9.5, dmg: 300, speed: 1100, r: 6, jitter: 0.02, wallBounce: 1, color: '#ff6ab0', sfx: 'pistol' },
+    super: { kind: 'burst', name: 'Trick Shot', desc: '12 long-range bullets that bounce off walls twice.', shots: 12, interval: 0.06, range: 11, dmg: 300, speed: 1150, r: 7, jitter: 0.02, wallBounce: 2, color: '#ffd030', sfx: 'pistol' },
+    gadget: { name: 'Multiball Launcher', desc: 'Fires 8 bouncy bullets in every direction.' },
+    star: { name: 'Robo Retreat', desc: 'Rico moves 30% faster when his health is low.' },
+    hyper: { name: 'Bounce House', desc: 'Hypercharged Super fires more bullets.' } },
+  { id: 'darryl', name: 'Darryl', rarity: 'Super Rare', role: 'Tank', bg: '#a0602a', bg2: '#4a2a10', hp: 4800, speed: 165, reload: 1.7, superCost: 3000,
+    blurb: 'Darryl is a robot pirate in a barrel. His Super charges up by itself over time.',
+    attack: { kind: 'spread', name: 'Double Deuce', desc: 'A short-range blast of 5 shells.', pellets: 5, spread: 0.45, range: 5, dmg: 320, speed: 800, r: 7, color: '#ffd35a', sfx: 'shotgun' },
+    super: { kind: 'dash', name: 'Barrel Roll', desc: 'Rolls forward in his barrel, knocking enemies back. Charges up by itself.', range: 6, dmg: 900, knock: 420, speed: 900, sfx: 'super' },
+    gadget: { name: 'Recoiling Rotator', desc: 'Spins and fires shells in every direction.' },
+    star: { name: 'Steel Hoops', desc: 'After a Barrel Roll, Darryl takes 30% less damage for 3.5 seconds.' },
+    hyper: { name: 'Rolling Thunder', desc: 'Hypercharged Barrel Roll goes farther.' } },
+  { id: 'penny', name: 'Penny', rarity: 'Super Rare', role: 'Artillery', bg: '#ff8a2a', bg2: '#a0400a', hp: 3200, speed: 150, reload: 1.4, superCost: 3000,
+    blurb: 'Penny throws bags of coins that burst on enemies, and builds a cannon to guard her treasure.',
+    attack: { kind: 'rocket', name: 'Plunderbuss', desc: 'A bag of coins that bursts and hurts everyone nearby.', range: 8, dmg: 900, speed: 750, r: 10, splash: 1.1, color: '#ffd030', sfx: 'throw' },
+    super: { kind: 'turret', name: 'Old Lobber', desc: 'Builds a cannon that shoots at the nearest enemy.', range: 4.5, hp: 3200, dmg: 600, rate: 0.8, trange: 9, life: 30, sfx: 'super' },
+    gadget: { name: 'Pocket Detonator', desc: 'Her cannon explodes and hurts enemies around it.' },
+    star: { name: 'Heavy Coffers', desc: 'Penny’s coin bags burst 30% wider.' },
+    hyper: { name: 'Big Cannon', desc: 'Hypercharged cannon has double health.' } },
+  { id: 'carl', name: 'Carl', rarity: 'Super Rare', role: 'Damage Dealer', bg: '#ffc020', bg2: '#a06a10', hp: 4400, speed: 150, reload: 1.4, superCost: 3000,
+    blurb: 'Carl is a rock-collecting robot. His pickaxe flies through enemies, and his Super spins him like a tornado.',
+    attack: { kind: 'wave', name: 'Pickaxe', desc: 'Throws his pickaxe, which flies through every enemy in its path.', range: 6.5, dmg: 720, speed: 700, r: 14, color: '#c8ccd8', sfx: 'throw' },
+    super: { kind: 'aura', name: 'Tailspin', desc: 'Spins fast with his pickaxe out, hurting nearby enemies and moving faster for 4 seconds.', radius: 1.6, life: 4, tick: 0.25, dmg: 300, boost: true, sfx: 'super' },
+    gadget: { name: 'Flying Hook', desc: 'Dashes forward a short distance.' },
+    star: { name: 'Protective Pirouette', desc: 'Carl takes 35% less damage while spinning.' },
+    hyper: { name: 'Mega Spin', desc: 'Hypercharged Tailspin is bigger.' } },
+  { id: 'bo', name: 'Bo', rarity: 'Epic', role: 'Controller', bg: '#8a5a2a', bg2: '#3a2010', hp: 3600, speed: 150, reload: 1.4, superCost: 3000,
+    blurb: 'Bo shoots 3 explosive arrows and hides mines for enemies to step near.',
+    attack: { kind: 'spread', name: 'Eagle Eyed', desc: 'Fires 3 long-range arrows in a small fan.', pellets: 3, spread: 0.22, range: 9, dmg: 560, speed: 950, r: 7, color: '#ffe0a0', sfx: 'pistol' },
+    super: { kind: 'dyna', name: 'Catch a Fire', desc: 'Throws 3 mines over walls that explode where they land.', range: 8, dmg: 1200, splash: 1.2, count: 3, sfx: 'throw' },
+    gadget: { name: 'Super Totem', desc: 'Charges the Super of Bo and nearby teammates by 30%.' },
+    star: { name: 'Eagle Strength', desc: 'Bo’s mines do 30% more damage.' },
+    hyper: { name: 'Mine Field', desc: 'Hypercharged Super throws more mines.' } },
+  { id: 'pam', name: 'Pam', rarity: 'Epic', role: 'Support', bg: '#d8402a', bg2: '#6a1a0a', hp: 4800, speed: 150, reload: 1.6, superCost: 3000,
+    blurb: 'Pam sprays scrap metal at enemies and patches up her whole team.',
+    attack: { kind: 'spread', name: 'Scrapstorm', desc: 'Sprays 9 bits of scrap metal in a wide fan.', pellets: 9, spread: 0.55, range: 8, dmg: 230, speed: 800, r: 6, color: '#c0c8d8', sfx: 'shotgun' },
+    super: { kind: 'heal', name: 'Mama’s Kiss', desc: 'Heals Pam and every teammate nearby for 2,600.', radius: 5, heal: 2600, sfx: 'super' },
+    gadget: { name: 'Pulse Modulator', desc: 'Heals Pam and nearby teammates for 1,200.' },
+    star: { name: 'Mama’s Hug', desc: 'Every hit Pam lands heals nearby teammates a little.' },
+    hyper: { name: 'Big Hug', desc: 'Hypercharged Super heals even more.' } },
 ];
 const BR = Object.fromEntries(BR_LIST.map(b => [b.id, b]));
 // practice robot for the Training Cave (not a playable brawler)
@@ -919,7 +961,7 @@ const UNLOCK = {
   bull: { coins: 150, road: 25 }, primo: { coins: 200, road: 75 }, poco: { coins: 250, pass: 4 }, brock: { coins: 300, road: 150 },
   jessie: { coins: 400, pass: 10 }, dynamike: { coins: 450, road: 300 }, spike: { gems: 120, road: 500 },
   rosa: { coins: 350, road: 120 }, piper: { coins: 600, road: 400 }, frank: { coins: 600, pass: 20 }, mortis: { gems: 150, road: 650 }, leon: { gems: 200, road: 800 }, crow: { gems: 200, pass: 25 },
-  barley: { coins: 300, road: 180 }, eightbit: { coins: 500, road: 850 }, tick: { coins: 450, road: 1000 }, edgar: { coins: 600, road: 950 }, bibi: { coins: 600, road: 1100 }, emz: { coins: 500, road: 1200 }, max: { gems: 150, road: 1300 }, gene: { gems: 150, road: 1400 }, sprout: { gems: 150, pass: 28 },
+  barley: { coins: 300, road: 180 }, eightbit: { coins: 500, road: 850 }, tick: { coins: 450, road: 1000 }, edgar: { coins: 600, road: 950 }, bibi: { coins: 600, road: 1100 }, emz: { coins: 500, road: 1200 }, max: { gems: 150, road: 1300 }, gene: { gems: 150, road: 1400 }, rico: { coins: 450, road: 1650 }, darryl: { coins: 450, road: 1750 }, penny: { coins: 450, road: 1850 }, carl: { coins: 450, road: 1900 }, bo: { coins: 600, road: 2100 }, pam: { coins: 600, road: 2200 }, sprout: { gems: 150, pass: 28 },
 };
 const GADGET_LVL = 7, STAR_LVL = 9, HYPER_LVL = 11;
 // Gears: unlock slot 1 at Power 8 and slot 2 at Power 10, buy each gear with coins, equip up to the slot count.
@@ -1625,6 +1667,7 @@ const ROAD = [
   { t: 650, brawler: 'mortis' }, { t: 700, gems: 60 }, { t: 800, brawler: 'leon' }, { t: 850, brawler: 'eightbit' }, { t: 900, coins: 800 }, { t: 950, brawler: 'edgar' }, { t: 1000, brawler: 'tick' }, { t: 1100, brawler: 'bibi' }, { t: 1200, brawler: 'emz' }, { t: 1300, brawler: 'max' }, { t: 1400, brawler: 'gene' }, { t: 1500, gems: 100 },
   { t: 15, drop: 0 }, { t: 40, drop: 0 }, { t: 60, drop: 1 }, { t: 90, drop: 0 }, { t: 135, drop: 1 }, { t: 165, drop: 0 }, { t: 250, drop: 1 }, { t: 350, drop: 0 }, { t: 550, drop: 2 },
   { t: 600, coins: 400 }, { t: 750, drop: 1 }, { t: 1050, drop: 2 }, { t: 1250, drop: 1 }, { t: 1600, drop: 3 }, { t: 1700, gems: 60 }, { t: 1800, coins: 1000 }, { t: 2000, drop: 4 },
+  { t: 1650, brawler: 'rico' }, { t: 1750, brawler: 'darryl' }, { t: 1850, brawler: 'penny' }, { t: 1900, brawler: 'carl' }, { t: 2100, brawler: 'bo' }, { t: 2200, brawler: 'pam' }, { t: 2300, drop: 3 }, { t: 2500, gems: 150 },
 ];
 const STAR_DROPS = [
   { name: 'Rare', col: '#5ad84a', w: 50, rewards: [{ coins: 30 }, { coins: 40 }, { gems: 2 }] },
@@ -1851,6 +1894,108 @@ const SPR = {
   // small items
   gem: { pal: { p: '#c063ff', P: '#7a2bd0', w: '#f2d2ff' }, rows: ['...k...', '..kwk..', '.kwppk.', 'kppppPk', 'kpppPPk', '.kpPPk.', '..kPk..', '...k...'] },
   cube: { pal: { l: '#9dff6b', g: '#4fd145' }, rows: ['kkkkkkk', 'kllllgk', 'kgggwgk', 'kggwwgk', 'kgwwggk', 'kgwgggk', 'kkkkkkk'] },
+  rico: { pal: { b: '#3a8ad8', B: '#1a4a8a', c: '#bfe4f8', r: '#e03040', y: '#ffd030' }, weapon: 'laser', rows: [
+    '.....kkkkkk.....',
+    '....kccccccck...',
+    '...kcwwcccwwck..',
+    '...kcwkcccwkck..',
+    '...kccccccccck..',
+    '....kkkkkkkkk...',
+    '...kbbbyybbbk...',
+    '..kbbrrrrrrbbk..',
+    '.kbbkrrwwrrkbbk.',
+    '.kbbkrrrrrrkbbk.',
+    '.kBBkrrrrrrkBBk.',
+    '..kk.kwwwwk.kk..',
+    '.....kwwwwk.....',
+    '....kBBkkBBk....',
+    '....kbbkkbbk....',
+    '....kkkkkkkk....'] },
+  darryl: { pal: { n: '#a0602a', N: '#6a3a1a', g: '#9aa0b8', r: '#d02a3a', s: '#c8ccd8', K: '#1a1a1a' }, weapon: 'double', rows: [
+    '....kkkkkkk.....',
+    '...krrrrrrrk....',
+    '..krrrwrrrrrk...',
+    '..kkkkkkkkkkk...',
+    '..ksskssskssk...',
+    '..ksssssssssk...',
+    '..kKKKKsKKKKk...',
+    '.kkkkkkkkkkkkk..',
+    '.knnnnnnnnnnnk..',
+    '.knnnnnnnnnnnk..',
+    '.kgggggggggggk..',
+    '.knnNnnnnNnnnk..',
+    '.knnNnnnnNnnnk..',
+    '.kgggggggggggk..',
+    '..knnnnnnnnnk...',
+    '...kkkkkkkkk....'] },
+  penny: { pal: { K: '#1a1a2a', o: '#ff8a2a', c: '#2a8ab0', C: '#1a5a7a', y: '#ffd030' }, weapon: 'bag', rows: [
+    '...kkkkkkkkkk...',
+    '..kKKKKwwKKKKk..',
+    '.kKKKKKKKKKKKKk.',
+    '..kkkkkkkkkkkk..',
+    '..koossssssook..',
+    '..koskssskssok..',
+    '..koossssssoook.',
+    '...ksssmsssk.ok.',
+    '..kccyccccycck..',
+    '.kscccyccccccsk.',
+    '.kscccccccccsk..',
+    '.kscccccccccsk..',
+    '..kCCCCCCCCCk...',
+    '...kCCCkCCCk....',
+    '...kKKKkKKKk....',
+    '...kkkkkkkkk....'] },
+  carl: { pal: { y: '#ffc020', Y: '#c08a10', b: '#5a7ad8', B: '#3a4a9a' }, weapon: 'pickaxe', rows: [
+    '....kkkkkkkk....',
+    '...kyyyyyyyyk...',
+    '..kyyYyyyyYyyk..',
+    '.kkkkkkkkkkkkkk.',
+    '.kwwwkbbbbkwwwk.',
+    '.kwkwkbbbbkwkwk.',
+    '.kwwwkbbbbkwwwk.',
+    '..kkkbbbbbbkkk..',
+    '..kbbwwwwwwbbk..',
+    '..kbbkkkkkkbbk..',
+    '...kbbbbbbbbk...',
+    '..kbkBBBBBBkbk..',
+    '..kbkBBBBBBkbk..',
+    '....kBBkkBBk....',
+    '....kggkkggk....',
+    '....kkkkkkkk....'] },
+  bo: { pal: { n: '#8a5a2a', N: '#5a3a1a', y: '#ffc020', r: '#c03a2a' }, weapon: 'bow', rows: [
+    '....kkkkkk......',
+    '...kwwwwwwk.....',
+    '..kwwkwwwwwk....',
+    '..kwwwwwwwyyk...',
+    '.knnnnnnnnnyk...',
+    '.knnkkkkkknk....',
+    '..ksksssksk.....',
+    '..ksssssssk.....',
+    '..kgggggggk.....',
+    '..krrnnnrrk.....',
+    '.ksrrnnnrrsk....',
+    '.ksrrnnnrrsk....',
+    '..kNNNNNNNk.....',
+    '..kNNNkNNNk.....',
+    '..knnnknnnk.....',
+    '..kkkkkkkkk.....'] },
+  pam: { pal: { r: '#d8402a', R: '#a02a1a', b: '#5ab8e8', j: '#5a9a3a', J: '#3a6a2a' }, weapon: 'scrap', rows: [
+    '...kkkkkkkkk....',
+    '..krrrrrrrrrk...',
+    '.krrRrrrrrRrrk..',
+    '.krkbbkkbbkrrk..',
+    '.krkbbkkbbkrrk..',
+    '.krrsssssssrrk..',
+    '.krsskssksssrk..',
+    '..krsssmsssrk...',
+    '..krrsssssrrk...',
+    '..kjjjjjjjjjk...',
+    '.ksjjjwjjjjjsk..',
+    '.ksjjjjjjjjjsk..',
+    '.kkJJJJJJJJJkk..',
+    '..kJJJJkJJJJk...',
+    '..kJJJJkJJJJk...',
+    '..kgggkkkgggk...'] },
   mushroom: { pal: { r: '#e8303a' }, rows: ['..kkk..', '.krwrk.', 'krrrwrk', 'kkkkkkk', '..kwk..', '..kwk..', '..kkk..'] },
   drink: { pal: { c: '#c0c8d8', g: '#3ad13a', G: '#1a8a1a', y: '#ffd23a' }, rows: ['.kkk.', 'kcwck', 'kgggk', 'kyGyk', 'kgggk', 'kgggk', '.kkk.'] },
   star: { pal: { y: '#ffe040', Y: '#e0a000' }, rows: ['...k...', '..kyk..', 'kkkyykk', 'kyyyyYk', '.kyyYk.', 'kyykYYk', 'kkk.kkk'] },
@@ -2158,6 +2303,10 @@ const WEAPONS = {
   lamp: { pal: { y: '#ffd030' }, rows: ['..kk...', '.kyyk..', 'kyyyykk', '.kkkk..'], ox: 11, oy: 10 },
   laser: { pal: { b: '#3a5ac8', c: '#5ad8ff' }, rows: ['kkkkkkk.', 'kbbbbbck', 'kbbkkkk.', 'kkk.....'], ox: 11, oy: 9 },
   bottle: { pal: { g: '#3ab040', c: '#e8d8a0' }, rows: ['.kk.', 'kggk', 'kcck', 'kcck', 'kggk', 'kkkk'], ox: 12, oy: 8 },
+  bag: { pal: { y: '#ffd030', n: '#8a5a2a' }, rows: ['.kkk.', 'kyyyk', 'kynyk', 'kyyyk', '.kkk.'], ox: 12, oy: 9 },
+  pickaxe: { pal: { g: '#b0b8c8', n: '#8a5a2a' }, rows: ['kkkkk.', 'kgggkk', '.knk..', '.knk..', '.knk..', '.kkk..'], ox: 12, oy: 4 },
+  bow: { pal: { n: '#8a5a2a' }, rows: ['kk...', '.kn..', '..kn.', '..kn.', '..kn.', '.kn..', 'kk...'], ox: 11, oy: 6 },
+  scrap: { pal: { g: '#9aa0b8' }, rows: ['kkkkkkk', 'kgggggk', 'kgkkkkk', 'kkk....'], ox: 10, oy: 10 },
   dynamite: { pal: { r: '#d83030', y: '#ffe040' }, rows: ['.y.', 'kkk', 'krk', 'krk', 'kkk'], ox: 12, oy: 9 },
 };
 (function finishSprites() {
@@ -2438,7 +2587,7 @@ function fireAbility(b, A, ang, aimDist, isSuper) {
       Sound.play('throw', vol(b)); break; }
     case 'teamboost': for (const o of G.brawlers) if (o.alive && o.team === b.team && dist(o.x, o.y, b.x, b.y) < A.radius * T) { o.boostT = A.dur; ringFx(o.x, o.y, 30, '#ffd030', 0.4, 4); } ringFx(b.x, b.y, A.radius * T, '#ffd030', 0.5, 6); break;
     case 'booster': { const sp = freeSpot(b.x + Math.cos(ang) * A.range * T * 0.6, b.y + Math.sin(ang) * A.range * T * 0.6, 14); G.boosters = (G.boosters || []).filter(q => q.owner !== b); G.boosters.push({ x: sp.x, y: sp.y, team: b.team, owner: b, r: A.radius * T * (b.star && b.id === 'eightbit' ? 1.3 : 1), life: A.life }); puff(sp.x, sp.y, 8, '#ff7ab8'); break; }
-    case 'aura': G.areas.push({ x: b.x, y: b.y, r: A.radius * T, team: b.team, owner: b, life: A.life, t: 0, tick: 0, dmg: A.dmg * dmgNow(b), A, follow: b, aura: true }); ringFx(b.x, b.y, A.radius * T, '#d0a0ff', 0.4, 6); break;
+    case 'aura': if (A.boost) { b.boostT = Math.max(b.boostT || 0, A.life); if (b.star && b.id === 'carl') { b.guardT = A.life; b.guardMul = 0.65; } } G.areas.push({ x: b.x, y: b.y, r: A.radius * T, team: b.team, owner: b, life: A.life, t: 0, tick: 0, dmg: A.dmg * dmgNow(b), A, follow: b, aura: true }); ringFx(b.x, b.y, A.radius * T, '#d0a0ff', 0.4, 6); break;
     case 'grab': spawnProj(b, ang, A, { kind: 'grab', isSuper: true }); Sound.play('orb', vol(b)); break;
     case 'hedge': {
       const d = clamp(aimDist || A.range * T * 0.6, 1.5 * T, A.range * T), cx = b.x + Math.cos(ang) * d, cy = b.y + Math.sin(ang) * d, px = -Math.sin(ang), py = Math.cos(ang);
@@ -2470,7 +2619,7 @@ function fireAbility(b, A, ang, aimDist, isSuper) {
     }
     case 'area': { const d = clamp(aimDist || A.range * T * 0.8, T, A.range * T); lob(b, ang, d, A, 'area'); Sound.play('throw', vol(b)); break; }
     case 'turret': { const d = clamp(aimDist || 2 * T, 0.8 * T, A.range * T); lob(b, ang, d, A, 'turret'); break; }
-    case 'dash': b.dash = { ang, left: A.range * T, speed: A.speed, hit: new Set(), A }; break;
+    case 'dash': b.dash = { ang, left: A.range * T * (b.id === 'darryl' && b.hyperT > 0 ? 1.5 : 1), speed: A.speed, hit: new Set(), A }; if (b.star && b.id === 'darryl') { b.guardT = 3.5; b.guardMul = 0.7; } break;
     case 'leap': {
       const d = clamp(aimDist || A.range * T * 0.75, 1.5 * T, A.range * T);
       const tx = clamp(b.x + Math.cos(ang) * d, T * 0.6, G.map.w * T - T * 0.6), ty = clamp(b.y + Math.sin(ang) * d, T * 0.6, G.map.h * T - T * 0.6);
@@ -2612,6 +2761,7 @@ function damage(tg, amount, src, o = {}) {
     if (src.hyperOK && src.hyperT <= 0 && src.alive) { const hb = src.hyper; src.hyper = Math.min(1, src.hyper + amount / (src.def.superCost * src.dmgMult * 2.6)); if (src.isPlayer && hb < 1 && src.hyper >= 1) Sound.play('superReady'); }
     if (src.star && src.id === 'nita' && !o.fromPet) { const pt = G.pets.find(q => q.owner === src); if (pt) pt.hp = Math.min(pt.hpMax, pt.hp + 500); }
     src.dmgDealt += amount; src.atkT = 0;
+    if (src.star && src.id === 'pam' && !o.isSuper) for (const m of G.brawlers) if (m.alive && m.team === src.team && m !== src && dist(m.x, m.y, src.x, src.y) < 5 * T) heal(m, 60, true);
     if (src.isPlayer) { G.stats.damage += amount; Sound.play('hit', 0.8); }
   }
   const seen = tg.kind !== 'brawler' || isVisibleToPlayer(tg) || (src && src.isPlayer);
@@ -2686,7 +2836,7 @@ function updateBrawler(b, dt) {
   if (b.dash) updateDash(b, dt);
   else {
     let mx = b.mx, my = b.my; const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
-    let sp = b.def.speed * (b.slowT > 0 ? 0.55 : 1) * (G.ball && G.ball.holder === b ? 0.93 : 1) * (b.star && b.id === 'colt' ? 1.1 : 1) * (b.hyperT > 0 ? 1.25 : 1) * (b.inBush && b.gears.has('speed') ? 1.15 : 1) * (b.boostT > 0 ? 1.5 : 1) * (b.energyT > 0 ? 1.2 : 1);
+    let sp = b.def.speed * (b.slowT > 0 ? 0.55 : 1) * (G.ball && G.ball.holder === b ? 0.93 : 1) * (b.star && b.id === 'colt' ? 1.1 : 1) * (b.hyperT > 0 ? 1.25 : 1) * (b.inBush && b.gears.has('speed') ? 1.15 : 1) * (b.boostT > 0 ? 1.5 : 1) * (b.energyT > 0 ? 1.2 : 1) * (b.star && b.id === 'rico' && b.hp < b.hpMax * 0.4 ? 1.3 : 1);
     if (b.stunT > 0 || G.intro > 0 || G.goalPause > 0 || G.over) sp = 0;
     const ox = b.x, oy = b.y;
     moveCircle(b, mx * sp * dt + b.kx * dt, my * sp * dt + b.ky * dt, b.r);
@@ -2724,6 +2874,11 @@ function updateProjs(dt) {
       const tx = Math.floor(p.x / T), ty = Math.floor(p.y / T), tt = tAt(tx, ty);
       if (solidShot(tt)) {
         const oob = !inMap(tx, ty);
+        if (p.A && p.A.wallBounce && !oob && !p.breakWalls && (p.wb || 0) < p.A.wallBounce + (p.owner.hyperT > 0 ? 1 : 0)) {
+          // ricochet: flip the axis that ran into the wall
+          p.wb = (p.wb || 0) + 1; const hx = solidShot(tAt(Math.floor(p.x / T), Math.floor(p.py / T))), hy = solidShot(tAt(Math.floor(p.px / T), Math.floor(p.y / T)));
+          if (hx || !hy) p.vx = -p.vx; if (hy || !hx) p.vy = -p.vy; p.x = p.px; p.y = p.py; p.ang = Math.atan2(p.vy, p.vx); burst(p.x, p.y, p.color, 3, 90, 3, 0.2); continue;
+        }
         if (p.breakWalls && !oob) destroyTile(tx, ty);
         else { if (!oob) damageTile(tx, ty, p.dmg); endProj(p, null); break; }
       }
@@ -2776,7 +2931,7 @@ function endProj(p, tg) {
     const A = p.A, x = p.px, y = p.py;
     for (let i = 0; i < A.spikes; i++) { const a = i / A.spikes * Math.PI * 2 + p.ang; spawnProj(p.owner, a, A, { x, y, kind: 'spike', speed: 620, r: 6, color: '#e6ffc0', range: A.spikeRange * T, dmg: A.spikeDmg, ignore: tg ? [tg] : null }); }
     burst(x, y, '#8ee05f', 10, 180, 5, 0.35); Sound.play('crate', volAt(x, y) * 0.6);
-  } else if (p.kind === 'rocket') explode(p.px, p.py, p.A.splash * T, p.dmg, p.owner, {});
+  } else if (p.kind === 'rocket') explode(p.px, p.py, p.A.splash * T * (p.owner.star && p.owner.id === 'penny' ? 1.3 : 1), p.dmg, p.owner, {});
   else if (!tg) burst(p.x, p.y, p.color, 3, 90, 3, 0.2);
 }
 function updateAreas(dt) {
@@ -3061,6 +3216,11 @@ function superStats(b) {
   const A = { ...b.def.super, isSuper: true }, hy = b.hyperT > 0;
   if (b.star && b.id === 'brock') A.rockets = 13;
   if (b.star && b.id === 'dynamike') A.dmg += 1000;
+  if (b.star && b.id === 'bo') A.dmg *= 1.3;
+  if (hy && b.id === 'bo') A.count = 5;
+  if (hy && b.id === 'rico') A.shots = 18;
+  if (hy && b.id === 'carl') A.radius *= 1.4;
+  if (hy && b.id === 'pam') A.heal *= 1.4;
   if (!hy) return A;
   switch (A.kind) {
     case 'spread': A.pellets = 13; A.spread *= 1.3; break;
@@ -3134,7 +3294,8 @@ function ikeShoot(s, dt) {
   Sound.play('turretShot', volAt(s.x, s.y));
 }
 function updateStatus(b, dt) {
-  b.invisT = Math.max(0, (b.invisT || 0) - dt); b.guardT = Math.max(0, (b.guardT || 0) - dt); b.boostT = Math.max(0, (b.boostT || 0) - dt); b.energyT = Math.max(0, (b.energyT || 0) - dt); b.unstopT = Math.max(0, (b.unstopT || 0) - dt);
+  b.invisT = Math.max(0, (b.invisT || 0) - dt); b.guardT = Math.max(0, (b.guardT || 0) - dt); b.boostT = Math.max(0, (b.boostT || 0) - dt); b.energyT = Math.max(0, (b.energyT || 0) - dt);
+  if (b.id === 'darryl' && b.alive && b.charge < 1) b.charge = Math.min(1, b.charge + dt / 16); b.unstopT = Math.max(0, (b.unstopT || 0) - dt);
   if (b.unstopT > 0) { b.stunT = 0; b.slowT = 0; b.kx = 0; b.ky = 0; }
   if (b.invisT > 0 && b.star && b.id === 'leon') heal(b, 1000 * dt, true);
   if (b.star && b.id === 'rosa' && b.inBush) heal(b, 300 * dt, true);
@@ -3205,9 +3366,15 @@ function doGadget(b) {
     case 'barley': G.areas.push({ x: b.x, y: b.y, r: 1.6 * T, team: b.team, owner: b, life: 3, t: 0, tick: 0, dmg: 200 * dmgNow(b), A: { tick: 0.5 } }); break;
     case 'sprout': heal(b, 1000 * b.dmgMult); break;
     case 'eightbit': { const q = (G.boosters || []).find(q => q.owner === b); if (!q) { ok = false; break; } puff(b.x, b.y, 8); b.x = q.x; b.y = q.y; const sp = freeSpot(b.x, b.y, b.r); b.x = sp.x; b.y = sp.y; puff(b.x, b.y, 8, '#ff7ab8'); break; }
+    case 'rico': for (let i = 0; i < 8; i++) spawnProj(b, i / 8 * Math.PI * 2, b.def.attack, {}); break;
+    case 'darryl': for (let i = 0; i < 12; i++) spawnProj(b, i / 12 * Math.PI * 2, b.def.attack, { range: 4 * T }); break;
+    case 'penny': { const tr = G.turrets.find(q => q.owner === b); if (!tr) { ok = false; break; } explode(tr.x, tr.y, 2.2 * T, 1000 * b.dmgMult, b, {}); tr.hp = 0; break; }
+    case 'carl': b.dash = { ang: moveAng, left: 3.5 * T, speed: 950, hit: new Set(), A: { dmg: 0, knock: 0 }, gadget: true }; break;
+    case 'bo': for (const o of G.brawlers) if (o.alive && o.team === b.team && dist(o.x, o.y, b.x, b.y) < 4 * T) o.charge = Math.min(1, o.charge + 0.3); ringFx(b.x, b.y, 4 * T, '#ffc020', 0.5, 6); break;
+    case 'pam': for (const o of G.brawlers) if (o.alive && o.team === b.team && dist(o.x, o.y, b.x, b.y) < 5 * T) heal(o, 1200 * b.dmgMult); ringFx(b.x, b.y, 5 * T, '#7dff6a', 0.5, 6); break;
     case 'emz': case 'gene': for (const tg of targetsFor(b.team)) { const d = dist(b.x, b.y, tg.x, tg.y); if (tg.kind === 'brawler' && d < 2.4 * T && d > 1) { damage(tg, 400 * b.dmgMult, b, { noCharge: true }); tg.kx = (tg.x - b.x) / d * 800; tg.ky = (tg.y - b.y) / d * 800; } } ringFx(b.x, b.y, 2.4 * T, '#d0a0ff', 0.35, 6); break;
   }
-  if (!ok) { if (b.isPlayer) { Sound.play('error'); textFx(b.x, b.y - 60, b.id === 'primo' ? 'NO ONE CLOSE' : b.id === 'eightbit' ? 'NEED A BOOSTER' : 'NEED YOUR PET', '#ffffff', 12, 0.9); } return false; }
+  if (!ok) { if (b.isPlayer) { Sound.play('error'); textFx(b.x, b.y - 60, b.id === 'primo' ? 'NO ONE CLOSE' : b.id === 'eightbit' ? 'NEED A BOOSTER' : b.id === 'penny' ? 'NEED YOUR CANNON' : 'NEED YOUR PET', '#ffffff', 12, 0.9); } return false; }
   b.gadgets--; b.gadgetCd = 4 * (b.gears.has('gadget') ? 0.6 : 1); b.revealT = 1; b.atkT = 0;
   if (b.isPlayer) G.stats.gadgets++;
   Sound.play('cube', vol(b)); ringFx(b.x, b.y, 40, '#4fd145', 0.3, 5);
@@ -3561,6 +3728,11 @@ function aiExtras(b, tgt) {
     case 'tick': case 'barley': use = tgt && d < 2.5 * T; break;
     case 'eightbit': { const q = (G.boosters || []).find(q => q.owner === b); use = q && tgt && dist(q.x, q.y, b.x, b.y) > 5 * T; break; }
     case 'emz': case 'gene': use = tgt && d < 2 * T; break;
+    case 'rico': case 'darryl': use = tgt && d < 3.5 * T; break;
+    case 'penny': { const tr = G.turrets.find(q => q.owner === b); use = tr && targetsFor(b.team).some(e => dist(tr.x, tr.y, e.x, e.y) < 2 * T); break; }
+    case 'carl': use = tgt && d > 3 * T && d < 6 * T; break;
+    case 'bo': use = b.charge < 0.7 && tgt && d < 8 * T; break;
+    case 'pam': use = b.hp < b.hpMax * 0.6; break;
     case 'brock': use = tgt && d < 2.5 * T && b.hp < b.hpMax * 0.5; if (use) { const a = Math.atan2(b.y - tgt.y, b.x - tgt.x); b.mx = Math.cos(a); b.my = Math.sin(a); } break;
   }
   if (use && doGadget(b)) ai.gadT = rand(3, 6) + (1 - ai.skill) * 6; else ai.gadT = 0.5;
@@ -4253,6 +4425,7 @@ const POSES = {
   frank: { rot: -3, em: 'note' }, mortis: { rot: -10, wrot: 30, em: 'bat' }, leon: { rot: 6, flip: true, em: 'dots' }, crow: { rot: -6, em: 'drop' },
   edgar: { rot: 4, em: 'dots' }, bibi: { rot: -6, wrot: -80, em: 'bubble' }, max: { rot: 12, em: 'bolt' }, tick: { rot: -8, em: 'bang' },
   barley: { rot: 3, wrot: -40, em: 'sparkle' }, sprout: { rot: 6, em: 'leaf' }, eightbit: { rot: -4, em: 'anger' }, emz: { rot: 8, wrot: -45, em: 'dots' }, gene: { rot: -6, em: 'sparkle' },
+  rico: { rot: 6, em: 'bolt' }, darryl: { rot: -5, em: 'anger' }, penny: { rot: 5, em: 'sparkle' }, carl: { rot: -7, wrot: -50, em: 'bang' }, bo: { rot: 4, wrot: -20, em: 'leaf' }, pam: { rot: -4, em: 'heart' },
 };
 const EMC = {};
 function emoteCanvas(n) { return EMC[n] || (EMC[n] = compileRows(EMOTES[n], EMOTE_PAL)); }
