@@ -422,6 +422,7 @@ input[type=text]{font-size:13px}
     <h2>Settings</h2>
     <div class="set"><span>Sound effects volume</span><input type="range" id="setSfx" min="0" max="100" step="5"></div>
     <div class="set"><span>Music volume</span><input type="range" id="setMusic" min="0" max="100" step="5"></div>
+    <div class="set"><span>Bot difficulty</span><select id="setBots"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></div>
     <div class="set"><span>Mute everything</span><button class="toggle" id="setMute" aria-label="Mute"></button></div>
     <div class="set"><span>Screen shake</span><button class="toggle" id="setShake" aria-label="Screen shake"></button></div>
     <div class="set"><span>Damage numbers</span><button class="toggle" id="setNums" aria-label="Damage numbers"></button></div>
@@ -628,7 +629,7 @@ function defaultSave() {
     brawlers: Object.fromEntries(['shelly', 'nita', 'colt', 'bull', 'primo', 'poco', 'brock', 'jessie', 'dynamike', 'spike', 'rosa', 'piper', 'frank', 'mortis', 'leon', 'crow', 'edgar', 'bibi', 'max', 'tick', 'barley', 'sprout', 'eightbit', 'emz', 'gene'].map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [], skins: [], skin: '', mastery: 0 }])),
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
     stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
-    settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto' },
+    settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
     lastGift: '', boxesOpened: 0, seenHelp: false, ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
     club: { name: 'Pixel Pals', members: [], chat: [], claimed: [] },
   };
@@ -1997,8 +1998,9 @@ function startBattle(modeKey) {
   const mode = MODES[modeKey]; const mapKey = pick(mode.maps); const map = buildMap(mapKey);
   const pid = S.selected, plvl = S.brawlers[pid].level, tro = totalTrophies();
   const rk = rankedNext ? rankIdx(S.ranked.pts) : -1;
-  const skill = rk >= 0 ? clamp(0.65 + rk / 25, 0, 1) : clamp(0.5 + tro / 500, 0, 1);
-  const bl = () => rk >= 0 ? clamp(plvl + Math.floor(rk / 6) + randi(0, 1), 1, MAX_LEVEL) : clamp(plvl + randi(-1, 1), 1, MAX_LEVEL);
+  const dOff = { easy: -0.15, normal: 0, hard: 0.3 }[S.settings.botDiff] || 0;
+  const skill = clamp((rk >= 0 ? 0.45 + rk / 25 : 0.15 + tro / 1200) + dOff, 0, 1);
+  const bl = () => rk >= 0 ? clamp(plvl + Math.floor(rk / 6) + randi(0, 1), 1, MAX_LEVEL) : clamp(plvl + (tro < 300 || S.settings.botDiff === 'easy' ? randi(-1, 0) : randi(-1, 1)), 1, MAX_LEVEL);
   G = {
     ranked: rk >= 0, mode: modeKey, map, theme: THEMES[map.theme], time: 0, brawlers: [], projs: [], parts: [], areas: [], turrets: [], pickups: [], safes: [], ball: null, feed: [],
     intro: 2.4, introBeep: 4, over: null, endT: 0, paused: false, shake: 0, cam: { x: 0, y: 0 }, hurtFlash: 0, goalPause: 0, mapVer: 0, player: null,
@@ -2872,7 +2874,7 @@ function resetRound() {
 // Bots: flow-field pathfinding plus a small objective/combat brain
 // ===================================================================
 function makeAI(skill, slot) {
-  return { skill, err: lerp(0.16, 0.04, skill), think: rand(0, 0.3), strafeDir: Math.random() < 0.5 ? 1 : -1, strafeT: rand(0.5, 1.5), fireT: rand(0.4, 0.9),
+  return { skill, err: lerp(0.34, 0.04, skill), reactT: 0, lastTgt: null, think: rand(0, 0.3), strafeDir: Math.random() < 0.5 ? 1 : -1, strafeT: rand(0.5, 1.5), fireT: rand(0.4, 0.9),
     target: null, goal: null, goalFirst: false, structTarget: null, flow: null, flowGoal: -1, flowVer: -1, flowT: 0, stuckT: 0, unstick: 0, ux: 0, uy: 0, lx: 0, ly: 0,
     slot, wander: null, wanderT: 0, superT: 0, want: 0, path: null };
 }
@@ -3112,19 +3114,22 @@ function aiUpdate(b, dt) {
     return;
   }
   const shootAt = tgt || ai.structTarget;
+  // weaker bots need a moment to react to a new enemy
+  if (tgt !== ai.lastTgt) { ai.lastTgt = tgt; if (tgt) ai.reactT = 0.15 + (1 - ai.skill) * 0.8; }
+  ai.reactT -= dt;
   if (shootAt) {
     const tx = shootAt.x, ty = shootAt.cy ?? shootAt.y, d = dist(b.x, b.y, tx, ty);
-    const sp = b.def.attack.speed || 700, lead = d / sp * 0.7;
+    const sp = b.def.attack.speed || 700, lead = d / sp * 0.7 * ai.skill;
     const px = tx + (shootAt.vx || 0) * lead, py = ty + (shootAt.vy || 0) * lead;
     const ang = Math.atan2(py - b.y, px - b.x) + gauss() * ai.err;
     b.aim = ang;
     const los = shootAt.kind === 'tile' ? losClear(b.x, b.y, tx, ty, true) : losClear(b.x, b.y, tx, ty);
     const reach = range * 0.95 + (shootAt.r || 19) * 0.6;
-    if (d <= reach && los && ai.fireT <= 0 && b.ammo >= 1) { if (doAttack(b, ang, d)) ai.fireT = rand(0.12, 0.35) + (1 - ai.skill) * 0.2; }
+    if (d <= reach && los && ai.fireT <= 0 && ai.reactT <= 0 && b.ammo >= 1) { if (doAttack(b, ang, d)) ai.fireT = rand(0.12, 0.35) + (1 - ai.skill) * 0.7; }
     if (b.charge >= 1 && ai.superT <= 0 && shootAt.kind !== 'tile' && aiWantsSuper(b, shootAt, d, los)) {
       const sk = b.def.super.kind;
       const sa = sk === 'turret' ? ang : sk === 'pjump' ? Math.atan2(b.y - ty, b.x - tx) : Math.atan2(ty - b.y, tx - b.x);
-      if (doSuper(b, sa, sk === 'turret' ? Math.min(d * 0.4, 2.5 * T) : d)) ai.superT = 1.2;
+      if (doSuper(b, sa, sk === 'turret' ? Math.min(d * 0.4, 2.5 * T) : d)) ai.superT = 1.2 + (1 - ai.skill) * 3;
     }
   } else if (b.moving) b.aim = Math.atan2(my, mx);
   aiExtras(b, tgt);
@@ -3132,7 +3137,7 @@ function aiUpdate(b, dt) {
 function aiExtras(b, tgt) {
   const ai = b.ai; ai.gadT = (ai.gadT || 0) - 0.016;
   const d = tgt ? dist(b.x, b.y, tgt.x, tgt.y) : 1e9;
-  if (b.hyper >= 1 && tgt && d < 6 * T) doHyper(b);
+  if (b.hyper >= 1 && tgt && d < 6 * T && ai.skill > 0.35) doHyper(b);
   if (b.gadgets <= 0 || b.gadgetCd > 0 || ai.gadT > 0) return;
   let use = false;
   switch (b.id) {
@@ -3157,7 +3162,7 @@ function aiExtras(b, tgt) {
     case 'emz': case 'gene': use = tgt && d < 2 * T; break;
     case 'brock': use = tgt && d < 2.5 * T && b.hp < b.hpMax * 0.5; if (use) { const a = Math.atan2(b.y - tgt.y, b.x - tgt.x); b.mx = Math.cos(a); b.my = Math.sin(a); } break;
   }
-  if (use && doGadget(b)) ai.gadT = rand(3, 6); else ai.gadT = 0.5;
+  if (use && doGadget(b)) ai.gadT = rand(3, 6) + (1 - ai.skill) * 6; else ai.gadT = 0.5;
 }
 
 // ===================================================================
@@ -4236,7 +4241,7 @@ function renderClub() {
 // ---------------- settings ----------------
 function syncSettings() {
   const st = S.settings;
-  $('#setSfx').value = Math.round(st.sfx * 100); $('#setMusic').value = Math.round(st.music * 100);
+  $('#setSfx').value = Math.round(st.sfx * 100); $('#setMusic').value = Math.round(st.music * 100); $('#setBots').value = st.botDiff || 'normal';
   $('#setMute').classList.toggle('on', st.muted); $('#setShake').classList.toggle('on', st.shake); $('#setNums').classList.toggle('on', st.dmgNums); $('#setAuto').classList.toggle('on', st.autoAim);
   $('#setTouch').value = st.touch;
   $('#pSound').textContent = st.muted ? 'Sound: off' : 'Sound: on';
@@ -4373,6 +4378,7 @@ function bindUI() {
   $('#helpClose').onclick = () => { $('#ov-help').hidden = true; if ($('#ov-help').dataset.then === 'play') { $('#ov-help').dataset.then = ''; startMatch(); } };
   $('#setSfx').oninput = e => { S.settings.sfx = e.target.value / 100; Sound.apply(); save(); };
   $('#setSfx').onchange = () => Sound.play('hit');
+  $('#setBots').onchange = e => { S.settings.botDiff = e.target.value; save(); };
   $('#setMusic').oninput = e => { S.settings.music = e.target.value / 100; Sound.apply(); save(); };
   const tog = (id, key) => $(id).onclick = () => { S.settings[key] = !S.settings[key]; save(); syncSettings(); };
   tog('#setMute', 'muted'); tog('#setShake', 'shake'); tog('#setNums', 'dmgNums'); tog('#setAuto', 'autoAim');
