@@ -442,6 +442,19 @@ input[type=text]{font-size:13px}
 .bdab .pxi{width:30px} .bdgear .pxi{width:22px} .bdic .pxi{width:26px} .bdst span .pxi{width:20px} .bdheart .pxi{width:26px}
 .aic .pxi{width:20px} .fxabi .pxi{width:28px} .starp b .pxi{width:14px} .bdst em .pxi{width:8px} .fxlvl .pxi,.fxinfo .pxi{width:14px}
 #btnPin .pxi{width:28px}
+#pinBar button{position:relative} #pinBar i,.bdpins i{position:absolute;right:2px;bottom:0;font-family:var(--display);font-size:10px;font-style:normal;color:#2a8a2a;text-shadow:1px 1px 0 #fff}
+.bdpins div{position:relative}
+.bcardx{position:relative;border:6px solid var(--ink);background-size:100% 100%;image-rendering:pixelated;aspect-ratio:3/4;overflow:hidden;box-shadow:0 6px 0 #000}
+.bcx-top{display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(13,11,30,.75);border-bottom:4px solid var(--ink)}
+.bcx-top b{font-family:var(--display);font-size:13px;color:#fff;text-shadow:2px 2px 0 #000}
+.bcx-pre{font-family:var(--display);font-size:9px;color:#1a1440;padding:4px 6px;border:3px solid var(--ink)}
+.bcx-title{margin:8px auto 0;width:max-content;max-width:90%;font-family:var(--display);font-size:11px;color:#1a1440;background:#ffc824;border:3px solid var(--ink);padding:4px 8px;text-align:center}
+.bcx-title.off{background:rgba(13,11,30,.6);color:#c9d2ff;font-size:8px}
+.bcx-pic{display:block;width:72%;margin:0 auto;image-rendering:pixelated}
+.bcx-name{position:absolute;left:0;right:0;bottom:70px;text-align:center;font-family:var(--display);font-size:20px;color:#fff;text-shadow:3px 3px 0 #000,-2px -2px 0 #000}
+.bcx-name small{display:block;font-size:10px;color:#ffc93a;margin-top:4px} .bcx-name small svg{width:12px;height:12px}
+.bcx-c1,.bcx-c2{position:absolute;bottom:8px;width:64px;height:auto;border:4px solid var(--ink);image-rendering:pixelated;background:#fff}
+.bcx-c1{left:8px} .bcx-c2{right:8px;height:56px;width:64px}
 </style>
 </head>
 <body>
@@ -622,6 +635,12 @@ input[type=text]{font-size:13px}
     <div class="row" id="bdTabs" style="justify-content:center;margin-bottom:10px"></div>
     <div id="bdBody"></div>
     <div class="btns"><button class="btn grey" id="bdClose">Close</button></div>
+  </div>
+</div>
+<div id="ov-card" class="overlay" hidden>
+  <div class="modal" role="dialog" aria-label="Battle card" style="max-width:420px;background:#1a1440">
+    <div id="cardBody"></div>
+    <div class="btns"><button class="btn grey" id="cardClose">Close</button></div>
   </div>
 </div>
 <div id="ov-confirm" class="overlay" hidden>
@@ -1815,6 +1834,12 @@ const TIPS = {
   bo: 'Throw mines where enemies are coming from, then shoot arrows.',
   pam: 'Stay with your team and heal them with your Super.',
 };
+// each brawler's own title, earned at 1,000 trophies on that brawler
+const BRAWLER_TITLES = { shelly: 'Buckshot Boss', nita: 'Bear Buddy', colt: 'Sharpshooter', bull: 'Bulldozer', primo: 'Luchador', poco: 'Rock Star', brock: 'Rocket Man', jessie: 'Little Inventor',
+  dynamike: 'Boom Boom', spike: 'Prickly Pal', rosa: 'Green Thumb', piper: 'Sweet Sniper', frank: 'Hammer Time', mortis: 'Night Stalker', leon: 'Invisible Kid', crow: 'Toxic Bird', edgar: 'Moody Puncher',
+  bibi: 'Home Run Hitter', max: 'Speedster', tick: 'Tick Tock', barley: 'Bartender', sprout: 'Garden Guard', eightbit: 'Game Over', emz: 'Hairspray Star', gene: 'Wish Granter', rico: 'Bounce Master',
+  darryl: 'Barrel Roller', penny: 'Treasure Hunter', carl: 'Rock Collector', bo: 'Eagle Eye', pam: 'Team Mom' };
+const TITLE_TROPHIES = 1000;
 const LOGIN_REWARDS = [{ coins: 50 }, { gems: 5 }, { coins: 100 }, { drop: 0 }, { coins: 150 }, { gems: 15 }, { drop: 2 }];
 // ---------------- daily event modifiers ----------------
 const EVENT_MODS = { meteor: { name: 'Meteor Shower', desc: 'Meteors fall from the sky. Watch for the red circles!', col: '#ff7a1a' },
@@ -3044,7 +3069,7 @@ function killBrawler(b, killer) {
       textFx(b.x, b.y - 50, st, killer.streak > 1 ? '#ff7a1a' : '#ffd23a', 30 + Math.min(3, killer.streak - 1) * 6);
       if (killer.streak > 1) { G.bigText = { text: st, color: '#ff7a1a', t: 1.2 }; Sound.play('superReady'); }
     }
-    if (killer.ai && Math.random() < 0.3) sendPin(killer, pick(['happy', 'laugh', 'gg']));
+    if (killer.ai && Math.random() < 0.3) sendPin(killer, pick(['happy', 'laugh', 'gg', 'thumbs']));
   }
   if (b.ai && Math.random() < 0.3) sendPin(b, pick(['sad', 'angry']));
   if (G.mode === 'bounty') {
@@ -4399,11 +4424,11 @@ function render() {
     if (G.mode === 'gemgrab' && b.gems > 0) txt(ctx, b.gems, s.x + 4 * k, s.y - 29, 8, '#f2d2ff', 'left', 3);
     if (G.mode === 'bounty') txt(ctx, b.bounty, s.x + 4 * k, s.y - 28, 8, '#ffe040', 'left', 3);
     if (b.pin && b.pin.t > 0) {
-      const pop = Math.min(1, (2.2 - b.pin.t) * 6), sz = Math.round(40 * pop), py = s.y - (b.isPlayer ? 22 : 34) - sz;
+      const pop = Math.min(1, (2.2 - b.pin.t) * 6), sz = Math.round(52 * pop), py = s.y - (b.isPlayer ? 22 : 34) - sz;
       ctx.fillStyle = '#0d0b1e'; ctx.fillRect(s.x - sz / 2 - 3, py - 3, sz + 6, sz + 6); ctx.fillStyle = '#fff'; ctx.fillRect(s.x - sz / 2, py, sz, sz);
       ctx.fillStyle = '#0d0b1e'; ctx.fillRect(s.x - 4, py + sz + 3, 8, 4); ctx.fillStyle = '#fff'; ctx.fillRect(s.x - 2, py + sz, 4, 4);
-      if (b.pin.k === 'gg') { if (pop > 0.6) txt(ctx, 'GG', s.x, py + sz / 2 + 1, 11, '#2a8a2a', 'center', 0); }
-      else { const pc = pinCanvas(b.pin.k), ps = Math.max(1, Math.floor((sz - 6) / pc.width)); ctx.imageSmoothingEnabled = false; ctx.drawImage(pc, s.x - pc.width * ps / 2, py + (sz - pc.height * ps) / 2, pc.width * ps, pc.height * ps); }
+      const pc = facePin(b.id === 'dummy' || b.id === 'robo' || b.id === 'robobig' ? 'tick' : b.id, b.pin.k, b.skin || ''), ps = pop < 1 ? Math.max(1, Math.floor((sz - 4) / pc.width)) : 2; ctx.imageSmoothingEnabled = false; ctx.drawImage(pc, s.x - pc.width * ps / 2, py + (sz - pc.height * ps) / 2, pc.width * ps, pc.height * ps);
+      if (b.pin.k === 'gg' && pop > 0.6) txt(ctx, 'GG', s.x + sz / 4, py + sz - 8, 10, '#2a8a2a', 'center', 2);
     }
   }
   for (const s of G.safes) if (s.hp > 0) { const q = worldToScreen(s.x, s.y - 66); txt(ctx, `${Math.ceil(s.hp / s.maxHp * 100)}%`, q.x, q.y - 6, 9, '#fff'); }
@@ -4701,7 +4726,23 @@ const PINS = {
   heart: ['.kk..kk.', 'kppkkppk', 'kpwppppk', 'kppppppk', '.kppppk.', '..kppk..', '...kk...'],
   gg: null,
 };
-const PIN_LIST = ['happy', 'laugh', 'gg', 'heart', 'angry', 'sad'];
+const PIN_LIST = ['happy', 'laugh', 'gg', 'thumbs', 'angry', 'sad'];
+const PIN_BADGE = {
+  happy: ['.kkkkk.', 'kyyyyyk', 'kykykyk', 'kyyyyyk', 'kkyyykk', 'kykkkyk', '.kkkkk.'],
+  laugh: ['.kkkkk.', 'kyyyyyk', 'kkykykk', 'kyyyyyk', 'kkkkkkk', 'kyrrryk', '.kkkkk.'],
+  angry: ['.rr.rr.', 'rrr.rrr', 'rr...rr', '.......', 'rr...rr', 'rrr.rrr', '.rr.rr.'],
+  sad: ['...k...', '..kbk..', '.kbbbk.', '.kbWbk.', '.kbbbk.', '..kkk..', '.......'],
+  thumbs: ['..kk...', '.kyk...', '.kyk...', 'kkyykkk', 'kyyyyyk', 'kyyyyyk', 'kkkkkkk'],
+};
+const FACEPIN = {};
+// a brawler's own pin: their pixel face with a little expression badge
+function facePin(id, k, skin = '') {
+  const key = id + '|' + k + '|' + skin; if (FACEPIN[key]) return FACEPIN[key];
+  const S_ = getSpr(id, skin), c = document.createElement('canvas'); c.width = 22; c.height = 19; const x = c.getContext('2d');
+  x.drawImage(S_.n[0], 0, 0, 16, 12, 1, 1, 16, 12);
+  if (k !== 'gg') { const bdg = compileRows(PIN_BADGE[k] || PIN_BADGE.happy, EMOTE_PAL); x.drawImage(bdg, 14, 11); }
+  return (FACEPIN[key] = c);
+}
 const PINC = {};
 const pinCanvas = n => PINC[n] || (PINC[n] = compileRows(PINS[n], EMOTE_PAL));
 const EMOTES = {
@@ -4730,9 +4771,9 @@ const POSES = {
 };
 const EMC = {};
 function emoteCanvas(n) { return EMC[n] || (EMC[n] = compileRows(EMOTES[n], EMOTE_PAL)); }
-function drawPosed(c, id, skin, px, py, sc, flip) {
+function drawPosed(c, id, skin, px, py, sc, flip, ex = {}) {
   const S_ = getSpr(id, skin), P = POSES[id] || {}, fl = !!(flip ^ !!P.flip), W_ = S_.w * sc, H_ = S_.h * sc;
-  c.save(); c.translate(px + W_ / 2, py + H_); c.rotate((P.rot || 0) * Math.PI / 180 * (fl ? -1 : 1)); c.translate(-W_ / 2, -H_);
+  c.save(); c.translate(px + W_ / 2, py + H_); c.rotate(((P.rot || 0) + (ex.rot || 0)) * Math.PI / 180 * (fl ? -1 : 1)); c.translate(-W_ / 2, -H_);
   const k = silhouette(id, INK)[fl ? 'f' : 'n']; for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) c.drawImage(k, dx * sc, dy * sc, W_, H_);
   c.drawImage((fl ? S_.f : S_.n)[0], 0, 0, W_, H_);
   if (S_.weapon) {
@@ -4741,7 +4782,7 @@ function drawPosed(c, id, skin, px, py, sc, flip) {
     c.drawImage(fl ? W.f : W.n, fl ? -W.w * sc : 0, -sc, W.w * sc, W.n.height * sc); c.restore();
   }
   c.restore();
-  if (P.em) { const e = emoteCanvas(P.em), es = Math.max(1, Math.round(sc * 0.7)); c.drawImage(e, fl ? px - e.width * es * 0.2 : px + W_ - e.width * es * 0.8, Math.max(2, py - es * 2), e.width * es, e.height * es); }
+  if (P.em && ex.em !== 0) { const e = emoteCanvas(P.em), es = Math.max(1, Math.round(sc * 0.7 * (ex.em || 1))); c.drawImage(e, fl ? px - e.width * es * 0.2 : px + W_ - e.width * es * 0.8, Math.max(2, py - es * 2), e.width * es, e.height * es); }
 }
 function drawPortrait(cv, id, opts = {}) {
   const c = cv.getContext('2d'), w = cv.width, h = cv.height, d = BR[id];
@@ -4766,7 +4807,7 @@ function show(name) {
   App.screen = name;
   for (const [k, sel] of Object.entries(SCREENS)) $(sel).hidden = k !== name;
   const battle = name === 'battle'; cv.hidden = !battle; $('#hud').hidden = !battle; if (R3.gl) R3.gl.hidden = !battle;
-  if (name !== 'detail') $('#ov-bd').hidden = true;
+  if (name !== 'detail') { $('#ov-bd').hidden = true; App.waveFor = null; }
   if (!battle) { updateWallet(); $('#pinBar').hidden = true; if (FX.length && !fxOpen) setTimeout(() => { if (!fxOpen && !fxBlocked()) fxNext(); }, 0); }
   const r = { menu: renderHome, brawlers: renderBrawlers, detail: renderDetail, modes: renderModes, shop: renderShop, quests: renderQuests, pass: renderPass, road: renderRoad, profile: renderProfile, ranked: renderRanked, club: renderClub }[name];
   if (r) r();
@@ -4880,6 +4921,7 @@ const PXI_DEF = {
   info: ['.kkk.', '.kwk.', '.kkk.', 'kkwk.', '.kwk.', '.kwk.', 'kkwkk', 'kwwwk', 'kkkkk'],
   burst: ['...k...', '.k.r.k.', '..rrr..', 'krrwrrk', '..rrr..', '.k.r.k.', '...k...'],
   plus: ['.kkk.', '.kwk.', 'kkwkk', 'kwwwk', 'kkwkk', '.kwk.', '.kkk.'],
+  card: ['kkkkkk', 'kwwwwk', 'kwbbwk', 'kwbbwk', 'kwwwwk', 'kwyywk', 'kwwwwk', 'kkkkkk'],
   diamond: ['...k...', '..kck..', '.kcwck.', 'kcccck.', '.kccck.', '..kck..', '...k...'],
 };
 const PXI_PAL = { k: '#0d0b1e', y: '#ffd23a', r: '#ff4a6a', w: '#ffffff', g: '#3ad13a', p: '#ff6af0', b: '#5ab8ff', c: '#7cd8ff' };
@@ -4971,9 +5013,9 @@ function renderDetail() {
   body.innerHTML = `<div class="bd">
     <div class="bdl">
       <div class="bdname"><b>${d.name.toUpperCase()}</b><span>${d.role.toUpperCase()}</span><i style="color:${c1}">${d.rarity.toUpperCase()}</i></div>
-      <div class="bdtro"><span class="bdrank">${rank}</span><div class="bdtbar"><i style="width:${st.owned ? Math.min(100, (st.trophies - rFrom) / (rTo - rFrom) * 100) : 0}%"></i><b>${icon('trophy')} ${st.trophies}/${rTo}</b></div></div>
+      <div class="bdtro"><span class="bdrank">${rank}</span><div class="bdtbar"><i style="width:${st.owned ? (rank >= 35 ? 100 : Math.min(100, (st.trophies - rFrom) / (rTo - rFrom) * 100)) : 0}%"></i><b>${icon('trophy')} ${rank >= 35 ? `${st.trophies} MAX RANK` : `${st.trophies}/${rTo}`}</b></div></div>
       <p class="bdblurb">${d.blurb}</p>${TIPS[id] ? `<p class="tip"><b>TIP:</b> ${TIPS[id]}</p>` : ''}
-      <div class="bdicons"><button class="bdic" data-tab="info" aria-label="Brawler info">${pxi('info')}</button><button class="bdic" data-tab="pins" aria-label="Pins">${pxi('smile')}</button><button class="bdic" data-tab="skins" aria-label="Skins">${pxi('shirt')}</button></div>
+      <div class="bdicons"><button class="bdic" data-tab="info" aria-label="Brawler info">${pxi('info')}</button><button class="bdic" data-tab="pins" aria-label="Pins">${pxi('smile')}</button><button class="bdic" data-tab="skins" aria-label="Skins">${pxi('shirt')}</button><button class="bdic" data-tab="card" aria-label="Battle card">${pxi('card')}</button></div>
       <div class="bdbtns" id="dBtns"></div>
     </div>
     <div class="bdc"><canvas width="420" height="420" aria-label="${d.name}"></canvas></div>
@@ -4989,11 +5031,20 @@ function renderDetail() {
         <div id="dUp"></div>
       </div>
     </div></div>`;
-  const cv = body.querySelector('.bdc canvas'), cx = cv.getContext('2d'); cx.imageSmoothingEnabled = false;
-  cx.fillStyle = 'rgba(13,11,30,.3)'; cx.beginPath(); cx.ellipse(210, 392, 110, 18, 0, 0, 7); cx.fill();
-  const S_ = getSpr(id, st.skin || ''), sc = 20; drawPosed(cx, id, st.owned ? st.skin || '' : '', 210 - S_.w * sc / 2, 400 - S_.h * sc, sc, false);
-  if (!st.owned) { cx.globalCompositeOperation = 'source-atop'; cx.fillStyle = 'rgba(13,11,30,.55)'; cx.fillRect(0, 0, 420, 420); cx.globalCompositeOperation = 'source-over'; }
-  body.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => openBd(b.dataset.tab));
+  const cv = body.querySelector('.bdc canvas'), cx = cv.getContext('2d');
+  // wave hello: the brawler rocks side to side and hops a little, then settles into their pose
+  const paint = t => {
+    cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, 420, 420); cx.imageSmoothingEnabled = false;
+    const k = Math.max(0, 1 - t / 1.3), hop = Math.round(Math.abs(Math.sin(t * 9)) * 12 * k / 4) * 4;
+    cx.fillStyle = 'rgba(13,11,30,.3)'; for (let r = 0; r < 5; r++) cx.fillRect(210 - (110 - r * 16) + r * 4, 384 + r * 4 - 8, (110 - r * 16) * 2, 4);
+    const S_ = getSpr(id, st.skin || ''), sc = 20; drawPosed(cx, id, st.owned ? st.skin || '' : '', 210 - S_.w * sc / 2, 400 - S_.h * sc - hop, sc, false, { rot: Math.sin(t * 10) * 12 * k, em: 1 + 0.6 * k });
+    if (!st.owned) { cx.globalCompositeOperation = 'source-atop'; cx.fillStyle = 'rgba(13,11,30,.55)'; cx.fillRect(0, 0, 420, 420); cx.globalCompositeOperation = 'source-over'; }
+  };
+  const fresh = App.waveFor !== id; App.waveFor = id;
+  if (fresh) { const t0 = performance.now(), step = () => { if (App.screen !== 'detail' || App.waveFor !== id || !cv.isConnected) return; const t = (performance.now() - t0) / 1000; paint(Math.min(t, 1.3)); if (t < 1.3) requestAnimationFrame(step); }; step(); }
+  else paint(1.3);
+  body.querySelector('[data-tab="card"]').onclick = () => openCard(id);
+  body.querySelectorAll('[data-tab]:not([data-tab="card"])').forEach(b => b.onclick = () => openBd(b.dataset.tab));
   body.querySelectorAll('[data-ab]').forEach(b => b.onclick = () => openBd('info'));
   body.querySelectorAll('[data-gear]').forEach(b => b.onclick = () => openBd('gears'));
   const btns = $('#dBtns'), mk = (label, cls, fn, dis, where = btns) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.innerHTML = label; b.onclick = fn; if (dis) b.disabled = true; where.appendChild(b); return b; };
@@ -5015,6 +5066,25 @@ function renderDetail() {
   }, false, up);
   if (!$('#ov-bd').hidden) openBd(App.bdTab);
 }
+// Battle card: your name, prestige (mastery), the brawler on its rarity background, a title, and two little cards in the corners
+function openCard(id) {
+  const d = BR[id], st = S.brawlers[id], [c1, c2] = RARITY_BG[d.rarity] || RARITY_BG.Rare, ml = masteryLvl(st.mastery || 0);
+  const title = BRAWLER_TITLES[id] && st.trophies >= TITLE_TROPHIES ? BRAWLER_TITLES[id] : '';
+  const MCOL = ['#8a90a8', '#c0602a', '#c0602a', '#c0602a', '#c8d0e0', '#c8d0e0', '#c8d0e0', '#ffc824', '#ffc824', '#ffc824', '#ff4ab0'];
+  const ov = $('#ov-card'); ov.hidden = false;
+  $('#cardBody').innerHTML = `<div class="bcardx" style="background-image:url(${pixGlowURL(c1, c2)})">
+      <div class="bcx-top"><b>${S.name.replace(/[<>]/g, '')}</b><span class="bcx-pre" style="background:${MCOL[ml]}">${MASTERY_NAMES[ml].toUpperCase()}</span></div>
+      ${title ? `<div class="bcx-title">${title.toUpperCase()}</div>` : `<div class="bcx-title off">Title at ${fmt(TITLE_TROPHIES)} trophies</div>`}
+      <canvas class="bcx-pic" width="320" height="320"></canvas>
+      <div class="bcx-name">${d.name.toUpperCase()}<small>${icon('trophy')} ${st.trophies}</small></div>
+      <canvas class="bcx-c1" width="64" height="64"></canvas><canvas class="bcx-c2" width="88" height="76"></canvas>
+    </div>`;
+  const pc = $('#cardBody .bcx-pic').getContext('2d'); pc.imageSmoothingEnabled = false; const S_ = getSpr(id, st.skin || '');
+  drawPosed(pc, id, st.skin || '', 160 - S_.w * 8, 300 - S_.h * 16, 16, false);
+  drawPortrait($('#cardBody .bcx-c1'), BR_LIST[S.avatar % BR_LIST.length].id, { scale: 2.2 });
+  const c2x = $('#cardBody .bcx-c2').getContext('2d'); c2x.imageSmoothingEnabled = false; c2x.fillStyle = '#fff'; c2x.fillRect(0, 0, 88, 76); c2x.drawImage(facePin(id, 'happy', st.skin || ''), 0, 0, 88, 76);
+  $('#cardClose').onclick = () => { ov.hidden = true; };
+}
 // Pop-up panel on the brawler screen: full info, pins, skins and gears
 function openBd(tab) {
   const id = App.detailId || S.selected, d = BR[id], st = S.brawlers[id], m = levelMult(st.level); App.bdTab = tab;
@@ -5032,7 +5102,7 @@ function openBd(tab) {
       <div style="margin-top:12px"><b style="font-family:var(--display);font-size:11px">Mastery: ${MASTERY_NAMES[masteryLvl(st.mastery || 0)]}</b><div class="bar purple" style="margin-top:6px"><i style="width:${(() => { const l = masteryLvl(st.mastery || 0); return l >= 10 ? 100 : ((st.mastery || 0) - MASTERY[l]) / (MASTERY[l + 1] - MASTERY[l]) * 100; })()}%"></i></div><p style="font-size:8px;margin-top:4px">${fmt(st.mastery || 0)} mastery points.</p></div>`;
   } else if (tab === 'pins') {
     B_.innerHTML = `<p style="font-size:10px;line-height:1.7">Use pins in battle with the smiley button (or press T on a keyboard).</p><div class="bdpins"></div>`;
-    for (const k of PIN_LIST) { const e = document.createElement('div'); if (k === 'gg') e.textContent = 'GG'; else { const c = document.createElement('canvas'), pc = pinCanvas(k); c.width = pc.width * 6; c.height = pc.height * 6; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(pc, 0, 0, c.width, c.height); e.appendChild(c); } B_.querySelector('.bdpins').appendChild(e); }
+    for (const k of PIN_LIST) { const e = document.createElement('div'); e.appendChild(pinImg(id, k, st.skin || '', 70)); if (k === 'gg') { const t = document.createElement('i'); t.textContent = 'GG'; e.appendChild(t); } B_.querySelector('.bdpins').appendChild(e); }
   } else if (tab === 'skins') { B_.innerHTML = '<div id="skinBox"></div>'; renderSkins(id, st); }
   else { B_.innerHTML = '<div id="gearBox"></div>'; renderGears(id, st); }
 }
@@ -5312,7 +5382,11 @@ function startMatch(ranked = false, picked = false) {
   show('battle'); resize();
   Sound.music('battle');
 }
-function togglePins(force) { const bar = $('#pinBar'); bar.hidden = force !== undefined ? !force : !bar.hidden; }
+function pinImg(id, k, skin, size) { const pc = facePin(id, k, skin), c = document.createElement('canvas'); c.width = pc.width * 4; c.height = pc.height * 4; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(pc, 0, 0, c.width, c.height); c.style.width = size + 'px'; c.style.imageRendering = 'pixelated'; return c; }
+function togglePins(force) {
+  const bar = $('#pinBar'); bar.hidden = force !== undefined ? !force : !bar.hidden;
+  if (!bar.hidden && G) { bar.innerHTML = ''; PIN_LIST.forEach((k, i) => { const b = document.createElement('button'); b.setAttribute('aria-label', 'Pin ' + k); b.title = `${k} (${i + 1})`; b.appendChild(pinImg(G.player.id, k, G.player.skin || '', 40)); if (k === 'gg') { const t = document.createElement('i'); t.textContent = 'GG'; b.appendChild(t); } b.onclick = () => playerPin(k); bar.appendChild(b); }); }
+}
 function playerPin(k) { if (G && sendPin(G.player, k)) togglePins(false); }
 function togglePause(force) {
   if (!G || G.over) return;
@@ -5358,6 +5432,7 @@ function finishMatch() {
       if (l === 10) { const t = 'Master of ' + BR[pid].name; if (!S.titles.includes(t)) S.titles.push(t); extraLines.push(`New title: ${t}!`); }
     }
     clubAfterMatch(res === 'win');
+    const bt = BRAWLER_TITLES[pid]; if (bt && bs.trophies >= TITLE_TROPHIES && !S.titles.includes(bt)) { S.titles.push(bt); extraLines.push(`New title: ${bt}!`); }
   }
   S.coins += coins; S.passXp += xp; if (checkPassBonus()) extraLines0.push('Brawl Pass bonus: Star Drop!'); S.bestTrophies = Math.max(S.bestTrophies, totalTrophies());
   const win = res === 'win', st = S.stats, gs = g.stats;
@@ -5539,9 +5614,7 @@ function bindUI() {
   $('#btnPause').onclick = () => togglePause(true);
   $('#bdClose').onclick = () => { $('#ov-bd').hidden = true; if (App.screen === 'detail') renderDetail(); };
   $('#btnPin').innerHTML = pxi('smile'); $('#btnPin').onclick = () => togglePins();
-  PIN_LIST.forEach((k, i) => { const b = document.createElement('button'); b.setAttribute('aria-label', 'Pin ' + k); b.title = `${k} (${i + 1})`;
-    if (k === 'gg') b.textContent = 'GG'; else { const c = document.createElement('canvas'), pc = pinCanvas(k); c.width = pc.width * 4; c.height = pc.height * 4; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(pc, 0, 0, c.width, c.height); b.appendChild(c); }
-    b.onclick = () => playerPin(k); $('#pinBar').appendChild(b); });
+
   $('#pResume').onclick = () => togglePause(false);
   $('#pSound').onclick = () => { S.settings.muted = !S.settings.muted; save(); syncSettings(); };
   $('#pSettings').onclick = openSettings;
