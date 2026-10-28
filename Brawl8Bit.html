@@ -4491,6 +4491,13 @@ function drawTutorial(c, p) {
 function drawHUD(c) {
   const top = INSET.t + 12, cx = VW / 2, p = G.player;
   drawTutorial(c, p);
+  // during the countdown, show a tip for the player's brawler
+  if (G.intro > 0 && TIPS[p.id] && G.mode !== 'training') {
+    const t_ = ('TIP: ' + TIPS[p.id]).toUpperCase(), w = Math.min(VW - 40, 560), y0 = VH * 0.52;
+    let lines = [t_]; if (t_.length > 56) { let k = t_.lastIndexOf(' ', Math.ceil(t_.length / 2) + 4); if (k < 10) k = t_.indexOf(' ', t_.length / 2); lines = [t_.slice(0, k), t_.slice(k + 1)]; }
+    panel(c, VW / 2 - w / 2, y0, w, 16 + lines.length * 14, 'rgba(255,210,58,.92)');
+    lines.forEach((l, k) => txt(c, l, VW / 2, y0 + 15 + k * 14, w < 420 ? 6 : 7, '#1a1440', 'center', 0));
+  }
   if (G.hurtFlash > 0) { c.fillStyle = `rgba(255,30,30,${G.hurtFlash * 0.6})`; c.fillRect(0, 0, VW, 10); c.fillRect(0, VH - 10, VW, 10); c.fillRect(0, 0, 10, VH); c.fillRect(VW - 10, 0, 10, VH); }
   else if (p.alive && p.hp < p.hpMax * 0.3 && Math.floor(G.time * 4) % 2) { c.fillStyle = 'rgba(255,30,30,.35)'; c.fillRect(0, 0, VW, 6); c.fillRect(0, VH - 6, VW, 6); c.fillRect(0, 0, 6, VH); c.fillRect(VW - 6, 0, 6, VH); }
   const m = G.mode, timer = G.timeLeft !== Infinity ? mmss(G.timeLeft) : '';
