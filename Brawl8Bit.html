@@ -390,6 +390,8 @@ input[type=text]{font-size:13px}
 .dlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;max-height:300px;overflow-y:auto;touch-action:pan-y}
 .dlist button{aspect-ratio:1;padding:0;border:3px solid var(--ink);background:#2a2a6a;cursor:pointer;position:relative}
 .dlist button.on{outline:3px solid #ffd23a} .dlist button b{position:absolute;top:0;left:2px;color:#ffd23a;font-family:var(--display);font-size:12px;text-shadow:1px 1px 0 #000}
+.evbanner{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;z-index:2;max-width:92%}
+.evbanner button{font-family:var(--display);font-size:8px;color:#fff;padding:5px 8px;border:3px solid var(--ink);cursor:pointer;text-shadow:1px 1px 0 #000;box-shadow:0 3px 0 var(--ink)}
 </style>
 </head>
 <body>
@@ -427,6 +429,7 @@ input[type=text]{font-size:13px}
       <button class="tile t-road" data-go="road"><span class="ico" data-icon="trophy"></span>Trophy Road<span class="badge" id="roadBadge" hidden>0</span></button>
     </nav>
     <section class="stage">
+      <div id="evBanner" class="evbanner"></div>
       <canvas id="featured" aria-label="Featured brawler, tap to change"></canvas>
       <div class="feat-label">
         <div class="feat-name stroke" id="featName">Shelly</div>
@@ -4722,12 +4725,18 @@ function renderFeatured(dt) {
   const sc = Math.max(2, Math.min(Math.round(12 * DPR), Math.floor(Math.min(h / 30, w / 26)))), cx = Math.round(w / 2), base = Math.round(h * 0.74);
   x.fillStyle = INK; x.fillRect(cx - 11 * sc, base, 22 * sc, 4 * sc); x.fillStyle = '#1e3aa8'; x.fillRect(cx - 10 * sc, base + sc, 20 * sc, 2 * sc); x.fillStyle = '#5d9bff'; x.fillRect(cx - 10 * sc, base + sc, 20 * sc, Math.max(1, sc / 2));
   for (let i = 0; i < 6; i++) { const a = feat.t * 0.8 + i * 1.05; if (Math.floor(feat.t * 4 + i) % 3 === 0) continue; x.fillStyle = '#fff6b0'; x.fillRect(Math.round(cx + Math.cos(a) * 12 * sc), Math.round(base - 9 * sc + Math.sin(a) * 6 * sc), sc, sc); }
-  const S_ = getSpr(S.selected, S.brawlers[S.selected].skin || ''), frame = Math.floor(feat.t * 3) % 4, bob = frame % 2 ? -sc : 0, flip = Math.sin(feat.t * 0.5) < -0.6;
-  const px = cx - S_.w * sc / 2, py = base - S_.h * sc + sc + bob;
-  x.drawImage((flip ? S_.f : S_.n)[frame], px, py, S_.w * sc, S_.h * sc);
-  if (S_.weapon) { const W = S_.weapon, r = feat.atk > 0.5 ? sc : 0; x.drawImage(flip ? W.f : W.n, flip ? px + (S_.w - W.ox - W.w) * sc + r : px + W.ox * sc - r, py + W.oy * sc, W.w * sc, W.n.height * sc); if (feat.atk > 0.7) { x.fillStyle = '#fff3a6'; x.fillRect(flip ? px + (S_.w - W.ox - W.w) * sc - 3 * sc : px + (W.ox + W.w) * sc, py + W.oy * sc, 2 * sc, 2 * sc); } }
+  // the selected brawler stands in their personality pose and bobs gently
+  const S_ = getSpr(S.selected, S.brawlers[S.selected].skin || ''), bob = Math.floor(feat.t * 1.5) % 2 ? -sc : 0;
+  drawPosed(x, S.selected, S.brawlers[S.selected].skin || '', cx - S_.w * sc / 2, base - S_.h * sc + sc + bob, sc, false);
+}
+function renderEvents() {
+  const box = $('#evBanner'); if (!box) return; box.innerHTML = '';
+  const evs = Object.keys(MODES).filter(k => !MODES[k].hidden && eventMod(k)).slice(0, 3);
+  for (const k of evs) { const e = EVENT_MODS[eventMod(k)], b = document.createElement('button'); b.style.background = e.col; b.textContent = `${e.name}: ${MODES[k].name}`; b.title = e.desc;
+    b.onclick = () => { S.mode = k; save(); Sound.play('click'); renderHome(); }; box.appendChild(b); }
 }
 function renderHome() {
+  renderEvents();
   const id = S.selected, d = BR[id], st = S.brawlers[id], md = MODES[S.mode];
   $('#featName').textContent = d.name; $('#featLevel').textContent = `Power ${st.level}`; $('#featTrophies').textContent = fmt(st.trophies);
   const ev = eventMod(S.mode); $('#modeName').textContent = md.name; $('#modeMap').textContent = (ev ? `${EVENT_MODS[ev].name}! · ` : '') + md.maps.map(k => MAPS[k].name).join(' / ');
