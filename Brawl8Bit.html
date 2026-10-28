@@ -392,6 +392,7 @@ input[type=text]{font-size:13px}
 .dlist button.on{outline:3px solid #ffd23a} .dlist button b{position:absolute;top:0;left:2px;color:#ffd23a;font-family:var(--display);font-size:12px;text-shadow:1px 1px 0 #000}
 .evbanner{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;z-index:2;max-width:92%}
 .evbanner button{font-family:var(--display);font-size:8px;color:#fff;padding:5px 8px;border:3px solid var(--ink);cursor:pointer;text-shadow:1px 1px 0 #000;box-shadow:0 3px 0 var(--ink)}
+.tip{background:#ffd23a;border:3px solid var(--ink);padding:6px 8px;font-size:9px;line-height:1.7;margin-top:8px;color:#1a1440}
 </style>
 </head>
 <body>
@@ -1725,6 +1726,39 @@ const ACHIEVEMENTS = [
   { id: 'diamond', name: 'Shiny', text: 'Reach Diamond in Ranked', n: 900, v: S => S.ranked.best, gems: 30 },
   { id: 'master', name: 'True Master', text: 'Reach Master on any brawler', n: 1, v: S => BR_LIST.some(b => masteryLvl(S.brawlers[b.id].mastery || 0) >= 10) ? 1 : 0, gems: 50 },
 ];
+const TIPS = {
+  shelly: 'Get close! All 5 shells hit when you are right next to an enemy.',
+  nita: 'Send Bruce in first, then attack the enemy who is busy fighting him.',
+  colt: 'Stand still for a moment before shooting so all 6 bullets hit.',
+  bull: 'Hide in bushes and wait. Then jump out when an enemy walks close.',
+  primo: 'Use your Super to jump over walls right on top of enemies.',
+  poco: 'Stay behind your team. Your sound wave hits every enemy in a row, and your Super heals everyone.',
+  brock: 'Shoot from far away. Rockets are slow, so aim where the enemy is walking.',
+  jessie: 'Shoot enemies standing close together so the orb bounces.',
+  dynamike: 'Throw dynamite over walls at enemies who are hiding.',
+  spike: 'Aim right at enemies so the needles burst on them.',
+  rosa: 'Use your shield Super, then run into the enemies and punch.',
+  piper: 'Stay far back. Your shots hurt more the farther they fly.',
+  frank: 'Wait for your Super, then stun a group of enemies.',
+  mortis: 'Dash in, hit, and dash back out before enemies hit you.',
+  leon: 'Turn invisible with your Super and sneak up close. Blades hurt most up close.',
+  crow: 'Poison everyone you can. Poisoned enemies cannot heal.',
+  edgar: 'Use Vault to jump on a weak enemy, then punch to heal yourself.',
+  bibi: 'Your bat pushes enemies away. Use it when they get too close.',
+  max: 'Use your speed Super to escape or to help your team rush in.',
+  tick: 'Throw mines where enemies will walk, like doorways and gaps.',
+  barley: 'Throw bottles over walls. The puddle keeps hurting for a while.',
+  sprout: 'Use the hedge wall to block enemies or protect your team.',
+  eightbit: 'You are slow. Place your booster near your team and stay in it.',
+  emz: 'Keep enemies at medium range, where your spray hits the longest.',
+  gene: 'Grab a weak enemy with Magic Hand and pull them to your team.',
+  rico: 'Shoot at walls! Your bullets bounce and hit enemies around corners.',
+  darryl: 'Your Super fills up by itself. Roll in when it is ready.',
+  penny: 'Build your cannon behind a wall so enemies cannot reach it.',
+  carl: 'Your pickaxe flies through enemies. Spin with your Super up close.',
+  bo: 'Throw mines where enemies are coming from, then shoot arrows.',
+  pam: 'Stay with your team and heal them with your Super.',
+};
 const LOGIN_REWARDS = [{ coins: 50 }, { gems: 5 }, { coins: 100 }, { drop: 0 }, { coins: 150 }, { gems: 15 }, { drop: 2 }];
 // ---------------- daily event modifiers ----------------
 const EVENT_MODS = { meteor: { name: 'Meteor Shower', desc: 'Meteors fall from the sky. Watch for the red circles!', col: '#ff7a1a' },
@@ -4828,7 +4862,7 @@ function renderDetail() {
     <div><canvas class="big" width="480" height="480"></canvas></div>
     <div class="panel">
       <h3>${d.name} <span style="font-size:17px;color:#8a6b3a">· ${d.role}</span></h3>
-      <p>${d.blurb}</p>
+      <p>${d.blurb}</p>${TIPS[id] ? `<p class="tip"><b>TIP:</b> ${TIPS[id]}</p>` : ''}
       <div class="stats">
         <div class="stat"><small>Health</small><b>${fmt(d.hp * m)}${next}</b></div>
         <div class="stat"><small>Attack damage</small><b>${atkNumbers(d.attack, m)}</b></div>
