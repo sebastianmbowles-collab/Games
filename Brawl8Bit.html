@@ -58,7 +58,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:
     linear-gradient(180deg,var(--sky-light),var(--sky) 45%,var(--sky-deep));}
 .screen.sub{background:
     radial-gradient(rgba(255,255,255,.08) 2px,transparent 2.5px) 0 0/22px 22px,
-    linear-gradient(180deg,#3d55d8,#24309a)}
+    linear-gradient(180deg,#3d55d8 0 50%,#24309a 50% 100%)}
 .topbar,.subbar{display:flex;align-items:center;gap:12px;
   padding-top:max(10px,env(safe-area-inset-top,0px));padding-bottom:8px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -115,9 +115,9 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:
 .road-mini{display:flex;flex-direction:column;gap:4px;background:rgba(15,10,50,.45);border:3px solid var(--ink);border-radius:14px;padding:8px 12px;cursor:pointer;color:#fff;text-align:left}
 .road-mini .bar{height:14px}
 .bar{background:rgba(0,0,0,.45);border:2px solid var(--ink);border-radius:999px;overflow:hidden;height:16px;position:relative}
-.bar>i{display:block;height:100%;background:linear-gradient(180deg,#ffe36b,#ffb200);border-radius:999px;transition:width .4s}
-.bar.green>i{background:linear-gradient(180deg,#9dff6b,#3fbf2a)}
-.bar.purple>i{background:linear-gradient(180deg,#e6a2ff,#a23cf0)}
+.bar>i{display:block;height:100%;background:linear-gradient(180deg,#ffe36b 0 50%,#ffb200 50% 100%);border-radius:999px;transition:width .4s}
+.bar.green>i{background:linear-gradient(180deg,#9dff6b 0 50%,#3fbf2a 50% 100%)}
+.bar.purple>i{background:linear-gradient(180deg,#e6a2ff 0 50%,#a23cf0 50% 100%)}
 .road-mini small{font-size:13px;display:flex;justify-content:space-between;gap:6px}
 
 @media (max-aspect-ratio:1/1),(max-width:760px){
@@ -215,7 +215,7 @@ input[type=text]{font-family:var(--display);font-size:20px;padding:8px 12px;bord
 input[type=range]{width:160px;accent-color:#ff9a1f}
 .result-banner{font-family:var(--display);font-size:64px;text-align:center;line-height:1;margin:0;letter-spacing:1px}
 .result-banner.win{color:var(--sun)} .result-banner.lose{color:var(--red)} .result-banner.draw{color:#c9d2ff}
-.result{max-width:620px;background:linear-gradient(180deg,#3346c8,#1f2580);color:#fff}
+.result{max-width:620px;background:linear-gradient(180deg,#3346c8 0 50%,#1f2580 50% 100%);color:#fff}
 .result .rsub{text-align:center;font-family:var(--display);font-size:20px;margin:6px 0 10px}
 .result-row{display:flex;gap:16px;align-items:center;justify-content:center;flex-wrap:wrap}
 .result canvas.rp{width:150px;height:150px;border-radius:18px;border:3px solid var(--ink);background:#ffb03b}
@@ -304,7 +304,7 @@ input[type=text]{font-size:13px}
 .bcard .blvl{width:32px;height:32px;border-radius:50%;background:#c02a9a;border:3px solid var(--ink);display:grid;place-items:center;font-family:var(--display);font-size:11px;color:#fff;position:relative}
 .bcard .barrow{position:absolute;top:-10px;left:-12px;width:18px;height:18px;border-radius:50%;background:#3ad13a;border:2px solid var(--ink);color:#fff;font-size:10px;display:grid;place-items:center;font-family:var(--display)}
 .bcard .bab{width:22px;height:22px;display:grid;place-items:center;font-size:12px;border:2px solid var(--ink);background:rgba(0,0,0,.25);color:rgba(255,255,255,.45)}
-.bcard .bab.g{background:#5ad84a;color:#fff;border-radius:6px} .bcard .bab.s{background:#ffb020;color:#fff;border-radius:50%} .bcard .bab.h{background:#8a3ad8;color:#fff;border-radius:50% 50% 50% 0}
+.bcard .bab.g{background:#5ad84a} .bcard .bab.s{background:#ffb020} .bcard .bab.h{background:#8a3ad8}
 .bcard.locked canvas{filter:grayscale(1) brightness(.5)}
 .bcard .block{position:absolute;top:6px;left:6px;right:6px;font-family:var(--display);font-size:7px;line-height:1.5;background:rgba(0,0,0,.7);padding:4px;color:#fff}
 .bcard .bnew{position:absolute;top:0;left:0;background:#e02a2a;color:#fff;font-family:var(--display);font-size:8px;padding:3px 5px;border:2px solid var(--ink)}
@@ -314,10 +314,10 @@ input[type=text]{font-size:13px}
 /* trophy road */
 .roadtop{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .roadtop h3 svg{width:20px;height:20px;vertical-align:-3px}
-.road{overflow-x:auto;overflow-y:hidden;background:linear-gradient(180deg,#3a2a8a,#2a1a6a);border:4px solid var(--ink);height:400px;touch-action:pan-x;-webkit-overflow-scrolling:touch}
+.road{overflow-x:auto;overflow-y:hidden;background:linear-gradient(180deg,#3a2a8a 0 50%,#2a1a6a 50% 100%);border:4px solid var(--ink);height:400px;touch-action:pan-x;-webkit-overflow-scrolling:touch}
 .roadin{position:relative;height:100%}
 .roadbar,.roadfill{position:absolute;left:0;top:188px;height:24px;border:4px solid var(--ink)}
-.roadbar{right:0;background:#1a1440} .roadfill{background:linear-gradient(180deg,#ffd84a,#ff9a1a);border-right:none}
+.roadbar{right:0;background:#1a1440} .roadfill{background:linear-gradient(180deg,#ffd84a 0 50%,#ff9a1a 50% 100%);border-right:none}
 .roadme{position:absolute;top:150px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:3;pointer-events:none}
 .roadme canvas{width:48px;height:48px;border:3px solid #fff;background:#1a1440;margin-top:-10px}
 .roadme b{font-family:var(--display);font-size:10px;color:#fff;background:#0d0b1e;padding:3px 6px;margin-top:4px}
@@ -338,9 +338,8 @@ input[type=text]{font-size:13px}
 @keyframes rpulse{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 /* unlock + star drop overlay */
 .overlay.fx{background:rgba(5,4,20,.9);z-index:80;overflow:hidden}
-.fxrays{position:absolute;left:50%;top:50%;width:1600px;height:1600px;margin:-800px 0 0 -800px;pointer-events:none;opacity:.45;
-  background:repeating-conic-gradient(from 0deg,var(--fx,#ffd84a) 0deg 10deg,transparent 10deg 30deg);animation:fxspin 14s linear infinite;
-  -webkit-mask:radial-gradient(circle,#000 0,#000 18%,transparent 52%);mask:radial-gradient(circle,#000 0,#000 18%,transparent 52%)}
+.fxrays{position:absolute;left:50%;top:50%;width:1600px;height:1600px;margin:-800px 0 0 -800px;pointer-events:none;opacity:.35;
+  background:var(--rays) center/100% 100% no-repeat;image-rendering:pixelated;animation:fxspin 14s steps(36) infinite}
 @keyframes fxspin{to{transform:rotate(360deg)}}
 .fxbox{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;max-width:420px}
 .fxtag{font-family:var(--display);font-size:22px;color:#fff;text-shadow:3px 3px 0 #000;animation:fxdrop .5s cubic-bezier(.2,1.6,.4,1) both}
@@ -395,17 +394,17 @@ input[type=text]{font-size:13px}
 .tip{background:#ffd23a;border:3px solid var(--ink);padding:6px 8px;font-size:9px;line-height:1.7;margin-top:8px;color:#1a1440}
 
 /* brawler screen */
-#detailBody{display:block;background:radial-gradient(circle at 50% 45%,var(--r1,#3a8ad8),var(--r2,#1a3a7a) 75%);border:4px solid var(--ink);padding:14px;margin:-6px -4px;box-shadow:0 6px 0 var(--ink)}
+#detailBody{display:block;background:var(--r2,#1a3a7a) center/100% 100% no-repeat;image-rendering:pixelated;border:4px solid var(--ink);padding:14px;margin:-6px -4px;box-shadow:0 6px 0 var(--ink)}
 .bd{display:grid;grid-template-columns:minmax(220px,1fr) minmax(240px,1.15fr) minmax(250px,1fr);gap:14px;align-items:start}
 .bdl,.bdr{display:flex;flex-direction:column;gap:10px;min-width:0}
-.bdname{background:#ffc824;clip-path:polygon(0 0,100% 0,92% 100%,0 100%);padding:10px 30px 10px 12px;display:flex;flex-direction:column;border-left:6px solid var(--ink)}
+.bdname{background:#ffc824;clip-path:polygon(0 0,100% 0,100% 25%,97% 25%,97% 50%,94% 50%,94% 75%,91% 75%,91% 100%,0 100%);padding:10px 30px 10px 12px;display:flex;flex-direction:column;border-left:6px solid var(--ink)}
 .bdname b{font-family:var(--display);font-size:26px;color:#fff;text-shadow:3px 3px 0 #000,-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000;line-height:1.1}
 .bdname span{font-family:var(--display);font-size:11px;color:#fff;text-shadow:2px 2px 0 #000;margin-top:4px}
 .bdname i{font-family:var(--display);font-size:10px;font-style:normal;text-shadow:2px 2px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;align-self:flex-end;margin-top:2px;filter:brightness(1.25)}
 .bdtro{display:flex;align-items:center;gap:0}
 .bdrank{width:46px;height:46px;flex:none;background:#c0602a;border:4px solid var(--ink);display:grid;place-items:center;font-family:var(--display);font-size:14px;color:#fff;text-shadow:2px 2px 0 #000;z-index:1}
 .bdtbar{flex:1;height:30px;background:#1a1440;border:4px solid var(--ink);border-left:none;position:relative;overflow:hidden}
-.bdtbar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(180deg,#ff9a3a,#d8601a)}
+.bdtbar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(180deg,#ff9a3a 0 50%,#d8601a 50% 100%)}
 .bdtbar b{position:relative;display:flex;align-items:center;gap:4px;height:100%;padding-left:8px;font-family:var(--display);font-size:10px;color:#fff;text-shadow:2px 2px 0 #000}
 .bdtbar b svg{width:14px;height:14px}
 .bdblurb{font-size:10px;line-height:1.7;color:#fff;text-shadow:2px 2px 0 #000;margin:0}
@@ -418,12 +417,12 @@ input[type=text]{font-size:13px}
 .bdc{display:flex;justify-content:center;align-items:center;align-self:center}
 .bdc canvas{width:100%;max-width:420px;aspect-ratio:1;image-rendering:pixelated}
 .bdgears{display:flex;gap:14px;justify-content:center}
-.bdgear{width:54px;height:54px;transform:rotate(45deg);background:#3a3f5a;border:4px solid var(--ink);cursor:pointer;display:grid;place-items:center;box-shadow:0 4px 0 var(--ink)}
-.bdgear span{transform:rotate(-45deg);color:#fff;font-size:22px;font-family:var(--display)} .bdgear.off{opacity:.6}
+.bdgear{width:54px;height:54px;background:#3a3f5a;border:4px solid var(--ink);cursor:pointer;display:grid;place-items:center;box-shadow:0 4px 0 var(--ink)}
+.bdgear span{color:#fff;font-size:22px;font-family:var(--display)} .bdgear.off{opacity:.6}
 .bdabs{display:flex;gap:10px;justify-content:center}
 .bdab{width:62px;height:62px;border:4px solid var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 0 var(--ink);position:relative}
 .bdab small{position:absolute;bottom:-14px;right:-6px;font-family:var(--display);font-size:9px;text-shadow:2px 2px 0 #000}
-.bdab.g{background:#3ad13a;border-radius:12px!important} .bdab.s{background:#ffa020;clip-path:polygon(50% 0,63% 20%,85% 15%,80% 37%,100% 50%,80% 63%,85% 85%,63% 80%,50% 100%,37% 80%,15% 85%,20% 63%,0 50%,20% 37%,15% 15%,37% 20%)} .bdab.h{background:#9a3ad8}
+.bdab.g{background:#3ad13a} .bdab.s{background:#ffa020} .bdab.h{background:#9a3ad8}
 .bdab.off{filter:grayscale(.8) brightness(.6)}
 .bdpow{background:#1a2a6a;border:4px solid var(--ink);padding:10px;display:flex;flex-direction:column;gap:8px;box-shadow:0 5px 0 var(--ink)}
 .bdpowh{display:flex;align-items:center;gap:8px} .bdpowh b{font-family:var(--display);font-size:16px;color:#fff} .bdpowh i{margin-left:auto;font-family:var(--display);font-size:10px;color:#ff6ad0;font-style:normal}
@@ -438,6 +437,11 @@ input[type=text]{font-size:13px}
 .bdpins{display:flex;gap:10px;flex-wrap:wrap;justify-content:center} .bdpins div{width:80px;height:80px;background:#fff;border:4px solid var(--ink);display:grid;place-items:center;font-family:var(--display);font-size:20px;color:#2a8a2a} .bdpins canvas{width:60px}
 @media (max-width:900px){ .bd{grid-template-columns:1fr 1fr} .bdc{grid-column:1 / -1;order:-1} .bdc canvas{max-width:300px} }
 @media (max-width:560px){ .bd{grid-template-columns:1fr} }
+.pxi{image-rendering:pixelated;width:1.4em;height:auto;vertical-align:middle;display:inline-block}
+.bab .pxi{width:14px} .barrow .pxi{width:12px} .bfav .pxi{width:22px} .rok .pxi{width:24px}
+.bdab .pxi{width:30px} .bdgear .pxi{width:22px} .bdic .pxi{width:26px} .bdst span .pxi{width:20px} .bdheart .pxi{width:26px}
+.aic .pxi{width:20px} .fxabi .pxi{width:28px} .starp b .pxi{width:14px} .bdst em .pxi{width:8px} .fxlvl .pxi,.fxinfo .pxi{width:14px}
+#btnPin .pxi{width:28px}
 </style>
 </head>
 <body>
@@ -446,7 +450,7 @@ input[type=text]{font-size:13px}
 <canvas id="game" hidden></canvas>
 <div id="hud" hidden>
   <button id="btnPause" class="iconbtn" aria-label="Pause" data-icon="pause"></button>
-  <button id="btnPin" class="iconbtn" aria-label="Pins" title="Pins (T)">☺</button>
+  <button id="btnPin" class="iconbtn" aria-label="Pins" title="Pins (T)"></button>
   <div id="pinBar" hidden></div>
 </div>
 
@@ -4834,7 +4838,7 @@ function renderHome() {
   const id = S.selected, d = BR[id], st = S.brawlers[id], md = MODES[S.mode];
   $('#featName').textContent = d.name; $('#featLevel').textContent = `Power ${st.level}`; $('#featTrophies').textContent = fmt(st.trophies);
   const ev = eventMod(S.mode); $('#modeName').textContent = md.name; $('#modeMap').textContent = (ev ? `${EVENT_MODS[ev].name}! · ` : '') + md.maps.map(k => MAPS[k].name).join(' / ');
-  const mb = $('#modeBtn'); mb.style.background = `linear-gradient(180deg, ${md.color}, ${md.color2})`;
+  const mb = $('#modeBtn'); mb.style.background = `linear-gradient(180deg,${md.color} 0 50%,${md.color2} 50% 100%)`;
   const mi = $('#modeIcon'), mc = mi.getContext('2d'); mc.clearRect(0, 0, 112, 112); mc.fillStyle = INK; mc.fillRect(4, 4, 104, 104); mc.fillStyle = 'rgba(255,255,255,.18)'; mc.fillRect(8, 8, 96, 96); drawModeIcon(mc, S.mode, 56, 56, 1.9);
   const tier = passTier(); $('#passTierMini').textContent = Math.min(PASS_TIERS, tier + 1);
   const into = tier >= PASS_TIERS ? PASS_XP : S.passXp - tier * PASS_XP; $('#passXpMini').textContent = tier >= PASS_TIERS ? 'Complete' : `${into}/${PASS_XP} XP`; $('#passBarMini').style.width = `${into / PASS_XP * 100}%`;
@@ -4857,11 +4861,52 @@ function unlockText(id) {
 const RARITY_ORDER = ['Starting', 'Rare', 'Super Rare', 'Epic', 'Mythic', 'Legendary'];
 const RARITY_BG = { Starting: ['#5ab8ff', '#3a8ad8'], Rare: ['#3ad13a', '#22a022'], 'Super Rare': ['#1e8cff', '#1060d0'], Epic: ['#b02dff', '#8018d0'], Mythic: ['#ff2a3a', '#c8101e'], Legendary: ['#ffe11a', '#f0b000'] };
 const canUpgrade = st => st.owned && st.level < MAX_LEVEL && S.coins >= UPGRADE_COST[st.level];
+// ---------------- pixel icons (everything is made of tiny squares) ----------------
+const PXI_DEF = {
+  lock: ['..kkk..', '.k...k.', '.k...k.', 'kkkkkkk', 'kyyyyyk', 'kyykyyk', 'kyykyyk', 'kkkkkkk'],
+  heart: ['.kk..kk.', 'krrkkrrk', 'krwrrrrk', 'krrrrrrk', '.krrrrk.', '..krrk..', '...kk...'],
+  heartw: ['.kk..kk.', 'kwwkkwwk', 'kwwwwwwk', 'kwwwwwwk', '.kwwwwk.', '..kwwk..', '...kk...'],
+  heart0: ['.kk..kk.', 'kggkkggk', 'kgggg.gk', 'kg....gk', '.kg..gk.', '..kggk..', '...kk...'],
+  gadget: ['..kkk..', '.kgggk.', 'kgwgggk', 'kgggggk', 'kgggggk', '.kgggk.', '..kkk..'],
+  star: ['...k...', '..kyk..', 'kkkyykk', 'kyyyyyk', '.kyyyk.', 'kyykyyk', 'kk...kk'],
+  bolt: ['..kkkk', '.kppk.', 'kppk..', 'kppppk', '.kppk.', '.kpk..', 'kpk...', 'kk....'],
+  up: ['...k...', '..kwk..', '.kwwwk.', 'kwwwwwk', '..kwk..', '..kwk..', '..kkk..'],
+  right: ['kk....', 'kwk...', 'kwwk..', 'kwwwk.', 'kwwk..', 'kwk...', 'kk....'],
+  check: ['.....kk', '....kgk', 'kk.kgk.', 'kgkgk..', '.kgk...', '..k....'],
+  smile: ['..kkkkkk..', '.kyyyyyyk.', 'kyykyykyyk', 'kyykyykyyk', 'kyyyyyyyyk', 'kykyyyykyk', 'kyykkkkyyk', '.kyyyyyyk.', '..kkkkkk..'],
+  shirt: ['.kk.kk.', 'kbbkbbk', 'kbbbbbk', '.kbbbk.', '.kbbbk.', '.kbbbk.', '.kkkkk.'],
+  info: ['.kkk.', '.kwk.', '.kkk.', 'kkwk.', '.kwk.', '.kwk.', 'kkwkk', 'kwwwk', 'kkkkk'],
+  burst: ['...k...', '.k.r.k.', '..rrr..', 'krrwrrk', '..rrr..', '.k.r.k.', '...k...'],
+  plus: ['.kkk.', '.kwk.', 'kkwkk', 'kwwwk', 'kkwkk', '.kwk.', '.kkk.'],
+  diamond: ['...k...', '..kck..', '.kcwck.', 'kcccck.', '.kccck.', '..kck..', '...k...'],
+};
+const PXI_PAL = { k: '#0d0b1e', y: '#ffd23a', r: '#ff4a6a', w: '#ffffff', g: '#3ad13a', p: '#ff6af0', b: '#5ab8ff', c: '#7cd8ff' };
+const PXI_URL = {};
+function pxi(name, cls = '') {
+  if (!PXI_URL[name]) { const rows = PXI_DEF[name], c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length; const x = c.getContext('2d');
+    rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') { x.fillStyle = PXI_PAL[ch] || '#ff00ff'; x.fillRect(i, j, 1, 1); } })); PXI_URL[name] = c.toDataURL(); }
+  return `<img class="pxi ${cls}" src="${PXI_URL[name]}" alt="" draggable="false">`;
+}
+// low-res pixel backgrounds: rarity glow (rings of flat colour) and rays for reward screens
+function shadeHex(hex, f) { const v = parseInt(hex.slice(1), 16); const ch = s => Math.max(0, Math.min(255, Math.round((v >> s & 255) * f))); return `rgb(${ch(16)},${ch(8)},${ch(0)})`; }
+function pixGlowURL(c1, c2) {
+  const W = 48, H = 32, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  const cols = [shadeHex(c1, 1.25), c1, shadeHex(c1, 0.85), c2, shadeHex(c2, 0.8)];
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const d = Math.hypot((i - W / 2) / W, (j - H * 0.45) / H) * 2.4 + ((i + j) % 2) * 0.04; x.fillStyle = cols[Math.min(cols.length - 1, Math.floor(d * 2.2))]; x.fillRect(i, j, 1, 1); }
+  return c.toDataURL();
+}
+const RAYS = {};
+function pixRaysURL(col) {
+  if (RAYS[col]) return RAYS[col];
+  const N = 64, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d');
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const a = Math.atan2(j - N / 2, i - N / 2), r = Math.hypot(i - N / 2, j - N / 2); if (r < N / 2 && Math.floor((a + Math.PI) / (Math.PI / 9)) % 2 === 0) { x.fillStyle = col; x.globalAlpha = r < N / 3 ? 1 : 0.55; x.fillRect(i, j, 1, 1); } }
+  return (RAYS[col] = c.toDataURL());
+}
 // Zoomed head-and-shoulders portrait on a rarity-coloured background, like the real brawler cards.
 function drawCardFace(cv, id, skin) {
   const c = cv.getContext('2d'), w = cv.width, h = cv.height, [c1, c2] = RARITY_BG[BR[id].rarity] || RARITY_BG.Rare;
   c.imageSmoothingEnabled = false; c.fillStyle = c1; c.fillRect(0, 0, w, h);
-  c.fillStyle = c2; c.beginPath(); c.moveTo(w * 0.55, 0); c.lineTo(w, 0); c.lineTo(w, h); c.lineTo(w * 0.35, h); c.fill();
+  { const q = 10, lw = Math.ceil(w / q), lh = Math.ceil(h / q); c.fillStyle = c2; for (let j = 0; j < lh; j++) { const from = Math.round(lw * (0.55 - 0.2 * j / lh)); c.fillRect(from * q, j * q, (lw - from) * q, q); } }
   const S_ = getSpr(id, skin), sc = Math.floor(h / 12.8), px = Math.round(w * 0.12), py = 4;
   drawPosed(c, id, skin, px, py, sc, false);
 }
@@ -4887,10 +4932,10 @@ function renderBrawlers() {
     const st = S.brawlers[d.id], up = canUpgrade(st);
     const el = document.createElement('button'); el.className = 'bcard' + (st.owned ? '' : ' locked') + (S.selected === d.id ? ' sel' : '');
     el.setAttribute('aria-label', `${d.name}, ${d.rarity}, ${st.owned ? 'power ' + st.level : 'locked'}`);
-    const ab = (cls, ch, ok, tip) => `<span class="bab ${ok ? cls : ''}" title="${tip}">${ok ? ch : '🔒'}</span>`;
-    el.innerHTML = `<div class="bface"><canvas width="184" height="128"></canvas>${!st.owned ? `<span class="block">${unlockText(d.id)}</span>` : st.trophies === 0 && st.level === 1 && d.id !== 'shelly' ? '<span class="bnew">NEW</span>' : ''}${S.favs.includes(d.id) ? '<span class="bfav">♥</span>' : ''}<span class="bname">${d.name}</span><span class="btro">${icon('trophy')} ${st.trophies}</span></div>
-      <div class="bside${up ? ' up' : ''}">${up ? '<span class="barrow" title="Can be upgraded">▲</span>' : ''}<span class="blvl">${st.owned ? st.level : '?'}</span>
-      ${ab('g', '◆', st.owned && st.level >= 7, 'Gadget at power 7')}${ab('s', '★', st.owned && st.level >= 9, 'Star power at power 9')}${ab('h', '⚡', st.owned && st.level >= 11, 'Hypercharge at power 11')}</div>`;
+    const ab = (cls, ch, ok, tip) => `<span class="bab ${ok ? cls : ''}" title="${tip}">${ok ? pxi(ch) : pxi('lock')}</span>`;
+    el.innerHTML = `<div class="bface"><canvas width="184" height="128"></canvas>${!st.owned ? `<span class="block">${unlockText(d.id)}</span>` : st.trophies === 0 && st.level === 1 && d.id !== 'shelly' ? '<span class="bnew">NEW</span>' : ''}${S.favs.includes(d.id) ? `<span class="bfav">${pxi('heart')}</span>` : ''}<span class="bname">${d.name}</span><span class="btro">${icon('trophy')} ${st.trophies}</span></div>
+      <div class="bside${up ? ' up' : ''}">${up ? `<span class="barrow" title="Can be upgraded">${pxi('up')}</span>` : ''}<span class="blvl">${st.owned ? st.level : '?'}</span>
+      ${ab('g', 'gadget', st.owned && st.level >= 7, 'Gadget at power 7')}${ab('s', 'star', st.owned && st.level >= 9, 'Star power at power 9')}${ab('h', 'bolt', st.owned && st.level >= 11, 'Hypercharge at power 11')}</div>`;
     drawCardFace(el.querySelector('canvas'), d.id, st.owned ? st.skin || '' : '');
     el.onclick = () => { App.detailId = d.id; show('detail'); };
     g.appendChild(el);
@@ -4917,27 +4962,27 @@ function renderDetail() {
   const id = App.detailId || S.selected, d = BR[id], st = S.brawlers[id], m = levelMult(st.level), mN = levelMult(Math.min(MAX_LEVEL, st.level + 1));
   $('#dTitle').textContent = d.name;
   const body = $('#detailBody'), maxed = st.level >= MAX_LEVEL, cost = UPGRADE_COST[st.level], u = UNLOCK[id] || {};
-  const [c1, c2] = RARITY_BG[d.rarity] || RARITY_BG.Rare; body.style.setProperty('--r1', c1); body.style.setProperty('--r2', c2);
+  const [c1, c2] = RARITY_BG[d.rarity] || RARITY_BG.Rare; body.style.setProperty('--r1', c1); body.style.setProperty('--r2', c2); body.style.backgroundImage = `url(${pixGlowURL(c1, c2)})`;
   const rank = brawlerRank(st.trophies), rFrom = (rank - 1) * 20, rTo = rank * 20, slots = gearSlots(st.level);
-  const ab = (cls, ch, a, lvl, label) => `<button class="bdab ${cls}${st.owned && st.level >= lvl ? '' : ' off'}" data-ab="${label}" aria-label="${label}: ${a.name}"><span>${st.owned && st.level >= lvl ? ch : '🔒'}</span><small>${st.owned && st.level >= lvl ? '1/1' : 'P' + lvl}</small></button>`;
-  const gearSlot = k => { const gid = (st.equipped || [])[k], g = GEARS.find(x => x.id === gid); return `<button class="bdgear${k < slots ? '' : ' off'}" data-gear="1" aria-label="Gear slot ${k + 1}" style="${g ? `background:${g.col}` : ''}"><span>${g ? '' : k < slots ? '+' : '🔒'}</span></button>`; };
+  const ab = (cls, ch, a, lvl, label) => `<button class="bdab ${cls}${st.owned && st.level >= lvl ? '' : ' off'}" data-ab="${label}" aria-label="${label}: ${a.name}"><span>${st.owned && st.level >= lvl ? pxi(ch) : pxi('lock')}</span><small>${st.owned && st.level >= lvl ? '1/1' : 'P' + lvl}</small></button>`;
+  const gearSlot = k => { const gid = (st.equipped || [])[k], g = GEARS.find(x => x.id === gid); return `<button class="bdgear${k < slots ? '' : ' off'}" data-gear="1" aria-label="Gear slot ${k + 1}" style="${g ? `background:${g.col}` : ''}"><span>${g ? pxi('diamond') : k < slots ? pxi('plus') : pxi('lock')}</span></button>`; };
   body.innerHTML = `<div class="bd">
     <div class="bdl">
       <div class="bdname"><b>${d.name.toUpperCase()}</b><span>${d.role.toUpperCase()}</span><i style="color:${c1}">${d.rarity.toUpperCase()}</i></div>
       <div class="bdtro"><span class="bdrank">${rank}</span><div class="bdtbar"><i style="width:${st.owned ? Math.min(100, (st.trophies - rFrom) / (rTo - rFrom) * 100) : 0}%"></i><b>${icon('trophy')} ${st.trophies}/${rTo}</b></div></div>
       <p class="bdblurb">${d.blurb}</p>${TIPS[id] ? `<p class="tip"><b>TIP:</b> ${TIPS[id]}</p>` : ''}
-      <div class="bdicons"><button class="bdic" data-tab="info" aria-label="Brawler info">i</button><button class="bdic" data-tab="pins" aria-label="Pins">☺</button><button class="bdic" data-tab="skins" aria-label="Skins">👕</button></div>
+      <div class="bdicons"><button class="bdic" data-tab="info" aria-label="Brawler info">${pxi('info')}</button><button class="bdic" data-tab="pins" aria-label="Pins">${pxi('smile')}</button><button class="bdic" data-tab="skins" aria-label="Skins">${pxi('shirt')}</button></div>
       <div class="bdbtns" id="dBtns"></div>
     </div>
     <div class="bdc"><canvas width="420" height="420" aria-label="${d.name}"></canvas></div>
     <div class="bdr">
       <div class="bdgears">${gearSlot(0)}${gearSlot(1)}</div>
-      <div class="bdabs">${ab('g', '◆', d.gadget, GADGET_LVL, 'Gadget')}${ab('s', '★', d.star, STAR_LVL, 'Star Power')}${ab('h', '⚡', d.hyper, HYPER_LVL, 'Hypercharge')}</div>
+      <div class="bdabs">${ab('g', 'gadget', d.gadget, GADGET_LVL, 'Gadget')}${ab('s', 'star', d.star, STAR_LVL, 'Star Power')}${ab('h', 'bolt', d.hyper, HYPER_LVL, 'Hypercharge')}</div>
       <div class="bdpow">
         <div class="bdpowh"><span class="bdlvl">${st.owned ? st.level : '?'}</span><b>POWER</b><i>MAX ${MAX_LEVEL}</i></div>
         <div class="bdpips">${Array.from({ length: MAX_LEVEL }, (_, k) => `<i class="${st.owned && k < st.level ? 'on' : ''}"></i>`).join('')}</div>
-        <div class="bdst hp"><span>♥</span><div><small>HEALTH</small><b>${fmt(d.hp * m)}${st.owned && !maxed ? ` <em>▶ ${fmt(d.hp * mN)}</em>` : ''}</b></div></div>
-        <div class="bdst at"><span>✸</span><div><small>ATTACK</small><b>${atkNumbers(d.attack, m)}</b></div></div>
+        <div class="bdst hp"><span>${pxi('heartw')}</span><div><small>HEALTH</small><b>${fmt(d.hp * m)}${st.owned && !maxed ? ` <em>${pxi('right')} ${fmt(d.hp * mN)}</em>` : ''}</b></div></div>
+        <div class="bdst at"><span>${pxi('burst')}</span><div><small>ATTACK</small><b>${atkNumbers(d.attack, m)}</b></div></div>
         <div class="bdst su"><span>S</span><div><small>SUPER</small><b>${d.super.name.toUpperCase()}</b></div></div>
         <div id="dUp"></div>
       </div>
@@ -4958,7 +5003,7 @@ function renderDetail() {
     if (u.gems) mk(`UNLOCK ${icon('gem')} ${u.gems}`, 'purple bdsel', () => buyBrawler(id, 'gems', u.gems));
   }
   mk('TRY', 'blue', () => startTraining(id));
-  mk(S.favs.includes(id) ? '♥' : '♡', 'bdheart' + (S.favs.includes(id) ? ' on' : ''), () => { if (S.favs.includes(id)) S.favs = S.favs.filter(x => x !== id); else S.favs.push(id); save(); renderDetail(); });
+  mk(S.favs.includes(id) ? pxi('heart') : pxi('heart0'), 'bdheart' + (S.favs.includes(id) ? ' on' : ''), () => { if (S.favs.includes(id)) S.favs = S.favs.filter(x => x !== id); else S.favs.push(id); save(); renderDetail(); });
   const up = $('#dUp');
   if (!st.owned) { const p = document.createElement('p'); p.className = 'bdinfo'; p.textContent = [u.road ? `Free at ${u.road} trophies on the Trophy Road.` : '', u.pass ? `Free at Brawl Pass tier ${u.pass}.` : ''].join(' ') || 'Unlock this brawler to upgrade it.'; up.appendChild(p); }
   else if (maxed) mk('MAX POWER', 'grey bdup', () => {}, true, up);
@@ -4981,10 +5026,10 @@ function openBd(tab) {
         <div class="stat"><small>Speed</small><b>${d.speed >= 165 ? 'Fast' : 'Normal'}</b></div><div class="stat"><small>Rarity</small><b>${d.rarity}</b></div></div>
       <div class="ability"><span class="aic" style="background:#ff4659">A</span><div><b>${d.attack.name}</b><p>${d.attack.desc}<br><span style="color:#8a6b3a">Damage ${atkNumbers(d.attack, m)}</span></p></div></div>
       <div class="ability"><span class="aic" style="background:#ffc824">S</span><div><b>Super: ${d.super.name}</b><p>${d.super.desc}<br><span style="color:#8a6b3a">Damage ${atkNumbers(d.super, m)}</span></p></div></div>
-      ${[['G', '#4fd145', 'Gadget', d.gadget, GADGET_LVL], ['★', '#ffe040', 'Star Power', d.star, STAR_LVL], ['H', '#c050ff', 'Hypercharge', d.hyper, HYPER_LVL]].map(([ic, col, label, a, lvl]) => `<div class="ability" style="opacity:${st.level >= lvl ? 1 : 0.55}"><span class="aic" style="background:${col}">${ic}</span><div><b>${label}: ${a.name}</b><p>${a.desc}<br><span style="color:#8a6b3a">${st.owned && st.level >= lvl ? 'Unlocked' : 'Unlocks at Power ' + lvl}</span></p></div></div>`).join('')}
+      ${[[pxi('gadget'), '#4fd145', 'Gadget', d.gadget, GADGET_LVL], [pxi('star'), '#ffe040', 'Star Power', d.star, STAR_LVL], [pxi('bolt'), '#c050ff', 'Hypercharge', d.hyper, HYPER_LVL]].map(([ic, col, label, a, lvl]) => `<div class="ability" style="opacity:${st.level >= lvl ? 1 : 0.55}"><span class="aic" style="background:${col}">${ic}</span><div><b>${label}: ${a.name}</b><p>${a.desc}<br><span style="color:#8a6b3a">${st.owned && st.level >= lvl ? 'Unlocked' : 'Unlocks at Power ' + lvl}</span></p></div></div>`).join('')}
       <div style="margin-top:12px"><b style="font-family:var(--display);font-size:11px">Mastery: ${MASTERY_NAMES[masteryLvl(st.mastery || 0)]}</b><div class="bar purple" style="margin-top:6px"><i style="width:${(() => { const l = masteryLvl(st.mastery || 0); return l >= 10 ? 100 : ((st.mastery || 0) - MASTERY[l]) / (MASTERY[l + 1] - MASTERY[l]) * 100; })()}%"></i></div><p style="font-size:8px;margin-top:4px">${fmt(st.mastery || 0)} mastery points.</p></div>`;
   } else if (tab === 'pins') {
-    B_.innerHTML = `<p style="font-size:10px;line-height:1.7">Use pins in battle with the ☺ button (or press T on a keyboard).</p><div class="bdpins"></div>`;
+    B_.innerHTML = `<p style="font-size:10px;line-height:1.7">Use pins in battle with the smiley button (or press T on a keyboard).</p><div class="bdpins"></div>`;
     for (const k of PIN_LIST) { const e = document.createElement('div'); if (k === 'gg') e.textContent = 'GG'; else { const c = document.createElement('canvas'), pc = pinCanvas(k); c.width = pc.width * 6; c.height = pc.height * 6; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(pc, 0, 0, c.width, c.height); e.appendChild(c); } B_.querySelector('.bdpins').appendChild(e); }
   } else if (tab === 'skins') { B_.innerHTML = '<div id="skinBox"></div>'; renderSkins(id, st); }
   else { B_.innerHTML = '<div id="gearBox"></div>'; renderGears(id, st); }
@@ -5036,7 +5081,7 @@ function renderModes() {
   for (const [k, md] of Object.entries(MODES)) {
     if (md.hidden) continue;
     const el = document.createElement('button'); el.className = 'mode' + (S.mode === k ? ' sel' : '');
-    el.style.background = `linear-gradient(180deg, ${md.color}, ${md.color2})`;
+    el.style.background = `linear-gradient(180deg,${md.color} 0 50%,${md.color2} 50% 100%)`;
     el.innerHTML = `<canvas class="mi" width="128" height="128"></canvas><span class="mtag">${md.tag}</span><b class="stroke-sm">${md.name}</b><p>${md.desc}</p>${eventMod(k) ? `<p class="evtag" style="background:${EVENT_MODS[eventMod(k)].col}">Today: ${EVENT_MODS[eventMod(k)].name}. ${EVENT_MODS[eventMod(k)].desc}</p>` : ''}<p style="opacity:.85">Map${md.maps.length > 1 ? 's' : ''}: ${md.maps.map(m => MAPS[m].name).join(', ')} · Wins: ${S.stats.modeWins[k] || 0}</p>`;
     const c = el.querySelector('canvas').getContext('2d'); rr(c, 4, 4, 120, 120, 24); fs(c, 'rgba(0,0,0,.25)', 4); drawModeIcon(c, k, 64, 64, 2.2);
     el.onclick = () => { S.mode = k; save(); show('menu'); };
@@ -5061,8 +5106,8 @@ function renderShop() {
   };
   const drawCoins = n => c => { for (let i = 0; i < n; i++) drawSpr(c, 'coin', 70 + (i % 3) * 40, 150 - Math.floor(i / 3) * 36 - (i % 2) * 8, 5, true); };
   const drawGems = n => c => { for (let i = 0; i < n; i++) drawSpr(c, 'gem', 70 + (i % 3) * 40, 140 - Math.floor(i / 3) * 44, 5, true); };
-  offer($('#offA'), 'linear-gradient(180deg,#4fd145,#2b9a25)', drawCoins(4), 'Daily gift', giftReady ? 'A free stack of 60 coins. Come back tomorrow for another.' : 'Claimed today. A new gift arrives tomorrow.', giftReady ? 'Claim free' : 'Claimed', 'green', () => { S.lastGift = today; grant({ coins: 60 }); renderShop(); }, !giftReady);
-  offer($('#offA'), 'linear-gradient(180deg,#ff9a3c,#e2531f)', c => { drawSpr(c, 'box', 110, 120, 12, true); txt(c, '?', 110, 132, 30, '#fff', 'center', 6); }, 'Mystery box', 'Coins, gems or, with luck, a brand new brawler.', `${icon('coin')} 120`, 'blue', () => {
+  offer($('#offA'), 'linear-gradient(180deg,#4fd145 0 50%,#2b9a25 50% 100%)', drawCoins(4), 'Daily gift', giftReady ? 'A free stack of 60 coins. Come back tomorrow for another.' : 'Claimed today. A new gift arrives tomorrow.', giftReady ? 'Claim free' : 'Claimed', 'green', () => { S.lastGift = today; grant({ coins: 60 }); renderShop(); }, !giftReady);
+  offer($('#offA'), 'linear-gradient(180deg,#ff9a3c 0 50%,#e2531f 50% 100%)', c => { drawSpr(c, 'box', 110, 120, 12, true); txt(c, '?', 110, 132, 30, '#fff', 'center', 6); }, 'Mystery box', 'Coins, gems or, with luck, a brand new brawler.', `${icon('coin')} 120`, 'blue', () => {
     if (S.coins < 120) { Sound.play('error'); toast('You need 120 coins for a mystery box.'); return; }
     S.coins -= 120; S.boxesOpened++; const lk = BR_LIST.filter(b => !S.brawlers[b.id].owned); const r = Math.random();
     let rw; if (lk.length && r < 0.1) rw = { brawler: pick(lk).id }; else if (r < 0.45) rw = { gems: randi(5, 15) }; else rw = { coins: randi(70, 260) };
@@ -5071,24 +5116,24 @@ function renderShop() {
   for (const d of locked) {
     const u = UNLOCK[d.id];
     const cur = u.coins ? 'coins' : 'gems', price = u.coins || u.gems;
-    offer($('#offB'), `linear-gradient(180deg,${d.bg},${d.bg2})`, (c, cvs) => drawPortrait(cvs, d.id, { scale: 2.2 }), d.name, d.role + '. ' + d.attack.name + ' and ' + d.super.name + '.', `${icon(cur === 'coins' ? 'coin' : 'gem')} ${price}`, cur === 'coins' ? 'green' : 'purple', () => buyBrawler(d.id, cur, price));
+    offer($('#offB'), `linear-gradient(180deg,${d.bg} 0 50%,${d.bg2} 50% 100%)`, (c, cvs) => drawPortrait(cvs, d.id, { scale: 2.2 }), d.name, d.role + '. ' + d.attack.name + ' and ' + d.super.name + '.', `${icon(cur === 'coins' ? 'coin' : 'gem')} ${price}`, cur === 'coins' ? 'green' : 'purple', () => buyBrawler(d.id, cur, price));
   }
   const allSp = Object.entries(SPECIAL_SKINS).flatMap(([bid, list]) => list.map(sk => ({ bid, sk })));
   const day = Math.floor(Date.now() / 86400000);
   for (let i = 0; i < 3; i++) {
     const { bid, sk } = allSp[(day * 7 + i * 5) % allSp.length], st = S.brawlers[bid], owned = (st.skins || []).includes(sk.id);
     const cur = sk.price.gems ? 'gems' : 'coins', price = sk.price[cur];
-    offer($('#offS'), `linear-gradient(180deg,${BR[bid].bg},${BR[bid].bg2})`, (c, cvs) => drawPortrait(cvs, bid, { scale: 2.2, skin: sk.id }), `${sk.name} ${BR[bid].name}`, st.owned ? 'A special skin. Changes daily.' : `Unlock ${BR[bid].name} first.`, owned ? 'Owned' : `${icon(cur === 'gems' ? 'gem' : 'coin')} ${price}`, 'purple', () => {
+    offer($('#offS'), `linear-gradient(180deg,${BR[bid].bg} 0 50%,${BR[bid].bg2} 50% 100%)`, (c, cvs) => drawPortrait(cvs, bid, { scale: 2.2, skin: sk.id }), `${sk.name} ${BR[bid].name}`, st.owned ? 'A special skin. Changes daily.' : `Unlock ${BR[bid].name} first.`, owned ? 'Owned' : `${icon(cur === 'gems' ? 'gem' : 'coin')} ${price}`, 'purple', () => {
       if (S[cur] < price) { Sound.play('error'); toast(`You need ${price - S[cur]} more ${cur}.`); return; }
       S[cur] -= price; st.skins = st.skins || []; st.skins.push(sk.id); st.skin = sk.id; save(); Sound.play('buy'); toast(`${sk.name} ${BR[bid].name} unlocked!`); updateWallet(); renderShop();
     }, owned || !st.owned);
   }
-  const ex = (gems, coins) => offer($('#offC'), 'linear-gradient(180deg,#3fa2ff,#2a5ad8)', drawCoins(Math.min(6, Math.round(coins / 120))), `${fmt(coins)} coins`, `Trade ${gems} gems for a pile of coins.`, `${icon('gem')} ${gems}`, 'purple', () => {
+  const ex = (gems, coins) => offer($('#offC'), 'linear-gradient(180deg,#3fa2ff 0 50%,#2a5ad8 50% 100%)', drawCoins(Math.min(6, Math.round(coins / 120))), `${fmt(coins)} coins`, `Trade ${gems} gems for a pile of coins.`, `${icon('gem')} ${gems}`, 'purple', () => {
     if (S.gems < gems) { Sound.play('error'); toast(`You need ${gems - S.gems} more gems.`); return; }
     S.gems -= gems; grant({ coins }); renderShop();
   });
   ex(20, 220); ex(60, 750);
-  offer($('#offC'), 'linear-gradient(180deg,#c063ff,#7a2bd0)', drawGems(3), '25 gems', 'Trade 400 coins for gems to unlock gem-priced brawlers sooner.', `${icon('coin')} 400`, 'green', () => {
+  offer($('#offC'), 'linear-gradient(180deg,#c063ff 0 50%,#7a2bd0 50% 100%)', drawGems(3), '25 gems', 'Trade 400 coins for gems to unlock gem-priced brawlers sooner.', `${icon('coin')} 400`, 'green', () => {
     if (S.coins < 400) { Sound.play('error'); toast(`You need ${400 - S.coins} more coins.`); return; }
     S.coins -= 400; grant({ gems: 25 }); renderShop();
   });
@@ -5167,7 +5212,7 @@ function renderProfile() {
   $$('.ble canvas').forEach(c => drawPortrait(c, c.dataset.id, { scale: 2 }));
   for (const a of ACHIEVEMENTS) {
     const v = Math.min(a.n, a.v(S)), done = v >= a.n, got = S.achClaimed.includes(a.id), el = document.createElement('div'); el.className = 'ach' + (got ? ' got' : done ? ' ready' : '');
-    el.innerHTML = `<div style="flex:1;min-width:0"><b>${a.name}</b><br><small>${a.text}</small><div class="bar green" style="margin-top:4px"><i style="width:${v / a.n * 100}%"></i></div><small>${fmt(v)} / ${fmt(a.n)}</small></div><button class="btn small ${done && !got ? 'green' : 'grey'}"${done && !got ? '' : ' disabled'}>${got ? '✓' : `${icon('gem')} ${a.gems}`}</button>`;
+    el.innerHTML = `<div style="flex:1;min-width:0"><b>${a.name}</b><br><small>${a.text}</small><div class="bar green" style="margin-top:4px"><i style="width:${v / a.n * 100}%"></i></div><small>${fmt(v)} / ${fmt(a.n)}</small></div><button class="btn small ${done && !got ? 'green' : 'grey'}"${done && !got ? '' : ' disabled'}>${got ? pxi('check') : `${icon('gem')} ${a.gems}`}</button>`;
     el.querySelector('button').onclick = () => { S.achClaimed.push(a.id); grant({ gems: a.gems }); save(); renderProfile(); };
     $('#achs').appendChild(el);
   }
@@ -5206,7 +5251,7 @@ function renderClub() {
     <div class="panel"><h3>Members</h3><div class="kv" id="memberList"></div></div>`;
   $('#clubName').value = C.name;
   $('#clubRename').onclick = () => { const v = $('#clubName').value.trim().slice(0, 18); if (v) { C.name = v; save(); renderClub(); } };
-  CLUB_GOALS.forEach((g, i) => { const ok = tot >= g.t, got = C.claimed.includes(i); const b = document.createElement('button'); b.className = 'btn small ' + (ok && !got ? 'green' : 'grey'); b.textContent = `${fmt(g.t)}: ${g.gems ? g.gems + ' gems' : g.coins + ' coins'}${got ? ' ✓' : ''}`; b.disabled = !ok || got; b.onclick = () => { C.claimed.push(i); grant(g); save(); renderClub(); }; $('#clubGoals').appendChild(b); });
+  CLUB_GOALS.forEach((g, i) => { const ok = tot >= g.t, got = C.claimed.includes(i); const b = document.createElement('button'); b.className = 'btn small ' + (ok && !got ? 'green' : 'grey'); b.innerHTML = `${fmt(g.t)}: ${g.gems ? g.gems + ' gems' : g.coins + ' coins'}${got ? ' ' + pxi('check') : ''}`; b.disabled = !ok || got; b.onclick = () => { C.claimed.push(i); grant(g); save(); renderClub(); }; $('#clubGoals').appendChild(b); });
   const list = [...C.members, { name: S.name + ' (you)', trophies: totalTrophies(), role: 'Member' }].sort((a, b) => b.trophies - a.trophies);
   $('#memberList').innerHTML = list.map(m => `<div class="stat"><small>${m.role}</small><b>${m.name.replace(/[<>]/g, '')}</b><br><span class="trophy-line" style="color:#8a6b3a">${icon('trophy')} ${fmt(m.trophies)}</span></div>`).join('');
   const box = $('#chatBox');
@@ -5343,7 +5388,7 @@ function finishMatch() {
         <div class="rw-line">${icon('pass')} <span>+${xp} pass XP</span></div>
         ${extraLines.map(l => `<div class="rw-line" style="font-size:9px;line-height:1.6">${l}</div>`).join('')}
       </div></div>
-    ${star && !g.quit ? `<div class="starp${star.isPlayer ? ' me' : ''}"><canvas width="64" height="64"></canvas><div><b>★ STAR PLAYER</b><br>${star.isPlayer ? 'YOU!' : star.name.replace(/[<>]/g, '')} · ${BR[star.id].name} · ${star.kills} KOs</div></div>` : ''}
+    ${star && !g.quit ? `<div class="starp${star.isPlayer ? ' me' : ''}"><canvas width="64" height="64"></canvas><div><b>${pxi('star')} STAR PLAYER</b><br>${star.isPlayer ? 'YOU!' : star.name.replace(/[<>]/g, '')} · ${BR[star.id].name} · ${star.kills} KOs</div></div>` : ''}
     <div class="rstats"><span>KOs ${gs.kills}</span><span>Damage ${fmt(gs.damage)}</span><span>Supers ${gs.supers}</span><span>${extra}</span></div>
     ${win && !g.quit ? `<div style="text-align:center;margin-top:10px" class="qnote">You earned a Star Drop for winning!</div>` : ''}
     ${finished.length ? `<p class="qnote">Quest complete: ${finished.join(', ')}. Claim it in Quests!</p>` : ''}
@@ -5371,7 +5416,7 @@ function fxNext() {
 }
 function fxUnlock(id) {
   const d = BR[id], col = RARITY_COL[d.rarity], ov = $('#ov-fx');
-  ov.style.setProperty('--fx', col);
+  ov.style.setProperty('--fx', col); ov.style.setProperty('--rays', `url(${pixRaysURL(col)})`);
   ov.innerHTML = `<div class="fxrays"></div><div class="fxbox"><div class="fxtag">NEW BRAWLER!</div><canvas class="fxpic" width="192" height="192"></canvas>
     <div class="fxname">${d.name}</div><div class="fxrar" style="color:${col}">${d.rarity} · ${d.role}</div>
     <p class="fxinfo">Attack: ${d.attack.name}<br>Super: ${d.super.name}</p><button class="btn green" id="fxGo">Awesome!</button></div>`;
@@ -5381,11 +5426,11 @@ function fxUnlock(id) {
 }
 function fxLevel(id, lvl) {
   const d = BR[id], ov = $('#ov-fx'), m0 = levelMult(lvl - 1), m1 = levelMult(lvl);
-  const ab = lvl === 7 ? ['GADGET UNLOCKED!', d.gadget, '#5ad84a', '◆'] : lvl === 9 ? ['STAR POWER UNLOCKED!', d.star, '#ffb020', '★'] : lvl === 11 ? ['HYPERCHARGE UNLOCKED!', d.hyper, '#b45bff', '⚡'] : null;
-  ov.style.setProperty('--fx', ab ? ab[2] : '#ff4ab0');
+  const ab = lvl === 7 ? ['GADGET UNLOCKED!', d.gadget, '#5ad84a', pxi('gadget')] : lvl === 9 ? ['STAR POWER UNLOCKED!', d.star, '#ffb020', pxi('star')] : lvl === 11 ? ['HYPERCHARGE UNLOCKED!', d.hyper, '#b45bff', pxi('bolt')] : null;
+  ov.style.setProperty('--fx', ab ? ab[2] : '#ff4ab0'); ov.style.setProperty('--rays', `url(${pixRaysURL(ab ? ab[2] : '#ff4ab0')})`);
   ov.innerHTML = `<div class="fxrays"></div><div class="fxbox"><div class="fxtag">LEVEL UP!</div><canvas class="fxpic" width="160" height="160" style="width:160px;height:160px"></canvas>
-    <div class="fxname">${d.name}</div><div class="fxlvl"><span>${lvl - 1}</span> ▶ <b>${lvl}</b></div>
-    <p class="fxinfo">Health ${fmt(d.hp * m0)} ▶ <b style="color:#7aff6a">${fmt(d.hp * m1)}</b><br>Damage +${Math.round((m1 / m0 - 1) * 100)}%</p>
+    <div class="fxname">${d.name}</div><div class="fxlvl"><span>${lvl - 1}</span> ${pxi('right')} <b>${lvl}</b></div>
+    <p class="fxinfo">Health ${fmt(d.hp * m0)} ${pxi('right')} <b style="color:#7aff6a">${fmt(d.hp * m1)}</b><br>Damage +${Math.round((m1 / m0 - 1) * 100)}%</p>
     ${ab && ab[1] ? `<div class="fxab" style="--ab:${ab[2]}"><span class="fxabi">${ab[3]}</span><div><b>${ab[0]}</b><br>${ab[1].name}: ${ab[1].desc}</div></div>` : ''}
     <button class="btn green" id="fxGo">Great!</button></div>`;
   drawPortrait(ov.querySelector('canvas'), id, { scale: 2.4, skin: S.brawlers[id].skin || '' });
@@ -5426,7 +5471,7 @@ function fxDrop(min) {
   const ov = $('#ov-fx'); let lvl = rollDrop(min), taps = 0; const need = 4;
   ov.innerHTML = `<div class="fxrays"></div><div class="fxbox"><div class="fxtag">STAR DROP</div><div class="fxname" id="fxRar"></div><button class="fxstar" id="fxStar" aria-label="Tap the Star Drop"><canvas width="216" height="216"></canvas></button><p class="fxinfo" id="fxHint">Tap the star ${need} times!</p><div id="fxOut"></div></div>`;
   const cvs = ov.querySelector('.fxstar canvas'), btn = $('#fxStar');
-  const paint = () => { const D = STAR_DROPS[lvl]; ov.style.setProperty('--fx', D.col); drawDropStar(cvs); $('#fxRar').textContent = D.name.toUpperCase(); $('#fxRar').style.color = D.col; };
+  const paint = () => { const D = STAR_DROPS[lvl]; ov.style.setProperty('--fx', D.col); ov.style.setProperty('--rays', `url(${pixRaysURL(D.col)})`); drawDropStar(cvs); $('#fxRar').textContent = D.name.toUpperCase(); $('#fxRar').style.color = D.col; };
   paint(); Sound.play('superReady');
   btn.onclick = () => {
     if (taps >= need) return;
@@ -5467,7 +5512,7 @@ function renderRoad() {
     const reached = tt >= r.t, claimed = S.roadClaimed.includes(i), up = k % 2 === 0;
     const el = document.createElement('div'); el.className = 'rnode' + (up ? ' up' : ' down') + (claimed ? ' claimed' : reached ? ' ready' : '');
     el.style.left = (PAD + k * GAP) + 'px';
-    el.innerHTML = `<div class="rcard"><canvas width="88" height="88"></canvas><span class="rl">${rewardLabel(r)}</span>${claimed ? '<span class="rok">✓</span>' : reached ? '<button class="btn small green">Claim</button>' : ''}</div><div class="rdot"></div><span class="rt">${icon('trophy')}${r.t}</span>`;
+    el.innerHTML = `<div class="rcard"><canvas width="88" height="88"></canvas><span class="rl">${rewardLabel(r)}</span>${claimed ? `<span class="rok">${pxi('check')}</span>` : reached ? '<button class="btn small green">Claim</button>' : ''}</div><div class="rdot"></div><span class="rt">${icon('trophy')}${r.t}</span>`;
     const cc = el.querySelector('canvas').getContext('2d'); cc.scale(2, 2); rewardCanvas(cc, r);
     const b = el.querySelector('button'); if (b) b.onclick = () => { S.roadClaimed.push(i); save(); Sound.play('buy'); grant(r, true); renderRoad(); if (!r.brawler && r.drop === undefined) toast('You got ' + rewardLabel(r) + (r.coins ? ' coins' : r.gems ? ' gems' : '')); };
     inner.appendChild(el);
@@ -5491,7 +5536,7 @@ function bindUI() {
   $('#playBtn').onclick = startMatch;
   $('#btnPause').onclick = () => togglePause(true);
   $('#bdClose').onclick = () => { $('#ov-bd').hidden = true; if (App.screen === 'detail') renderDetail(); };
-  $('#btnPin').onclick = () => togglePins();
+  $('#btnPin').innerHTML = pxi('smile'); $('#btnPin').onclick = () => togglePins();
   PIN_LIST.forEach((k, i) => { const b = document.createElement('button'); b.setAttribute('aria-label', 'Pin ' + k); b.title = `${k} (${i + 1})`;
     if (k === 'gg') b.textContent = 'GG'; else { const c = document.createElement('canvas'), pc = pinCanvas(k); c.width = pc.width * 4; c.height = pc.height * 4; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(pc, 0, 0, c.width, c.height); b.appendChild(c); }
     b.onclick = () => playerPin(k); $('#pinBar').appendChild(b); });
