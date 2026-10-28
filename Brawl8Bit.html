@@ -884,9 +884,9 @@ const BR_LIST = [
     gadget: { name: 'Defense Booster', desc: 'Takes 40% less damage for 3 seconds.' },
     star: { name: 'Extra Toxic', desc: 'Poison deals 50% more damage.' },
     hyper: { name: 'Toxic Swoop', desc: 'Hypercharged Swoop throws 24 daggers.' } },
-  { id: 'edgar', name: 'Edgar', rarity: 'Epic', role: 'Assassin', bg: '#4a2a3a', bg2: '#1a0a1a', hp: 3800, speed: 180, reload: 0.9, superCost: 2600,
+  { id: 'edgar', name: 'Edgar', rarity: 'Epic', role: 'Assassin', bg: '#4a2a3a', bg2: '#1a0a1a', hp: 4100, speed: 195, reload: 0.9, superCost: 2600,
     blurb: 'Edgar jumps over walls and heals himself with every punch.',
-    attack: { kind: 'punch', name: 'Fisticuffs', desc: 'Two quick punches. Each hit heals Edgar for 30% of the damage.', shots: 2, interval: 0.12, range: 2.3, dmg: 520, speed: 900, r: 14, color: '#ff5a6a', drain: 0.3, sfx: 'punch' },
+    attack: { kind: 'punch', name: 'Fisticuffs', desc: 'Two quick punches. Each hit heals Edgar for 30% of the damage.', shots: 2, interval: 0.12, range: 2.3, dmg: 560, speed: 900, r: 14, color: '#ff5a6a', drain: 0.3, sfx: 'punch' },
     super: { kind: 'leap', name: 'Vault', desc: 'Jumps a long way over walls and lands on enemies.', range: 7, radius: 1.2, dmg: 300, knock: 100, dur: 0.6, sfx: 'super' },
     gadget: { name: 'Let’s Fly', desc: 'Instantly charges half of his Super.' },
     star: { name: 'Hard Landing', desc: 'Vault deals 900 extra damage where he lands.' },
@@ -900,7 +900,7 @@ const BR_LIST = [
     hyper: { name: 'Bubble Trouble', desc: 'Hypercharged Spitball is bigger and stronger.' } },
   { id: 'max', name: 'Max', rarity: 'Mythic', role: 'Support', bg: '#ffc020', bg2: '#c04a10', hp: 3300, speed: 200, reload: 1.3, superCost: 3400,
     blurb: 'Max is the fastest brawler of all, and her Super makes the whole team zoom.',
-    attack: { kind: 'burst', name: 'Pew Pew Pew!', desc: 'Fires 4 quick shots in a line.', shots: 4, interval: 0.08, range: 8.5, dmg: 305, speed: 1000, r: 6, jitter: 0.03, color: '#ffe066', sfx: 'pistol' },
+    attack: { kind: 'burst', name: 'Pew Pew Pew!', desc: 'Fires 4 quick shots in a line.', shots: 4, interval: 0.08, range: 8.5, dmg: 290, speed: 1000, r: 6, jitter: 0.03, color: '#ffe066', sfx: 'pistol' },
     super: { kind: 'teamboost', name: 'Let’s Go!', desc: 'Max and every teammate nearby run 50% faster for 4 seconds.', radius: 6, dur: 4, sfx: 'super' },
     gadget: { name: 'Phase Shifter', desc: 'Cannot be hurt for 1.2 seconds.' },
     star: { name: 'Super Charged', desc: 'Her Super slowly charges while she runs.' },
@@ -926,10 +926,10 @@ const BR_LIST = [
     gadget: { name: 'Garden Mulcher', desc: 'Instantly heals 1,000 health.' },
     star: { name: 'Overgrowth', desc: 'Seed Bomb explodes in a bigger area.' },
     hyper: { name: 'Big Hedge', desc: 'Hypercharged Hedge is 5 tiles long.' } },
-  { id: 'eightbit', name: '8-Bit', rarity: 'Epic', role: 'Damage Dealer', bg: '#7a4ad8', bg2: '#2a1a5a', hp: 5000, speed: 120, reload: 1.5, superCost: 3600,
+  { id: 'eightbit', name: '8-Bit', rarity: 'Epic', role: 'Damage Dealer', bg: '#7a4ad8', bg2: '#2a1a5a', hp: 4600, speed: 120, reload: 1.5, superCost: 3600,
     blurb: '8-Bit is a slow arcade machine with big damage and a booster that powers up his team.',
-    attack: { kind: 'burst', name: 'Blaster Beams', desc: 'Fires 6 long-range laser beams.', shots: 6, interval: 0.06, range: 9.5, dmg: 310, speed: 1100, r: 6, jitter: 0.03, color: '#ff4a6a', sfx: 'pistol' },
-    super: { kind: 'booster', name: 'Damage Booster', desc: 'Places a booster that makes teammates near it deal 30% more damage.', range: 3, radius: 4.5, life: 12, sfx: 'super' },
+    attack: { kind: 'burst', name: 'Blaster Beams', desc: 'Fires 6 long-range laser beams.', shots: 6, interval: 0.06, range: 9.5, dmg: 285, speed: 1100, r: 6, jitter: 0.03, color: '#ff4a6a', sfx: 'pistol' },
+    super: { kind: 'booster', name: 'Damage Booster', desc: 'Places a booster that makes teammates near it deal 20% more damage.', range: 3, radius: 4.5, life: 12, sfx: 'super' },
     gadget: { name: 'Cheat Cartridge', desc: 'Teleports to his Damage Booster.' },
     star: { name: 'Boosted Booster', desc: 'The booster reaches farther.' },
     hyper: { name: 'Extra Credits', desc: 'Hypercharged booster reaches much farther.' } },
@@ -3394,7 +3394,7 @@ function stepBattle(dt) {
 // explosions, healing, burning and knockout rounds
 // ===================================================================
 const boosted = b => G && G.boosters && b.kind === 'brawler' && G.boosters.some(q => q.team === b.team && dist(q.x, q.y, b.x, b.y) < q.r);
-const dmgNow = b => (b.dmgMult || 1) * cubeMult(b) * (b.hyperT > 0 ? 1.15 : 1) * (boosted(b) ? 1.3 : 1) * (b.energyT > 0 ? 1.3 : 1) * (b.gears && b.gears.has('damage') && b.hp < b.hpMax * 0.5 ? 1.15 : 1);
+const dmgNow = b => (b.dmgMult || 1) * cubeMult(b) * (b.hyperT > 0 ? 1.15 : 1) * (boosted(b) ? 1.2 : 1) * (b.energyT > 0 ? 1.3 : 1) * (b.gears && b.gears.has('damage') && b.hp < b.hpMax * 0.5 ? 1.15 : 1);
 function superStats(b) {
   const A = { ...b.def.super, isSuper: true }, hy = b.hyperT > 0;
   if (b.star && b.id === 'brock') A.rockets = 13;
