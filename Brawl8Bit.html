@@ -94,7 +94,7 @@ button{font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:
 .badge{position:absolute;top:-8px;right:-8px;background:var(--red);border:3px solid var(--ink);border-radius:999px;
   min-width:28px;height:28px;display:grid;place-items:center;font-size:15px;padding:0 6px}
 .stage{grid-area:stage;position:relative;min-height:0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
-#featured{position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+#featured{position:absolute;left:0;right:0;bottom:0;top:40px;width:100%;height:calc(100% - 40px);cursor:pointer}
 .feat-label{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
 .feat-name{font-family:var(--display);font-size:38px;line-height:1}
 .feat-sub{display:flex;gap:8px;align-items:center}
@@ -389,8 +389,8 @@ input[type=text]{font-size:13px}
 .dlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;max-height:300px;overflow-y:auto;touch-action:pan-y}
 .dlist button{aspect-ratio:1;padding:0;border:3px solid var(--ink);background:#2a2a6a;cursor:pointer;position:relative}
 .dlist button.on{outline:3px solid #ffd23a} .dlist button b{position:absolute;top:0;left:2px;color:#ffd23a;font-family:var(--display);font-size:12px;text-shadow:1px 1px 0 #000}
-.evbanner{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;z-index:2;max-width:92%}
-.evbanner button{font-family:var(--display);font-size:8px;color:#fff;padding:5px 8px;border:3px solid var(--ink);cursor:pointer;text-shadow:1px 1px 0 #000;box-shadow:0 3px 0 var(--ink)}
+.evbanner{position:absolute;top:4px;left:0;right:0;display:flex;gap:6px;flex-wrap:nowrap;justify-content:center;z-index:2;overflow:hidden;height:32px}
+.evbanner button{flex:none;white-space:nowrap;font-family:var(--display);font-size:7px;color:#fff;padding:5px 8px;border:3px solid var(--ink);cursor:pointer;text-shadow:1px 1px 0 #000;box-shadow:0 3px 0 var(--ink)}
 .tip{background:#ffd23a;border:3px solid var(--ink);padding:6px 8px;font-size:9px;line-height:1.7;margin-top:8px;color:#1a1440}
 
 /* brawler screen */
@@ -4873,7 +4873,7 @@ function renderFeatured(dt) {
 function renderEvents() {
   const box = $('#evBanner'); if (!box) return; box.innerHTML = '';
   const evs = Object.keys(MODES).filter(k => !MODES[k].hidden && eventMod(k)).slice(0, 3);
-  for (const k of evs) { const e = EVENT_MODS[eventMod(k)], b = document.createElement('button'); b.style.background = e.col; b.textContent = `${e.name}: ${MODES[k].name}`; b.title = e.desc;
+  for (const k of evs) { const e = EVENT_MODS[eventMod(k)], b = document.createElement('button'); b.style.background = e.col; b.textContent = `${{ meteor: 'Meteors', mushroom: 'Mushrooms', energy: 'Drinks' }[eventMod(k)]}: ${MODES[k].name}`; b.title = e.desc;
     b.onclick = () => { S.mode = k; save(); Sound.play('click'); renderHome(); }; box.appendChild(b); }
 }
 function renderHome() {
