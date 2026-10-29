@@ -455,6 +455,7 @@ input[type=text]{font-size:13px}
 .bcx-name small{display:block;font-size:10px;color:#ffc93a;margin-top:4px} .bcx-name small svg{width:12px;height:12px}
 .bcx-c1,.bcx-c2{position:absolute;bottom:8px;width:64px;height:auto;border:4px solid var(--ink);image-rendering:pixelated;background:#fff}
 .bcx-c1{left:8px} .bcx-c2{right:8px;height:56px;width:64px}
+.bdvoice{font-family:var(--display);font-size:10px;color:#ffd23a;text-shadow:2px 2px 0 #000;margin:0}
 </style>
 </head>
 <body>
@@ -584,6 +585,7 @@ input[type=text]{font-size:13px}
     <div class="set"><span>Bot difficulty</span><select id="setBots"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></div>
     <div class="set"><span>Mute everything</span><button class="toggle" id="setMute" aria-label="Mute"></button></div>
     <div class="set"><span>Screen shake</span><button class="toggle" id="setShake" aria-label="Screen shake"></button></div>
+    <div class="set"><span>Voice lines</span><button class="toggle" id="setVoice" aria-label="Voice lines"></button></div>
     <div class="set"><span>Damage numbers</span><button class="toggle" id="setNums" aria-label="Damage numbers"></button></div>
     <div class="set"><span>Tap attack button to auto-aim</span><button class="toggle" id="setAuto" aria-label="Auto aim"></button></div>
     <div class="set"><span>Show touch controls</span><select id="setTouch" style="font:inherit;font-size:16px;border:3px solid var(--ink);border-radius:10px;padding:4px 8px;background:#fff;color:var(--ink)"><option value="auto">Automatic</option><option value="on">Always</option><option value="off">Never</option></select></div>
@@ -787,6 +789,7 @@ const Sound = {
       case 'reveal': [392, 523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.22, 'square', 0.09 * v, null, i * 0.09)); this.noise(0.5, 0.08 * v, 3000); break;
       case 'dropTap': this.tone(300 + (vol * 100), 0.12, 'square', 0.12, 900 + vol * 200); break;
       case 'burst': this.noise(0.35, 0.25 * v, 2200); [523, 659, 784].forEach(f => this.tone(f, 0.4, 'triangle', 0.12 * v)); break;
+      case 'voice': { const base = v; for (let i = 0; i < 4; i++) this.tone(base * (0.85 + Math.random() * 0.4), 0.06, 'square', 0.05, null, i * 0.07); break; }
       case 'buy': [660, 880, 1100].forEach((f, i) => this.tone(f, 0.14, 'sine', 0.15 * v, null, i * 0.07)); break;
       case 'error': this.tone(200, 0.18, 'square', 0.1 * v, 140); break;
       case 'poison': this.tone(110, 0.2, 'sawtooth', 0.06 * v, 90); break;
@@ -828,7 +831,7 @@ function defaultSave() {
     brawlers: Object.fromEntries(BR_LIST.map(b => b.id).map(id => [id, { owned: ['shelly', 'nita', 'colt'].includes(id), level: 1, trophies: 0, gears: [], equipped: [], skins: [], skin: '', mastery: 0 }])),
     quests: [], questSeq: 0, passXp: 0, passClaimed: [], roadClaimed: [], bestTrophies: 0,
     stats: { matches: 0, wins: 0, kills: 0, damage: 0, goals: 0, gems: 0, supers: 0, showdownWins: 0, modeWins: { showdown: 0, gemgrab: 0, brawlball: 0, heist: 0, bounty: 0, hotzone: 0, knockout: 0, duo: 0, wipeout: 0, siege: 0, basket: 0, duels: 0, robo: 0, biggame: 0 }, gadgets: 0, stars: 0, starDrops: 0 },
-    settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
+    settings: { sfx: 0.8, music: 0.5, muted: false, shake: true, dmgNums: true, voices: true, autoAim: true, touch: 'auto', botDiff: 'normal' },
     lastGift: '', boxesOpened: 0, seenHelp: false, tutDone: false, login: { day: '', streak: 0, claimed: '' }, passBonus: 0, achClaimed: [], duelTeam: [], favs: [], log: [], ranked: { pts: 0, best: 0, claimed: [] }, titles: [], title: '',
     club: { name: 'Pixel Pals', members: [], chat: [], claimed: [] },
   };
@@ -1847,6 +1850,25 @@ const BRAWLER_TITLES = { shelly: 'Buckshot Boss', nita: 'Bear Buddy', colt: 'Sha
   bibi: 'Home Run Hitter', max: 'Speedster', tick: 'Tick Tock', barley: 'Bartender', sprout: 'Garden Guard', eightbit: 'Game Over', emz: 'Hairspray Star', gene: 'Wish Granter', rico: 'Bounce Master',
   darryl: 'Barrel Roller', penny: 'Treasure Hunter', carl: 'Rock Collector', bo: 'Eagle Eye', pam: 'Team Mom' };
 const TITLE_TROPHIES = 1000;
+// Voice lines written for this game: [match start, knockout, Super], plus a voice pitch for the 8-bit beeps
+const VOICE = {
+  shelly: [['Time to brawl!', 'Got you!', 'Shell shock!'], 520], nita: [['Bruce, let\'s go!', 'Rawr!', 'Get \'em, Bruce!'], 560],
+  colt: [['Fastest hands around!', 'Too slow!', 'Bullet storm!'], 480], bull: [['Out of my way!', 'Crushed!', 'Charge!'], 200],
+  primo: [['Into the ring!', 'Pinned!', 'Flying elbow!'], 240], poco: [['Let\'s make music!', 'Off-key!', 'Encore!'], 420],
+  brock: [['Rockets ready!', 'Boom!', 'Rocket rain!'], 300], jessie: [['Scrappy and me!', 'Zapped!', 'Build time!'], 640],
+  dynamike: [['Ka-boom time!', 'Blasted!', 'Big barrel!'], 260], spike: [['. . .', '!', '!!!'], 700],
+  rosa: [['Nature is strong!', 'Weeded out!', 'Leaf shield!'], 460], piper: [['Smile, darling!', 'Perfect shot!', 'Up and away!'], 600],
+  frank: [['HRRRM!', 'SMASH!', 'HAMMER TIME!'], 150], mortis: [['Night falls...', 'Rest in peace.', 'Bats, feast!'], 340],
+  leon: [['Now you see me...', 'Gotcha!', '...now you don\'t!'], 500], crow: [['Caw caw!', 'Poisoned!', 'Swooping in!'], 380],
+  edgar: [['Ugh, fine.', 'Whatever.', 'Leap!'], 360], bibi: [['Batter up!', 'Home run!', 'Bubble trouble!'], 560],
+  max: [['Gotta go fast!', 'Too slow!', 'Speed up, team!'], 660], tick: [['Tick tick tick!', 'Boom!', 'Heads up!'], 760],
+  barley: [['Your order?', 'Last call!', 'Drinks on me!'], 320], sprout: [['Grow, grow!', 'Planted!', 'Hedge wall!'], 720],
+  eightbit: [['PLAYER ONE READY', 'GAME OVER', 'POWER UP'], 280], emz: [['Ugh, so boring.', 'Like, whatever.', 'Toxic vibes!'], 540],
+  gene: [['Your wish?', 'Granted!', 'Come here!'], 330], rico: [['Bounce bounce!', 'Ricochet!', 'Trick shot!'], 680],
+  darryl: [['Yarr, let\'s roll!', 'Plundered!', 'Barrel roll!'], 250], penny: [['Treasure time!', 'That\'s mine!', 'Fire the cannon!'], 580],
+  carl: [['Rock and roll!', 'Rocked!', 'Spin cycle!'], 440], bo: [['Eyes sharp.', 'Bullseye.', 'Mines set.'], 230],
+  pam: [['Mama\'s here!', 'Behave!', 'Healing time!'], 400],
+};
 const LOGIN_REWARDS = [{ coins: 50 }, { gems: 5 }, { coins: 100 }, { drop: 0 }, { coins: 150 }, { gems: 15 }, { drop: 2 }];
 // ---------------- daily event modifiers ----------------
 const EVENT_MODS = { meteor: { name: 'Meteor Shower', desc: 'Meteors fall from the sky. Watch for the red circles!', col: '#ff7a1a' },
@@ -2835,6 +2857,11 @@ function doAttack(b, ang, aimDist) {
   fireAbility(b, b.def.attack, ang, aimDist, false);
   return true;
 }
+function say(b, kind, chance = 1) {
+  const V = VOICE[b.id]; if (!V || !b.alive || !S.settings.voices || Math.random() > chance || (b.sayCd || 0) > G.time) return;
+  b.say = { text: V[0][kind], t: 1.8 }; b.sayCd = G.time + 4;
+  if (b.isPlayer || isVisibleToPlayer(b)) Sound.play('voice', V[1] * (b.isPlayer ? 1 : 0.9));
+}
 function doSuper(b, ang, aimDist) {
   if (!canAct(b)) return false;
   if (G.ball && G.ball.holder === b) { if (b.cd > 0) return false; kickBall(b, ang, true); b.cd = 0.45; return true; }
@@ -2843,6 +2870,7 @@ function doSuper(b, ang, aimDist) {
   if (b.isPlayer) { G.stats.supers++; shake(5); }
   Sound.play('super', vol(b)); ringFx(b.x, b.y, 60, '#ffd23a', 0.35, 5);
   fireAbility(b, superStats(b), ang, aimDist, true);
+  say(b, 2, b.isPlayer ? 1 : 0.3);
   return true;
 }
 function fireAbility(b, A, ang, aimDist, isSuper) {
@@ -3077,6 +3105,7 @@ function killBrawler(b, killer) {
       textFx(b.x, b.y - 50, st, killer.streak > 1 ? '#ff7a1a' : '#ffd23a', 30 + Math.min(3, killer.streak - 1) * 6);
       if (killer.streak > 1) { G.bigText = { text: st, color: '#ff7a1a', t: 1.2 }; Sound.play('superReady'); }
     }
+    say(killer, 1, killer.isPlayer ? 1 : 0.35);
     if (killer.ai && Math.random() < 0.3) sendPin(killer, pick(['happy', 'laugh', 'gg', 'thumbs']));
   }
   if (b.ai && Math.random() < 0.3) sendPin(b, pick(['sad', 'angry']));
@@ -3490,12 +3519,12 @@ function updateEventMod(dt) {
 }
 function stepBattle(dt) {
   G.time += dt;
-  for (const b of G.brawlers) if (b.pin) { b.pin.t -= dt; if (b.pin.t <= 0) b.pin = null; }
+  for (const b of G.brawlers) { if (b.pin) { b.pin.t -= dt; if (b.pin.t <= 0) b.pin = null; } if (b.say) { b.say.t -= dt; if (b.say.t <= 0) b.say = null; } }
   if (G.intro > -1) {
     const was = G.intro; G.intro -= dt;
     const n = Math.ceil(G.intro / 0.6);
     if (n < G.introBeep && n >= 1) { G.introBeep = n; Sound.play('beep', 0.7); }
-    if (was > 0 && G.intro <= 0) Sound.play('go', 0.8);
+    if (was > 0 && G.intro <= 0) { Sound.play('go', 0.8); say(G.player, 0); }
   }
   if (G.goalPause > 0) { G.goalPause -= dt; if (G.goalPause <= 0 && !G.over && G.afterPause) { const f = G.afterPause; G.afterPause = null; f(); } }
   if (!G.over && G.intro <= 0 && G.goalPause <= 0) { readPlayerInput(dt); for (const b of G.brawlers) if (b.ai && b.alive) aiUpdate(b, dt); }
@@ -4432,6 +4461,12 @@ function render() {
     if (!b.isPlayer) txt(ctx, b.name, s.x, s.y - 16, 7, b.team === p.team ? '#bfe2ff' : '#ffc2c8', 'center', 3);
     if (G.mode === 'gemgrab' && b.gems > 0) txt(ctx, b.gems, s.x + 4 * k, s.y - 29, 8, '#f2d2ff', 'left', 3);
     if (G.mode === 'bounty') txt(ctx, b.bounty, s.x + 4 * k, s.y - 28, 8, '#ffe040', 'left', 3);
+    if (b.say && !b.pin) {
+      const tw = Math.min(260, b.say.text.length * 7 + 14), by = s.y - (b.isPlayer ? 26 : 38);
+      ctx.fillStyle = '#0d0b1e'; ctx.fillRect(s.x - tw / 2 - 3, by - 21, tw + 6, 22); ctx.fillStyle = '#fff'; ctx.fillRect(s.x - tw / 2, by - 18, tw, 16);
+      ctx.fillStyle = '#0d0b1e'; ctx.fillRect(s.x - 4, by + 1, 8, 4); ctx.fillStyle = '#fff'; ctx.fillRect(s.x - 2, by - 2, 4, 4);
+      txt(ctx, b.say.text, s.x, by - 10, 7, '#1a1440', 'center', 0);
+    }
     if (b.pin && b.pin.t > 0) {
       const pop = Math.min(1, (2.2 - b.pin.t) * 6), sz = Math.round(52 * pop), py = s.y - (b.isPlayer ? 22 : 34) - sz;
       ctx.fillStyle = '#0d0b1e'; ctx.fillRect(s.x - sz / 2 - 3, py - 3, sz + 6, sz + 6); ctx.fillStyle = '#fff'; ctx.fillRect(s.x - sz / 2, py, sz, sz);
@@ -5026,7 +5061,7 @@ function renderDetail() {
     <div class="bdl">
       <div class="bdname"><b>${d.name.toUpperCase()}</b><span>${d.role.toUpperCase()}</span><i style="color:${c1}">${d.rarity.toUpperCase()}</i></div>
       <div class="bdtro"><span class="bdrank">${rank}</span><div class="bdtbar"><i style="width:${st.owned ? (rank >= 35 ? 100 : Math.min(100, (st.trophies - rFrom) / (rTo - rFrom) * 100)) : 0}%"></i><b>${icon('trophy')} ${rank >= 35 ? `${st.trophies} MAX RANK` : `${st.trophies}/${rTo}`}</b></div></div>
-      <p class="bdblurb">${d.blurb}</p>${TIPS[id] ? `<p class="tip"><b>TIP:</b> ${TIPS[id]}</p>` : ''}
+      <p class="bdblurb">${d.blurb}</p>${VOICE[id] ? `<p class="bdvoice">"${VOICE[id][0][0]}"</p>` : ''}${TIPS[id] ? `<p class="tip"><b>TIP:</b> ${TIPS[id]}</p>` : ''}
       <div class="bdicons"><button class="bdic" data-tab="info" aria-label="Brawler info">${pxi('info')}</button><button class="bdic" data-tab="pins" aria-label="Pins">${pxi('smile')}</button><button class="bdic" data-tab="skins" aria-label="Skins">${pxi('shirt')}</button><button class="bdic" data-tab="card" aria-label="Battle card">${pxi('card')}</button></div>
       <div class="bdbtns" id="dBtns"></div>
     </div>
@@ -5353,7 +5388,7 @@ function renderClub() {
 function syncSettings() {
   const st = S.settings;
   $('#setSfx').value = Math.round(st.sfx * 100); $('#setMusic').value = Math.round(st.music * 100); $('#setBots').value = st.botDiff || 'normal';
-  $('#setMute').classList.toggle('on', st.muted); $('#setShake').classList.toggle('on', st.shake); $('#setNums').classList.toggle('on', st.dmgNums); $('#setAuto').classList.toggle('on', st.autoAim);
+  $('#setMute').classList.toggle('on', st.muted); $('#setShake').classList.toggle('on', st.shake); $('#setNums').classList.toggle('on', st.dmgNums); $('#setVoice').classList.toggle('on', st.voices !== false); $('#setAuto').classList.toggle('on', st.autoAim);
   $('#setTouch').value = st.touch;
   $('#pSound').textContent = st.muted ? 'Sound: off' : 'Sound: on';
   Sound.apply();
@@ -5641,7 +5676,7 @@ function bindUI() {
   $('#setBots').onchange = e => { S.settings.botDiff = e.target.value; save(); };
   $('#setMusic').oninput = e => { S.settings.music = e.target.value / 100; Sound.apply(); save(); };
   const tog = (id, key) => $(id).onclick = () => { S.settings[key] = !S.settings[key]; save(); syncSettings(); };
-  tog('#setMute', 'muted'); tog('#setShake', 'shake'); tog('#setNums', 'dmgNums'); tog('#setAuto', 'autoAim');
+  tog('#setMute', 'muted'); tog('#setShake', 'shake'); tog('#setNums', 'dmgNums'); tog('#setVoice', 'voices'); tog('#setAuto', 'autoAim');
   $('#setTouch').onchange = e => { S.settings.touch = e.target.value; save(); };
   $('#setReset').onclick = () => confirmBox('Reset everything?', 'All trophies, brawlers, coins and quests go back to the start. This cannot be undone.', 'Reset', () => {
     const keepSettings = S.settings; S = defaultSave(); S.settings = keepSettings; ensureQuests(); save(); $('#ov-settings').hidden = true; if (G) { G = null; } $('#ov-pause').hidden = true; show('menu'); toast('Progress reset');
