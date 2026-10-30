@@ -456,6 +456,7 @@ input[type=text]{font-size:13px}
 .bcx-c1,.bcx-c2{position:absolute;bottom:8px;width:64px;height:auto;border:4px solid var(--ink);image-rendering:pixelated;background:#fff}
 .bcx-c1{left:8px} .bcx-c2{right:8px;height:56px;width:64px}
 .bdvoice{font-family:var(--display);font-size:10px;color:#ffd23a;text-shadow:2px 2px 0 #000;margin:0}
+.rvoice{text-align:center;font-family:var(--display);font-size:11px;color:#ffd23a;text-shadow:2px 2px 0 #000;margin:4px 0 8px}
 </style>
 </head>
 <body>
@@ -1850,24 +1851,24 @@ const BRAWLER_TITLES = { shelly: 'Buckshot Boss', nita: 'Bear Buddy', colt: 'Sha
   bibi: 'Home Run Hitter', max: 'Speedster', tick: 'Tick Tock', barley: 'Bartender', sprout: 'Garden Guard', eightbit: 'Game Over', emz: 'Hairspray Star', gene: 'Wish Granter', rico: 'Bounce Master',
   darryl: 'Barrel Roller', penny: 'Treasure Hunter', carl: 'Rock Collector', bo: 'Eagle Eye', pam: 'Team Mom' };
 const TITLE_TROPHIES = 1000;
-// Voice lines written for this game: [match start, knockout, Super], plus a voice pitch for the 8-bit beeps
+// Voice lines written for this game: [match start, knockout, Super, win, lose], plus a voice pitch for the 8-bit beeps
 const VOICE = {
-  shelly: [['Time to brawl!', 'Got you!', 'Shell shock!'], 520], nita: [['Bruce, let\'s go!', 'Rawr!', 'Get \'em, Bruce!'], 560],
-  colt: [['Fastest hands around!', 'Too slow!', 'Bullet storm!'], 480], bull: [['Out of my way!', 'Crushed!', 'Charge!'], 200],
-  primo: [['Into the ring!', 'Pinned!', 'Flying elbow!'], 240], poco: [['Let\'s make music!', 'Off-key!', 'Encore!'], 420],
-  brock: [['Rockets ready!', 'Boom!', 'Rocket rain!'], 300], jessie: [['Scrappy and me!', 'Zapped!', 'Build time!'], 640],
-  dynamike: [['Ka-boom time!', 'Blasted!', 'Big barrel!'], 260], spike: [['. . .', '!', '!!!'], 700],
-  rosa: [['Nature is strong!', 'Weeded out!', 'Leaf shield!'], 460], piper: [['Smile, darling!', 'Perfect shot!', 'Up and away!'], 600],
-  frank: [['HRRRM!', 'SMASH!', 'HAMMER TIME!'], 150], mortis: [['Night falls...', 'Rest in peace.', 'Bats, feast!'], 340],
-  leon: [['Now you see me...', 'Gotcha!', '...now you don\'t!'], 500], crow: [['Caw caw!', 'Poisoned!', 'Swooping in!'], 380],
-  edgar: [['Ugh, fine.', 'Whatever.', 'Leap!'], 360], bibi: [['Batter up!', 'Home run!', 'Bubble trouble!'], 560],
-  max: [['Gotta go fast!', 'Too slow!', 'Speed up, team!'], 660], tick: [['Tick tick tick!', 'Boom!', 'Heads up!'], 760],
-  barley: [['Your order?', 'Last call!', 'Drinks on me!'], 320], sprout: [['Grow, grow!', 'Planted!', 'Hedge wall!'], 720],
-  eightbit: [['PLAYER ONE READY', 'GAME OVER', 'POWER UP'], 280], emz: [['Ugh, so boring.', 'Like, whatever.', 'Toxic vibes!'], 540],
-  gene: [['Your wish?', 'Granted!', 'Come here!'], 330], rico: [['Bounce bounce!', 'Ricochet!', 'Trick shot!'], 680],
-  darryl: [['Yarr, let\'s roll!', 'Plundered!', 'Barrel roll!'], 250], penny: [['Treasure time!', 'That\'s mine!', 'Fire the cannon!'], 580],
-  carl: [['Rock and roll!', 'Rocked!', 'Spin cycle!'], 440], bo: [['Eyes sharp.', 'Bullseye.', 'Mines set.'], 230],
-  pam: [['Mama\'s here!', 'Behave!', 'Healing time!'], 400],
+  shelly: [['Time to brawl!', 'Got you!', 'Shell shock!', 'That\'s how it\'s done!', 'I\'ll get you next time.'], 520], nita: [['Bruce, let\'s go!', 'Rawr!', 'Get \'em, Bruce!', 'Bruce, we did it!', 'Bruce, I\'m tired...'], 560],
+  colt: [['Fastest hands around!', 'Too slow!', 'Bullet storm!', 'Never missed a shot!', 'My aim was off...'], 480], bull: [['Out of my way!', 'Crushed!', 'Charge!', 'Who\'s the boss now?', 'Grrr... not fair!'], 200],
+  primo: [['Into the ring!', 'Pinned!', 'Flying elbow!', 'The champion wins!', 'I\'ll train harder!'], 240], poco: [['Let\'s make music!', 'Off-key!', 'Encore!', 'What a show!', 'Wrong note...'], 420],
+  brock: [['Rockets ready!', 'Boom!', 'Rocket rain!', 'Rockets for the win!', 'Out of rockets...'], 300], jessie: [['Scrappy and me!', 'Zapped!', 'Build time!', 'Scrappy, high five!', 'Back to the workshop.'], 640],
+  dynamike: [['Ka-boom time!', 'Blasted!', 'Big barrel!', 'What a blast!', 'Fizzled out...'], 260], spike: [['. . .', '!', '!!!', '!!!', '...'], 700],
+  rosa: [['Nature is strong!', 'Weeded out!', 'Leaf shield!', 'Strong as a tree!', 'Even trees fall...'], 460], piper: [['Smile, darling!', 'Perfect shot!', 'Up and away!', 'Simply perfect!', 'How rude!'], 600],
+  frank: [['HRRRM!', 'SMASH!', 'HAMMER TIME!', 'HRRM! WIN!', 'hrrm... lost...'], 150], mortis: [['Night falls...', 'Rest in peace.', 'Bats, feast!', 'The night is mine.', 'I shall return...'], 340],
+  leon: [['Now you see me...', 'Gotcha!', '...now you don\'t!', 'Didn\'t see me coming!', 'They saw me...'], 500], crow: [['Caw caw!', 'Poisoned!', 'Swooping in!', 'Caw! Victory!', 'Caw... defeat.'], 380],
+  edgar: [['Ugh, fine.', 'Whatever.', 'Leap!', 'Cool. I guess.', 'Ugh. Whatever.'], 360], bibi: [['Batter up!', 'Home run!', 'Bubble trouble!', 'Out of the park!', 'Strike three...'], 560],
+  max: [['Gotta go fast!', 'Too slow!', 'Speed up, team!', 'Fastest win ever!', 'Too slow today...'], 660], tick: [['Tick tick tick!', 'Boom!', 'Heads up!', 'Tick tock, I win!', 'Fizz... boom...'], 760],
+  barley: [['Your order?', 'Last call!', 'Drinks on me!', 'Drinks for everyone!', 'Bar\'s closed...'], 320], sprout: [['Grow, grow!', 'Planted!', 'Hedge wall!', 'Garden grows!', 'Wilted...'], 720],
+  eightbit: [['PLAYER ONE READY', 'GAME OVER', 'POWER UP', 'HIGH SCORE', 'INSERT COIN'], 280], emz: [['Ugh, so boring.', 'Like, whatever.', 'Toxic vibes!', 'Okay, that was fun.', 'So embarrassing.'], 540],
+  gene: [['Your wish?', 'Granted!', 'Come here!', 'Wish come true!', 'No more wishes...'], 330], rico: [['Bounce bounce!', 'Ricochet!', 'Trick shot!', 'Bouncing with joy!', 'Out of bounce...'], 680],
+  darryl: [['Yarr, let\'s roll!', 'Plundered!', 'Barrel roll!', 'Treasure is ours!', 'Sunk...'], 250], penny: [['Treasure time!', 'That\'s mine!', 'Fire the cannon!', 'All the gold is mine!', 'My treasure...'], 580],
+  carl: [['Rock and roll!', 'Rocked!', 'Spin cycle!', 'Rocks rule!', 'Rock bottom...'], 440], bo: [['Eyes sharp.', 'Bullseye.', 'Mines set.', 'The eagle wins.', 'Missed the mark.'], 230],
+  pam: [['Mama\'s here!', 'Behave!', 'Healing time!', 'That\'s my team!', 'Everyone, home now.'], 400],
 };
 const LOGIN_REWARDS = [{ coins: 50 }, { gems: 5 }, { coins: 100 }, { drop: 0 }, { coins: 150 }, { gems: 15 }, { drop: 2 }];
 // ---------------- daily event modifiers ----------------
@@ -3475,6 +3476,8 @@ const teamGems = team => G.brawlers.reduce((a, b) => a + (b.team === team && b.a
 function endMatch(result, rank) {
   if (G.over) return;
   G.over = { result, rank: rank || 0 }; G.endT = 2.2;
+  // the player's brawler reacts to winning or losing
+  if (G.player && VOICE[G.player.id] && S.settings.voices) { G.player.sayCd = 0; say(G.player, result === 'win' ? 3 : 4); if (!G.player.alive) Sound.play('voice', VOICE[G.player.id][1]); }
   const txt = isSD(G.mode) ? (rank === 1 ? 'VICTORY!' : `#${rank}`) : result === 'win' ? 'VICTORY!' : result === 'lose' ? 'DEFEAT' : 'DRAW';
   G.bigText = { text: txt, color: result === 'win' ? '#ffd23a' : result === 'lose' ? '#ff6a6a' : '#c9d2ff', t: 3 };
   for (const b of G.brawlers) { b.mx = b.my = 0; }
@@ -5504,7 +5507,7 @@ function finishMatch() {
   const cls = win ? 'win' : res === 'draw' ? 'draw' : 'lose';
   $('#resultBody').innerHTML = `
     <p class="result-banner stroke ${cls}">${banner}</p>
-    <p class="rsub">${MODES[g.mode].name} · ${g.map.name} · ${sub}</p>
+    <p class="rsub">${MODES[g.mode].name} · ${g.map.name} · ${sub}</p>${VOICE[pid] && !g.quit ? `<p class="rvoice">${BR[pid].name}: "${VOICE[pid][0][win ? 3 : 4]}"</p>` : ''}
     <div class="result-row"><canvas class="rp" width="300" height="300"></canvas>
       <div class="rewards">
         <div class="rw-line">${icon('trophy')} <span>${dTro >= 0 ? '+' : ''}${dTro}</span><span style="margin-left:auto;font-size:15px;opacity:.85">${BR[pid].name}: ${bs.trophies}</span></div>
