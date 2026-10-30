@@ -586,6 +586,7 @@ input[type=text]{font-size:13px}
     <div class="set"><span>Bot difficulty</span><select id="setBots"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></div>
     <div class="set"><span>Mute everything</span><button class="toggle" id="setMute" aria-label="Mute"></button></div>
     <div class="set"><span>Screen shake</span><button class="toggle" id="setShake" aria-label="Screen shake"></button></div>
+    <div class="set"><span>Secret code</span><span class="row" style="gap:6px"><input type="text" id="setCode" maxlength="20" placeholder="Brawler name" aria-label="Secret code"><button class="btn small green" id="setCodeGo">Go</button></span></div>
     <div class="set"><span>Voice lines</span><button class="toggle" id="setVoice" aria-label="Voice lines"></button></div>
     <div class="set"><span>Damage numbers</span><button class="toggle" id="setNums" aria-label="Damage numbers"></button></div>
     <div class="set"><span>Tap attack button to auto-aim</span><button class="toggle" id="setAuto" aria-label="Auto aim"></button></div>
@@ -1961,11 +1962,11 @@ const ROAD = [
   { t: 1650, brawler: 'rico' }, { t: 1750, brawler: 'darryl' }, { t: 1850, brawler: 'penny' }, { t: 1900, brawler: 'carl' }, { t: 2100, brawler: 'bo' }, { t: 2200, brawler: 'pam' }, { t: 2300, drop: 3 }, { t: 2500, gems: 150 },
 ];
 const STAR_DROPS = [
-  { name: 'Rare', col: '#5ad84a', w: 50, rewards: [{ coins: 30 }, { coins: 40 }, { gems: 2 }] },
-  { name: 'Super Rare', col: '#3a8aff', w: 28, rewards: [{ coins: 70 }, { gems: 5 }, { coins: 90 }] },
-  { name: 'Epic', col: '#c050ff', w: 15, rewards: [{ coins: 150 }, { gems: 12 }] },
-  { name: 'Mythic', col: '#ff4a6a', w: 5, rewards: [{ coins: 300 }, { gems: 25 }, { brawlerRandom: true }] },
-  { name: 'Legendary', col: '#ffb81a', w: 2, rewards: [{ brawlerRandom: true }, { coins: 600 }] },
+  { name: 'Rare', col: '#5ad84a', w: 44, rewards: [{ coins: 50 }, { coins: 70 }, { gems: 3 }, { xp: 50 }] },
+  { name: 'Super Rare', col: '#3a8aff', w: 30, rewards: [{ coins: 120 }, { coins: 150 }, { gems: 8 }, { xp: 100 }] },
+  { name: 'Epic', col: '#c050ff', w: 16, rewards: [{ coins: 250 }, { gems: 15 }, { skin: true }, { upgrade: true }, { xp: 200 }] },
+  { name: 'Mythic', col: '#ff4a6a', w: 7, rewards: [{ coins: 500 }, { gems: 30 }, { skin: true }, { upgrade: true }, { brawlerRandom: true }] },
+  { name: 'Legendary', col: '#ffb81a', w: 3, rewards: [{ brawlerRandom: true }, { brawlerRandom: true }, { coins: 1000 }, { gems: 60 }, { skin: true }] },
 ];
 
 function makeQuest() {
@@ -4882,6 +4883,9 @@ function grant(r, silent) {
     else { b.owned = true; out.push(`new brawler ${BR[r.brawler].name}!`); fxQueue({ type: 'unlock', id: r.brawler }); }
   }
   if (r.drop !== undefined) { out.push(`a ${STAR_DROPS[r.drop].name} Star Drop`); fxQueue({ type: 'drop', min: r.drop }); }
+  if (r.xp) { S.passXp += r.xp; out.push(`${r.xp} pass XP`); checkPassBonus(); }
+  if (r.skinOf) { const st = S.brawlers[r.skinOf]; st.skins = st.skins || []; if (!st.skins.includes(r.skinId)) st.skins.push(r.skinId); out.push(`${skinName(r.skinOf, r.skinId)} ${BR[r.skinOf].name} skin`); }
+  if (r.upgradeOf) { const st = S.brawlers[r.upgradeOf]; st.level = Math.min(MAX_LEVEL, st.level + 1); out.push(`${BR[r.upgradeOf].name} is now Power ${st.level}`); }
   save(); updateWallet();
   if (!silent) { Sound.play('buy'); toast('You got ' + out.join(' + ')); }
   return out;
@@ -5275,7 +5279,7 @@ function renderQuests() {
 }
 
 // ---------------- pass / road ----------------
-function rewardCanvas(c, r) { const x = 22, y = 22; if (r.drop !== undefined) { c.setTransform(1, 0, 0, 1, 0, 0); drawDropStar(c.canvas); } else if (r.brawler) { c.setTransform(1, 0, 0, 1, 0, 0); drawPortrait(c.canvas, r.brawler, { scale: 2.4 }); } else if (r.coins) drawCoinIcon(c, x, y, 16); else drawGem(c, x, y, 1.6, 0); }
+function rewardCanvas(c, r) { const x = 22, y = 22; if (r.skinOf || r.upgradeOf) { c.setTransform(1, 0, 0, 1, 0, 0); drawPortrait(c.canvas, r.skinOf || r.upgradeOf, { scale: 2.4, skin: r.skinId || '' }); return; } if (r.xp) { drawSpr(c, 'star', x, y + 4, 4, true); return; } if (r.drop !== undefined) { c.setTransform(1, 0, 0, 1, 0, 0); drawDropStar(c.canvas); } else if (r.brawler) { c.setTransform(1, 0, 0, 1, 0, 0); drawPortrait(c.canvas, r.brawler, { scale: 2.4 }); } else if (r.coins) drawCoinIcon(c, x, y, 16); else drawGem(c, x, y, 1.6, 0); }
 function renderPass() {
   const B = $('#passBody'), tab = App.passTab;
   $('#passTitle').textContent = tab === 'pass' ? 'Brawl Pass' : 'Trophy Road';
@@ -5604,18 +5608,20 @@ function fxDrop(min) {
     if (taps >= need) return;
     taps++;
     if (taps < need) {
-      if (lvl < STAR_DROPS.length - 1 && Math.random() < 0.22) { lvl++; Sound.play('reveal'); btn.classList.remove('up'); void btn.offsetWidth; btn.classList.add('up'); }
+      if (lvl < STAR_DROPS.length - 1 && Math.random() < 0.3) { lvl++; Sound.play('reveal'); btn.classList.remove('up'); void btn.offsetWidth; btn.classList.add('up'); }
       else Sound.play('dropTap', taps);
       btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
       paint(); $('#fxHint').textContent = `Tap ${need - taps} more!`; return;
     }
     const D = STAR_DROPS[lvl]; let rw = { ...pick(D.rewards) };
     if (rw.brawlerRandom) { const lk = BR_LIST.filter(b => !S.brawlers[b.id].owned); rw = lk.length ? { brawler: pick(lk).id } : { coins: 400 }; }
+    if (rw.skin) { const opts = BR_LIST.filter(b => S.brawlers[b.id].owned).flatMap(b => (SPECIAL_SKINS[b.id] || []).filter(k => !(S.brawlers[b.id].skins || []).includes(k.id)).map(k => ({ skinOf: b.id, skinId: k.id }))); rw = opts.length ? pick(opts) : { coins: 300 }; }
+    if (rw.upgrade) { const opts = BR_LIST.filter(b => S.brawlers[b.id].owned && S.brawlers[b.id].level < MAX_LEVEL); rw = opts.length ? { upgradeOf: pick(opts).id } : { coins: 300 }; }
     btn.classList.add('burst'); Sound.play('burst');
     setTimeout(() => {
       const got = grant(rw, true); S.stats.starDrops = (S.stats.starDrops || 0) + 1; save();
       btn.hidden = true; $('#fxHint').textContent = '';
-      $('#fxOut').innerHTML = `<canvas class="fxrw" width="132" height="132"></canvas><div class="fxname">${rw.brawler ? 'NEW BRAWLER!' : rw.coins ? `${fmt(rw.coins)} COINS` : `${fmt(rw.gems)} GEMS`}</div>${rw.brawler ? `<p class="fxinfo">${got.join(' + ')}</p>` : ''}<button class="btn green" id="fxGo">${rw.brawler ? 'See brawler' : 'Collect'}</button>`;
+      $('#fxOut').innerHTML = `<canvas class="fxrw" width="132" height="132"></canvas><div class="fxname">${rw.brawler ? 'NEW BRAWLER!' : rw.skinOf ? 'NEW SKIN!' : rw.upgradeOf ? 'POWER UP!' : rw.xp ? `${fmt(rw.xp)} PASS XP` : rw.coins ? `${fmt(rw.coins)} COINS` : `${fmt(rw.gems)} GEMS`}</div>${rw.brawler || rw.skinOf || rw.upgradeOf ? `<p class="fxinfo">${got.join(' + ')}</p>` : ''}<button class="btn green" id="fxGo">${rw.brawler ? 'See brawler' : 'Collect'}</button>`;
       const rc = $('#fxOut canvas').getContext('2d'); if (rw.brawler) rc.canvas.style.display = 'none'; else { rc.scale(3, 3); rewardCanvas(rc, rw); }
       $('#fxGo').onclick = () => { Sound.play('click'); fxNext(); };
     }, 420);
@@ -5650,6 +5656,15 @@ function renderRoad() {
 function goHome() { G = null; show('menu'); Sound.music('menu'); }
 
 // ---------------- wiring ----------------
+// secret code: type the name of a brawler in the game to unlock them
+function useCode() {
+  const norm = t => t.toLowerCase().replace(/[^a-z0-9]/g, ''), v = norm($('#setCode').value);
+  if (!v) return;
+  const d = BR_LIST.find(b => norm(b.name) === v || b.id === v);
+  if (!d) { Sound.play('error'); toast('No brawler with that name in this game.'); return; }
+  if (S.brawlers[d.id].owned) { toast(`You already have ${d.name}!`); return; }
+  $('#setCode').value = ''; $('#ov-settings').hidden = true; grant({ brawler: d.id }, true);
+}
 function bindUI() {
   document.addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) Sound.play('click'); });
   const unlock = () => { Sound.init(); Sound.resume(); Sound.music(App.screen === 'battle' ? 'battle' : 'menu'); };
@@ -5662,6 +5677,7 @@ function bindUI() {
   $('#featured').onclick = () => { App.detailId = S.selected; show('detail'); };
   $('#playBtn').onclick = startMatch;
   $('#btnPause').onclick = () => togglePause(true);
+  $('#setCodeGo').onclick = useCode; $('#setCode').onkeydown = e => { if (e.key === 'Enter') useCode(); };
   $('#bdClose').onclick = () => { $('#ov-bd').hidden = true; if (App.screen === 'detail') renderDetail(); };
   $('#btnPin').innerHTML = pxi('smile'); $('#btnPin').onclick = () => togglePins();
 
