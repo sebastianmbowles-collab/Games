@@ -82,6 +82,7 @@ body.touch.playing #touch{display:block}
 const TAU = Math.PI * 2;
 const H = 540, GROUND = 450, BMAX = 340, JUMPV = 790;
 const FOOD_GOAL = 200;
+const CHASE_MAX = 450; // top speed while the fox is chasing
 const FL = 352; // burrow floor
 const VAL = { carrot: 1, berry: 1, apple: 3, gold: 10 };
 const cv = document.getElementById('c');
@@ -202,11 +203,27 @@ function drawEye(c, x, y, p) {
     c.fillStyle = '#1d120c'; c.beginPath(); c.ellipse(x + 1 + lk, y, 2, 2.5 * open, 0, 0, TAU); c.fill();
     c.fillStyle = '#fff'; c.beginPath(); c.arc(x + 1.6 + lk, y - 1, 0.8, 0, TAU); c.fill();
   } else {
-    c.fillStyle = '#1d120c'; c.beginPath(); c.ellipse(x + lk, y, 3.6, 4.6 * open, 0, 0, TAU); c.fill();
-    c.fillStyle = '#fff'; c.beginPath(); c.arc(x + 1.2 + lk, y - 1.8 * open, 1.4, 0, TAU); c.fill();
-    c.globalAlpha *= 0.7; c.beginPath(); c.arc(x - 1 + lk, y + 1.6 * open, 0.7, 0, TAU); c.fill();
+    const ex = x + lk;
+    c.fillStyle = '#1d120c'; c.beginPath(); c.ellipse(ex, y, 3.9, 4.9 * open, 0, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(140,82,44,.9)'; c.beginPath(); c.ellipse(ex + 0.3, y + 1.5 * open, 2.6, 2.3 * open, 0, 0, TAU); c.fill();
+    c.fillStyle = '#0b0604'; c.beginPath(); c.ellipse(ex + 0.4, y + 0.2, 1.7, 2.4 * open, 0, 0, TAU); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(ex + 1.3, y - 1.9 * open, 1.55, 0, TAU); c.fill();
+    c.globalAlpha *= 0.85; c.beginPath(); c.arc(ex - 1.2, y + 2 * open, 0.75, 0, TAU); c.fill();
   }
   c.restore();
+  if (e !== 'wide') { c.beginPath(); c.moveTo(x + 2.4 + lk, y - 4.5 * open); c.quadraticCurveTo(x + 4.6 + lk, y - 5.8 * open, x + 5.8 + lk, y - 5 * open); inkStroke(c, 1, 0.75); }
+}
+// little fluffy tufts poking out of an outline
+function furTufts(c, cx, cy, rx, ry, angs, fill, len = 5, wd = 3.4, ink = 0.6) {
+  for (const a of angs) {
+    const nx = Math.cos(a), ny = Math.sin(a), px = cx + nx * rx, py = cy + ny * ry, tx = -ny, ty = nx;
+    const b1x = px - tx * wd - nx * 1.5, b1y = py - ty * wd - ny * 1.5, b2x = px + tx * wd - nx * 1.5, b2y = py + ty * wd - ny * 1.5;
+    const tipx = px + nx * len + tx * 1.6, tipy = py + ny * len + ty * 1.6;
+    c.beginPath(); c.moveTo(b1x, b1y); c.quadraticCurveTo(px + nx * 2.5 - tx, py + ny * 2.5 - ty, tipx, tipy); c.quadraticCurveTo(px + nx * 1.2 + tx * 2, py + ny * 1.2 + ty * 2, b2x, b2y); c.closePath();
+    c.fillStyle = fill; c.fill();
+    c.beginPath(); c.moveTo(b1x + nx, b1y + ny); c.quadraticCurveTo(px + nx * 2.5 - tx, py + ny * 2.5 - ty, tipx, tipy); c.quadraticCurveTo(px + nx * 1.2 + tx * 2, py + ny * 1.2 + ty * 2, b2x + nx, b2y + ny);
+    inkStroke(c, 0.9, ink);
+  }
 }
 function mouth(c, m, x, y) {
   if (!m) return;
@@ -246,6 +263,7 @@ function drawBunny(c, x, y, o) {
   blob(c, 8, -15, 8.5, 10, sd + 5, 7, 0.1, 16); c.fillStyle = pal.belly; c.fill();
   c.save(); c.strokeStyle = pal.dark; c.lineWidth = 1; c.globalAlpha *= 0.7; c.beginPath();
   c.moveTo(-14, -26); c.lineTo(-12, -23); c.moveTo(-8, -30); c.lineTo(-7, -27); c.moveTo(-19, -14); c.lineTo(-16, -13); c.stroke(); c.restore();
+  furTufts(c, -3, -18, 19, 15, [-2.65, -2.1, -1.35, 2.45], pal.fur, 3.2, 2.6, 0.35);
   // near back foot + front paw
   paint(c, () => { c.beginPath(); c.ellipse(-8 + bx, -3 + by, 10, 3.8, p.bfr || 0, 0, TAU); }, pal.light, 1.5);
   paint(c, () => { c.beginPath(); c.ellipse(11 + fx, -3 + fy, 4.6, 3.6, 0, 0, TAU); }, pal.light, 1.4);
@@ -253,6 +271,7 @@ function drawBunny(c, x, y, o) {
   c.save(); c.translate(13, -33); c.rotate(p.head || 0);
   ear(c, -5, -9, (p.ear ?? -0.2) - 0.14, 26, 6.2, pal.dark, shade(pal.inner, -0.2), sd + 1);
   paint(c, () => blob(c, 0, 0, 13, 12, sd + 6, 9, 0.06, 22), rgrad(c, -4, -5, 18, pal.hi, pal.fur), 1.9);
+  furTufts(c, 0, 0, 13, 12, [-1.75, 2.75], pal.fur, 3.2, 2.6, 0.35);
   blob(c, 8, 4, 6.5, 5, sd + 7, 6, 0.08, 14); c.fillStyle = pal.belly; c.fill();
   c.fillStyle = 'rgba(240,130,130,.35)'; c.beginPath(); c.ellipse(3.5, 5, 3.5, 2.3, 0, 0, TAU); c.fill();
   drawEye(c, 3, -2, p);
@@ -281,6 +300,7 @@ function foxLeg(c, hx, hy, a, col) {
   c.beginPath(); c.moveTo(hx, hy); c.lineTo(k1x, k1y); c.lineTo(px, py);
   c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = INK; c.lineWidth = 8.5; c.stroke();
   c.strokeStyle = col; c.lineWidth = 5.5; c.stroke();
+  c.beginPath(); c.moveTo(lerp(k1x, px, 0.2), lerp(k1y, py, 0.2)); c.lineTo(px, py); c.strokeStyle = FOX.leg; c.lineWidth = 5.5; c.stroke();
   c.fillStyle = FOX.leg; c.beginPath(); c.ellipse(px + 2, py - 1, 4.5, 2.6, 0, 0, TAU); c.fill();
 }
 // o = { dir, ph, mode: run|stand|crouch|pounce|sniff|dizzy|hide, jaw, lift, duck, t }
@@ -309,12 +329,16 @@ function drawFox(c, x, y, o) {
     const px = iu * iu * tb[0] + 2 * iu * u * tc[0] + u * u * te[0], py = iu * iu * tb[1] + 2 * iu * u * tc[1] + u * u * te[1];
     paint(c, () => blob(c, px, py, R[i], R[i] * 0.85, 40 + i, 7, 0.12, 14), i === R.length - 1 ? FOX.cream : mix(FOX.body, FOX.dark, 0.2 + u * 0.2), 1.6);
   }
+  c.save(); c.globalAlpha *= 0.4; c.strokeStyle = FOX.dark; c.lineWidth = 1.2; c.beginPath();
+  for (let k = -1; k <= 1; k++) { c.moveTo(tb[0] - 6, tb[1] + k * 4); c.quadraticCurveTo(tc[0], tc[1] + k * 6, te[0] + 10, te[1] + k * 4); } c.stroke(); c.restore();
   foxLeg(c, 24, -32, legs[1], FOX.dark); foxLeg(c, -24, -33, legs[3], FOX.dark);
   c.save(); c.scale(stretch, 1);
   paint(c, () => blob(c, 0, -37, 38, 15, 31, 10, 0.05, 26), lgrad(c, 0, -54, 0, -22, [[0, FOX.dark], [0.45, FOX.body], [1, '#d9774a']]), 2);
   blob(c, 14, -30, 18, 7.5, 33, 7, 0.08, 16); c.fillStyle = FOX.cream; c.fill();
   c.save(); c.strokeStyle = FOX.dark; c.globalAlpha *= 0.6; c.lineWidth = 1.2; c.beginPath();
   for (let i = 0; i < 5; i++) { c.moveTo(-22 + i * 9, -47); c.lineTo(-19 + i * 9, -43); } c.stroke(); c.restore();
+  furTufts(c, 0, -37, 38, 15, [-2.1, -1.75, -1.4], FOX.dark, 5);
+  furTufts(c, 26, -33, 10, 9, [-0.2, 0.35, 0.9], FOX.cream, 5);
   c.restore();
   foxLeg(c, 26, -31, legs[0], FOX.body); foxLeg(c, -21, -33, legs[2], FOX.body);
   // head
@@ -529,7 +553,7 @@ function musicTick() {
 //  Carrot Meadows: the level
 // ---------------------------------------------------------------------
 function buildLevel() {
-  const L = { solids: [], hazards: [], ledges: [], streams: [], items: [], signs: [], secrets: [], CHASE_X: 5050, GOAL: 12150, FINAL_X: 11550 };
+  const L = { solids: [], hazards: [], ledges: [], streams: [], items: [], signs: [], secrets: [], CHASE_X: 5050, GOAL: 12460, FINAL_X: 11800 };
   L.END = L.GOAL + 520;
   const S = (k, x, w, h) => L.solids.push({ k, x, y: GROUND - h, w, h, sq: 0 });
   const log = x => S('log', x, 76, 34), rock = x => S('rock', x, 54, 40), stump = x => S('stump', x, 60, 72), mush = x => S('mush', x, 80, 48);
@@ -566,21 +590,23 @@ function buildLevel() {
   bram(5700, 70); row('carrot', 5820, 3, 40);
   branch(6080); row('carrot', 6060, 3, 36, GROUND - 14);
   rock(6440); arc('berry', 6400, 4, 44, GROUND - 70, 85);
-  stream(6780, 120); arc('carrot', 6760, 5, 40, GROUND - 50, 105);
+  stream(6830, 120); arc('carrot', 6810, 5, 40, GROUND - 50, 105);
   log(7160); row('apple', 7290, 1, 0);
   branch(7500); row('berry', 7480, 3, 36, GROUND - 14);
   stump(7860); row('carrot', 7870, 2, 40, GROUND - 100);
   bram(8220, 90); arc('carrot', 8190, 5, 40, GROUND - 60, 100);
   stream(8580, 130); arc('berry', 8560, 5, 44, GROUND - 50, 110);
-  branch(8920); row('carrot', 8900, 3, 36, GROUND - 14);
-  log(9240); row('apple', 9370, 1, 0);
-  rock(9500); bram(9720, 70); arc('carrot', 9460, 4, 46, GROUND - 70, 85);
-  branch(10060); row('berry', 10040, 3, 36, GROUND - 14);
-  stream(10400, 120); arc('carrot', 10380, 5, 40, GROUND - 50, 105);
-  log(10740); row('carrot', 10860, 3, 40);
-  branch(11020); row('carrot', 11000, 3, 36, GROUND - 14);
-  bram(11320, 80); arc('apple', 11300, 3, 50, GROUND - 60, 95);
-  log(11720); branch(11930); row('carrot', 11910, 3, 36, GROUND - 14);
+  branch(8980); row('carrot', 8960, 3, 36, GROUND - 14);
+  log(9280); row('apple', 9400, 1, 0);
+  rock(9600); bram(9900, 70); arc('carrot', 9560, 4, 46, GROUND - 70, 85);
+  branch(10200); row('berry', 10180, 3, 36, GROUND - 14);
+  stream(10520, 120); arc('carrot', 10500, 5, 40, GROUND - 50, 105);
+  log(10880); row('carrot', 11000, 3, 40);
+  branch(11260); row('carrot', 11240, 3, 36, GROUND - 14);
+  bram(11560, 80); arc('apple', 11540, 3, 50, GROUND - 60, 95);
+  log(11840); branch(12160); row('carrot', 12140, 3, 36, GROUND - 14);
+  L.flies = [];
+  for (let x = 380; x < L.CHASE_X - 900; x += 330 + hash(x) * 200) L.flies.push({ x, y: GROUND - 50 - hash(x + 1) * 90, ph: hash(x + 2) * 10, col: ['#f6d35a', '#f3a5c0', '#ffffff', '#9fc7f0', '#f29a4a'][Math.floor(hash(x + 3) * 5)], flee: 0 });
   L.total = L.items.reduce((a, i) => a + VAL[i.k], 0);
   // solid ground pieces between streams
   L.grounds = []; let gx = -400;
@@ -613,6 +639,8 @@ function roundTree(c, x, y, r, col, R) {
   c.save(); c.strokeStyle = '#5b4030'; c.lineWidth = r * 0.16; c.lineCap = 'round';
   c.beginPath(); c.moveTo(x, y); c.lineTo(x + R() * 4 - 2, y - r * 1.2); c.stroke(); c.restore();
   for (let i = 0; i < 3; i++) wash(c, () => blob(c, x + (i - 1) * r * 0.45, y - r * 1.5 - (i === 1 ? r * 0.35 : 0), r * 0.75, r * 0.65, R() * 9, 7, 0.08, 18), shade(col, (i - 1) * 0.08), 0.85);
+  c.save(); c.globalAlpha = 0.5; c.fillStyle = shade(col, 0.4); blob(c, x - r * 0.25, y - r * 1.95, r * 0.5, r * 0.32, R() * 9, 6, 0.12, 14); c.fill();
+  c.globalAlpha = 0.25; c.fillStyle = shade(col, -0.4); blob(c, x + r * 0.2, y - r * 1.15, r * 0.7, r * 0.22, R() * 9, 6, 0.12, 14); c.fill(); c.restore();
 }
 function spookyTree(c, x, y, h, col) {
   c.save(); c.strokeStyle = col; c.lineCap = 'round';
@@ -657,7 +685,11 @@ function buildArt() {
     const R = rng(37);
     for (let i = 0; i < 26; i++) {
       const x = i / 26 * w + R() * 20, r = 22 + R() * 22;
-      wrapEach(w, x, r * 1.2, xx => wash(c, () => blob(c, xx, 452 - r * 0.4, r * 1.1, r * 0.8, R() * 9, 8, 0.08, 20), R() < 0.5 ? '#5f8f3a' : '#6e9c43', 0.9));
+      const hc = R() < 0.5 ? '#5f8f3a' : '#6e9c43', hs = R() * 9;
+      wrapEach(w, x, r * 1.2, xx => {
+        wash(c, () => blob(c, xx, 452 - r * 0.4, r * 1.1, r * 0.8, hs, 8, 0.08, 20), hc, 0.9);
+        c.save(); c.globalAlpha = 0.45; c.fillStyle = shade(hc, 0.35); blob(c, xx - r * 0.3, 452 - r * 0.85, r * 0.5, r * 0.25, hs + 1, 6, 0.12, 14); c.fill(); c.restore();
+      });
     }
     c.save(); c.strokeStyle = '#7a5434'; c.lineWidth = 4; c.lineCap = 'round';
     for (let x = 30; x < w; x += 110) { c.beginPath(); c.moveTo(x, 455); c.lineTo(x + 2, 405); c.stroke(); }
@@ -724,6 +756,7 @@ function getChunk(i) {
       if (h1 > 0.82) { c.globalAlpha = 0.5; c.beginPath(); c.moveTo(x, GROUND + 14); c.bezierCurveTo(x + 10, GROUND + 30, x - 6, GROUND + 44, x + 8, GROUND + 60); c.strokeStyle = '#3b2414'; c.lineWidth = 1.6; c.stroke(); }
     }
     c.restore();
+    c.fillStyle = lgrad(c, 0, GROUND + 6, 0, GROUND + 26, [[0, 'rgba(40,22,10,.35)'], [1, 'rgba(40,22,10,0)']]); c.fillRect(sa, GROUND + 6, sb - sa, 20);
     // grass band
     c.beginPath(); c.moveTo(sa, GROUND - 2 + gNoise(sa) * 0.5);
     for (let x = sa; x <= sb; x += 6) c.lineTo(x, GROUND - 2 + gNoise(x) * 0.5);
@@ -732,11 +765,15 @@ function getChunk(i) {
     c.beginPath(); c.moveTo(sa, GROUND - 2 + gNoise(sa) * 0.5);
     for (let x = sa; x <= sb; x += 6) c.lineTo(x, GROUND - 2 + gNoise(x) * 0.5);
     inkStroke(c, 1.8, 0.7);
+    c.beginPath(); c.moveTo(sa, GROUND + 1 + gNoise(sa) * 0.5);
+    for (let x = sa; x <= sb; x += 6) c.lineTo(x, GROUND + 1 + gNoise(x) * 0.5);
+    c.save(); c.globalAlpha = 0.55; c.strokeStyle = '#c2e47c'; c.lineWidth = 1.6; c.stroke(); c.restore();
     // tufts and flowers
-    for (let x = Math.ceil(sa / 9) * 9; x < sb; x += 9) {
-      const h1 = hash(x * 0.37), hh = 5 + h1 * 11;
+    for (let x = Math.ceil(sa / 6) * 6; x < sb; x += 6) {
+      const h1 = hash(x * 0.37), hh = 5 + h1 * 12;
       c.beginPath(); c.moveTo(x, GROUND); c.quadraticCurveTo(x + 1, GROUND - hh * 0.6, x + (h1 - 0.5) * 8, GROUND - hh);
-      c.strokeStyle = h1 < 0.5 ? '#5f8f33' : '#7aab45'; c.lineWidth = 1.6; c.lineCap = 'round'; c.stroke();
+      c.strokeStyle = h1 < 0.33 ? '#557f2c' : h1 < 0.66 ? '#6f9f3d' : '#8cbf55'; c.lineWidth = 1.5; c.lineCap = 'round'; c.stroke();
+      if (h1 > 0.5 && h1 < 0.535) { [[-3, -3], [3, -3], [0, -6]].forEach(([dx, dy]) => { c.fillStyle = '#4f8a2e'; c.beginPath(); c.arc(x + dx, GROUND + dy, 2.6, 0, TAU); c.fill(); }); }
       if (h1 > 0.93) {
         const col = ['#f2d15b', '#f3a5c0', '#ffffff', '#c7a3e6'][Math.floor(hash(x) * 4)];
         c.beginPath(); c.moveTo(x, GROUND); c.lineTo(x + 1, GROUND - 16); c.strokeStyle = '#4f7a30'; c.lineWidth = 1.3; c.stroke();
@@ -783,6 +820,14 @@ function buildBurrow() {
     paint(c, () => rrect(c, w - 230, sy, 200, 12, 4), '#8a5a32', 2);
     c.beginPath(); c.moveTo(w - 210, sy + 12); c.lineTo(w - 200, sy + 30); c.moveTo(w - 52, sy + 12); c.lineTo(w - 62, sy + 30); inkStroke(c, 3, 0.6);
   }
+  // a little drawing pinned to the wall (Little Bunny drew the family)
+  c.save(); c.translate(w / 2 - 120, 232); c.rotate(-0.06);
+  paint(c, () => rrect(c, -34, -26, 68, 50, 4), '#f3e3c0', 2);
+  c.strokeStyle = '#8a5a3c'; c.lineWidth = 1.6;
+  [[-18, 8, 7], [-4, 10, 5], [8, 10, 5], [20, 9, 6]].forEach(([dx, dy, r]) => { c.beginPath(); c.arc(dx, dy, r, 0, TAU); c.stroke(); c.beginPath(); c.moveTo(dx - 2, dy - r); c.lineTo(dx - 3, dy - r - 8); c.moveTo(dx + 2, dy - r); c.lineTo(dx + 3, dy - r - 8); c.stroke(); });
+  c.fillStyle = '#e8792b'; c.beginPath(); c.moveTo(-26, -16); c.lineTo(-18, -18); c.lineTo(-24, -6); c.closePath(); c.fill();
+  c.fillStyle = '#c0392b'; c.beginPath(); c.arc(0, -26, 2.5, 0, TAU); c.fill();
+  c.restore();
   // straw floor
   wash(c, () => blob(c, w / 2, FL + 12, w * 0.44, 28, 8, 7, 0.06, 30), '#c9a25a', 0.95);
   for (let i = 0; i < 120; i++) {
@@ -790,6 +835,10 @@ function buildBurrow() {
     c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l * 0.3);
     c.strokeStyle = R() < 0.5 ? '#e4c27a' : '#a77f3d'; c.lineWidth = 1.4; c.stroke();
   }
+  // woven rug
+  paint(c, () => blob(c, w / 2 - 20, FL + 10, Math.min(300, w * 0.3), 20, 12, 6, 0.03, 30), '#9b3b2e', 2);
+  blob(c, w / 2 - 20, FL + 10, Math.min(300, w * 0.3) - 16, 13, 13, 6, 0.03, 30); c.fillStyle = '#c4613f'; c.fill();
+  c.save(); c.setLineDash([6, 5]); blob(c, w / 2 - 20, FL + 10, Math.min(300, w * 0.3) - 30, 7, 14, 6, 0.03, 30); c.strokeStyle = '#efc070'; c.lineWidth = 2; c.stroke(); c.restore();
   burrowBg = cnv;
 }
 
@@ -995,12 +1044,12 @@ function stepBunny(dt) {
   const under = blockedAbove(b);
   b.crouch = b.onGround && (b.slideT > 0 || wantDown || under);
   b.h = b.crouch ? 22 : 44;
-  const max = b.crouch && b.slideT <= 0 ? 130 : BMAX;
+  const top = G.chase === 2 ? CHASE_MAX : BMAX, max = b.crouch && b.slideT <= 0 ? 130 : top;
   if (b.slideT > 0 && b.onGround) {
     b.vx -= Math.sign(b.vx) * 180 * dt;
     if (Math.random() < 0.6) puff(b.x - b.dir * 14, b.y, 1, '#b08b62', 30, 'dust', 0.4, 4);
   } else if (want) {
-    const acc = b.onGround ? 1500 : 1050, before = Math.abs(b.vx);
+    const acc = (b.onGround ? 1500 : 1050) * (G.chase === 2 ? 1.35 : 1), before = Math.abs(b.vx);
     b.vx += want * acc * (Math.sign(b.vx) === -want ? 1.8 : 1) * dt;
     if (Math.abs(b.vx) > max) b.vx = Math.sign(b.vx) * (before > max ? Math.max(max, before - 900 * dt) : max);
     b.dir = want;
@@ -1121,7 +1170,7 @@ function updatePlay(dt) {
     }
     if (I.t > 2.2) {
       G.intro = null; G.chase = 2; G.chaseT = 0; G.ctrl = true; b.scared = 0; b.dir = 1;
-      f.mode = 'run'; f.v = BMAX * 0.4;
+      f.mode = 'run'; f.v = CHASE_MAX * 0.4;
       setMusic('chase'); G.banner = { text: 'RUN, LITTLE BUNNY!', t: 0, dur: 1.6 };
       sfx.scared();
     }
@@ -1133,7 +1182,7 @@ function updatePlay(dt) {
     const dist = b.x - f.x;
     let m = G.chaseT < 1.3 ? 0.55 : dist > 480 ? 1.18 : dist > 230 ? 0.99 : 0.9;
     if (b.x > L.FINAL_X) m += 0.05;
-    f.v = lerp(f.v, BMAX * m, Math.min(1, dt * 3));
+    f.v = lerp(f.v, CHASE_MAX * m, Math.min(1, dt * 3));
     f.x += f.v * dt; f.ph += dt * f.v / 120; f.t += dt;
     f.lift = foxHop(f.x + 20); f.duck = foxDuck(f.x) && f.lift < 5; f.mode = 'run';
     f.jawT -= dt; f.jaw = f.jawT > 0 ? Math.sin((f.jawT / 0.25) * Math.PI) : 0;
@@ -1150,11 +1199,11 @@ function updatePlay(dt) {
     Music.duck = 1 - clamp((b.x - (L.CHASE_X - 900)) / 900, 0, 0.85);
     G.birdT -= dt; if (G.birdT <= 0 && b.x < L.CHASE_X - 900) { G.birdT = rand(2, 6); sfx.birds(); }
   }
-  if (windGain) windGain.gain.value = G.chase === 2 ? 0.05 + Math.abs(b.vx) / BMAX * 0.06 : 0.015;
+  if (windGain) windGain.gain.value = G.chase === 2 ? 0.05 + Math.abs(b.vx) / CHASE_MAX * 0.07 : 0.015;
   // mushrooms spring back
   for (const s of L.solids) if (s.sq > 0) s.sq = Math.max(0, s.sq - dt * 4);
   // speed lines + blowing leaves
-  if (G.chase === 2 && Math.abs(b.vx) > 260 && Math.random() < dt * 30) G.speedLines.push({ x: VW + 20, y: rand(80, GROUND - 10), len: rand(40, 120), v: rand(900, 1500), life: 1 });
+  if (G.chase === 2 && Math.abs(b.vx) > 340 && Math.random() < dt * 40) G.speedLines.push({ x: VW + 20, y: rand(80, GROUND - 10), len: rand(40, 120), v: rand(900, 1500), life: 1 });
   if (G.chase === 2 && Math.random() < dt * 3) addPart({ x: G.cam.x + VW + 20, y: rand(80, 420), vx: rand(-420, -260), vy: rand(-20, 40), kind: 'leaf', col: Math.random() < 0.5 ? '#d9822b' : '#9b3d1f', life: 3, size: 6, g: 20 });
   updateCamera(dt);
 }
@@ -1162,7 +1211,7 @@ function updateCamera(dt) {
   const b = G.bunny, L = G.L, f = G.fox;
   let target;
   if (G.intro) target = (b.x + Math.max(f.active ? f.x : L.foxBush.x, b.x - 400)) / 2 - VW / 2;
-  else if (G.chase === 2) target = b.x - VW * 0.44;
+  else if (G.chase === 2) target = b.x - VW * 0.4;
   else target = b.x - VW * (b.dir > 0 ? 0.36 : 0.62);
   G.cam.x += (target - G.cam.x) * Math.min(1, dt * (G.chase === 2 ? 6 : 3.5));
   G.cam.x = clamp(G.cam.x, isTouch() ? -240 : 0, Math.max(0, L.END - VW));
@@ -1245,7 +1294,20 @@ function drawSky(c) {
   const sx = VW * 0.74, sy = 100 + m * 140, sr = 44;
   c.fillStyle = rgrad(c, sx, sy, sr * 3.2, mix('#fff3c4', '#ffb070', m) + '99', '#ffffff00'); c.beginPath(); c.arc(sx, sy, sr * 3.2, 0, TAU); c.fill();
   c.fillStyle = mix('#fff6d8', '#ff9a5a', m); c.beginPath(); c.arc(sx, sy, sr, 0, TAU); c.fill();
+  c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.032 * (1 - m * 0.5); c.fillStyle = mix('#fff2c0', '#ff9a5a', m);
+  for (let i = 0; i < 7; i++) {
+    const a = 1.85 + i * 0.2 + Math.sin(G.t * 0.25 + i * 1.3) * 0.03, wd = 0.035 + (i % 3) * 0.015;
+    c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + Math.cos(a - wd) * 1400, sy + Math.sin(a - wd) * 1400); c.lineTo(sx + Math.cos(a + wd) * 1400, sy + Math.sin(a + wd) * 1400); c.closePath(); c.fill();
+  }
+  c.restore();
   const camx = G.cam.x;
+  c.save(); c.strokeStyle = mix('#5a4646', '#120a10', m); c.lineWidth = 1.6 + m; c.lineCap = 'round';
+  for (let i = 0; i < 5; i++) {
+    const span = VW + 400, bx = ((i * 290 + G.t * (24 + i * 4) - camx * 0.15) % span + span) % span - 200;
+    const by = 70 + i * 21 + Math.sin(G.t * 0.8 + i) * 8, fl = Math.sin(G.t * (m > 0.5 ? 6 : 9) + i * 2) * (3 + m * 2), sz = 6 + m * 3;
+    c.beginPath(); c.moveTo(bx - sz, by - fl); c.quadraticCurveTo(bx - sz / 2, by - 2, bx, by); c.quadraticCurveTo(bx + sz / 2, by - 2, bx + sz, by - fl); c.stroke();
+  }
+  c.restore();
   for (const cl of clouds) {
     const span = 2600; let x = ((cl.x - camx * 0.06 - G.t * 6) % span + span) % span - 300;
     c.save(); c.globalAlpha = 1 - m * 0.55; c.drawImage(cl.cnv, x, cl.y, cl.w, cl.h); c.restore();
@@ -1259,8 +1321,11 @@ function drawTile(c, tile, factor, tint) {
 function drawParallax(c) {
   const m = G.chaseMix;
   drawTile(c, tiles.far, 0.1, 0);
+  const hz = mix('#f6e0b4', '#e88a4c', m);
+  c.save(); c.globalAlpha = 0.45; c.fillStyle = lgrad(c, 0, 290, 0, 460, [[0, hz + '00'], [1, hz]]); c.fillRect(0, 290, VW, 172); c.restore();
   c.save(); c.globalAlpha = m * 0.35; c.fillStyle = '#2b1d3a'; c.fillRect(0, tiles.far.y0, VW, tiles.far.h); c.restore();
   drawTile(c, tiles.mid, 0.3, 0);
+  c.save(); c.globalAlpha = 0.22; c.fillStyle = lgrad(c, 0, 360, 0, 460, [[0, hz + '00'], [1, hz]]); c.fillRect(0, 360, VW, 102); c.restore();
   c.save(); c.globalAlpha = m * 0.3; c.fillStyle = '#2b1d3a'; c.fillRect(0, tiles.mid.y0, VW, GROUND - tiles.mid.y0 + 12); c.restore();
   drawTile(c, tiles.near, 0.6, 0);
   c.save(); c.globalAlpha = m * 0.25; c.fillStyle = '#2b1d3a'; c.fillRect(0, tiles.near.y0, VW, GROUND - tiles.near.y0 + 12); c.restore();
@@ -1403,11 +1468,49 @@ function drawSecret(c, s) {
   }
   c.restore();
 }
+function drawButterflies(c) {
+  const b = G.bunny;
+  for (const f of G.L.flies) {
+    if (f.flee >= 1 || !inView(f.x - 60, 220)) continue;
+    if (f.flee > 0 || (Math.abs(f.x - b.x) < 90 && Math.abs(f.y - b.y) < 150)) f.flee = Math.min(1, f.flee + 0.012);
+    const t = G.t + f.ph, x = f.x + Math.sin(t * 0.7) * 30 + f.flee * 120, y = f.y + Math.sin(t * 1.9) * 12 - f.flee * f.flee * 420;
+    const flap = Math.abs(Math.sin(t * (14 + f.flee * 10)));
+    c.save(); c.translate(x, y); c.rotate(Math.sin(t * 0.7) * 0.25);
+    for (const sgn of [-1, 1]) {
+      c.save(); c.scale(sgn * (0.2 + flap * 0.8), 1);
+      paint(c, () => { c.beginPath(); c.ellipse(4.5, -2.5, 5.5, 4.2, -0.5, 0, TAU); }, f.col, 0.9);
+      paint(c, () => { c.beginPath(); c.ellipse(3.8, 3, 3.6, 2.8, 0.5, 0, TAU); }, shade(f.col, -0.15), 0.9);
+      c.restore();
+    }
+    c.fillStyle = INK; c.beginPath(); c.ellipse(0, 0, 1.1, 4.5, 0, 0, TAU); c.fill();
+    c.restore();
+  }
+}
+function drawMotes(c) {
+  const m = G.chaseMix;
+  c.save(); c.globalCompositeOperation = 'lighter';
+  if (m < 0.95) for (let i = 0; i < 24; i++) {
+    const sp = VW + 40, x = ((hash(i) * sp - G.cam.x * (0.3 + hash(i + 9) * 0.5) + G.t * (8 + hash(i + 3) * 10)) % sp + sp) % sp - 20;
+    const y = 60 + hash(i + 5) * 380 + Math.sin(G.t * 0.9 + i) * 10;
+    c.globalAlpha = (0.3 + 0.25 * Math.sin(G.t * 2 + i)) * (1 - m);
+    c.fillStyle = '#fff4c8'; c.beginPath(); c.arc(x, y, 1.1 + hash(i + 1) * 1.6, 0, TAU); c.fill();
+  }
+  if (m > 0.3) for (let i = 0; i < 16; i++) {
+    const sp = VW + 40, x = ((hash(i + 40) * sp - G.cam.x * 0.9 + Math.sin(G.t * 0.5 + i) * 30) % sp + sp) % sp - 20;
+    const y = 290 + hash(i + 50) * 150 + Math.sin(G.t * 1.3 + i * 2) * 14, bl = Math.max(0, Math.sin(G.t * 2.2 + i * 1.7));
+    c.globalAlpha = (m - 0.3) * bl;
+    c.fillStyle = rgrad(c, x, y, 10, 'rgba(255,240,140,.95)', 'rgba(255,240,140,0)'); c.beginPath(); c.arc(x, y, 10, 0, TAU); c.fill();
+  }
+  c.restore();
+}
 function drawItems(c) {
   for (const it of G.L.items) {
     if (it.got || !inView(it.x, 0, 40)) continue;
     const bob = Math.sin(G.t * 3 + it.x * 0.02) * 3;
+    if (it.y > GROUND - 70) { c.save(); c.globalAlpha = 0.16; c.fillStyle = '#24160c'; c.beginPath(); c.ellipse(it.x, GROUND + 1, 9 - bob * 0.5, 2.5, 0, 0, TAU); c.fill(); c.restore(); }
     drawFood(c, it.k, it.x, it.y + bob, 1, G.t);
+    const gl = (G.t * 0.55 + hash(it.x)) % 1;
+    if (gl < 0.14) { const k = Math.sin(gl / 0.14 * Math.PI); c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = '#fff6d0'; c.translate(it.x + 6, it.y + bob - 9); c.rotate(gl * 6); star(c, 0, 0, 7 * k, 4, 0.22); c.fill(); c.restore(); }
   }
 }
 function bunnyPose(b) {
@@ -1534,9 +1637,17 @@ function drawWorld(c) {
   for (const s of L.solids) if (inView(s.x, s.w)) drawSolid(c, s);
   for (const hz of L.hazards) if (hz.k === 'bramble' && inView(hz.x, hz.w)) drawBramble(c, hz);
   drawItems(c);
+  drawButterflies(c);
   drawRescueHole(c);
   const foxBehind = f.active && f.x < b.x;
-  const drawF = () => { if (f.active && inView(f.x - 100, 200)) { WK = 1; drawFox(c, f.x, GROUND, { ph: f.ph, mode: f.mode, jaw: f.jaw, lift: f.lift, duck: f.duck, t: f.t }); WK = 0; } };
+  const drawF = () => { if (f.active && inView(f.x - 100, 200)) {
+    if (G.state === 'play' && G.chase === 2 && !f.duck) {
+      const ex = f.x + 50, ey = GROUND - f.lift - 53;
+      c.save(); c.globalCompositeOperation = 'lighter'; c.lineCap = 'round';
+      c.strokeStyle = lgrad(c, ex - 70, 0, ex, 0, [[0, 'rgba(255,200,60,0)'], [1, 'rgba(255,210,70,.55)']]); c.lineWidth = 3;
+      c.beginPath(); c.moveTo(ex - 70, ey + 4 + Math.sin(f.ph * TAU) * 3); c.quadraticCurveTo(ex - 30, ey + 2, ex, ey); c.stroke(); c.restore();
+    }
+    WK = 1; drawFox(c, f.x, GROUND, { ph: f.ph, mode: f.mode, jaw: f.jaw, lift: f.lift, duck: f.duck, t: f.t }); WK = 0; } };
   if (foxBehind) drawF();
   drawPlayBunny(c);
   drawRescueHole(c, true);
@@ -1549,6 +1660,7 @@ function drawWorld(c) {
   // foreground grass
   const ft = tiles.fore, off = ((-G.cam.x * 1.25) % ft.w + ft.w) % ft.w - ft.w;
   c.save(); c.globalAlpha = 0.9; for (let x = off; x < VW; x += ft.w) c.drawImage(ft.cnv, x, ft.y0 + 20, ft.w, ft.h); c.restore();
+  drawMotes(c);
   // speed lines
   if (G.speedLines.length) {
     c.save(); c.strokeStyle = 'rgba(255,248,230,.55)'; c.lineCap = 'round';
@@ -1640,6 +1752,14 @@ function drawPantry(c) {
 }
 function drawBurrowScene(c) {
   c.drawImage(burrowBg, 0, -OY - 2, VW, H + OY * 2 + 4);
+  // dust floating in the sunbeam
+  c.save(); c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 26; i++) {
+    const u = (hash(i + 70) + G.t * 0.02 * (0.5 + hash(i))) % 1, yy = 110 + u * (FL - 110), spread = (yy - 100) / (FL - 100);
+    const xx = VW * (0.13 + (hash(i + 80) - 0.5) * (0.08 + spread * 0.24)) + Math.sin(G.t * 0.7 + i) * 6 + spread * VW * 0.04;
+    c.globalAlpha = 0.5 * Math.sin(u * Math.PI); c.fillStyle = '#fff1c0'; c.beginPath(); c.arc(xx, yy, 1 + hash(i + 90) * 1.5, 0, TAU); c.fill();
+  }
+  c.restore();
   // lantern
   const lx = VW * 0.3, ly = 150, fl = 0.85 + Math.sin(G.t * 7) * 0.05 + Math.sin(G.t * 13) * 0.03;
   c.fillStyle = rgrad(c, lx, ly, 200 * fl, 'rgba(255,200,110,.35)', 'rgba(255,200,110,0)'); c.beginPath(); c.arc(lx, ly, 200 * fl, 0, TAU); c.fill();
