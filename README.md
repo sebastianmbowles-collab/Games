@@ -20,3 +20,10 @@ If you are developing a production application, we recommend using TypeScript wi
 `AnteUp.html` is a first-person psychological horror game, all in one file. Open it in a desktop browser (headphones recommended).
 Five acts against the Dealer (Blind Man's Bluff, the Carved Labyrinth, the Soul Scale, the Chess of Glass and Russian Roulette Backgammon), timed intermissions to explore the cellar, and four endings.
 Source lives in `src/ante-up/`; rebuild the file with `npm run build:au`.
+
+## RUN LITTLE BUNNY!
+
+`RunLittleBunny.html` is a hand-drawn side-scrolling adventure, all in one file. Open it in any browser (keyboard or touch).
+Little Bunny forages through Carrot Meadows for his family of 7 siblings, escapes the fox, and dives into the hollow log to get home.
+If the fox catches him, his siblings pull him down a secret tunnel, but the food from that trip is lost. The family food supply is saved in the browser.
+Step 1 so far: the burrow, Carrot Meadows and the fox chase. Minigames and the rest of Bunwood come next.
