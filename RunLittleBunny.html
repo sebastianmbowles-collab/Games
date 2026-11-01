@@ -47,11 +47,16 @@ body{font-family:var(--body);color:var(--ink)}
 body.touch.playing #touch{display:block}
 .tbtn{position:absolute;width:82px;height:82px;border-radius:50%;pointer-events:auto;background:rgba(120,78,40,.5);border:3px solid rgba(60,36,18,.8);color:#fff3dc;font:26px/1 var(--display);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 0 rgba(40,24,10,.6);touch-action:none}
 .tbtn.on{background:rgba(240,160,75,.75);transform:translateY(2px)}
-#tLeft{left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px))}
-#tRight{left:calc(110px + env(safe-area-inset-left,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+#joyZone{position:absolute;left:0;bottom:0;width:46%;height:78%;pointer-events:auto;touch-action:none}
+#joy{position:absolute;width:132px;height:132px;margin:-66px 0 0 -66px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(255,240,210,.16) 0 40%,rgba(120,78,40,.38) 70%);border:3px solid rgba(60,36,18,.75);box-shadow:inset 0 0 0 6px rgba(255,240,210,.08),0 4px 0 rgba(40,24,10,.45)}
+#joy::before,#joy::after{content:"";position:absolute;top:50%;width:0;height:0;margin-top:-8px;border:8px solid transparent;opacity:.55}
+#joy::before{left:8px;border-right:11px solid #fff3dc;border-left:0}
+#joy::after{right:8px;border-left:11px solid #fff3dc;border-right:0}
+#joyKnob{position:absolute;left:50%;top:50%;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffc27a,#d9741f 60%,#a8520f);border:3px solid #5e3b1f;box-shadow:0 3px 0 rgba(40,24,10,.6)}
+#joy.on{border-color:rgba(255,220,150,.9)}
 #tJump{right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(30px + env(safe-area-inset-bottom,0px));width:96px;height:96px}
 #tSlide{right:calc(124px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px))}
-@media (max-height:520px){#panel{padding:8px 14px 10px}#panel h2{font-size:26px;margin:0 0 2px}#panel p{font-size:16px;margin:3px 0}#panel table{font-size:15px}.btn{font-size:20px;padding:7px 16px 8px}.btns{margin-top:6px}.tbtn{width:68px;height:68px;font-size:22px}#tRight{left:calc(96px + env(safe-area-inset-left,0px))}#tJump{width:80px;height:80px}#tSlide{right:calc(106px + env(safe-area-inset-right,0px))}}
+@media (max-height:520px){#panel{padding:8px 14px 10px}#panel h2{font-size:26px;margin:0 0 2px}#panel p{font-size:16px;margin:3px 0}#panel table{font-size:15px}.btn{font-size:20px;padding:7px 16px 8px}.btns{margin-top:6px}.tbtn{width:68px;height:68px;font-size:22px}#joy{width:112px;height:112px;margin:-56px 0 0 -56px}#joyKnob{width:50px;height:50px;margin:-25px 0 0 -25px}#tJump{width:80px;height:80px}#tSlide{right:calc(106px + env(safe-area-inset-right,0px))}}
 .tbtn{background:rgba(120,78,40,.38)}
 @media (prefers-reduced-motion:reduce){.btn:active,.wbtn:active{transform:none}}
 </style>
@@ -68,8 +73,8 @@ body.touch.playing #touch{display:block}
   <div class="btns" id="pBtns"></div>
 </div>
 <div id="touch">
-  <div class="tbtn" id="tLeft" data-k="left">&#9664;</div>
-  <div class="tbtn" id="tRight" data-k="right">&#9654;</div>
+  <div id="joyZone"></div>
+  <div id="joy"><div id="joyKnob"></div></div>
   <div class="tbtn" id="tSlide" data-k="down">Slide</div>
   <div class="tbtn" id="tJump" data-k="jump">Jump</div>
 </div>
@@ -867,32 +872,98 @@ function floatText(x, y, s, col = '#b0521a') { addPart({ x, y, vy: -60, kind: 't
 // ---------------------------------------------------------------------
 //  Input
 // ---------------------------------------------------------------------
+// Every control (keyboard, touch buttons, on-screen joystick, game controller) keeps its own
+// state; they are merged into "input" once per frame so they never fight each other.
 const input = { left: false, right: false, down: false, jump: false, jumpPressed: false };
-window.__RLBinput = input;
+const mkSrc = () => ({ left: false, right: false, down: false, jump: false, jumpPressed: false });
+const kb = mkSrc(), tb = mkSrc(), js = mkSrc(), gp = mkSrc(), SOURCES = [kb, tb, js, gp];
+window.__RLBinput = kb;
+function mergeInput() {
+  for (const k of ['left', 'right', 'down', 'jump']) input[k] = kb[k] || tb[k] || js[k] || gp[k];
+  for (const src of SOURCES) if (src.jumpPressed) { input.jumpPressed = true; src.jumpPressed = false; }
+}
+function clearInputs() {
+  for (const src of [input, ...SOURCES]) { src.left = src.right = src.down = src.jump = src.jumpPressed = false; }
+  document.querySelectorAll('.tbtn.on').forEach(el => el.classList.remove('on'));
+  joyRelease();
+}
 const KEYS = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'jump', KeyW: 'jump', Space: 'jump', ArrowDown: 'down', KeyS: 'down' };
 addEventListener('keydown', e => {
   initAudio();
   const k = KEYS[e.code];
   if (k && G.state !== 'title' && G.state !== 'home') {
     e.preventDefault();
-    if (k === 'jump' && !input.jump) input.jumpPressed = true;
-    input[k] = true;
+    if (k === 'jump' && !kb.jump) kb.jumpPressed = true;
+    kb[k] = true;
   }
   if (e.code === 'KeyP' || e.code === 'Escape') { if (G.state === 'play' || G.paused) togglePause(); }
   if (e.code === 'KeyM') toggleMute();
   if ((e.code === 'Enter') && !panel.hidden && !G.paused && document.activeElement?.tagName !== 'BUTTON') { const b = pBtns.querySelector('.primary'); if (b) { e.preventDefault(); b.click(); } }
 });
-addEventListener('keyup', e => { const k = KEYS[e.code]; if (k) input[k] = false; });
-addEventListener('blur', () => { input.left = input.right = input.down = input.jump = false; if (G.state === 'play' && !G.paused) togglePause(); });
+addEventListener('keyup', e => { const k = KEYS[e.code]; if (k) kb[k] = false; });
+addEventListener('blur', () => { clearInputs(); if (G.state === 'play' && !G.paused) togglePause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'play' && !G.paused) togglePause(); });
 addEventListener('touchstart', () => document.body.classList.add('touch'), { passive: true });
 if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
 document.querySelectorAll('.tbtn').forEach(el => {
   const k = el.dataset.k, ptrs = new Set();
-  const on = e => { e.preventDefault(); initAudio(); ptrs.add(e.pointerId); try { el.setPointerCapture(e.pointerId); } catch (_) { /* ok */ } if (k === 'jump' && !input.jump) input.jumpPressed = true; input[k] = true; el.classList.add('on'); };
-  const off = e => { ptrs.delete(e.pointerId); if (!ptrs.size) { input[k] = false; el.classList.remove('on'); } };
+  const on = e => { e.preventDefault(); initAudio(); ptrs.add(e.pointerId); try { el.setPointerCapture(e.pointerId); } catch (_) { /* ok */ } if (k === 'jump' && !tb.jump) tb.jumpPressed = true; tb[k] = true; el.classList.add('on'); };
+  const off = e => { ptrs.delete(e.pointerId); if (!ptrs.size) { tb[k] = false; el.classList.remove('on'); } };
   el.addEventListener('pointerdown', on); el.addEventListener('pointerup', off); el.addEventListener('pointercancel', off); el.addEventListener('lostpointercapture', off);
 });
+// --- on-screen joystick: touch anywhere on the left side and it appears under your thumb ---
+const joy = document.getElementById('joy'), joyKnob = document.getElementById('joyKnob'), joyZone = document.getElementById('joyZone');
+let joyId = null, jx0 = 0, jy0 = 0;
+function joyRadius() { return joy.offsetWidth * 0.36 || 46; }
+function joyPlace(x, y) { joy.style.left = x + 'px'; joy.style.top = y + 'px'; jx0 = x; jy0 = y; }
+function joyHome() { const r = (joy.offsetWidth || 132) / 2; joyPlace(r + 22, innerHeight - r - 22); }
+function joyRelease() {
+  joyId = null; joy.classList.remove('on'); joyKnob.style.transform = '';
+  js.left = js.right = js.down = js.jump = false; joyHome();
+}
+function joyMove(cx, cy) {
+  const R = joyRadius(); let dx = cx - jx0, dy = cy - jy0; const len = Math.hypot(dx, dy);
+  if (len > R) { dx *= R / len; dy *= R / len; }
+  joyKnob.style.transform = `translate(${dx}px,${dy}px)`;
+  const nx = dx / R, ny = dy / R;
+  js.left = nx < -0.3; js.right = nx > 0.3;
+  js.down = ny > 0.55;
+  const up = ny < -0.6;
+  if (up && !js.jump) js.jumpPressed = true;
+  if (up) js.jump = true; else if (ny > -0.4) js.jump = false;
+}
+joyZone.addEventListener('pointerdown', e => {
+  e.preventDefault(); initAudio(); document.body.classList.add('touch');
+  if (joyId !== null) return;
+  joyId = e.pointerId; try { joyZone.setPointerCapture(e.pointerId); } catch (_) { /* ok */ }
+  joyPlace(e.clientX, e.clientY); joy.classList.add('on'); joyMove(e.clientX, e.clientY);
+});
+joyZone.addEventListener('pointermove', e => { if (e.pointerId === joyId) { e.preventDefault(); joyMove(e.clientX, e.clientY); } });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => joyZone.addEventListener(ev, e => { if (e.pointerId === joyId) joyRelease(); }));
+// --- game controllers (Xbox, PlayStation, Switch Pro and friends) ---
+let padPrev = { a: false, b: false, start: false }, padName = '';
+function pollPad() {
+  let pads = [];
+  try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch (_) { pads = []; }
+  let p = null; for (const g of pads) if (g && g.connected) { p = g; break; }
+  if (!p) { gp.left = gp.right = gp.down = gp.jump = false; return; }
+  const bt = i => !!(p.buttons[i] && p.buttons[i].pressed), ax = p.axes[0] || 0, ay = p.axes[1] || 0;
+  const A = bt(0), B = bt(1), start = bt(9);
+  gp.left = ax < -0.35 || bt(14); gp.right = ax > 0.35 || bt(15);
+  gp.down = ay > 0.6 || bt(13) || B;
+  const j = A || bt(12) || bt(3);
+  if (j && !gp.jump && G.state === 'play') gp.jumpPressed = true;
+  gp.jump = j;
+  if (start && !padPrev.start && (G.state === 'play' || G.paused)) togglePause();
+  if (!panel.hidden && G.fade.dir === 0) {
+    const btns = pBtns.querySelectorAll('.btn');
+    if (A && !padPrev.a && btns[0]) btns[0].click();
+    else if (B && !padPrev.b && btns[1]) btns[1].click();
+  }
+  padPrev = { a: A, b: B, start };
+}
+addEventListener('gamepadconnected', e => { padName = 'Controller connected'; G.toast = { text: 'Controller connected! A = jump, B = slide, Start = pause', t: 0 }; void e; });
+addEventListener('gamepaddisconnected', () => { G.toast = { text: 'Controller disconnected', t: 0 }; });
 cv.addEventListener('pointerdown', e => {
   initAudio();
   if (G.state !== 'title' && G.state !== 'home') return;
@@ -920,10 +991,11 @@ function hidePanel() { panel.hidden = true; if (document.activeElement && docume
 function isTouch() { return document.body.classList.contains('touch'); }
 function controlsHTML() {
   return `<table>
-  <tr><td>Run</td><td>${isTouch() ? 'Hold the &#9664; &#9654; buttons' : 'Arrow keys or A / D'}</td></tr>
+  <tr><td>Run</td><td>${isTouch() ? 'Put your thumb on the left side and push the joystick' : 'Arrow keys or A / D'}</td></tr>
   <tr><td>Jump</td><td>${isTouch() ? 'Tap Jump (hold it to jump higher)' : 'Up, W or Space (hold to jump higher)'}</td></tr>
-  <tr><td>Slide</td><td>${isTouch() ? 'Tap Slide while running' : 'Down or S while running'}</td></tr>
-  <tr><td>Pause</td><td>${isTouch() ? 'The pause button, top right' : 'P or Esc'}</td></tr></table>`;
+  <tr><td>Slide</td><td>${isTouch() ? 'Tap Slide, or pull the joystick down, while running' : 'Down or S while running'}</td></tr>
+  <tr><td>Pause</td><td>${isTouch() ? 'The pause button, top right' : 'P or Esc'}</td></tr>
+  <tr><td>Controller</td><td>Stick or D-pad to run, A to jump, B to slide, Start to pause</td></tr></table>`;
 }
 function showTitle() {
   G.state = 'title'; G.homeMode = 'title'; G.homeT = 0; setMusic('home'); layoutFamily();
@@ -941,7 +1013,7 @@ function togglePause() {
   if (G.state !== 'play') return;
   G.paused = !G.paused;
   if (G.paused) {
-    input.left = input.right = input.down = input.jump = false;
+    clearInputs();
     if (AC) AC.suspend();
     showPanel('Paused', `<p>Little Bunny is catching his breath.</p>${controlsHTML()}`,
       [{ label: 'Keep running', primary: true, fn: togglePause }, { label: 'Back to the burrow', fn: () => { G.paused = false; if (AC) AC.resume(); fadeTo(showTitle); } }]);
@@ -1411,7 +1483,7 @@ function drawStreamWater(c, s) {
 function drawSign(c, sg) {
   const x = sg.x, touch = isTouch();
   const T = {
-    run: touch ? 'Hold ▶ to run' : 'Hold → to run',
+    run: touch ? 'Push the joystick to run' : 'Hold → to run',
     jump: touch ? 'Tap Jump to hop!' : 'Jump: ↑ or Space',
     slide: touch ? 'Run, then tap Slide!' : 'Run, then press ↓ to slide',
     water: 'Deep water! Jump!',
@@ -1829,6 +1901,11 @@ function render() {
   // paper grain over everything
   if (paperPat) { c.save(); c.globalCompositeOperation = 'multiply'; c.globalAlpha = 0.55; c.fillStyle = paperPat; c.fillRect(-2, -OY - 2, VW + 4, H + OY * 2 + 4); c.restore(); }
   if (G.state === 'play' || G.state === 'caught' || G.state === 'escape') drawHUD(c);
+  if (G.toast) {
+    const a = clamp(G.toast.t / 0.2, 0, 1) * clamp((3 - G.toast.t) / 0.4, 0, 1);
+    c.save(); c.globalAlpha = a; c.font = font(20, 'body'); const tw = c.measureText(G.toast.text).width;
+    woodBoard(c, VW / 2 - tw / 2 - 20, H - 70, tw + 40, 40); txt(c, G.toast.text, VW / 2, H - 50, 20, '#fff3dc'); c.restore();
+  }
   if (G.fade.a > 0) { c.fillStyle = `rgba(20,12,8,${G.fade.a})`; c.fillRect(-2, -OY - 2, VW + 4, H + OY * 2 + 4); }
 }
 function resize() {
@@ -1840,6 +1917,7 @@ function resize() {
   VH = ch / SCALE; OY = (VH - H) / 2; OX = 0;
   buildArt();
   layoutFamily();
+  if (joyId === null) joyHome();
 }
 addEventListener('resize', resize);
 let last = performance.now();
@@ -1847,7 +1925,10 @@ function frame(now) {
   requestAnimationFrame(frame);
   let dt = (now - last) / 1000; last = now;
   if (dt > 0.05) dt = 0.05;
+  pollPad();
+  mergeInput();
   if (!G.paused) update(dt);
+  if (G.toast) { G.toast.t += dt; if (G.toast.t > 3) G.toast = null; }
   render();
   musicTick();
 }
