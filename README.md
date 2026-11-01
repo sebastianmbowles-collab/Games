@@ -24,6 +24,14 @@ Source lives in `src/ante-up/`; rebuild the file with `npm run build:au`.
 ## RUN LITTLE BUNNY!
 
 `RunLittleBunny.html` is a hand-drawn side-scrolling adventure, all in one file. Open it in any browser (keyboard, touch joystick or game controller).
-Little Bunny forages through Carrot Meadows for his family of 7 siblings, escapes the fox, and dives into the hollow log to get home.
-If the fox catches him, his siblings pull him down a secret tunnel, but the food from that trip is lost. The family food supply is saved in the browser.
-Step 1 so far: the burrow, Carrot Meadows and the fox chase. Minigames and the rest of Bunwood come next.
+Little Bunny forages across Bunwood to feed his family of 7 siblings before winter:
+
+| Area | Danger | Minigame |
+|---|---|---|
+| Carrot Meadows | Fox | Carrot Picking |
+| Mushroom Valley | Fox, Wildcat | Mushroom Match |
+| Whispering Woods | Owl, Wildcat, Wolf | Berry Sorting |
+| Thorny Thicket | Owl, Wolf (twice) | Butterfly Catcher |
+| Bunny Burrows (home) | none | Bunny's Garden, Burrow Cleaning |
+
+Pick an area on the map, run to the hollow log, and hide from predators along the way. If one catches him, his siblings pull him down a secret tunnel, but the food from that trip is lost. Minigame food goes straight to the pantry. Finishing the Thorny Thicket shows the ending. Progress is saved in the browser.
