@@ -165,6 +165,7 @@ Ray.render = function (cam, map, sprites, opt = {}) {
   }
   // walls
   const zb = Ray.zbuf;
+  const near = cam.d ? cam.d - 0.3 : 0; // cutaway: skip walls between the chase camera and the player
   for (let x = 0; x < W; x++) {
     const cx = 2 * x / W - 1, rdx = dirX + plX * cx, rdy = dirY + plY * cx;
     let mx = Math.floor(cam.x), my = Math.floor(cam.y);
@@ -176,7 +177,8 @@ Ray.render = function (cam, map, sprites, opt = {}) {
     while (n++ < 80) {
       if (sdx < sdy) { sdx += ddx; mx += sx; side = 0; } else { sdy += ddy; my += sy; side = 1; }
       if (mx < 0 || my < 0 || mx >= map.w || my >= map.h) { tile = -1; break; }
-      tile = map.t[my * map.w + mx]; if (tile > 0) break;
+      tile = map.t[my * map.w + mx];
+      if (tile > 0) { if ((side === 0 ? sdx - ddx : sdy - ddy) < near) { tile = 0; continue; } break; }
     }
     if (tile <= 0) { zb[x] = 1e9; continue; }
     const perp = side === 0 ? (mx - cam.x + (1 - sx) / 2) / rdx : (my - cam.y + (1 - sy) / 2) / rdy;
@@ -237,6 +239,12 @@ Ray.floor = function (cam, hor, proj, dirX, dirY, plX, plY, tex, fog, fogD) {
   }
   FLOORBUF.x.putImageData(img, 0, 0, 0, y0, W, H - y0);
   ctx.drawImage(FLOORBUF.c, 0, y0, W, H - y0, 0, y0, W, H - y0);
+};
+// Third-person chase camera: always sits behind the player. It may float inside a wall
+// (the engine never draws the wall the camera is in), so the player never gets lost.
+Ray.chase = function (map, p, back, z, pitch) {
+  const x = clamp(p.x - Math.cos(p.a) * back, 0.05, map.w - 0.05), y = clamp(p.y - Math.sin(p.a) * back, 0.05, map.h - 0.05);
+  return { x, y, a: p.a, z, pitch, d: back };
 };
 Ray.solid = (map, x, y) => { const mx = Math.floor(x), my = Math.floor(y); if (mx < 0 || my < 0 || mx >= map.w || my >= map.h) return true; return map.t[my * map.w + mx] > 0; };
 Ray.move = function (map, e, dx, dy, r) {

@@ -233,7 +233,7 @@ function drawBackdrop(kind, t) {
 // ================= STORY FLOW =================
 const Story = { stage: 0, replay: false };
 const CHAPTERS = [
-  { key: 'running', title: 'THE RAID', mode: 'RUNNING', view: 'FIRST PERSON', bg: 'night', make: c => new RunningMode(c),
+  { key: 'running', title: 'THE RAID', mode: 'RUNNING', view: 'THIRD PERSON', bg: 'night', make: c => new RunningMode(c),
     goal: ['Run through the ruined town', 'and reach the BUNKER.', 'Red marks = bombs landing!'],
     keys: ['ARROWS/WASD  run & turn', 'SPACE jump   SHIFT dive', 'E roll (hold)   Q hide (hold)'],
     tkeys: ['PAD run & turn', 'A jump  B dive', 'C roll (hold)  D hide (hold)'] },
@@ -241,7 +241,7 @@ const CHAPTERS = [
     goal: ['Build 10 supplies before', 'the clock runs out.', 'They go to the front line!'],
     keys: ['DRAG parts onto the blueprint', 'or ARROWS pick + SPACE place', 'Wrong part = lose 2 seconds'],
     tkeys: ['DRAG parts onto the blueprint', 'or tap a part to place it', 'Wrong part = lose 2 seconds'] },
-  { key: 'survival', title: 'HOLD THE LINE', mode: 'SURVIVAL', view: '3RD PERSON, THEN 1ST', bg: 'dusk', make: c => new SurvivalMode(c),
+  { key: 'survival', title: 'HOLD THE LINE', mode: 'SURVIVAL', view: 'THIRD PERSON', bg: 'dusk', make: c => new SurvivalMode(c),
     goal: ['1 minute to build a shelter,', 'then survive the bombing', 'and repair your walls.'],
     keys: ['BUILD: ARROWS move SPACE place', 'SHIFT remove  Q/E item  ENTER ready', 'SURVIVE: SPACE repairs a wall'],
     tkeys: ['BUILD: tap a square to place', 'tap items below, READY on top', 'SURVIVE: A repairs a wall'] },
@@ -249,7 +249,7 @@ const CHAPTERS = [
     goal: ['Destroy every enemy base.', 'Bombs land 2 SECONDS later.', 'Do NOT hit our prisoners!'],
     keys: ['ARROWS fly   SPACE drop bomb', 'Q / E or 1-4 change bomb', 'White eggs are OURS'],
     tkeys: ['PAD fly   A drop bomb', 'B / C change bomb', 'White eggs are OURS'] },
-  { key: 'tanking', title: 'IRON SHELL', mode: 'TANKING', view: 'FIRST PERSON', bg: 'fortress', make: c => new TankingMode(c),
+  { key: 'tanking', title: 'IRON SHELL', mode: 'TANKING', view: 'THIRD PERSON', bg: 'fortress', make: c => new TankingMode(c),
     goal: ['Destroy 5 enemy bases,', 'beat the STINKER tank,', 'then grab the GOLDEN EGG!'],
     keys: ['UP/DOWN drive  LEFT/RIGHT turn', 'SPACE fire', 'Watch the radar (top right)'],
     tkeys: ['PAD drive & turn', 'A fire', 'Watch the radar (top right)'] },

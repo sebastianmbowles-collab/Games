@@ -43,11 +43,11 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 | Chapter | Mode | View |
 |---|---|---|
-| 1. The Raid | Running: escape the bomber to the bunker | First person |
+| 1. The Raid | Running: escape the bomber to the bunker | Third person |
 | 2. The Egg Factory | Building: put parts together before time runs out | Third person |
-| 3. Hold the Line | Survival: build a shelter, then repair it under fire | Third, then first person |
+| 3. Hold the Line | Survival: build a shelter, then repair it under fire | Third person |
 | 4. Wings of Shell | Bombing: bombs land 2 seconds late; don't hit prisoners | Bird's eye |
-| 5. Iron Shell | Tanking: bases, the Stinker, then the Golden Egg | First person |
+| 5. Iron Shell | Tanking: bases, the Stinker, then the Golden Egg | Third person |
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.

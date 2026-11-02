@@ -14,6 +14,25 @@ SPR.rubble = (() => { const [c, x] = mk(28, 12); srand(6); for (let i = 0; i < 2
 SPR.sign = (() => { const [c, x] = mk(24, 20); x.fillStyle = '#4a3a22'; x.fillRect(11, 8, 2, 12); x.fillStyle = '#e8c020'; x.fillRect(0, 0, 24, 9); x.fillStyle = '#111'; x.fillRect(1, 1, 22, 7); x.fillStyle = '#e8c020'; x.font = '6px monospace'; x.fillText('BUNKER', 1, 7); return c; })();
 SPR.fire = (() => { const fr = []; for (let f = 0; f < 4; f++) { const [c, x] = mk(16, 20); srand(30 + f); for (let i = 0; i < 30; i++) { const y = rnd() * 18; x.fillStyle = y < 6 ? '#ffd040' : y < 12 ? '#ff7a20' : '#c02a10'; x.fillRect(8 + (rnd() - 0.5) * (20 - y) * 0.6, 20 - y - 2, 2, 2); } fr.push(c); } return fr; })();
 
+// Shelly from behind, for the third-person modes (plus spinning frames for rolling)
+const SHELLY3P = (() => {
+  const cache = {};
+  return st => {
+    if (cache[st]) return cache[st];
+    const back = makeEgg(Object.assign(CAST.shelly(st), { back: true }));
+    const s = Math.ceil(Math.hypot(back.width, back.height)) + 2, roll = [];
+    for (let i = 0; i < 8; i++) { const [c, x] = mk(s, s); x.translate(s / 2, s / 2); x.rotate(i * Math.PI / 4); x.drawImage(back, -back.width / 2, -back.height / 2); roll.push(c); }
+    return (cache[st] = { back, roll, s });
+  };
+})();
+function shellySprite(st, x, y, opt) { // opt: {h, z, rollFrame, lying, alpha}
+  const S = SHELLY3P(st), h = opt.h || 0.5;
+  if (opt.rollFrame !== undefined || opt.lying) {
+    const img = S.roll[opt.lying ? 2 : opt.rollFrame & 7], hh = h * S.s / S.back.height;
+    return { x, y, img, w: hh, h: hh, z: (opt.z || 0) - (hh - h * 0.75) / 2, alpha: opt.alpha };
+  }
+  return { x, y, img: S.back, w: h * S.back.width / S.back.height, h, z: opt.z || 0, alpha: opt.alpha };
+}
 function spatial(cam, x, y, maxD = 20) {
   const d = dist(cam.x, cam.y, x, y), v = clamp(1 - d / maxD, 0, 1);
   const a = angDiff(cam.a, Math.atan2(y - cam.y, x - cam.x));
@@ -165,7 +184,7 @@ class RunningMode {
   }
   draw() {
     const p = this.p;
-    const cam = { x: p.x, y: p.y, a: p.a, z: p.camZ || 0.5, pitch: p.diveT > 0 ? 8 : 0 };
+    const cam = Ray.chase(this.map, p, 2.3, 0.72, -14);
     const sprites = [];
     for (const c of this.covers) sprites.push({ x: c.x, y: c.y, img: SPR.cover, w: 0.9, h: 0.42 });
     for (const r of this.rubble) sprites.push({ x: r.x, y: r.y, img: SPR.rubble, w: 0.9, h: 0.38 });
@@ -175,7 +194,15 @@ class RunningMode {
     sprites.push({ x: 25.2, y: 23.4, img: SPR.sign, w: 0.7, h: 0.6, z: 0.35 });
     const P = this.plane;
     if (P.active) sprites.push({ x: P.x, y: P.y, img: SPR.bomber, w: 4.5, h: 1.8, z: 5, noZ: true });
+    if (!this.dead) {
+      const blink = p.inv > 0 && (p.inv * 8) % 1 < 0.5;
+      const o = { h: this.hiding ? 0.3 : 0.48, z: p.h * 0.6, alpha: blink ? 0.4 : undefined };
+      if (p.diveT > 0) o.lying = true; else if (this.rolling) o.rollFrame = (p.rollA * 1.4) | 0;
+      sprites.push(shellySprite(0, p.x, p.y, o));
+    }
     const decals = this.decals.slice();
+    decals.push({ x: p.x, y: p.y, r: 0.2 - p.h * 0.1, fill: 'rgba(0,0,0,.45)' });
+    if (this.dead) decals.push({ x: p.x, y: p.y, r: 0.5, img: SPLATS[1] });
     if (P.active) decals.push({ x: P.x + 1, y: P.y + 1, r: 1.6, fill: 'rgba(0,0,0,.25)' });
     for (const b of this.bombs) {
       const f = b.t / b.fuse, blink = (b.t * (4 + f * 10)) % 1 < 0.5;
@@ -184,13 +211,11 @@ class RunningMode {
       decals.push({ x: b.x, y: b.y, r: 0.12, fill: '#ff2a1a' });
     }
     ctx.save();
-    const roll = this.rolling ? Math.sin(p.rollA) * 0.32 : 0;
+    const roll = 0;
     if (roll) { ctx.translate(W / 2, H / 2); ctx.rotate(roll); ctx.scale(1.3, 1.3); ctx.translate(-W / 2, -H / 2); }
     Ray.render(cam, this.map, sprites, { decals, skyImg: SKY.town, floor: FLOOR.cobble, fog: '46,20,12', fogDist: 13 });
     ctx.restore();
     // helmet rim, top of screen
-    ctx.fillStyle = '#2e3818'; ctx.beginPath(); ctx.ellipse(W / 2, -26, W * 0.7, 34, 0, 0, 7); ctx.fill();
-    if (this.hiding) { rect(0, H - 30, W, 30, '#5b6b2e'); for (let i = 0; i < W; i += 12) rect(i, H - 30, 10, 3, '#3a4a1e'); }
     // HUD: compass to bunker
     const ba = angDiff(p.a, Math.atan2(this.bunker.y - p.y, this.bunker.x - p.x));
     const bx = W / 2 + clamp(ba / 1.6, -1, 1) * 70;
@@ -203,7 +228,6 @@ class RunningMode {
     const near = this.bombs.some(b => dist(b.x, b.y, p.x, p.y) < 2);
     if (near && (this.time * 6) % 1 < 0.5) { ctx.strokeStyle = '#ff2a1a'; ctx.lineWidth = 3; ctx.strokeRect(2, 2, W - 4, H - 4); }
     txt(this.hiding ? (this.covers.some(c => dist(c.x, c.y, p.x, p.y) < 0.8) ? 'HIDING - SAFE IN SANDBAGS' : 'HIDING (find sandbags!)') : this.rolling ? 'ROLLING!' : '', W / 2, H - 14, '#ffd23a', 'center');
-    if (p.inv > 0 && (p.inv * 8) % 1 < 0.5) { ctx.globalAlpha = 0.25; rect(0, 0, W, H, '#fff'); ctx.globalAlpha = 1; }
-    if (this.dead) drawSplatOverlay(this.dead);
+    if (this.dead) { ctx.globalAlpha = Math.min(0.5, this.dead * 0.4); rect(0, 0, W, H, '#f5b819'); ctx.globalAlpha = 1; txt('SPLAT!', W / 2, 70, '#fff', 'center', 16); }
   }
 }

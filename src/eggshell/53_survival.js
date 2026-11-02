@@ -199,19 +199,21 @@ class SurvivalMode {
       decals.push({ x: b.x, y: b.y, r: 1.6, fill: `rgba(230,30,20,${0.12 + f * 0.25})`, stroke: blink ? '#ff3a2a' : '#901a10' });
       decals.push({ x: b.x, y: b.y, r: Math.max(0.1, 1.6 * (1 - f)), stroke: '#ffd0c0' });
     }
-    Ray.render({ x: p.x, y: p.y, a: p.a, z: p.z }, this.map, sprites, { decals, skyImg: SKY.dusk, floor: FLOOR.dirt, fog: '52,42,34', fogDist: 12 });
-    ctx.fillStyle = '#2e3818'; ctx.beginPath(); ctx.ellipse(W / 2, -26, W * 0.7, 34, 0, 0, 7); ctx.fill();
+    const low = p.z < 0.4;
+    if (!this.dead) sprites.push(shellySprite(2, p.x, p.y, { h: 0.48, z: low ? -0.18 : 0, alpha: p.inv > 0 && (p.inv * 8) % 1 < 0.5 ? 0.4 : undefined }));
+    else decals.push({ x: p.x, y: p.y, r: 0.5, img: SPLATS[2] });
+    decals.push({ x: p.x, y: p.y, r: 0.2, fill: 'rgba(0,0,0,.45)' });
+    if (this.aim) decals.push({ x: this.aim.x + 0.5, y: this.aim.y + 0.5, r: 0.62, stroke: '#7dff6a' });
+    Ray.render(Ray.chase(this.map, p, 1.9, 0.78, -16), this.map, sprites, { decals, skyImg: SKY.dusk, floor: FLOOR.dirt, fog: '52,42,34', fogDist: 12 });
     // crosshair + wall health
     const a = this.aim; const cc = a ? '#7dff6a' : '#f4ecd0';
-    rect(W / 2 - 5, H / 2, 4, 1, cc); rect(W / 2 + 2, H / 2, 4, 1, cc); rect(W / 2, H / 2 - 5, 1, 4, cc); rect(W / 2, H / 2 + 2, 1, 4, cc);
-    if (a) { const mat = MATS[this.g[a.gi]]; bar(W / 2 - 30, H / 2 + 10, 60, 6, this.hp[a.gi] / mat.hp, '#7dff6a'); txt(mat.name, W / 2, H / 2 + 18, '#f4ecd0', 'center'); if (this.hp[a.gi] < mat.hp) txt(In.touch ? 'A: REPAIR' : 'SPACE: REPAIR', W / 2, H / 2 + 28, '#ffd23a', 'center'); }
+    if (a) { const mat = MATS[this.g[a.gi]]; bar(W / 2 - 30, 24, 60, 6, this.hp[a.gi] / mat.hp, '#7dff6a'); txt(mat.name, W / 2, 32, '#f4ecd0', 'center'); if (this.hp[a.gi] < mat.hp) txt(In.touch ? 'A: REPAIR' : 'SPACE: REPAIR', W / 2, 42, '#ffd23a', 'center'); }
     txt('SURVIVE ' + Math.ceil(Math.max(0, this.surviveT)) + 's', 6, 6, '#ffd23a');
     txt('REPAIR KITS ' + this.kits, W - 40, 6, '#f4ecd0', 'right');
     const gx = Math.floor(p.x) - 1, gy = Math.floor(p.y) - 1;
     if (this.inB(gx, gy) && this.hole[this.idx(gx, gy)]) txt('IN FOXHOLE - STAYING LOW', W / 2, H - 14, '#7dff6a', 'center');
     const near = this.bombs.some(b => dist(b.x, b.y, p.x, p.y) < 2);
     if (near && (this.t * 6) % 1 < 0.5) { ctx.strokeStyle = '#ff2a1a'; ctx.lineWidth = 3; ctx.strokeRect(2, 2, W - 4, H - 4); }
-    if (p.inv > 0 && (p.inv * 8) % 1 < 0.5) { ctx.globalAlpha = 0.25; rect(0, 0, W, H, '#fff'); ctx.globalAlpha = 1; }
-    if (this.dead) drawSplatOverlay(this.dead);
+    if (this.dead) { ctx.globalAlpha = Math.min(0.5, this.dead * 0.4); rect(0, 0, W, H, '#f5b819'); ctx.globalAlpha = 1; txt('SPLAT!', W / 2, 70, '#fff', 'center', 16); }
   }
 }

@@ -816,6 +816,7 @@ Ray.render = function (cam, map, sprites, opt = {}) {
   }
   // walls
   const zb = Ray.zbuf;
+  const near = cam.d ? cam.d - 0.3 : 0; // cutaway: skip walls between the chase camera and the player
   for (let x = 0; x < W; x++) {
     const cx = 2 * x / W - 1, rdx = dirX + plX * cx, rdy = dirY + plY * cx;
     let mx = Math.floor(cam.x), my = Math.floor(cam.y);
@@ -827,7 +828,8 @@ Ray.render = function (cam, map, sprites, opt = {}) {
     while (n++ < 80) {
       if (sdx < sdy) { sdx += ddx; mx += sx; side = 0; } else { sdy += ddy; my += sy; side = 1; }
       if (mx < 0 || my < 0 || mx >= map.w || my >= map.h) { tile = -1; break; }
-      tile = map.t[my * map.w + mx]; if (tile > 0) break;
+      tile = map.t[my * map.w + mx];
+      if (tile > 0) { if ((side === 0 ? sdx - ddx : sdy - ddy) < near) { tile = 0; continue; } break; }
     }
     if (tile <= 0) { zb[x] = 1e9; continue; }
     const perp = side === 0 ? (mx - cam.x + (1 - sx) / 2) / rdx : (my - cam.y + (1 - sy) / 2) / rdy;
@@ -888,6 +890,12 @@ Ray.floor = function (cam, hor, proj, dirX, dirY, plX, plY, tex, fog, fogD) {
   }
   FLOORBUF.x.putImageData(img, 0, 0, 0, y0, W, H - y0);
   ctx.drawImage(FLOORBUF.c, 0, y0, W, H - y0, 0, y0, W, H - y0);
+};
+// Third-person chase camera: always sits behind the player. It may float inside a wall
+// (the engine never draws the wall the camera is in), so the player never gets lost.
+Ray.chase = function (map, p, back, z, pitch) {
+  const x = clamp(p.x - Math.cos(p.a) * back, 0.05, map.w - 0.05), y = clamp(p.y - Math.sin(p.a) * back, 0.05, map.h - 0.05);
+  return { x, y, a: p.a, z, pitch, d: back };
 };
 Ray.solid = (map, x, y) => { const mx = Math.floor(x), my = Math.floor(y); if (mx < 0 || my < 0 || mx >= map.w || my >= map.h) return true; return map.t[my * map.w + mx] > 0; };
 Ray.move = function (map, e, dx, dy, r) {
@@ -1140,7 +1148,7 @@ function drawBackdrop(kind, t) {
 // ================= STORY FLOW =================
 const Story = { stage: 0, replay: false };
 const CHAPTERS = [
-  { key: 'running', title: 'THE RAID', mode: 'RUNNING', view: 'FIRST PERSON', bg: 'night', make: c => new RunningMode(c),
+  { key: 'running', title: 'THE RAID', mode: 'RUNNING', view: 'THIRD PERSON', bg: 'night', make: c => new RunningMode(c),
     goal: ['Run through the ruined town', 'and reach the BUNKER.', 'Red marks = bombs landing!'],
     keys: ['ARROWS/WASD  run & turn', 'SPACE jump   SHIFT dive', 'E roll (hold)   Q hide (hold)'],
     tkeys: ['PAD run & turn', 'A jump  B dive', 'C roll (hold)  D hide (hold)'] },
@@ -1148,7 +1156,7 @@ const CHAPTERS = [
     goal: ['Build 10 supplies before', 'the clock runs out.', 'They go to the front line!'],
     keys: ['DRAG parts onto the blueprint', 'or ARROWS pick + SPACE place', 'Wrong part = lose 2 seconds'],
     tkeys: ['DRAG parts onto the blueprint', 'or tap a part to place it', 'Wrong part = lose 2 seconds'] },
-  { key: 'survival', title: 'HOLD THE LINE', mode: 'SURVIVAL', view: '3RD PERSON, THEN 1ST', bg: 'dusk', make: c => new SurvivalMode(c),
+  { key: 'survival', title: 'HOLD THE LINE', mode: 'SURVIVAL', view: 'THIRD PERSON', bg: 'dusk', make: c => new SurvivalMode(c),
     goal: ['1 minute to build a shelter,', 'then survive the bombing', 'and repair your walls.'],
     keys: ['BUILD: ARROWS move SPACE place', 'SHIFT remove  Q/E item  ENTER ready', 'SURVIVE: SPACE repairs a wall'],
     tkeys: ['BUILD: tap a square to place', 'tap items below, READY on top', 'SURVIVE: A repairs a wall'] },
@@ -1156,7 +1164,7 @@ const CHAPTERS = [
     goal: ['Destroy every enemy base.', 'Bombs land 2 SECONDS later.', 'Do NOT hit our prisoners!'],
     keys: ['ARROWS fly   SPACE drop bomb', 'Q / E or 1-4 change bomb', 'White eggs are OURS'],
     tkeys: ['PAD fly   A drop bomb', 'B / C change bomb', 'White eggs are OURS'] },
-  { key: 'tanking', title: 'IRON SHELL', mode: 'TANKING', view: 'FIRST PERSON', bg: 'fortress', make: c => new TankingMode(c),
+  { key: 'tanking', title: 'IRON SHELL', mode: 'TANKING', view: 'THIRD PERSON', bg: 'fortress', make: c => new TankingMode(c),
     goal: ['Destroy 5 enemy bases,', 'beat the STINKER tank,', 'then grab the GOLDEN EGG!'],
     keys: ['UP/DOWN drive  LEFT/RIGHT turn', 'SPACE fire', 'Watch the radar (top right)'],
     tkeys: ['PAD drive & turn', 'A fire', 'Watch the radar (top right)'] },
@@ -1401,6 +1409,25 @@ SPR.rubble = (() => { const [c, x] = mk(28, 12); srand(6); for (let i = 0; i < 2
 SPR.sign = (() => { const [c, x] = mk(24, 20); x.fillStyle = '#4a3a22'; x.fillRect(11, 8, 2, 12); x.fillStyle = '#e8c020'; x.fillRect(0, 0, 24, 9); x.fillStyle = '#111'; x.fillRect(1, 1, 22, 7); x.fillStyle = '#e8c020'; x.font = '6px monospace'; x.fillText('BUNKER', 1, 7); return c; })();
 SPR.fire = (() => { const fr = []; for (let f = 0; f < 4; f++) { const [c, x] = mk(16, 20); srand(30 + f); for (let i = 0; i < 30; i++) { const y = rnd() * 18; x.fillStyle = y < 6 ? '#ffd040' : y < 12 ? '#ff7a20' : '#c02a10'; x.fillRect(8 + (rnd() - 0.5) * (20 - y) * 0.6, 20 - y - 2, 2, 2); } fr.push(c); } return fr; })();
 
+// Shelly from behind, for the third-person modes (plus spinning frames for rolling)
+const SHELLY3P = (() => {
+  const cache = {};
+  return st => {
+    if (cache[st]) return cache[st];
+    const back = makeEgg(Object.assign(CAST.shelly(st), { back: true }));
+    const s = Math.ceil(Math.hypot(back.width, back.height)) + 2, roll = [];
+    for (let i = 0; i < 8; i++) { const [c, x] = mk(s, s); x.translate(s / 2, s / 2); x.rotate(i * Math.PI / 4); x.drawImage(back, -back.width / 2, -back.height / 2); roll.push(c); }
+    return (cache[st] = { back, roll, s });
+  };
+})();
+function shellySprite(st, x, y, opt) { // opt: {h, z, rollFrame, lying, alpha}
+  const S = SHELLY3P(st), h = opt.h || 0.5;
+  if (opt.rollFrame !== undefined || opt.lying) {
+    const img = S.roll[opt.lying ? 2 : opt.rollFrame & 7], hh = h * S.s / S.back.height;
+    return { x, y, img, w: hh, h: hh, z: (opt.z || 0) - (hh - h * 0.75) / 2, alpha: opt.alpha };
+  }
+  return { x, y, img: S.back, w: h * S.back.width / S.back.height, h, z: opt.z || 0, alpha: opt.alpha };
+}
 function spatial(cam, x, y, maxD = 20) {
   const d = dist(cam.x, cam.y, x, y), v = clamp(1 - d / maxD, 0, 1);
   const a = angDiff(cam.a, Math.atan2(y - cam.y, x - cam.x));
@@ -1552,7 +1579,7 @@ class RunningMode {
   }
   draw() {
     const p = this.p;
-    const cam = { x: p.x, y: p.y, a: p.a, z: p.camZ || 0.5, pitch: p.diveT > 0 ? 8 : 0 };
+    const cam = Ray.chase(this.map, p, 2.3, 0.72, -14);
     const sprites = [];
     for (const c of this.covers) sprites.push({ x: c.x, y: c.y, img: SPR.cover, w: 0.9, h: 0.42 });
     for (const r of this.rubble) sprites.push({ x: r.x, y: r.y, img: SPR.rubble, w: 0.9, h: 0.38 });
@@ -1562,7 +1589,15 @@ class RunningMode {
     sprites.push({ x: 25.2, y: 23.4, img: SPR.sign, w: 0.7, h: 0.6, z: 0.35 });
     const P = this.plane;
     if (P.active) sprites.push({ x: P.x, y: P.y, img: SPR.bomber, w: 4.5, h: 1.8, z: 5, noZ: true });
+    if (!this.dead) {
+      const blink = p.inv > 0 && (p.inv * 8) % 1 < 0.5;
+      const o = { h: this.hiding ? 0.3 : 0.48, z: p.h * 0.6, alpha: blink ? 0.4 : undefined };
+      if (p.diveT > 0) o.lying = true; else if (this.rolling) o.rollFrame = (p.rollA * 1.4) | 0;
+      sprites.push(shellySprite(0, p.x, p.y, o));
+    }
     const decals = this.decals.slice();
+    decals.push({ x: p.x, y: p.y, r: 0.2 - p.h * 0.1, fill: 'rgba(0,0,0,.45)' });
+    if (this.dead) decals.push({ x: p.x, y: p.y, r: 0.5, img: SPLATS[1] });
     if (P.active) decals.push({ x: P.x + 1, y: P.y + 1, r: 1.6, fill: 'rgba(0,0,0,.25)' });
     for (const b of this.bombs) {
       const f = b.t / b.fuse, blink = (b.t * (4 + f * 10)) % 1 < 0.5;
@@ -1571,13 +1606,11 @@ class RunningMode {
       decals.push({ x: b.x, y: b.y, r: 0.12, fill: '#ff2a1a' });
     }
     ctx.save();
-    const roll = this.rolling ? Math.sin(p.rollA) * 0.32 : 0;
+    const roll = 0;
     if (roll) { ctx.translate(W / 2, H / 2); ctx.rotate(roll); ctx.scale(1.3, 1.3); ctx.translate(-W / 2, -H / 2); }
     Ray.render(cam, this.map, sprites, { decals, skyImg: SKY.town, floor: FLOOR.cobble, fog: '46,20,12', fogDist: 13 });
     ctx.restore();
     // helmet rim, top of screen
-    ctx.fillStyle = '#2e3818'; ctx.beginPath(); ctx.ellipse(W / 2, -26, W * 0.7, 34, 0, 0, 7); ctx.fill();
-    if (this.hiding) { rect(0, H - 30, W, 30, '#5b6b2e'); for (let i = 0; i < W; i += 12) rect(i, H - 30, 10, 3, '#3a4a1e'); }
     // HUD: compass to bunker
     const ba = angDiff(p.a, Math.atan2(this.bunker.y - p.y, this.bunker.x - p.x));
     const bx = W / 2 + clamp(ba / 1.6, -1, 1) * 70;
@@ -1590,8 +1623,7 @@ class RunningMode {
     const near = this.bombs.some(b => dist(b.x, b.y, p.x, p.y) < 2);
     if (near && (this.time * 6) % 1 < 0.5) { ctx.strokeStyle = '#ff2a1a'; ctx.lineWidth = 3; ctx.strokeRect(2, 2, W - 4, H - 4); }
     txt(this.hiding ? (this.covers.some(c => dist(c.x, c.y, p.x, p.y) < 0.8) ? 'HIDING - SAFE IN SANDBAGS' : 'HIDING (find sandbags!)') : this.rolling ? 'ROLLING!' : '', W / 2, H - 14, '#ffd23a', 'center');
-    if (p.inv > 0 && (p.inv * 8) % 1 < 0.5) { ctx.globalAlpha = 0.25; rect(0, 0, W, H, '#fff'); ctx.globalAlpha = 1; }
-    if (this.dead) drawSplatOverlay(this.dead);
+    if (this.dead) { ctx.globalAlpha = Math.min(0.5, this.dead * 0.4); rect(0, 0, W, H, '#f5b819'); ctx.globalAlpha = 1; txt('SPLAT!', W / 2, 70, '#fff', 'center', 16); }
   }
 }
 // ================= MODE 5 (story chapter 2): BUILDING — third person =================
@@ -1957,20 +1989,22 @@ class SurvivalMode {
       decals.push({ x: b.x, y: b.y, r: 1.6, fill: `rgba(230,30,20,${0.12 + f * 0.25})`, stroke: blink ? '#ff3a2a' : '#901a10' });
       decals.push({ x: b.x, y: b.y, r: Math.max(0.1, 1.6 * (1 - f)), stroke: '#ffd0c0' });
     }
-    Ray.render({ x: p.x, y: p.y, a: p.a, z: p.z }, this.map, sprites, { decals, skyImg: SKY.dusk, floor: FLOOR.dirt, fog: '52,42,34', fogDist: 12 });
-    ctx.fillStyle = '#2e3818'; ctx.beginPath(); ctx.ellipse(W / 2, -26, W * 0.7, 34, 0, 0, 7); ctx.fill();
+    const low = p.z < 0.4;
+    if (!this.dead) sprites.push(shellySprite(2, p.x, p.y, { h: 0.48, z: low ? -0.18 : 0, alpha: p.inv > 0 && (p.inv * 8) % 1 < 0.5 ? 0.4 : undefined }));
+    else decals.push({ x: p.x, y: p.y, r: 0.5, img: SPLATS[2] });
+    decals.push({ x: p.x, y: p.y, r: 0.2, fill: 'rgba(0,0,0,.45)' });
+    if (this.aim) decals.push({ x: this.aim.x + 0.5, y: this.aim.y + 0.5, r: 0.62, stroke: '#7dff6a' });
+    Ray.render(Ray.chase(this.map, p, 1.9, 0.78, -16), this.map, sprites, { decals, skyImg: SKY.dusk, floor: FLOOR.dirt, fog: '52,42,34', fogDist: 12 });
     // crosshair + wall health
     const a = this.aim; const cc = a ? '#7dff6a' : '#f4ecd0';
-    rect(W / 2 - 5, H / 2, 4, 1, cc); rect(W / 2 + 2, H / 2, 4, 1, cc); rect(W / 2, H / 2 - 5, 1, 4, cc); rect(W / 2, H / 2 + 2, 1, 4, cc);
-    if (a) { const mat = MATS[this.g[a.gi]]; bar(W / 2 - 30, H / 2 + 10, 60, 6, this.hp[a.gi] / mat.hp, '#7dff6a'); txt(mat.name, W / 2, H / 2 + 18, '#f4ecd0', 'center'); if (this.hp[a.gi] < mat.hp) txt(In.touch ? 'A: REPAIR' : 'SPACE: REPAIR', W / 2, H / 2 + 28, '#ffd23a', 'center'); }
+    if (a) { const mat = MATS[this.g[a.gi]]; bar(W / 2 - 30, 24, 60, 6, this.hp[a.gi] / mat.hp, '#7dff6a'); txt(mat.name, W / 2, 32, '#f4ecd0', 'center'); if (this.hp[a.gi] < mat.hp) txt(In.touch ? 'A: REPAIR' : 'SPACE: REPAIR', W / 2, 42, '#ffd23a', 'center'); }
     txt('SURVIVE ' + Math.ceil(Math.max(0, this.surviveT)) + 's', 6, 6, '#ffd23a');
     txt('REPAIR KITS ' + this.kits, W - 40, 6, '#f4ecd0', 'right');
     const gx = Math.floor(p.x) - 1, gy = Math.floor(p.y) - 1;
     if (this.inB(gx, gy) && this.hole[this.idx(gx, gy)]) txt('IN FOXHOLE - STAYING LOW', W / 2, H - 14, '#7dff6a', 'center');
     const near = this.bombs.some(b => dist(b.x, b.y, p.x, p.y) < 2);
     if (near && (this.t * 6) % 1 < 0.5) { ctx.strokeStyle = '#ff2a1a'; ctx.lineWidth = 3; ctx.strokeRect(2, 2, W - 4, H - 4); }
-    if (p.inv > 0 && (p.inv * 8) % 1 < 0.5) { ctx.globalAlpha = 0.25; rect(0, 0, W, H, '#fff'); ctx.globalAlpha = 1; }
-    if (this.dead) drawSplatOverlay(this.dead);
+    if (this.dead) { ctx.globalAlpha = Math.min(0.5, this.dead * 0.4); rect(0, 0, W, H, '#f5b819'); ctx.globalAlpha = 1; txt('SPLAT!', W / 2, 70, '#fff', 'center', 16); }
   }
 }
 // ================= MODE 1 (story chapter 4): BOMBING — bird's eye view =================
@@ -2234,6 +2268,22 @@ function makeTankFront(body, big) {
   return c;
 }
 SPR.etank = makeTankFront('#4a5238');
+// our tank, seen from behind (barrel pointing away from you)
+function makeTankBack(lvl) {
+  const [c, x] = mk(44, 32);
+  x.fillStyle = '#121410'; x.fillRect(0, 14, 11, 18); x.fillRect(33, 14, 11, 18);
+  x.fillStyle = '#3a3a34'; for (let y = 15; y < 32; y += 3) { x.fillRect(1, y, 9, 1); x.fillRect(34, y, 9, 1); }
+  x.fillStyle = '#5b6b2e'; x.fillRect(9, 12, 26, 18); x.fillStyle = '#7a8a40'; x.fillRect(9, 12, 26, 2); x.fillStyle = '#3e4a20'; x.fillRect(9, 26, 26, 4);
+  x.fillStyle = '#4b5a26'; x.fillRect(13, 5, 18, 10); x.fillStyle = '#6a7a36'; x.fillRect(13, 5, 18, 2);
+  x.fillStyle = '#2e3818'; x.fillRect(20, 0, 4, 7); x.fillStyle = '#1a2010'; x.fillRect(20, 0, 4, 1);
+  x.fillStyle = '#fff'; x.beginPath(); x.arc(22, 20, 3.5, 0, 7); x.fill(); x.fillStyle = '#f5b819'; x.beginPath(); x.arc(22, 20, 2, 0, 7); x.fill();
+  x.fillStyle = '#2a2a24'; x.fillRect(12, 27, 4, 3); x.fillRect(28, 27, 4, 3);
+  if (lvl >= 1) { x.fillStyle = '#121410'; x.fillRect(0, 26, 11, 6); x.fillStyle = '#5a3a20'; x.fillRect(2, 28, 7, 2); }
+  if (lvl >= 2) { x.fillStyle = '#1a1a14'; x.fillRect(19, 0, 6, 3); x.fillStyle = '#3a3a34'; x.fillRect(16, 7, 3, 2); }
+  if (lvl >= 3) { x.fillStyle = '#111'; x.fillRect(14, 16, 6, 2); x.fillRect(26, 22, 5, 2); x.fillRect(24, 13, 1, 6); }
+  return c;
+}
+SPR.mytank = [0, 1, 2, 3].map(makeTankBack);
 SPR.stinker = makeTankFront('#5f7a24', true);
 SPR.wreck = (() => { const [c, x] = mk(40, 20); x.fillStyle = '#1a1814'; x.fillRect(2, 8, 36, 12); x.fillRect(12, 2, 16, 8); x.fillStyle = '#2a2420'; for (let i = 0; i < 20; i++) x.fillRect(R() * 38, 6 + R() * 13, 2, 1); return c; })();
 SPR.bunker = (() => { const [c, x] = mk(48, 30); x.fillStyle = '#3a4030'; x.beginPath(); x.ellipse(24, 30, 24, 24, 0, Math.PI, 0); x.fill(); x.fillStyle = '#4e5640'; x.beginPath(); x.ellipse(24, 30, 21, 21, 0, Math.PI, 0); x.fill(); x.fillStyle = '#0a0a08'; x.fillRect(10, 18, 28, 4); x.fillStyle = '#6f8a2a'; x.beginPath(); x.ellipse(24, 11, 4, 5, 0, 0, 7); x.fill(); x.fillStyle = '#111'; x.fillRect(22, 10, 1, 1); x.fillRect(25, 10, 1, 1); x.fillStyle = '#b59a62'; for (let i = 0; i < 48; i += 6) x.fillRect(i, 26, 5, 4); return c; })();
@@ -2433,19 +2483,19 @@ class TankingMode {
     for (const s of this.shots) sprites.push({ x: s.x, y: s.y, img: SPR.shot, w: 0.18, h: 0.18, z: 0.42 });
     for (const s of this.eshots) sprites.push({ x: s.x, y: s.y, img: SPR.eshot, w: 0.22, h: 0.22, z: 0.42 });
     for (const b of this.booms) sprites.push({ x: b.x, y: b.y, img: BOOM[Math.min(9, (b.t / 0.8 * 10) | 0)], w: b.s, h: b.s, z: -0.2 });
-    Ray.render({ x: p.x, y: p.y, a: p.a, z: 0.55, pitch: this.recoil * -4 }, this.map, sprites, { decals: this.decals, skyImg: SKY.storm, floor: FLOOR.mud, fog: '62,60,40', fogDist: 17 });
+    if (!this.dead) {
+      const lvl = (this.dmg.treads ? 1 : 0) + (this.dmg.cannon ? 1 : 0) + (this.dmg.hull ? 1 : 0);
+      const rk = this.recoil * 0.12, bx = p.x - Math.cos(p.a) * rk, by = p.y - Math.sin(p.a) * rk;
+      sprites.push({ x: bx, y: by, img: SPR.mytank[lvl], w: 1.05, h: 0.76 });
+      if (this.recoil > 0.6) sprites.push({ x: p.x + Math.cos(p.a) * 0.75, y: p.y + Math.sin(p.a) * 0.75, img: BOOM[1], w: 0.6, h: 0.6, z: 0.2 });
+      if (lvl >= 2) sprites.push({ x: bx, y: by, img: SPR.fire[((this.t * 8) | 0) % 4], w: 0.3, h: 0.4, z: 0.6 });
+    } else sprites.push({ x: p.x, y: p.y, img: SPR.wreck, w: 1.2, h: 0.55 }, { x: p.x, y: p.y, img: SPR.fire[((this.t * 8) | 0) % 4], w: 0.8, h: 1, z: 0.2 });
+    Ray.render(Ray.chase(this.map, p, 2.4, 0.85, -14 - this.recoil * 3), this.map, sprites, { decals: this.decals, skyImg: SKY.storm, floor: FLOOR.mud, fog: '62,60,40', fogDist: 17 });
     // rotten egg goo on the periscope
     for (const g of this.goo) { ctx.globalAlpha = Math.min(1, g.t); ctx.fillStyle = '#7d8f3a'; ctx.beginPath(); ctx.ellipse(g.x, g.y, g.r, g.r * 0.8, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#a0b048'; ctx.beginPath(); ctx.ellipse(g.x - 3, g.y - 3, g.r * 0.4, g.r * 0.3, 0, 0, 7); ctx.fill(); rect(g.x - 2, g.y + g.r * 0.6, 3, (2.5 - g.t) * 14, '#7d8f3a'); }
     ctx.globalAlpha = 1;
-    // inside the tank: hull, barrel, crosshair
-    const rc = this.recoil * 6;
-    ctx.fillStyle = '#2a3018'; ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, H - 26); ctx.lineTo(70, H - 34); ctx.lineTo(W - 70, H - 34); ctx.lineTo(W, H - 26); ctx.lineTo(W, H); ctx.fill();
-    rect(70, H - 34, W - 140, 2, '#4a5428');
-    ctx.fillStyle = '#1e2410'; ctx.beginPath(); ctx.moveTo(W / 2 - 14, H); ctx.lineTo(W / 2 - 6, H - 52 + rc); ctx.lineTo(W / 2 + 6, H - 52 + rc); ctx.lineTo(W / 2 + 14, H); ctx.fill();
-    rect(W / 2 - 6, H - 54 + rc, 12, 4, '#3a4420');
-    if (this.recoil > 0.7) { ctx.fillStyle = '#ffd040'; ctx.beginPath(); ctx.arc(W / 2, H - 60, 8 * this.recoil, 0, 7); ctx.fill(); }
     ctx.strokeStyle = this.cool <= 0 ? '#7dff6a' : '#ff5a4a'; ctx.lineWidth = 1;
-    ctx.strokeRect(W / 2 - 8.5, H / 2 - 8.5, 17, 17); rect(W / 2, H / 2 - 14, 1, 6, ctx.strokeStyle); rect(W / 2, H / 2 + 8, 1, 6, ctx.strokeStyle);
+    ctx.strokeRect(W / 2 - 6.5, 52.5, 13, 13); rect(W / 2, 48, 1, 5, ctx.strokeStyle); rect(W / 2, 65, 1, 5, ctx.strokeStyle);
     // tank damage card
     box(4, H - 50, 62, 46, '#14160e', '#6a6450');
     txt('TANK', 8, H - 46, '#c8b77a', 'left', 6);
@@ -2462,7 +2512,7 @@ class TankingMode {
     rect(RX - 1, RY - 1, 3, 3, '#7dff6a');
     txt(this.golden ? 'GRAB THE GOLDEN EGG!' : this.stinker && !this.stinker.dead ? 'DESTROY THE STINKER' : 'BASES LEFT ' + this.basesLeft(), 6, 6, '#ffd23a');
     if (this.stinker && !this.stinker.dead) bar(6, 16, 100, 6, this.stinker.hp / 12, '#7d8f3a');
-    if (this.dead) { ctx.globalAlpha = Math.min(0.85, this.dead); rect(0, 0, W, H, '#1a0a04'); ctx.globalAlpha = 1; txt('KA-BOOM!', W / 2, H / 2 - 8, '#ff6a3a', 'center', 16); }
+    if (this.dead) { ctx.globalAlpha = Math.min(0.45, this.dead * 0.4); rect(0, 0, W, H, '#1a0a04'); ctx.globalAlpha = 1; txt('KA-BOOM!', W / 2, 60, '#ff6a3a', 'center', 16); }
   }
 }
 // ================= MAIN LOOP =================

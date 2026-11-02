@@ -13,6 +13,22 @@ function makeTankFront(body, big) {
   return c;
 }
 SPR.etank = makeTankFront('#4a5238');
+// our tank, seen from behind (barrel pointing away from you)
+function makeTankBack(lvl) {
+  const [c, x] = mk(44, 32);
+  x.fillStyle = '#121410'; x.fillRect(0, 14, 11, 18); x.fillRect(33, 14, 11, 18);
+  x.fillStyle = '#3a3a34'; for (let y = 15; y < 32; y += 3) { x.fillRect(1, y, 9, 1); x.fillRect(34, y, 9, 1); }
+  x.fillStyle = '#5b6b2e'; x.fillRect(9, 12, 26, 18); x.fillStyle = '#7a8a40'; x.fillRect(9, 12, 26, 2); x.fillStyle = '#3e4a20'; x.fillRect(9, 26, 26, 4);
+  x.fillStyle = '#4b5a26'; x.fillRect(13, 5, 18, 10); x.fillStyle = '#6a7a36'; x.fillRect(13, 5, 18, 2);
+  x.fillStyle = '#2e3818'; x.fillRect(20, 0, 4, 7); x.fillStyle = '#1a2010'; x.fillRect(20, 0, 4, 1);
+  x.fillStyle = '#fff'; x.beginPath(); x.arc(22, 20, 3.5, 0, 7); x.fill(); x.fillStyle = '#f5b819'; x.beginPath(); x.arc(22, 20, 2, 0, 7); x.fill();
+  x.fillStyle = '#2a2a24'; x.fillRect(12, 27, 4, 3); x.fillRect(28, 27, 4, 3);
+  if (lvl >= 1) { x.fillStyle = '#121410'; x.fillRect(0, 26, 11, 6); x.fillStyle = '#5a3a20'; x.fillRect(2, 28, 7, 2); }
+  if (lvl >= 2) { x.fillStyle = '#1a1a14'; x.fillRect(19, 0, 6, 3); x.fillStyle = '#3a3a34'; x.fillRect(16, 7, 3, 2); }
+  if (lvl >= 3) { x.fillStyle = '#111'; x.fillRect(14, 16, 6, 2); x.fillRect(26, 22, 5, 2); x.fillRect(24, 13, 1, 6); }
+  return c;
+}
+SPR.mytank = [0, 1, 2, 3].map(makeTankBack);
 SPR.stinker = makeTankFront('#5f7a24', true);
 SPR.wreck = (() => { const [c, x] = mk(40, 20); x.fillStyle = '#1a1814'; x.fillRect(2, 8, 36, 12); x.fillRect(12, 2, 16, 8); x.fillStyle = '#2a2420'; for (let i = 0; i < 20; i++) x.fillRect(R() * 38, 6 + R() * 13, 2, 1); return c; })();
 SPR.bunker = (() => { const [c, x] = mk(48, 30); x.fillStyle = '#3a4030'; x.beginPath(); x.ellipse(24, 30, 24, 24, 0, Math.PI, 0); x.fill(); x.fillStyle = '#4e5640'; x.beginPath(); x.ellipse(24, 30, 21, 21, 0, Math.PI, 0); x.fill(); x.fillStyle = '#0a0a08'; x.fillRect(10, 18, 28, 4); x.fillStyle = '#6f8a2a'; x.beginPath(); x.ellipse(24, 11, 4, 5, 0, 0, 7); x.fill(); x.fillStyle = '#111'; x.fillRect(22, 10, 1, 1); x.fillRect(25, 10, 1, 1); x.fillStyle = '#b59a62'; for (let i = 0; i < 48; i += 6) x.fillRect(i, 26, 5, 4); return c; })();
@@ -212,19 +228,19 @@ class TankingMode {
     for (const s of this.shots) sprites.push({ x: s.x, y: s.y, img: SPR.shot, w: 0.18, h: 0.18, z: 0.42 });
     for (const s of this.eshots) sprites.push({ x: s.x, y: s.y, img: SPR.eshot, w: 0.22, h: 0.22, z: 0.42 });
     for (const b of this.booms) sprites.push({ x: b.x, y: b.y, img: BOOM[Math.min(9, (b.t / 0.8 * 10) | 0)], w: b.s, h: b.s, z: -0.2 });
-    Ray.render({ x: p.x, y: p.y, a: p.a, z: 0.55, pitch: this.recoil * -4 }, this.map, sprites, { decals: this.decals, skyImg: SKY.storm, floor: FLOOR.mud, fog: '62,60,40', fogDist: 17 });
+    if (!this.dead) {
+      const lvl = (this.dmg.treads ? 1 : 0) + (this.dmg.cannon ? 1 : 0) + (this.dmg.hull ? 1 : 0);
+      const rk = this.recoil * 0.12, bx = p.x - Math.cos(p.a) * rk, by = p.y - Math.sin(p.a) * rk;
+      sprites.push({ x: bx, y: by, img: SPR.mytank[lvl], w: 1.05, h: 0.76 });
+      if (this.recoil > 0.6) sprites.push({ x: p.x + Math.cos(p.a) * 0.75, y: p.y + Math.sin(p.a) * 0.75, img: BOOM[1], w: 0.6, h: 0.6, z: 0.2 });
+      if (lvl >= 2) sprites.push({ x: bx, y: by, img: SPR.fire[((this.t * 8) | 0) % 4], w: 0.3, h: 0.4, z: 0.6 });
+    } else sprites.push({ x: p.x, y: p.y, img: SPR.wreck, w: 1.2, h: 0.55 }, { x: p.x, y: p.y, img: SPR.fire[((this.t * 8) | 0) % 4], w: 0.8, h: 1, z: 0.2 });
+    Ray.render(Ray.chase(this.map, p, 2.4, 0.85, -14 - this.recoil * 3), this.map, sprites, { decals: this.decals, skyImg: SKY.storm, floor: FLOOR.mud, fog: '62,60,40', fogDist: 17 });
     // rotten egg goo on the periscope
     for (const g of this.goo) { ctx.globalAlpha = Math.min(1, g.t); ctx.fillStyle = '#7d8f3a'; ctx.beginPath(); ctx.ellipse(g.x, g.y, g.r, g.r * 0.8, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#a0b048'; ctx.beginPath(); ctx.ellipse(g.x - 3, g.y - 3, g.r * 0.4, g.r * 0.3, 0, 0, 7); ctx.fill(); rect(g.x - 2, g.y + g.r * 0.6, 3, (2.5 - g.t) * 14, '#7d8f3a'); }
     ctx.globalAlpha = 1;
-    // inside the tank: hull, barrel, crosshair
-    const rc = this.recoil * 6;
-    ctx.fillStyle = '#2a3018'; ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, H - 26); ctx.lineTo(70, H - 34); ctx.lineTo(W - 70, H - 34); ctx.lineTo(W, H - 26); ctx.lineTo(W, H); ctx.fill();
-    rect(70, H - 34, W - 140, 2, '#4a5428');
-    ctx.fillStyle = '#1e2410'; ctx.beginPath(); ctx.moveTo(W / 2 - 14, H); ctx.lineTo(W / 2 - 6, H - 52 + rc); ctx.lineTo(W / 2 + 6, H - 52 + rc); ctx.lineTo(W / 2 + 14, H); ctx.fill();
-    rect(W / 2 - 6, H - 54 + rc, 12, 4, '#3a4420');
-    if (this.recoil > 0.7) { ctx.fillStyle = '#ffd040'; ctx.beginPath(); ctx.arc(W / 2, H - 60, 8 * this.recoil, 0, 7); ctx.fill(); }
     ctx.strokeStyle = this.cool <= 0 ? '#7dff6a' : '#ff5a4a'; ctx.lineWidth = 1;
-    ctx.strokeRect(W / 2 - 8.5, H / 2 - 8.5, 17, 17); rect(W / 2, H / 2 - 14, 1, 6, ctx.strokeStyle); rect(W / 2, H / 2 + 8, 1, 6, ctx.strokeStyle);
+    ctx.strokeRect(W / 2 - 6.5, 52.5, 13, 13); rect(W / 2, 48, 1, 5, ctx.strokeStyle); rect(W / 2, 65, 1, 5, ctx.strokeStyle);
     // tank damage card
     box(4, H - 50, 62, 46, '#14160e', '#6a6450');
     txt('TANK', 8, H - 46, '#c8b77a', 'left', 6);
@@ -241,6 +257,6 @@ class TankingMode {
     rect(RX - 1, RY - 1, 3, 3, '#7dff6a');
     txt(this.golden ? 'GRAB THE GOLDEN EGG!' : this.stinker && !this.stinker.dead ? 'DESTROY THE STINKER' : 'BASES LEFT ' + this.basesLeft(), 6, 6, '#ffd23a');
     if (this.stinker && !this.stinker.dead) bar(6, 16, 100, 6, this.stinker.hp / 12, '#7d8f3a');
-    if (this.dead) { ctx.globalAlpha = Math.min(0.85, this.dead); rect(0, 0, W, H, '#1a0a04'); ctx.globalAlpha = 1; txt('KA-BOOM!', W / 2, H / 2 - 8, '#ff6a3a', 'center', 16); }
+    if (this.dead) { ctx.globalAlpha = Math.min(0.45, this.dead * 0.4); rect(0, 0, W, H, '#1a0a04'); ctx.globalAlpha = 1; txt('KA-BOOM!', W / 2, 60, '#ff6a3a', 'center', 16); }
   }
 }
