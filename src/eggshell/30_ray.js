@@ -216,6 +216,7 @@ Ray.render = function (cam, map, sprites, opt = {}) {
     if (s.fogged !== false && ty > 4) { /* distant sprites get a light haze */ }
   }
   if (opt.vignette !== false) ctx.drawImage(VIGNETTE, 0, 0);
+  chunkify();
   return { proj, hor, toCam };
 };
 // Floor casting: work out which bit of the ground texture each screen pixel shows.

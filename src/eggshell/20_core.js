@@ -1,7 +1,7 @@
 // ================= CORE: screen, text, random numbers, pixel art =================
 const W = 320, H = 180;
 const cv = document.getElementById('c');
-const ctx = cv.getContext('2d');
+const ctx = cv.getContext('2d', { willReadFrequently: true });
 const FONT = '"Press Start 2P", monospace';
 
 function resize() {
@@ -12,6 +12,43 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
+// ================= 8-BIT FILTER =================
+// Squeezes every frame into a 34-colour 8-bit war palette with checkerboard dithering,
+// the way old consoles could only show a few colours.
+const RETRO = (() => {
+  const NES = '000000 1a1a1a 3a3a3a 5e5e5e 8a8a8a b4b4b4 dedede ffffff 2a1a0e 4a2e18 6e4626 965e32 c08a4e e0b878 f4e2b0 1c2a12 2e4a1a 4a6a22 6e8e2e 9ab040 c8d870 3a0e0a 7a1a10 b8301c e85a20 f8962e ffd23a fff07a 0e1a3a 1e3e7a 3a6ec0 8ab8e8 3a1a3a 7a4a8a'.split(' ').map(h => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]);
+  const lut = new Uint32Array(32768);
+  for (let r = 0; r < 32; r++) for (let g = 0; g < 32; g++) for (let b = 0; b < 32; b++) {
+    const R = r * 8.2, G = g * 8.2, B = b * 8.2; let best = 0, bd = 1e9;
+    for (let i = 0; i < NES.length; i++) { const p = NES[i], dr = R - p[0], dg = G - p[1], db = B - p[2]; const d = dr * dr * 3 + dg * dg * 4 + db * db * 2; if (d < bd) { bd = d; best = i; } }
+    const p = NES[best]; lut[(r << 10) | (g << 5) | b] = 0xff000000 | (p[2] << 16) | (p[1] << 8) | p[0];
+  }
+  const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v / 16 - 0.47) * 22);
+  return {
+    on: true,
+    apply(c) {
+      const img = c.getImageData(0, 0, W, H), d = new Uint32Array(img.data.buffer);
+      for (let y = 0, i = 0; y < H; y++) {
+        const row = (y & 3) << 2;
+        for (let x = 0; x < W; x++, i++) {
+          const v = d[i], o = bayer[row | (x & 3)];
+          let r = (v & 255) + o, g = ((v >>> 8) & 255) + o, b = ((v >>> 16) & 255) + o;
+          r = r < 0 ? 0 : r > 255 ? 255 : r; g = g < 0 ? 0 : g > 255 ? 255 : g; b = b < 0 ? 0 : b > 255 ? 255 : b;
+          d[i] = lut[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)];
+        }
+      }
+      c.putImageData(img, 0, 0);
+    }
+  };
+})();
+// Make the 3D world twice as chunky (the HUD drawn afterwards stays sharp).
+const CHUNK = (() => { const c = document.createElement('canvas'); c.width = W / 2; c.height = H / 2; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; return { c, x }; })();
+function chunkify() {
+  if (!RETRO.on) return;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
+  CHUNK.x.clearRect(0, 0, W / 2, H / 2); CHUNK.x.drawImage(cv, 0, 0, W, H, 0, 0, W / 2, H / 2);
+  ctx.drawImage(CHUNK.c, 0, 0, W / 2, H / 2, 0, 0, W, H); ctx.restore();
+}
 function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; return [c, x]; }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;

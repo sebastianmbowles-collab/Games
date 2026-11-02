@@ -344,7 +344,7 @@ class TitleScreen {
   constructor() { this.t = 0; this.sel = 0; this.confirmNew = false; this.touch = { pad: true, a: 'OK' }; }
   enter() { Snd.play('title'); }
   items() {
-    const a = [{ k: 'story', l: save.chapter > 0 || save.prologue ? (save.finished ? 'WATCH ENDING' : 'CONTINUE STORY') : 'START STORY' }, { k: 'chapters', l: 'CHAPTERS' }, { k: 'sound', l: 'SOUND: ' + (Snd.isMuted() ? 'OFF' : 'ON') }, { k: 'voices', l: 'VOICES: ' + (Voice.on ? 'ON' : 'OFF') }];
+    const a = [{ k: 'story', l: save.chapter > 0 || save.prologue ? (save.finished ? 'WATCH ENDING' : 'CONTINUE STORY') : 'START STORY' }, { k: 'chapters', l: 'CHAPTERS' }, { k: 'sound', l: 'SOUND: ' + (Snd.isMuted() ? 'OFF' : 'ON') }, { k: 'voices', l: 'VOICES: ' + (Voice.on ? 'ON' : 'OFF') }, { k: 'retro', l: '8-BIT LOOK: ' + (RETRO.on ? 'ON' : 'OFF') }];
     if (save.chapter > 0 || save.prologue) a.push({ k: 'new', l: this.confirmNew ? 'SURE? PRESS AGAIN' : 'NEW GAME' });
     return a;
   }
@@ -353,13 +353,14 @@ class TitleScreen {
     if (In.hit('up')) { this.sel = (this.sel + it.length - 1) % it.length; Snd.blip(); this.confirmNew = false; }
     if (In.hit('down')) { this.sel = (this.sel + 1) % it.length; Snd.blip(); this.confirmNew = false; }
     let choose = In.ok();
-    it.forEach((m, i) => { if (tapIn(90, 102 + i * 13 - 3, 140, 13)) { this.sel = i; choose = true; } });
+    it.forEach((m, i) => { if (tapIn(90, 96 + i * 12 - 2, 140, 12)) { this.sel = i; choose = true; } });
     if (choose) this.choose(it[this.sel].k);
   }
   choose(k) {
     Snd.select();
     if (k === 'story') startStory();
     else if (k === 'chapters') go(new ChapterSelect());
+    else if (k === 'retro') { RETRO.on = !RETRO.on; save.retro = RETRO.on; writeSave(); }
     else if (k === 'voices') { Voice.on = !Voice.on; save.voices = Voice.on; writeSave(); if (Voice.on) Voice.speak({ who: 'general', text: 'Voices on, soldier!' }); else Voice.stop(); }
     else if (k === 'sound') { Snd.setMuted(!Snd.isMuted()); save.muted = Snd.isMuted(); writeSave(); }
     else if (k === 'new') { if (!this.confirmNew) { this.confirmNew = true; return; } try { localStorage.removeItem(SAVE_KEY); } catch (_) { } save = { chapter: 0, done: [false, false, false, false, false], rank: 0, sup: { bombs: 0, parts: 0, bags: 0, meds: 0 }, finished: false, muted: Snd.isMuted(), prologue: false }; this.confirmNew = false; this.sel = 0; Snd.confirm(); }
@@ -376,7 +377,7 @@ class TitleScreen {
     txt('BOMBING', W / 2, 42, '#ffd23a', 'center', 16, '#7a2a10');
     txt('~ EGG WAR III ~', W / 2, 68, '#e04a3a', 'center');
     const it = this.items();
-    it.forEach((m, i) => { const y = 102 + i * 13; if (i === this.sel) { rect(86, y - 3, 148, 12, 'rgba(200,183,122,.25)'); txt('►', 90, y, '#ffd23a'); } txt(m.l, W / 2 + 6, y, i === this.sel ? '#ffd23a' : '#d8d0b0', 'center'); });
+    it.forEach((m, i) => { const y = 96 + i * 12; if (i === this.sel) { rect(86, y - 2, 148, 11, 'rgba(200,183,122,.25)'); txt('►', 90, y, '#ffd23a'); } txt(m.l, W / 2 + 6, y, i === this.sel ? '#ffd23a' : '#d8d0b0', 'center'); });
     txt(RANKS[save.rank] + ' SHELLY', W / 2, 168, '#8a8a7a', 'center');
   }
 }
