@@ -2470,7 +2470,7 @@ function drawPawCursor(c, x, y) {
 
 // ---- 1. Carrot Picking (Carrot Meadows) ----
 MINIS.carrots = {
-  name: 'Carrot Picking', dur: 30,
+  name: 'Carrot Picking', dur: 20,
   intro: 'Pull up the <b>ripe carrots</b> with big bushy leaves. Leave the tiny sprouts to grow, and do not touch the wormy ones!',
   controls: 'Tap a carrot to pull it. Keyboard or controller: arrows to choose, Space or A to pull.',
   pos(i) { const c = i % 5, r = Math.floor(i / 5); return [VW / 2 + (c - 2) * Math.min(132, VW / 6.5), 232 + r * 94]; },
@@ -2478,7 +2478,7 @@ MINIS.carrots = {
   update(m, dt) {
     m.happy -= dt; m.fly = m.fly.filter(f => (f.t += dt) < 0.6);
     if (m.phase !== 'play') return;
-    const speed = 1 + m.t / 25;
+    const speed = 1.15 + m.t / 16;
     m.spawnT -= dt;
     if (m.spawnT <= 0) {
       m.spawnT = rand(0.4, 0.75) / speed;
@@ -2532,7 +2532,7 @@ MINIS.carrots = {
     for (const f of m.fly) { const k = f.t / 0.6; drawCarrot(c, lerp(f.x, bx + 70, k), lerp(f.y, by - 40, k) - Math.sin(k * Math.PI) * 120, 0.9, k * 8, f.gold); }
   },
   reward(m) { return m.score; },
-  result(m) { return `You pulled up ${m.picked} carrots!`; },
+  result(m) { return `You pulled up ${m.picked} carrot${m.picked === 1 ? '' : 's'}!`; },
 };
 
 // ---- 2. Mushroom Match (Mushroom Valley) ----
@@ -2553,7 +2553,7 @@ function drawMushKind(c, k, x, y, s = 1) {
   c.restore();
 }
 MINIS.mushrooms = {
-  name: 'Mushroom Match', dur: 60,
+  name: 'Mushroom Match', dur: 35,
   intro: 'Turn over two cards at a time and find the <b>matching mushrooms</b>. Find all 6 pairs before time runs out. The faster you are, the more food you get!',
   controls: 'Tap a card to turn it. Keyboard or controller: arrows to choose, Space or A to turn.',
   pos(i) { const c = i % 4, r = Math.floor(i / 4), cw = 92, chh = 100; return [VW / 2 + (c - 1.5) * (cw + 20), 182 + r * (chh + 14), cw, chh]; },
@@ -2570,8 +2570,8 @@ MINIS.mushrooms = {
       if (m.cards[a].k === m.cards[b2].k) {
         m.cards[a].done = m.cards[b2].done = true; m.open = []; m.pairs++; m.score += 2; sfx.collect('mushroom');
         const [x, y] = this.pos(b2); floatText(x, y - 60, 'A pair! +2');
-        if (m.pairs === 6) { const bonus = Math.ceil(m.time / 3); m.score += bonus; floatText(VW / 2, 160, 'Time bonus +' + bonus, '#6a3f9a'); m.over = true; }
-      } else m.wait = 0.85;
+        if (m.pairs === 6) { const bonus = Math.ceil(m.time / 2); m.score += bonus; floatText(VW / 2, 160, 'Time bonus +' + bonus, '#6a3f9a'); m.over = true; }
+      } else m.wait = 0.7;
     }
   },
   tap(m, x, y) { for (let i = 0; i < 12; i++) { const [cx, cy, w, h] = this.pos(i); if (Math.abs(x - cx) < w / 2 && Math.abs(y - cy) < h / 2) { m.sel = i; this.flip(m, i); return; } } },
@@ -2604,13 +2604,13 @@ MINIS.mushrooms = {
 
 // ---- 3. Berry Sorting (Whispering Woods) ----
 MINIS.berries = {
-  name: 'Berry Sorting', dur: 40,
+  name: 'Berry Sorting', dur: 25,
   intro: 'Berries are dropping from the bushes! Put each berry into the <b>basket with the same kind</b> before it falls in the grass. Golden berries can go in any basket.',
   controls: 'Tap a basket. Keyboard or controller: Left, Down and Right choose the left, middle and right baskets.',
   cols: ['#e2443a', '#4a6ad0', '#5a2a6a'], names: ['Strawberries', 'Blueberries', 'Blackberries'],
   bx(i) { return VW / 2 + (i - 1) * Math.min(230, VW / 4); },
   init(m) { m.berry = null; m.next = 0.4; m.combo = 0; m.fly = null; m.shake = [0, 0, 0]; m.counts = [0, 0, 0]; m.good = 0; },
-  spawn(m) { const gold = Math.random() < 0.08; m.berry = { k: gold ? -1 : Math.floor(Math.random() * 3), x: VW / 2 + rand(-70, 70), y: 120, sp: 75 + m.t * 4.5 }; tone(1200, 0.05, 'sine', 0.04, 900); },
+  spawn(m) { const gold = Math.random() < 0.08; m.berry = { k: gold ? -1 : Math.floor(Math.random() * 3), x: VW / 2 + rand(-70, 70), y: 120, sp: 90 + m.t * 7 }; tone(1200, 0.05, 'sine', 0.04, 900); },
   update(m, dt) {
     m.shake = m.shake.map(v => Math.max(0, v - dt * 3));
     if (m.phase !== 'play') return;
@@ -2625,7 +2625,7 @@ MINIS.berries = {
       m.combo++; const v = (b.k === -1 ? 3 : 1) + (m.combo % 5 === 0 ? 2 : 0); m.score += v; m.counts[i]++; m.good++;
       sfx.collect(b.k === -1 ? 'gold' : 'berry'); floatText(x, 360, '+' + v + (m.combo % 5 === 0 ? ' combo!' : ''));
     } else { m.combo = 0; m.shake[i] = 1; sfx.oof(); floatText(x, 360, 'Wrong basket!', '#8a2a14'); }
-    m.next = Math.max(0.12, 0.45 - m.t * 0.008);
+    m.next = Math.max(0.1, 0.35 - m.t * 0.01);
   },
   tap(m, x, y) { for (let i = 0; i < 3; i++) if (Math.abs(x - this.bx(i)) < 100 && y > 300) { this.send(m, i); return; } },
   key(m, a) { if (a === 'left') this.send(m, 0); else if (a === 'down' || a === 'ok') this.send(m, 1); else if (a === 'right') this.send(m, 2); },
@@ -2664,19 +2664,19 @@ MINIS.berries = {
 
 // ---- 4. Butterfly Catcher (Thorny Thicket's secret glade) ----
 MINIS.butterflies = {
-  name: 'Butterfly Catcher', dur: 35, free: true,
+  name: 'Butterfly Catcher', dur: 20, free: true,
   intro: 'A <b>secret peaceful glade</b> hidden in the thorns! Catch the butterflies with your net. They will show you where the sweetest berries grow. Do not catch the bees!',
   controls: 'Tap a butterfly. Keyboard or controller: move the net with the arrows or stick, then press Space or A.',
   init(m) { m.bugs = []; m.spawnT = 0; m.swing = 0; m.sx = 0; m.sy = 0; m.caught = 0; m.flowers = Array.from({ length: 30 }, (_, i) => ({ x: hash(i) * VW, y: 380 + hash(i + 9) * 150, col: ['#f3a5c0', '#f2d15b', '#ffffff', '#c7a3e6'][i % 4] })); },
   spawn(m) {
     const left = Math.random() < 0.5, r = Math.random(), kind = r < 0.08 ? 'gold' : r < 0.26 ? 'bee' : 'fly';
     const y0 = rand(140, 420);
-    m.bugs.push({ kind, x: left ? -30 : VW + 30, y: y0, y0, vx: (left ? 1 : -1) * rand(70, 140) * (1 + m.t / 45), ph: Math.random() * 10, amp: rand(20, 60), col: ['#f6d35a', '#f3a5c0', '#9fc7f0', '#f29a4a', '#ffffff'][Math.floor(Math.random() * 5)] });
+    m.bugs.push({ kind, x: left ? -30 : VW + 30, y: y0, y0, vx: (left ? 1 : -1) * rand(70, 140) * (1 + m.t / 25), ph: Math.random() * 10, amp: rand(20, 60), col: ['#f6d35a', '#f3a5c0', '#9fc7f0', '#f29a4a', '#ffffff'][Math.floor(Math.random() * 5)] });
   },
   update(m, dt) {
     m.swing = Math.max(0, m.swing - dt);
     if (m.phase !== 'play') return;
-    m.spawnT -= dt; if (m.spawnT <= 0) { m.spawnT = rand(0.35, 0.8); this.spawn(m); }
+    m.spawnT -= dt; if (m.spawnT <= 0) { m.spawnT = rand(0.25, 0.55); this.spawn(m); }
     for (const b of m.bugs) { b.x += b.vx * dt; b.ph += dt; b.y = b.y0 + Math.sin(b.ph * 2.2) * b.amp; }
     m.bugs = m.bugs.filter(b => !b.gone && b.x > -60 && b.x < VW + 60);
   },
@@ -2730,20 +2730,20 @@ MINIS.butterflies = {
 
 // ---- 5. Bunny's Garden (home) ----
 MINIS.garden = {
-  name: "Bunny's Garden", dur: 45,
+  name: "Bunny's Garden", dur: 25,
   intro: 'Help the family garden grow! <b>Water</b> the dry plants, <b>pull out weeds</b>, and <b>pick the carrots</b> when they are big and orange.',
   controls: 'Tap a plot. Keyboard or controller: arrows to choose, Space or A to help that plot.',
   pos(i) { const c = i % 3, r = Math.floor(i / 3); return [VW / 2 + (c - 1) * Math.min(200, VW / 4.2), 262 + r * 132]; },
-  init(m) { m.plots = Array.from({ length: 6 }, (_, i) => ({ stage: i % 2, grow: Math.random() * 0.5, water: rand(0.4, 1), weed: false, wob: 0 })); m.weedT = 3; m.harvest = 0; m.sel = 0; },
+  init(m) { m.plots = Array.from({ length: 6 }, (_, i) => ({ stage: i % 2, grow: Math.random() * 0.5, water: rand(0.4, 1), weed: false, wob: 0 })); m.weedT = 2.2; m.harvest = 0; m.sel = 0; },
   update(m, dt) {
     for (const p of m.plots) p.wob = Math.max(0, p.wob - dt * 3);
     if (m.phase !== 'play') return;
     for (const p of m.plots) {
-      p.water = Math.max(0, p.water - dt * 0.085);
-      if (p.water > 0 && !p.weed && p.stage < 3) { p.grow += dt / 3.2; if (p.grow >= 1) { p.grow = 0; p.stage++; if (p.stage === 3) tone(1320, 0.2, 'sine', 0.05, 1760); } }
+      p.water = Math.max(0, p.water - dt * 0.12);
+      if (p.water > 0 && !p.weed && p.stage < 3) { p.grow += dt / 1.9; if (p.grow >= 1) { p.grow = 0; p.stage++; if (p.stage === 3) tone(1320, 0.2, 'sine', 0.05, 1760); } }
     }
     m.weedT -= dt;
-    if (m.weedT <= 0) { m.weedT = rand(2.4, 4.2); const free = m.plots.filter(p => !p.weed); if (free.length) free[Math.floor(Math.random() * free.length)].weed = true; }
+    if (m.weedT <= 0) { m.weedT = rand(1.8, 3.2); const free = m.plots.filter(p => !p.weed); if (free.length) free[Math.floor(Math.random() * free.length)].weed = true; }
   },
   act(m, i) {
     const p = m.plots[i]; if (!p) return; const [x, y] = this.pos(i); p.wob = 1;
@@ -2787,15 +2787,15 @@ MINIS.garden = {
     WK = 1; drawBunny(c, 80, H - 20, { s: 1.2, p: { blink: blinkVal(G.t, 1), ear: -0.1 }, seed: 3 }); WK = 0;
   },
   reward(m) { return m.score; },
-  result(m) { return `You picked ${m.harvest} carrots from the garden!`; },
+  result(m) { return `You picked ${m.harvest} carrot${m.harvest === 1 ? '' : 's'} from the garden!`; },
 };
 
 // ---- 6. Burrow Cleaning (home) ----
 MINIS.clean = {
-  name: 'Burrow Cleaning', dur: 40, free: true,
+  name: 'Burrow Cleaning', dur: 25, free: true,
   intro: 'The burrow is a mess! Tap the <b>leaves, pebbles, twigs and dust bunnies</b> to tidy them away. Shh, do not wake your sleeping little sister!',
   controls: 'Tap the mess. Keyboard or controller: move the paw with the arrows or stick, then press Space or A.',
-  init(m) { m.items = []; for (let i = 0; i < 16; i++) this.add(m); m.addT = 2.5; m.sis = { x: VW * 0.8, y: FL + 6 }; m.done = 0; m.woke = 0; },
+  init(m) { m.items = []; for (let i = 0; i < 14; i++) this.add(m); m.addT = 1.5; m.sis = { x: VW * 0.8, y: FL + 6 }; m.done = 0; m.woke = 0; },
   add(m) {
     let x, y, tries = 0;
     do { x = rand(VW * 0.12, VW * 0.9); y = rand(FL - 70, FL + 120); tries++; } while (tries < 20 && Math.hypot(x - VW * 0.8, y - FL) < 70);
@@ -2807,8 +2807,8 @@ MINIS.clean = {
     m.items = m.items.filter(it => it.gone < 0.5);
     if (m.phase !== 'play') return;
     m.addT -= dt;
-    if (m.addT <= 0 && m.items.length < 20 && m.t < m.def.dur - 8) { m.addT = rand(1.1, 2); this.add(m); }
-    if (m.t > 3 && m.items.filter(it => !it.gone).length === 0) { const bonus = Math.ceil(m.time / 4); m.score += bonus; floatText(VW / 2, 200, 'All tidy! +' + bonus, '#6a3f9a'); m.over = true; }
+    if (m.addT <= 0 && m.items.length < 20 && m.t < m.def.dur - 6) { m.addT = rand(0.7, 1.3); this.add(m); }
+    if (m.t > 3 && m.items.filter(it => !it.gone).length === 0) { const bonus = Math.ceil(m.time / 2); m.score += bonus; floatText(VW / 2, 200, 'All tidy! +' + bonus, '#6a3f9a'); m.over = true; }
   },
   tap(m, x, y) {
     if (Math.hypot(x - m.sis.x, y - (m.sis.y - 14)) < 34) { m.woke = 1.8; m.score = Math.max(0, m.score - 2); sfx.curious(); floatText(m.sis.x, m.sis.y - 60, 'Hey! I was sleeping!', '#8a2a14'); return; }
