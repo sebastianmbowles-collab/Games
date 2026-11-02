@@ -362,7 +362,7 @@ class TitleScreen {
     else if (k === 'chapters') go(new ChapterSelect());
     else if (k === 'voices') { Voice.on = !Voice.on; save.voices = Voice.on; writeSave(); if (Voice.on) Voice.speak({ who: 'general', text: 'Voices on, soldier!' }); else Voice.stop(); }
     else if (k === 'sound') { Snd.setMuted(!Snd.isMuted()); save.muted = Snd.isMuted(); writeSave(); }
-    else if (k === 'new') { if (!this.confirmNew) { this.confirmNew = true; return; } localStorage.removeItem(SAVE_KEY); save = { chapter: 0, done: [false, false, false, false, false], rank: 0, sup: { bombs: 0, parts: 0, bags: 0, meds: 0 }, finished: false, muted: Snd.isMuted(), prologue: false }; this.confirmNew = false; this.sel = 0; Snd.confirm(); }
+    else if (k === 'new') { if (!this.confirmNew) { this.confirmNew = true; return; } try { localStorage.removeItem(SAVE_KEY); } catch (_) { } save = { chapter: 0, done: [false, false, false, false, false], rank: 0, sup: { bombs: 0, parts: 0, bags: 0, meds: 0 }, finished: false, muted: Snd.isMuted(), prologue: false }; this.confirmNew = false; this.sel = 0; Snd.confirm(); }
   }
   draw() {
     drawBackdrop('night', this.t);
