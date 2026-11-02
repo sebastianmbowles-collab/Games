@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Eggshell: Bombing</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* One 320x180 pixel canvas scaled up to fill the screen, plus touch buttons on top. */
+:root{--bg:#0b0d08;--khaki:#c8b77a;--red:#b8312f;color-scheme:dark}
+html,body{height:100%;margin:0;background:var(--bg);overflow:hidden;overscroll-behavior:none;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#c{position:absolute;image-rendering:pixelated;image-rendering:crisp-edges;background:#000}
+#touch{position:fixed;inset:0;pointer-events:none;display:none}
+#touch.on{display:block}
+.tb{position:absolute;pointer-events:auto;box-sizing:border-box;width:54px;height:54px;border-radius:10px;background:rgba(200,183,122,.16);border:2px solid rgba(200,183,122,.5);color:#efe6c4;font:8px 'Press Start 2P',monospace;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.4;text-shadow:0 1px 0 #000}
+.tb.down{background:rgba(200,183,122,.5)}
+.tb.off{display:none}
+#pad{position:absolute;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));width:162px;height:162px}
+#pad.off{display:none}
+#bt_up{left:54px;top:0}#bt_down{left:54px;top:108px}#bt_left{left:0;top:54px}#bt_right{left:108px;top:54px}
+#btns{position:absolute;right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));width:150px;height:150px}
+#bt_a{right:0;top:44px;width:62px;height:62px;border-radius:50%;background:rgba(184,49,47,.32);border-color:rgba(230,110,100,.7)}
+#bt_b{right:44px;top:96px;border-radius:50%}
+#bt_c{right:44px;top:-8px;border-radius:50%}
+#bt_d{right:88px;top:44px;border-radius:50%}
+#bt_pause{position:absolute;right:calc(10px + env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));width:44px;height:36px;font-size:10px}
+#rot{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:18px;background:#0b0d08;color:#c8b77a;font:12px 'Press Start 2P',monospace;text-align:center;line-height:1.8;padding:20px;z-index:5}
+@media (orientation:portrait) and (pointer:coarse){#rot{display:flex}}
+@media (max-height:460px){#pad{transform:scale(.78);transform-origin:left bottom}#btns{transform:scale(.78);transform-origin:right bottom}.tb{background:rgba(200,183,122,.1)}}
+</style>
+</head>
+<body>
+<canvas id="c" width="320" height="180"></canvas>
+<div id="touch">
+  <div id="pad">
+    <div class="tb" id="bt_up" data-k="up">&#9650;</div>
+    <div class="tb" id="bt_left" data-k="left">&#9664;</div>
+    <div class="tb" id="bt_right" data-k="right">&#9654;</div>
+    <div class="tb" id="bt_down" data-k="down">&#9660;</div>
+  </div>
+  <div id="btns">
+    <div class="tb" id="bt_a" data-k="a">A</div>
+    <div class="tb" id="bt_b" data-k="b">B</div>
+    <div class="tb" id="bt_c" data-k="c">C</div>
+    <div class="tb" id="bt_d" data-k="d">D</div>
+  </div>
+  <div class="tb" id="bt_pause" data-k="pause">II</div>
+</div>
+<div id="rot"><div>&#x1F95A;&#x1F504;</div><div>Turn your device<br>sideways to play</div></div>
+<script>
+'use strict';

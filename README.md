@@ -35,3 +35,19 @@ Little Bunny forages across Bunwood to feed his family of 7 siblings before wint
 | Bunny Burrows (home) | none | Bunny's Garden, Burrow Cleaning |
 
 Pick an area on the map, run to the hollow log, and hide from predators along the way. If one catches him, his siblings pull him down a secret tunnel, but the food from that trip is lost. Minigame food goes straight to the pantry. Finishing the Thorny Thicket shows the ending. Progress is saved in the browser.
+
+## EGGSHELL: BOMBING
+
+`EggshellBombing.html` is an 8-bit war game about eggs, all in one file. Open it in any browser (keyboard, or touch buttons on a tablet or phone held sideways).
+Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg from the Rotten Egg, and grows older and gets promoted chapter by chapter:
+
+| Chapter | Mode | View |
+|---|---|---|
+| 1. The Raid | Running: escape the bomber to the bunker | First person |
+| 2. The Egg Factory | Building: put parts together before time runs out | Third person |
+| 3. Hold the Line | Survival: build a shelter, then repair it under fire | Third, then first person |
+| 4. Wings of Shell | Bombing: bombs land 2 seconds late; don't hit prisoners | Bird's eye |
+| 5. Iron Shell | Tanking: bases, the Stinker, then the Golden Egg | First person |
+
+Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
+Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
