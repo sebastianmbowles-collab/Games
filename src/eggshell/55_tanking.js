@@ -212,7 +212,7 @@ class TankingMode {
     for (const s of this.shots) sprites.push({ x: s.x, y: s.y, img: SPR.shot, w: 0.18, h: 0.18, z: 0.42 });
     for (const s of this.eshots) sprites.push({ x: s.x, y: s.y, img: SPR.eshot, w: 0.22, h: 0.22, z: 0.42 });
     for (const b of this.booms) sprites.push({ x: b.x, y: b.y, img: BOOM[Math.min(9, (b.t / 0.8 * 10) | 0)], w: b.s, h: b.s, z: -0.2 });
-    Ray.render({ x: p.x, y: p.y, a: p.a, z: 0.55, pitch: this.recoil * -4 }, this.map, sprites, { decals: this.decals, sky: ['#2a3020', '#4a4a2a', '#7a6a3a'], ground: ['#4a4630', '#38351f'], fog: '42,42,28', fogDist: 18 });
+    Ray.render({ x: p.x, y: p.y, a: p.a, z: 0.55, pitch: this.recoil * -4 }, this.map, sprites, { decals: this.decals, skyImg: SKY.storm, floor: FLOOR.mud, fog: '62,60,40', fogDist: 17 });
     // rotten egg goo on the periscope
     for (const g of this.goo) { ctx.globalAlpha = Math.min(1, g.t); ctx.fillStyle = '#7d8f3a'; ctx.beginPath(); ctx.ellipse(g.x, g.y, g.r, g.r * 0.8, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#a0b048'; ctx.beginPath(); ctx.ellipse(g.x - 3, g.y - 3, g.r * 0.4, g.r * 0.3, 0, 0, 7); ctx.fill(); rect(g.x - 2, g.y + g.r * 0.6, 3, (2.5 - g.t) * 14, '#7d8f3a'); }
     ctx.globalAlpha = 1;

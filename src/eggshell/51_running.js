@@ -186,7 +186,7 @@ class RunningMode {
     ctx.save();
     const roll = this.rolling ? Math.sin(p.rollA) * 0.32 : 0;
     if (roll) { ctx.translate(W / 2, H / 2); ctx.rotate(roll); ctx.scale(1.3, 1.3); ctx.translate(-W / 2, -H / 2); }
-    Ray.render(cam, this.map, sprites, { decals, sky: ['#1a0e0c', '#4a1e12', '#8a3a18'], ground: ['#3a3026', '#2a221a'], fog: '40,20,12', fogDist: 15 });
+    Ray.render(cam, this.map, sprites, { decals, skyImg: SKY.town, floor: FLOOR.cobble, fog: '46,20,12', fogDist: 13 });
     ctx.restore();
     // helmet rim, top of screen
     ctx.fillStyle = '#2e3818'; ctx.beginPath(); ctx.ellipse(W / 2, -26, W * 0.7, 34, 0, 0, 7); ctx.fill();

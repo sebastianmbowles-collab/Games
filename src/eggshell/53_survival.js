@@ -199,7 +199,7 @@ class SurvivalMode {
       decals.push({ x: b.x, y: b.y, r: 1.6, fill: `rgba(230,30,20,${0.12 + f * 0.25})`, stroke: blink ? '#ff3a2a' : '#901a10' });
       decals.push({ x: b.x, y: b.y, r: Math.max(0.1, 1.6 * (1 - f)), stroke: '#ffd0c0' });
     }
-    Ray.render({ x: p.x, y: p.y, a: p.a, z: p.z }, this.map, sprites, { decals, sky: ['#2a2420', '#4a3a2e', '#6a5038'], ground: ['#4a3e2c', '#3a3022'], fog: '40,34,28', fogDist: 12 });
+    Ray.render({ x: p.x, y: p.y, a: p.a, z: p.z }, this.map, sprites, { decals, skyImg: SKY.dusk, floor: FLOOR.dirt, fog: '52,42,34', fogDist: 12 });
     ctx.fillStyle = '#2e3818'; ctx.beginPath(); ctx.ellipse(W / 2, -26, W * 0.7, 34, 0, 0, 7); ctx.fill();
     // crosshair + wall health
     const a = this.aim; const cc = a ? '#7dff6a' : '#f4ecd0';
