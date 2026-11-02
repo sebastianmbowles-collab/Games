@@ -47,10 +47,10 @@ function frame(now) {
 }
 // boot
 loadSave(); Snd.setMuted(!!save.muted);
-Voice.probe('p1');
+Voice.on = save.voices !== false; Voice.probe('p1');
 class Boot { // "tap to start" so the browser allows sound
   constructor() { this.t = 0; this.touch = {}; }
-  update(dt) { this.t += dt; if (In.ok() || In.ptr.pressed || Object.keys(In.k).some(k => In.k[k])) { Snd.init(); go(new TitleScreen()); } }
+  update(dt) { this.t += dt; if (In.ok() || In.ptr.pressed || Object.keys(In.k).some(k => In.k[k])) { Snd.init(); Voice.unlock(); go(new TitleScreen()); } }
   draw() {
     rect(0, 0, W, H, '#0b0d08');
     const s = eggSprite('shelly', 0); ctx.drawImage(s, W / 2 - s.width * 2, 40, s.width * 4, s.height * 4);

@@ -827,20 +827,20 @@ In.end = () => { In.p = Object.assign({}, In.k); In.q = {}; In.ptr.pressed = In.
 const KMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   Space: 'a', KeyJ: 'a', KeyZ: 'a', Enter: 'start', ShiftLeft: 'b', ShiftRight: 'b', KeyK: 'b', KeyX: 'b', KeyE: 'c', KeyL: 'c', KeyC: 'c',
   KeyQ: 'd', KeyF: 'd', KeyV: 'd', Escape: 'pause', KeyP: 'pause', Digit1: 'n1', Digit2: 'n2', Digit3: 'n3', Digit4: 'n4', Digit5: 'n5', Digit6: 'n6', Digit7: 'n7', Tab: 'tab' };
-addEventListener('keydown', e => { Snd.init(); const k = KMAP[e.code]; if (k) { if (!In.k[k] && !e.repeat) In.q[k] = true; In.k[k] = true; e.preventDefault(); } });
+addEventListener('keydown', e => { Snd.init(); Voice.unlock(); const k = KMAP[e.code]; if (k) { if (!In.k[k] && !e.repeat) In.q[k] = true; In.k[k] = true; e.preventDefault(); } });
 addEventListener('keyup', e => { const k = KMAP[e.code]; if (k) { In.k[k] = false; e.preventDefault(); } });
 addEventListener('blur', () => { In.k = {}; });
 const touchEl = document.getElementById('touch');
 function showTouch() { if (!In.touch) { In.touch = true; touchEl.classList.add('on'); } }
 document.querySelectorAll('.tb').forEach(el => {
   const k = el.dataset.k;
-  const on = e => { e.preventDefault(); Snd.init(); showTouch(); In.q[k] = true; In.k[k] = true; el.classList.add('down'); try { el.setPointerCapture(e.pointerId); } catch (_) { } };
+  const on = e => { e.preventDefault(); Snd.init(); Voice.unlock(); showTouch(); In.q[k] = true; In.k[k] = true; el.classList.add('down'); try { el.setPointerCapture(e.pointerId); } catch (_) { } };
   const off = e => { e.preventDefault(); In.k[k] = false; el.classList.remove('down'); };
   el.addEventListener('pointerdown', on); el.addEventListener('pointerup', off); el.addEventListener('pointercancel', off); el.addEventListener('lostpointercapture', off);
   el.addEventListener('contextmenu', e => e.preventDefault());
 });
 function ptrPos(e) { const r = cv.getBoundingClientRect(); In.ptr.x = (e.clientX - r.left) / r.width * W; In.ptr.y = (e.clientY - r.top) / r.height * H; }
-cv.addEventListener('pointerdown', e => { Snd.init(); if (e.pointerType === 'touch') showTouch(); ptrPos(e); In.ptr.down = true; In.ptr.pressed = true; try { cv.setPointerCapture(e.pointerId); } catch (_) { } e.preventDefault(); });
+cv.addEventListener('pointerdown', e => { Snd.init(); Voice.unlock(); if (e.pointerType === 'touch') showTouch(); ptrPos(e); In.ptr.down = true; In.ptr.pressed = true; try { cv.setPointerCapture(e.pointerId); } catch (_) { } e.preventDefault(); });
 cv.addEventListener('pointermove', e => { ptrPos(e); });
 cv.addEventListener('pointerup', e => { ptrPos(e); In.ptr.down = false; In.ptr.released = true; });
 cv.addEventListener('pointercancel', () => { In.ptr.down = false; In.ptr.released = true; });
@@ -853,7 +853,7 @@ const tapIn = (x, y, w, h) => In.ptr.pressed && In.ptr.x >= x && In.ptr.x < x + 
 
 // ================= SAVE =================
 const SAVE_KEY = 'eggshellBombing.v1';
-let save = { chapter: 0, done: [false, false, false, false, false], rank: 0, sup: { bombs: 0, parts: 0, bags: 0, meds: 0 }, finished: false, muted: false, prologue: false };
+let save = { chapter: 0, done: [false, false, false, false, false], rank: 0, sup: { bombs: 0, parts: 0, bags: 0, meds: 0 }, finished: false, muted: false, prologue: false, voices: true };
 function loadSave() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) save = Object.assign(save, s); } catch (_) { } }
 function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (_) { } }
 const RANKS = ['PRIVATE', 'CORPORAL', 'SERGEANT', 'LIEUTENANT', 'CAPTAIN', 'MAJOR', 'GENERAL'];
@@ -877,24 +877,80 @@ class Parts {
   draw(ox = 0, oy = 0) { for (const p of this.a) { const f = p.t / p.life; ctx.globalAlpha = p.fade ? 1 - f : 1; const s = p.grow ? p.s * (1 + f * p.grow) : p.s; rect(p.x - ox - s / 2, p.y - oy - s / 2, s, s, p.c); } ctx.globalAlpha = 1; }
 }
 
-// ================= VOICES (your own recordings go in a "voices" folder) =================
+// ================= VOICES =================
+// Every line is spoken by the computer, and each egg gets its own voice (pitch, speed, and a
+// different built-in voice when the device has several). If you record a line yourself and put
+// it in a "voices" folder (voices/<id>.mp3), your recording plays instead.
+const VOICE_STYLE = {
+  narrator: { pitch: 0.55, rate: 0.82, slot: 0 },
+  shelly: { pitch: 1.7, rate: 1.08, slot: 1 },   // gets deeper as Shelly grows up
+  general: { pitch: 0.25, rate: 0.92, slot: 2, vol: 1 },
+  scramble: { pitch: 0.45, rate: 0.95, slot: 3 },
+  benny: { pitch: 1.25, rate: 1.25, slot: 4 },
+  coddle: { pitch: 1.35, rate: 0.92, slot: 5 },
+  poach: { pitch: 2, rate: 1.35, slot: 6 },
+  rotten: { pitch: 0.05, rate: 0.72, slot: 7 },
+};
 const Voice = {
-  cur: null, playing: false, enabled: null, missing: {},
-  probe(id) { // find out once whether any voice files exist
+  cur: null, playing: false, enabled: null, missing: {}, tts: 'speechSynthesis' in window, on: true, voices: [],
+  probe(id) { // find out once whether any recorded voice files exist
     const a = new Audio(); let i = 0; const exts = ['mp3', 'm4a', 'wav', 'ogg'];
     const next = () => { if (i >= exts.length) { Voice.enabled = false; return; } a.src = 'voices/' + id + '.' + exts[i++]; a.load(); };
     a.oncanplaythrough = () => { Voice.enabled = true; }; a.onerror = next;
     try { next(); } catch (_) { Voice.enabled = false; }
+    if (this.tts) { this.loadVoices(); try { speechSynthesis.onvoiceschanged = () => this.loadVoices(); } catch (_) { } }
+  },
+  loadVoices() {
+    try {
+      const all = speechSynthesis.getVoices();
+      let en = all.filter(v => /^en/i.test(v.lang));
+      // prefer the nicer-sounding voices, and skip joke voices
+      en = en.filter(v => !/bells|bubbles|bad news|good news|boing|cellos|jester|organ|trinoids|whisper|wobble|zarvox|superstar|deranged|hysterical|bahh|albert/i.test(v.name));
+      this.voices = en.length ? en : all;
+    } catch (_) { this.voices = []; }
+  },
+  unlock() { // phones and iPads only allow speech after a tap, so say nothing once on the first tap
+    if (!this.tts || this.unlocked) return; this.unlocked = true;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (_) { }
+  },
+  lineById(id) { for (const k in SCRIPT) { const v = SCRIPT[k]; const list = Array.isArray(v) ? v : [v]; for (const L of list) if (L.id === id) return L; } return null; },
+  sayable(t) {
+    return t.replace(/EGG WAR III/gi, 'egg war three').replace(/Egg War II\b/gi, 'egg war two').replace(/Egg War I\b/gi, 'egg war one')
+      .replace(/-/g, ', ').replace(/\b[A-Z]{2,}\b/g, w => w.toLowerCase());
+  },
+  speak(L) {
+    if (!this.tts || !this.on) return;
+    try {
+      speechSynthesis.cancel();
+      const st = VOICE_STYLE[L.who] || VOICE_STYLE.narrator;
+      const u = new SpeechSynthesisUtterance(this.sayable(L.text));
+      let pitch = st.pitch, rate = st.rate;
+      if (L.who === 'shelly') pitch = Math.max(0.6, 1.7 - Story.stage * 0.2);
+      if (L.yell) { rate *= 1.15; }
+      u.pitch = pitch; u.rate = rate; u.volume = st.vol || 0.95; u.lang = 'en-US';
+      if (!this.voices.length) this.loadVoices();
+      if (this.voices.length) u.voice = this.voices[st.slot % this.voices.length];
+      u.onstart = () => { this.playing = true; };
+      u.onend = u.onerror = () => { this.playing = false; };
+      this.playing = true;
+      speechSynthesis.speak(u);
+    } catch (_) { this.playing = false; }
   },
   play(id) {
-    this.stop(); if (!this.enabled || this.missing[id]) return;
+    this.stop();
+    const L = this.lineById(id);
+    if (!this.enabled || this.missing[id]) { if (L) this.speak(L); return; }
     const exts = ['mp3', 'm4a', 'wav', 'ogg']; let i = 0; const a = new Audio(); this.cur = a;
-    const next = () => { if (i >= exts.length) { this.missing[id] = true; return; } a.src = 'voices/' + id + '.' + exts[i++]; a.play().then(() => { if (this.cur === a) this.playing = true; }).catch(() => { }); };
+    const next = () => { if (i >= exts.length) { this.missing[id] = true; if (this.cur === a && L) this.speak(L); return; } a.src = 'voices/' + id + '.' + exts[i++]; a.play().then(() => { if (this.cur === a) this.playing = true; }).catch(() => { }); };
     a.onerror = () => { if (this.cur === a) next(); };
     a.onended = () => { if (this.cur === a) this.playing = false; };
     next();
   },
-  stop() { if (this.cur) { this.cur.onerror = null; try { this.cur.pause(); } catch (_) { } this.cur = null; } this.playing = false; }
+  stop() {
+    if (this.cur) { this.cur.onerror = null; try { this.cur.pause(); } catch (_) { } this.cur = null; }
+    if (this.tts) try { speechSynthesis.cancel(); } catch (_) { }
+    this.playing = false;
+  }
 };
 
 // ================= THE STORY SCRIPT =================
@@ -916,10 +972,10 @@ const SCRIPT = {
     { id: 'p3', who: 'narrator', text: 'Without it, our nest will go cold forever. This is EGG WAR III.' },
   ],
   c1: [
-    { id: 'c1_1', who: 'shelly', text: 'My first day in the army! I just got my helmet. It is a little big.' },
-    { id: 'c1_2', who: 'scramble', text: 'Kid, you hear that buzzing? Do not look up. Just listen.' },
+    { id: 'c1_1', who: 'shelly', text: 'My first day in the army! I just got my helmet. It\'s a little big.' },
+    { id: 'c1_2', who: 'scramble', text: 'Kid, you hear that buzzing? Don\'t look up. Just listen.' },
     { id: 'c1_3', who: 'general', radio: true, sfx: 'siren', text: 'AIR RAID! Rotten bomber over Eggsburg! Every egg to the bunker, NOW!' },
-    { id: 'c1_4', who: 'scramble', text: 'Watch for the red marks on the ground. That is where the bombs land. RUN, Private!' },
+    { id: 'c1_4', who: 'scramble', text: 'Watch for the red marks on the ground. That\'s where the bombs land. RUN, Private!' },
     { id: 'c1_5', who: 'shelly', text: 'Jump, dive, roll, hide... I can do this. I can do this!' },
   ],
   c1w: [
@@ -927,29 +983,29 @@ const SCRIPT = {
     { id: 'c1_w2', who: 'general', text: 'Report to the egg factory. We need supplies, and we need them YESTERDAY!' },
   ],
   c2: [
-    { id: 'c2_1', who: 'benny', text: 'Welcome to the factory! I am Corporal Benny Benedict. Mind the conveyor belt.' },
+    { id: 'c2_1', who: 'benny', text: 'Welcome to the factory! I\'m Corporal Benny Benedict. Mind the conveyor belt.' },
     { id: 'c2_2', who: 'benny', text: 'We build bombs, tank treads, sandbags, and food and medicine kits. You put every part on yourself.' },
-    { id: 'c2_3', who: 'general', text: 'Everything you build goes to the front line. If you are too slow, I will know about it!' },
+    { id: 'c2_3', who: 'general', text: 'Everything you build goes to the front line. If you\'re too slow, I\'ll know about it!' },
     { id: 'c2_4', who: 'poach', text: 'Psst... he yells a LOT. Just build fast.' },
   ],
-  c2w: [{ id: 'c2_w1', who: 'general', text: 'All orders done?! ...Fine. Good work. Do not let it go to your yolk.' }],
-  c2y: [{ id: 'c2_y1', who: 'general', yell: true, text: 'TIME IS UP?! Our soldiers are WAITING! You are DEMOTED, soldier!' },
+  c2w: [{ id: 'c2_w1', who: 'general', text: 'All orders done?! ...Fine. Good work. Don\'t let it go to your yolk.' }],
+  c2y: [{ id: 'c2_y1', who: 'general', yell: true, text: 'TIME IS UP?! Our soldiers are WAITING! You\'re DEMOTED, soldier!' },
     { id: 'c2_y2', who: 'poach', text: 'Ouch. Told you he yells a lot. Come on, the front line needs us anyway.' }],
   c3: [
-    { id: 'c3_1', who: 'coddle', text: 'Shelly? I am Medic Coddle. The front line is getting bombed day and night.' },
+    { id: 'c3_1', who: 'coddle', text: 'Shelly? I\'m Medic Coddle. The front line is getting bombed day and night.' },
     { id: 'c3_2', who: 'scramble', text: 'Bombers come in ONE minute. Build a shelter. Sandbags, bricks, cement, metal, anything!' },
     { id: 'c3_3', who: 'scramble', text: 'Metal is strongest. Wood breaks fast. You can dig a foxhole to stay low.' },
     { id: 'c3_4', who: 'coddle', text: 'When the bombs fall, fix your walls. A wall with holes is just a fence.' },
   ],
   c3w: [
-    { id: 'c3_w1', who: 'coddle', text: 'You held the line! I have never seen walls take that much.' },
+    { id: 'c3_w1', who: 'coddle', text: 'You held the line! I\'ve never seen walls take that much.' },
     { id: 'c3_w2', who: 'general', text: 'The air force needs a pilot. Can you fly?' },
     { id: 'c3_w3', who: 'shelly', text: '...I can learn.' },
   ],
   c4: [
     { id: 'c4_1', who: 'benny', text: 'Your plane is loaded with eggshell bombs. Regular, big, cluster, and sticky yolk.' },
     { id: 'c4_2', who: 'benny', text: 'The bombs take TWO seconds to land. Aim where the enemy WILL be, not where they are.' },
-    { id: 'c4_3', who: 'general', text: 'The Rotten Egg keeps OUR eggs as prisoners next to his bases. Hit three of ours and I am calling you home!' },
+    { id: 'c4_3', who: 'general', text: 'The Rotten Egg keeps OUR eggs as prisoners next to his bases. Hit three of ours and I\'m calling you home!' },
     { id: 'c4_4', who: 'rotten', radio: true, text: 'Heh heh heh... come and try, little white egg. The Golden Egg is MINE.' },
   ],
   c4w: [{ id: 'c4_w1', who: 'general', text: 'Every base destroyed. The road to the Rotten Fortress is open.' }],
@@ -957,19 +1013,19 @@ const SCRIPT = {
     { id: 'c5_1', who: 'shelly', text: 'Three years in this war. My shell has more cracks than I can count.' },
     { id: 'c5_2', who: 'general', text: 'This tank is our last one. Bring back the Golden Egg.' },
     { id: 'c5_3', who: 'scramble', text: 'Enemy tanks shoot back. Every hit knocks a piece off. Treads first, then the cannon.' },
-    { id: 'c5_4', who: 'rotten', radio: true, text: 'You will never reach my fortress. My tank, the STINKER, will scramble you!' },
+    { id: 'c5_4', who: 'rotten', radio: true, text: 'You\'ll never reach my fortress. My tank, the STINKER, will scramble you!' },
   ],
   ending: [
     { id: 'e1', who: 'rotten', text: 'No... NO! My Golden Egg!' },
-    { id: 'e2', who: 'shelly', text: 'It is not yours. It never was. It belongs to every egg.' },
-    { id: 'e3', who: 'general', text: '...Shelly. I have yelled at a LOT of eggs. You are the first one who made me proud.' },
-    { id: 'e4', who: 'general', text: 'From today, you are GENERAL Shelly.' },
+    { id: 'e2', who: 'shelly', text: 'It\'s not yours. It never was. It belongs to every egg.' },
+    { id: 'e3', who: 'general', text: '...Shelly. I\'ve yelled at a LOT of eggs. You\'re the first one who made me proud.' },
+    { id: 'e4', who: 'general', text: 'From today, you\'re GENERAL Shelly.' },
     { id: 'e5', who: 'narrator', text: 'Egg War III was over. The Golden Egg came home, and the nest was warm again.' },
     { id: 'e6', who: 'narrator', text: 'THE END... for now.' },
   ],
   // shouted during missions
   ff: { id: 'g_ff', who: 'general', text: 'THAT WAS ONE OF OURS!' },
-  medic: { id: 'm_patch', who: 'coddle', text: 'Hold still! I am taping your shell back together!' },
+  medic: { id: 'm_patch', who: 'coddle', text: 'Hold still! I\'m taping your shell back together!' },
 };
 
 // ---------- backgrounds for story scenes ----------
@@ -1108,7 +1164,7 @@ class TitleScreen {
   constructor() { this.t = 0; this.sel = 0; this.confirmNew = false; this.touch = { pad: true, a: 'OK' }; }
   enter() { Snd.play('title'); }
   items() {
-    const a = [{ k: 'story', l: save.chapter > 0 || save.prologue ? (save.finished ? 'WATCH ENDING' : 'CONTINUE STORY') : 'START STORY' }, { k: 'chapters', l: 'CHAPTERS' }, { k: 'sound', l: 'SOUND: ' + (Snd.isMuted() ? 'OFF' : 'ON') }];
+    const a = [{ k: 'story', l: save.chapter > 0 || save.prologue ? (save.finished ? 'WATCH ENDING' : 'CONTINUE STORY') : 'START STORY' }, { k: 'chapters', l: 'CHAPTERS' }, { k: 'sound', l: 'SOUND: ' + (Snd.isMuted() ? 'OFF' : 'ON') }, { k: 'voices', l: 'VOICES: ' + (Voice.on ? 'ON' : 'OFF') }];
     if (save.chapter > 0 || save.prologue) a.push({ k: 'new', l: this.confirmNew ? 'SURE? PRESS AGAIN' : 'NEW GAME' });
     return a;
   }
@@ -1117,13 +1173,14 @@ class TitleScreen {
     if (In.hit('up')) { this.sel = (this.sel + it.length - 1) % it.length; Snd.blip(); this.confirmNew = false; }
     if (In.hit('down')) { this.sel = (this.sel + 1) % it.length; Snd.blip(); this.confirmNew = false; }
     let choose = In.ok();
-    it.forEach((m, i) => { if (tapIn(90, 110 + i * 14 - 3, 140, 14)) { this.sel = i; choose = true; } });
+    it.forEach((m, i) => { if (tapIn(90, 102 + i * 13 - 3, 140, 13)) { this.sel = i; choose = true; } });
     if (choose) this.choose(it[this.sel].k);
   }
   choose(k) {
     Snd.select();
     if (k === 'story') startStory();
     else if (k === 'chapters') go(new ChapterSelect());
+    else if (k === 'voices') { Voice.on = !Voice.on; save.voices = Voice.on; writeSave(); if (Voice.on) Voice.speak({ who: 'general', text: 'Voices on, soldier!' }); else Voice.stop(); }
     else if (k === 'sound') { Snd.setMuted(!Snd.isMuted()); save.muted = Snd.isMuted(); writeSave(); }
     else if (k === 'new') { if (!this.confirmNew) { this.confirmNew = true; return; } localStorage.removeItem(SAVE_KEY); save = { chapter: 0, done: [false, false, false, false, false], rank: 0, sup: { bombs: 0, parts: 0, bags: 0, meds: 0 }, finished: false, muted: Snd.isMuted(), prologue: false }; this.confirmNew = false; this.sel = 0; Snd.confirm(); }
   }
@@ -1139,7 +1196,7 @@ class TitleScreen {
     txt('BOMBING', W / 2, 42, '#ffd23a', 'center', 16, '#7a2a10');
     txt('~ EGG WAR III ~', W / 2, 68, '#e04a3a', 'center');
     const it = this.items();
-    it.forEach((m, i) => { const y = 110 + i * 14; if (i === this.sel) { rect(86, y - 3, 148, 13, 'rgba(200,183,122,.25)'); txt('►', 90, y, '#ffd23a'); } txt(m.l, W / 2 + 6, y, i === this.sel ? '#ffd23a' : '#d8d0b0', 'center'); });
+    it.forEach((m, i) => { const y = 102 + i * 13; if (i === this.sel) { rect(86, y - 3, 148, 12, 'rgba(200,183,122,.25)'); txt('►', 90, y, '#ffd23a'); } txt(m.l, W / 2 + 6, y, i === this.sel ? '#ffd23a' : '#d8d0b0', 'center'); });
     txt(RANKS[save.rank] + ' SHELLY', W / 2, 168, '#8a8a7a', 'center');
   }
 }
@@ -2370,10 +2427,10 @@ function frame(now) {
 }
 // boot
 loadSave(); Snd.setMuted(!!save.muted);
-Voice.probe('p1');
+Voice.on = save.voices !== false; Voice.probe('p1');
 class Boot { // "tap to start" so the browser allows sound
   constructor() { this.t = 0; this.touch = {}; }
-  update(dt) { this.t += dt; if (In.ok() || In.ptr.pressed || Object.keys(In.k).some(k => In.k[k])) { Snd.init(); go(new TitleScreen()); } }
+  update(dt) { this.t += dt; if (In.ok() || In.ptr.pressed || Object.keys(In.k).some(k => In.k[k])) { Snd.init(); Voice.unlock(); go(new TitleScreen()); } }
   draw() {
     rect(0, 0, W, H, '#0b0d08');
     const s = eggSprite('shelly', 0); ctx.drawImage(s, W / 2 - s.width * 2, 40, s.width * 4, s.height * 4);
