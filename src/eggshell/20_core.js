@@ -13,17 +13,16 @@ function resize() {
 addEventListener('resize', resize); resize();
 
 // ================= 8-BIT FILTER =================
-// Squeezes every frame into a 34-colour 8-bit war palette with checkerboard dithering,
-// the way old consoles could only show a few colours.
+// Squeezes every frame into a bright 50-colour pixel-art palette with clean flat colours.
 const RETRO = (() => {
-  const NES = '000000 1a1a1a 3a3a3a 5e5e5e 8a8a8a b4b4b4 dedede ffffff 2a1a0e 4a2e18 6e4626 965e32 c08a4e e0b878 f4e2b0 1c2a12 2e4a1a 4a6a22 6e8e2e 9ab040 c8d870 3a0e0a 7a1a10 b8301c e85a20 f8962e ffd23a fff07a 0e1a3a 1e3e7a 3a6ec0 8ab8e8 3a1a3a 7a4a8a'.split(' ').map(h => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]);
+  const NES = '000000 1b1b1b 3c3c3c 6b6b6b 9a9a9a c8c8c8 ffffff f4e2b0 e0b878 c08a4e 965e32 6e4626 4a2e18 2a1a0e 0f3d1a 1e6a2a 2fa03a 5cd04a 9cf06a d4ff9a 4a6a22 6e8e2e 9ab040 7d8f3a 0e1a3a 1c3a8a 2f6ad0 4aa0f0 8ad0ff c8ecff 3a0e0a 7a1a10 c0281c f04a28 ff8a30 ffb848 ffd23a fff07a 5a4a2a 8a6a3a b8925a 3a1a4a 7a3a9a 1a6a6a 3ab0a0 ffd8a0 f8a0a0 3c4a6a 5a6a8a 8a9ab0'.split(' ').map(h => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]);
   const lut = new Uint32Array(32768);
   for (let r = 0; r < 32; r++) for (let g = 0; g < 32; g++) for (let b = 0; b < 32; b++) {
     const R = r * 8.2, G = g * 8.2, B = b * 8.2; let best = 0, bd = 1e9;
     for (let i = 0; i < NES.length; i++) { const p = NES[i], dr = R - p[0], dg = G - p[1], db = B - p[2]; const d = dr * dr * 3 + dg * dg * 4 + db * db * 2; if (d < bd) { bd = d; best = i; } }
     const p = NES[best]; lut[(r << 10) | (g << 5) | b] = 0xff000000 | (p[2] << 16) | (p[1] << 8) | p[0];
   }
-  const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v / 16 - 0.47) * 22);
+  const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v / 16 - 0.47) * 0);
   return {
     on: true,
     apply(c) {
@@ -49,6 +48,12 @@ function chunkify() {
   CHUNK.x.clearRect(0, 0, W / 2, H / 2); CHUNK.x.drawImage(cv, 0, 0, W, H, 0, 0, W / 2, H / 2);
   ctx.drawImage(CHUNK.c, 0, 0, W / 2, H / 2, 0, 0, W, H); ctx.restore();
 }
+function outlined(src, col = '#141414') {
+  const [c, x] = mk(src.width + 2, src.height + 2), [s, sx] = mk(src.width, src.height);
+  sx.drawImage(src, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = col; sx.fillRect(0, 0, src.width, src.height);
+  for (const [dx, dy] of [[0, 1], [2, 1], [1, 0], [1, 2]]) x.drawImage(s, dx, dy);
+  x.drawImage(src, 1, 1); return c;
+}
 function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; return [c, x]; }
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -72,7 +77,7 @@ function shade(h, f) {
 // ---- text ----
 function txt(s, x, y, col = '#f4ecd0', align = 'left', size = 8, sh = '#000') {
   ctx.font = size + 'px ' + FONT; ctx.textAlign = align; ctx.textBaseline = 'top';
-  if (sh) { ctx.fillStyle = sh; ctx.fillText(s, x + 1, y + 1); }
+  if (sh) { ctx.fillStyle = sh; for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]]) ctx.fillText(s, x + dx, y + dy); }
   ctx.fillStyle = col; ctx.fillText(s, x, y);
 }
 function wrapText(s, maxW, size = 8) {
@@ -185,7 +190,7 @@ function makeEgg(o) {
   }
   if (o.stink) { for (let i = 0; i < 3; i++) { const sx = 2 + i * Math.round(w / 3); for (let s = 0; s < 5; s++) P(sx + ((s % 2) ? 1 : 0), -3 - s, 'rgba(120,200,60,0.7)'); } }
   if (o.glow) { x.globalCompositeOperation = 'destination-over'; x.fillStyle = 'rgba(255,220,80,0.35)'; x.beginPath(); x.ellipse(ox + w / 2, oy + h / 2, w / 2 + 3, h / 2 + 3, 0, 0, 7); x.fill(); x.globalCompositeOperation = 'source-over'; }
-  return c;
+  return o.glow ? c : outlined(c);
 }
 
 // The cast. Every one is different.

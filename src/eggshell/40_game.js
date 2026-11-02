@@ -208,6 +208,8 @@ const SCRIPT = {
   medic: { id: 'm_patch', who: 'coddle', text: 'Hold still! I\'m taping your shell back together!' },
 };
 
+function panel(x, y, w, h, a = 0.72) { ctx.globalAlpha = a; rect(x, y, w, h, '#0e0f0a'); ctx.globalAlpha = 1; rect(x, y, w, 1, '#c8b77a'); rect(x, y + h - 1, w, 1, '#6a6450'); }
+function spotlight(cx, cy, r) { ctx.globalAlpha = 0.18; ctx.fillStyle = '#fff07a'; ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.28, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 0.35; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(cx, cy, r * 0.55, r * 0.14, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
 // ---------- backgrounds for story scenes ----------
 function drawBackdrop(kind, t) {
   if (kind === 'factory') {
@@ -216,24 +218,19 @@ function drawBackdrop(kind, t) {
     for (let i = 0; i < 4; i++) rect(i * 90 + 20, 10, 4, 90, '#4a4234');
     return;
   }
-  const sky = kind === 'night' ? ['#0a0c14', '#14182a'] : kind === 'fortress' ? ['#1e2410', '#3a3a1a'] : ['#2a2018', '#6a4428'];
-  rect(0, 0, W, H, sky[0]); rect(0, 50, W, 60, sky[1]);
-  // searchlights
-  ctx.globalAlpha = 0.12; ctx.fillStyle = '#ffffd0';
-  for (let i = 0; i < 2; i++) { const a = Math.sin(t * 0.4 + i * 2) * 0.5 - Math.PI / 2; const bx = 80 + i * 160; ctx.beginPath(); ctx.moveTo(bx, 130); ctx.lineTo(bx + Math.cos(a - 0.08) * 220, 130 + Math.sin(a - 0.08) * 220); ctx.lineTo(bx + Math.cos(a + 0.08) * 220, 130 + Math.sin(a + 0.08) * 220); ctx.fill(); }
-  ctx.globalAlpha = 1;
-  // distant flashes
-  if ((t * 1.3) % 3 < 0.12) { ctx.globalAlpha = 0.3; rect(0, 90, W, 40, '#ff9a40'); ctx.globalAlpha = 1; }
-  // ruined skyline
-  srand(kind === 'fortress' ? 77 : 44);
-  for (let x = 0; x < W; x += 14) { const h = 20 + rnd() * 40; rect(x, 130 - h, 14, h, '#0e0c0a'); if (rnd() < 0.4) rect(x + 3, 130 - h - 6, 4, 6, '#0e0c0a'); }
-  rect(0, 128, W, 52, '#16120e');
+  const sky = { night: SKY.night, dusk: SKY.dusk, fortress: SKY.storm, town: SKY.town }[kind] || SKY.day;
+  const off = (t * 6) % sky.pw, dh = sky.height * W / sky.span;
+  rect(0, 0, W, 140, sky.topCol);
+  ctx.drawImage(sky, off, 0, sky.span, sky.height, 0, 140 - dh, W, dh);
+  const g = kind === 'night' ? ['#1e6a2a', '#0f3d1a'] : kind === 'fortress' ? ['#4a6a22', '#2e5a1a'] : ['#5cd04a', '#2fa03a'];
+  rect(0, 138, W, 42, g[1]); rect(0, 138, W, 3, g[0]);
+  for (let x = 0; x < W; x += 6) rect(x + ((x / 6) % 2) * 2, 136, 2, 2, g[0]);
 }
 
 // ================= STORY FLOW =================
 const Story = { stage: 0, replay: false };
 const CHAPTERS = [
-  { key: 'running', title: 'THE RAID', mode: 'RUNNING', view: 'THIRD PERSON', bg: 'night', make: c => new RunningMode(c),
+  { key: 'running', title: 'THE RAID', mode: 'RUNNING', view: 'THIRD PERSON', bg: 'town', make: c => new RunningMode(c),
     goal: ['Run through the ruined town', 'and reach the BUNKER.', 'Red marks = bombs landing!'],
     keys: ['ARROWS/WASD  run & turn', 'SPACE jump   SHIFT dive', 'E roll (hold)   Q hide (hold)'],
     tkeys: ['PAD run & turn', 'A jump  B dive', 'C roll (hold)  D hide (hold)'] },
@@ -329,6 +326,7 @@ class Cutscene {
     const spr = who.sprite(), sc = 4;
     const bob = Math.sin(this.t * 3) * 1.5;
     const px = L.who === 'rotten' ? W - 30 - spr.width * sc : 24;
+    spotlight(px + spr.width * sc / 2, 118, 40); rect(0, 0, W, 8, '#000');
     ctx.drawImage(spr, px, 112 - spr.height * sc + bob + 8, spr.width * sc, spr.height * sc);
     if (L.radio) { ctx.globalAlpha = 0.25; for (let y = 0; y < 120; y += 2) rect(px, y, spr.width * sc, 1, R() < 0.5 ? '#000' : '#7f7'); ctx.globalAlpha = 1; }
     box(6, 116, W - 12, 58);
@@ -366,7 +364,7 @@ class TitleScreen {
     else if (k === 'new') { if (!this.confirmNew) { this.confirmNew = true; return; } try { localStorage.removeItem(SAVE_KEY); } catch (_) { } save = { chapter: 0, done: [false, false, false, false, false], rank: 0, sup: { bombs: 0, parts: 0, bags: 0, meds: 0 }, finished: false, muted: Snd.isMuted(), prologue: false }; this.confirmNew = false; this.sel = 0; Snd.confirm(); }
   }
   draw() {
-    drawBackdrop('night', this.t);
+    drawBackdrop('day', this.t);
     // bomber silhouettes crossing the sky
     for (let i = 0; i < 3; i++) { const x = ((this.t * 22 + i * 120) % 420) - 50, y = 18 + i * 9; rect(x, y, 18, 2, '#000'); rect(x + 6, y - 3, 3, 8, '#000'); rect(x + 15, y - 2, 2, 5, '#000'); }
     const s = eggSprite('shelly', 1);
@@ -399,7 +397,7 @@ class ChapterSelect {
     }
   }
   draw() {
-    rect(0, 0, W, H, '#14160e');
+    this.t = this.t || 0; drawBackdrop('day', this.t); panel(14, 4, 292, 172, 0.62);
     txt('CHAPTERS', W / 2, 10, '#ffd23a', 'center');
     CHAPTERS.forEach((c, i) => {
       const y = 30 + i * 22, locked = i > save.chapter;
@@ -419,15 +417,16 @@ class MissionCard {
   update(dt) { this.t += dt; if (this.t > 0.4 && (In.ok() || In.ptr.pressed)) { Snd.confirm(); startMission(this.i); } }
   draw() {
     const c = CHAPTERS[this.i];
-    rect(0, 0, W, H, '#14160e'); for (let y = 0; y < H; y += 4) rect(0, y, W, 1, 'rgba(255,255,255,.03)');
-    txt('CHAPTER ' + (this.i + 1), 10, 10, '#c8b77a'); txt(c.title, 10, 22, '#ffd23a', 'left', 16);
-    txt(c.mode + ' MODE  -  ' + c.view, 10, 44, '#e04a3a');
+    drawBackdrop(c.bg, this.t); panel(4, 4, 230, 172);
+    spotlight(274, 76, 30);
+    txt('CHAPTER ' + (this.i + 1), 10, 10, '#c8b77a'); txt(c.title, 10, 22, '#ffd23a', 'left', c.title.length > 13 ? 12 : 16);
+    txt(c.mode + ' MODE - ' + c.view, 10, 44, '#e04a3a');
     const s = eggSprite('shelly', this.i);
-    ctx.drawImage(s, 248, 14, s.width * 3, s.height * 3);
-    txt(RANKS[save.rank], 274, 96, '#f4ecd0', 'center'); txt(AGES[this.i], 274, 106, '#8a8a7a', 'center');
+    ctx.drawImage(s, 274 - s.width * 1.5, 76 - s.height * 3 + 4 + Math.sin(this.t * 2) * 1.5, s.width * 3, s.height * 3);
+    panel(240, 90, 70, 26, 0.75); txt(RANKS[save.rank], 274, 96, '#f4ecd0', 'center'); txt(AGES[this.i], 274, 106, '#8a8a7a', 'center');
     txt('MISSION:', 10, 62, '#c8b77a'); c.goal.forEach((g, j) => txt(g, 10, 74 + j * 10, '#f4ecd0'));
     txt('CONTROLS:', 10, 112, '#c8b77a'); (In.touch ? c.tkeys : c.keys).forEach((g, j) => txt(g, 10, 124 + j * 10, '#d8d0b0'));
-    if ((this.t * 2) % 1 < 0.6) txt(In.touch ? 'TAP TO START' : 'PRESS SPACE TO START', W / 2, 166, '#ffd23a', 'center');
+    if ((this.t * 2) % 1 < 0.6) txt(In.touch ? 'TAP TO START' : 'PRESS SPACE', 119, 162, '#ffd23a', 'center');
   }
 }
 
@@ -443,13 +442,19 @@ class ResultScreen {
     }
   }
   draw() {
-    rect(0, 0, W, H, this.won ? '#14200e' : '#200e0e');
     const st = this.stats;
+    drawBackdrop(this.won ? CHAPTERS[this.i].bg : 'night', this.t); panel(0, 0, W, H, this.won ? 0.55 : 0.7);
+    if (!this.won) { ctx.globalAlpha = 0.25; rect(0, 0, W, H, '#7a1a10'); ctx.globalAlpha = 1; }
+    if (this.won && !st.demoted) { // fireworks
+      srand(Math.floor(this.t / 1.2) + 5);
+      for (let k = 0; k < 3; k++) { const fx = 40 + rnd() * 240, fy = 20 + rnd() * 50, ph = (this.t % 1.2) / 1.2, col = pick(['#ffd23a', '#e85a20', '#8ab8e8', '#c8d870', '#ffffff']); for (let j = 0; j < 12; j++) { const a = j / 12 * 6.28; rect(fx + Math.cos(a) * ph * 22, fy + Math.sin(a) * ph * 22 + ph * ph * 8, 2, 2, col); } }
+    }
+    if (this.won) spotlight(W / 2, 145, 34);
     if (this.won) {
       txt(st.demoted ? 'TIME IS UP!' : 'MISSION COMPLETE!', W / 2, 14, st.demoted ? '#e04a3a' : '#ffd23a', 'center', 16);
       (st.lines || []).forEach((l, j) => txt(l, W / 2, 46 + j * 12, '#f4ecd0', 'center'));
       const s = eggSprite('shelly', this.i);
-      ctx.drawImage(s, W / 2 - s.width * 1.5, 92, s.width * 3, s.height * 3);
+      ctx.drawImage(s, W / 2 - s.width, 144 - s.height * 2, s.width * 2, s.height * 2);
       if (this.promoted && this.t > 1.6) { txt('PROMOTED!', W / 2, 152, '#ffd23a', 'center'); txt(RANKS[save.rank] + ' SHELLY', W / 2, 164, '#f4ecd0', 'center'); }
       else if (st.demoted) { txt('DEMOTED...', W / 2, 152, '#e04a3a', 'center'); txt(RANKS[save.rank] + ' SHELLY', W / 2, 164, '#f4ecd0', 'center'); }
       else if (this.t > 1) txt(In.touch ? 'TAP TO CONTINUE' : 'PRESS SPACE', W / 2, 164, '#c8b77a', 'center');

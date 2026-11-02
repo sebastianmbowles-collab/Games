@@ -4,16 +4,16 @@ function topEgg(shell, hat) {
   x.fillStyle = shade(shell, 0.5); x.beginPath(); x.ellipse(4, 4.5, 3.5, 4, 0, 0, 7); x.fill();
   x.fillStyle = shell; x.beginPath(); x.ellipse(4, 4.5, 2.6, 3.2, 0, 0, 7); x.fill();
   if (hat) { x.fillStyle = hat; x.beginPath(); x.arc(4, 4, 2.2, 0, 7); x.fill(); x.fillStyle = shade(hat, 1.4); x.fillRect(3, 3, 1, 1); }
-  return c;
+  return outlined(c);
 }
 const TOP = (() => {
   const T2 = {};
   T2.enemy = ENEMY_SHELLS.map((s, i) => topEgg(s, ['#262626', '#3a3a3a', '#2a3320'][i % 3]));
   T2.friend = FRIEND_SHELLS.map((s, i) => topEgg(s, ['#5b6b2e', '#56662c', null, '#6b5a2e'][i % 4]));
   T2.prisoner = FRIEND_SHELLS.map(s => topEgg(s, null));
-  T2.tank = (() => { const [c, x] = mk(14, 18); x.fillStyle = '#1a1e14'; x.fillRect(0, 1, 4, 16); x.fillRect(10, 1, 4, 16); x.fillStyle = '#3a4628'; x.fillRect(3, 2, 8, 14); x.fillStyle = '#2a3420'; x.beginPath(); x.arc(7, 10, 4, 0, 7); x.fill(); x.fillRect(6, 0, 2, 9); x.fillStyle = '#6f8a2a'; x.fillRect(6, 10, 2, 2); return c; })();
-  T2.base = (() => { const [c, x] = mk(28, 22); x.fillStyle = '#1e2218'; x.fillRect(0, 2, 28, 20); x.fillStyle = '#4a5238'; x.fillRect(1, 1, 26, 19); srand(3); for (let i = 0; i < 18; i++) { x.fillStyle = pick(['#3a4228', '#5a6244', '#2e3420']); x.fillRect(rnd() * 24, rnd() * 16, 4, 3); } x.fillStyle = '#0a0a08'; x.fillRect(4, 16, 20, 2); x.fillStyle = '#6f8a2a'; x.beginPath(); x.ellipse(14, 9, 4, 5, 0, 0, 7); x.fill(); x.fillStyle = '#111'; x.fillRect(12, 8, 1, 1); x.fillRect(15, 8, 1, 1); return c; })();
-  T2.tent = (() => { const [c, x] = mk(14, 11); x.fillStyle = '#3e4a2a'; x.fillRect(0, 0, 14, 11); x.fillStyle = '#56663a'; x.fillRect(0, 0, 7, 11); x.fillStyle = '#2a321c'; x.fillRect(6, 0, 2, 11); return c; })();
+  T2.tank = (() => { const [c, x] = mk(14, 18); x.fillStyle = '#1a1e14'; x.fillRect(0, 1, 4, 16); x.fillRect(10, 1, 4, 16); x.fillStyle = '#3a4628'; x.fillRect(3, 2, 8, 14); x.fillStyle = '#2a3420'; x.beginPath(); x.arc(7, 10, 4, 0, 7); x.fill(); x.fillRect(6, 0, 2, 9); x.fillStyle = '#6f8a2a'; x.fillRect(6, 10, 2, 2); return outlined(c); })();
+  T2.base = (() => { const [c, x] = mk(28, 22); x.fillStyle = '#1e2218'; x.fillRect(0, 2, 28, 20); x.fillStyle = '#4a5238'; x.fillRect(1, 1, 26, 19); srand(3); for (let i = 0; i < 18; i++) { x.fillStyle = pick(['#3a4228', '#5a6244', '#2e3420']); x.fillRect(rnd() * 24, rnd() * 16, 4, 3); } x.fillStyle = '#0a0a08'; x.fillRect(4, 16, 20, 2); x.fillStyle = '#6f8a2a'; x.beginPath(); x.ellipse(14, 9, 4, 5, 0, 0, 7); x.fill(); x.fillStyle = '#111'; x.fillRect(12, 8, 1, 1); x.fillRect(15, 8, 1, 1); return outlined(c); })();
+  T2.tent = (() => { const [c, x] = mk(14, 11); x.fillStyle = '#3e4a2a'; x.fillRect(0, 0, 14, 11); x.fillStyle = '#56663a'; x.fillRect(0, 0, 7, 11); x.fillStyle = '#2a321c'; x.fillRect(6, 0, 2, 11); return outlined(c); })();
   T2.plane = [0, 1].map(f => { const [c, x] = mk(28, 26);
     x.fillStyle = '#8a8470'; x.fillRect(0, 9, 28, 6); x.fillStyle = '#e4dfcc'; x.fillRect(1, 9, 26, 5);
     x.fillStyle = '#d8d2bc'; x.fillRect(12, 2, 4, 22); x.fillStyle = '#e4dfcc'; x.fillRect(8, 20, 12, 3);
@@ -21,10 +21,18 @@ const TOP = (() => {
     [[5, 11], [23, 11]].forEach(([a, b]) => { x.fillStyle = '#fff'; x.beginPath(); x.arc(a, b, 2.5, 0, 7); x.fill(); x.fillStyle = '#f5b819'; x.beginPath(); x.arc(a, b, 1.5, 0, 7); x.fill(); });
     x.fillStyle = '#555'; x.fillRect(13, 1, 2, 2);
     x.fillStyle = 'rgba(220,220,220,.7)'; if (f) x.fillRect(8, 0, 12, 1); else x.fillRect(11, 0, 6, 1);
-    return c; });
-  T2.planeShadow = (() => { const [c, x] = mk(28, 26); x.drawImage(T2.plane[0], 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#000'; x.fillRect(0, 0, 28, 26); return c; })();
+    return outlined(c); });
+  T2.planeShadow = (() => { const [c, x] = mk(30, 28); x.drawImage(T2.plane[0], 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#000'; x.fillRect(0, 0, 28, 26); return c; })();
   return T2;
 })();
+const CLOUDS = [0, 1, 2].map(k => {
+  const [c, x] = mk(64, 34); srand(70 + k);
+  const blobs = Array.from({ length: 9 }, () => [10 + rnd() * 44, 12 + rnd() * 10, 6 + rnd() * 9]);
+  x.fillStyle = '#b4b4b4'; blobs.forEach(([a, b, r]) => { x.beginPath(); x.arc(a, b + 3, r, 0, 7); x.fill(); });
+  x.fillStyle = '#ffffff'; blobs.forEach(([a, b, r]) => { x.beginPath(); x.arc(a, b, r, 0, 7); x.fill(); });
+  x.fillStyle = '#dedede'; blobs.forEach(([a, b, r]) => { x.fillRect(a - r * 0.6, b + r * 0.3, r * 1.2, 2); });
+  return c;
+});
 const BOMB_TYPES = [
   { k: 'shell', name: 'EGGSHELL', r: 14, dmg: 1, cd: 0.55, col: '#e8e4d8' },
   { k: 'big', name: 'BIG BOMB', r: 30, dmg: 3, cd: 3.5, col: '#ffd23a', ammo: true },
@@ -39,19 +47,19 @@ class BombingMode {
     const L = this.L = 2600;
     const [tc, tx] = mk(W, L); this.terrain = tc; this.tx = tx;
     srand(404);
-    tx.fillStyle = '#4a5a2a'; tx.fillRect(0, 0, W, L);
-    for (let i = 0; i < 7000; i++) { tx.fillStyle = pick(['#44542a', '#506232', '#3e4c24', '#56682e', '#4e5a30']); tx.fillRect(rnd() * W, rnd() * L, 2 + rnd() * 5, 1 + rnd() * 3); }
-    for (let i = 0; i < 26; i++) { const x = rnd() * (W - 70), y = rnd() * L, w = 40 + rnd() * 50, h = 30 + rnd() * 60; const c = pick(['#6a6a32', '#5a4a2a', '#7a7a3a', '#4a6a2a']); tx.fillStyle = c; tx.fillRect(x, y, w, h); tx.fillStyle = shade(c, 0.82); for (let s = 0; s < h; s += 4) tx.fillRect(x, y + s, w, 1); }
+    tx.fillStyle = '#3a9a34'; tx.fillRect(0, 0, W, L);
+    for (let i = 0; i < 7000; i++) { tx.fillStyle = pick(['#36903a', '#46a83e', '#2e8434', '#52b844', '#3c9a34']); tx.fillRect(rnd() * W, rnd() * L, 2 + rnd() * 5, 1 + rnd() * 3); }
+    for (let i = 0; i < 26; i++) { const x = rnd() * (W - 70), y = rnd() * L, w = 40 + rnd() * 50, h = 30 + rnd() * 60; const c = pick(['#c8b040', '#b8925a', '#9ab040', '#5cc04a']); tx.fillStyle = c; tx.fillRect(x, y, w, h); tx.fillStyle = shade(c, 0.82); for (let s = 0; s < h; s += 4) tx.fillRect(x, y + s, w, 1); }
     // the river and the bridge
-    const ry = 1350; tx.fillStyle = '#2a4a6a'; for (let x = 0; x < W; x++) tx.fillRect(x, ry + Math.sin(x / 30) * 6, 1, 26); tx.fillStyle = '#3a5a7a'; for (let i = 0; i < 80; i++) tx.fillRect(rnd() * W, ry + 6 + rnd() * 14, 4, 1);
+    const ry = 1350; tx.fillStyle = '#2f6ad0'; for (let x = 0; x < W; x++) tx.fillRect(x, ry + Math.sin(x / 30) * 6, 1, 26); tx.fillStyle = '#8ad0ff'; for (let i = 0; i < 80; i++) tx.fillRect(rnd() * W, ry + 6 + rnd() * 14, 4, 1);
     // the winding road
-    for (let y = 0; y < L; y += 2) { const x = this.roadX(y); tx.fillStyle = '#6a5a40'; tx.fillRect(x - 8, y, 16, 2); tx.fillStyle = '#7a6a4a'; tx.fillRect(x - 6, y, 12, 2); if (y % 20 < 8) { tx.fillStyle = '#8a7a5a'; tx.fillRect(x - 1, y, 2, 2); } }
+    for (let y = 0; y < L; y += 2) { const x = this.roadX(y); tx.fillStyle = '#965e32'; tx.fillRect(x - 8, y, 16, 2); tx.fillStyle = '#d0aa6a'; tx.fillRect(x - 6, y, 12, 2); if (y % 20 < 8) { tx.fillStyle = '#e0c080'; tx.fillRect(x - 1, y, 2, 2); } }
     tx.fillStyle = '#5a4a3a'; tx.fillRect(this.roadX(ry) - 12, ry - 6, 24, 38); tx.fillStyle = '#7a6a5a'; tx.fillRect(this.roadX(ry) - 10, ry - 6, 20, 38);
     // trenches
     for (const ty of [400, 1000, 1700, 2250]) { tx.fillStyle = '#2a2016'; let y = ty; for (let x = 0; x < W; x += 8) { tx.fillRect(x, y, 9, 3); y += (Math.floor(x / 8) % 2 ? 4 : -4); } }
     // trees and ruined houses
-    for (let i = 0; i < 160; i++) { const x = rnd() * W, y = rnd() * L; if (Math.abs(x - this.roadX(y)) < 14) continue; tx.fillStyle = 'rgba(0,0,0,.3)'; tx.beginPath(); tx.arc(x + 3, y + 3, 5, 0, 7); tx.fill(); tx.fillStyle = pick(['#2a4a1a', '#34561e', '#24401a']); tx.beginPath(); tx.arc(x, y, 5, 0, 7); tx.fill(); tx.fillStyle = '#4a6a2a'; tx.fillRect(x - 2, y - 3, 2, 2); }
-    for (let i = 0; i < 30; i++) { const x = rnd() * W, y = rnd() * L; if (Math.abs(x - this.roadX(y)) < 22) continue; tx.fillStyle = '#2a2420'; tx.fillRect(x + 2, y + 2, 14, 12); tx.fillStyle = pick(['#8a3b2a', '#6a5a4a', '#7a4a32']); tx.fillRect(x, y, 14, 12); tx.fillStyle = '#1a1410'; if (rnd() < 0.6) tx.fillRect(x + 3 + rnd() * 6, y + 2 + rnd() * 5, 5, 4); }
+    for (let i = 0; i < 160; i++) { const x = rnd() * W, y = rnd() * L; if (Math.abs(x - this.roadX(y)) < 14) continue; tx.fillStyle = 'rgba(0,0,0,.3)'; tx.beginPath(); tx.arc(x + 3, y + 3, 5, 0, 7); tx.fill(); tx.fillStyle = pick(['#1e6a2a', '#2a7a32', '#1a5a22']); tx.beginPath(); tx.arc(x, y, 5, 0, 7); tx.fill(); tx.fillStyle = '#5cd04a'; tx.fillRect(x - 2, y - 3, 2, 2); }
+    for (let i = 0; i < 30; i++) { const x = rnd() * W, y = rnd() * L; if (Math.abs(x - this.roadX(y)) < 22) continue; tx.fillStyle = '#2a2420'; tx.fillRect(x + 2, y + 2, 14, 12); tx.fillStyle = pick(['#c0281c', '#965e32', '#f04a28']); tx.fillRect(x, y, 14, 12); tx.fillStyle = '#1a1410'; if (rnd() < 0.6) tx.fillRect(x + 3 + rnd() * 6, y + 2 + rnd() * 5, 5, 4); }
     // ---- units ----
     this.ents = [];
     const add = e => { e.hp = e.hp || 1; e.slow = 0; e.flee = 0; e.tx = e.x; e.ty = e.y; this.ents.push(e); return e; };
@@ -79,7 +87,7 @@ class BombingMode {
     this.bombs = []; this.mini = []; this.puddles = []; this.fires = [];
     this.cd = [0, 0, 0, 0]; this.sel = 0; this.bigAmmo = 3 + save.sup.bombs;
     this.ff = 0; this.score = 0; this.kills = 0; this.t = 0; this.over = false; this.passes = 1;
-    this.parts = new Parts(); this.clouds = []; for (let i = 0; i < 6; i++) this.clouds.push({ x: rr(0, W), y: rr(0, H), r: rr(14, 26) });
+    this.parts = new Parts(); this.clouds = []; for (let i = 0; i < 3; i++) this.clouds.push({ x: rr(0, W), y: rr(0, H), r: rr(14, 26) });
   }
   enter() { Snd.play('bombing'); this.engine = Snd.planeEngine(); FX.banner('DESTROY ALL 6 BASES', '#ffd23a'); }
   exit() { if (this.engine) this.engine.stop(); }
@@ -214,7 +222,7 @@ class BombingMode {
       if (e.type === 'base') { ctx.drawImage(TOP.base, sx - 14, sy - 11); rect(sx + 10, sy - 18, 1, 9, '#222'); rect(sx + 11, sy - 18, 6, 4, (this.t * 3) % 1 < 0.5 ? '#6f8a2a' : '#5a7a20'); }
       else if (e.type === 'tent') ctx.drawImage(TOP.tent, sx - 7, sy - 5);
       else if (e.type === 'tank') { ctx.save(); ctx.translate(sx, sy); if (e.dir > 0) ctx.rotate(Math.PI); ctx.drawImage(TOP.tank, -7, -9); ctx.restore(); }
-      else ctx.drawImage(e.img, sx - 4, sy - 4 + (Math.sin(this.t * 10 + e.x) > 0 ? 0 : 1));
+      else { rect(sx - 3, sy + 4, 7, 2, 'rgba(0,0,0,.35)'); ctx.drawImage(e.img, sx - 5, sy - 6 + (Math.sin(this.t * 10 + e.x) > 0 ? 0 : 1), 10, 11); }
     }
     this.parts.draw(0, cy);
     // falling bombs: shrinking bomb + target mark on the ground + countdown
@@ -229,7 +237,7 @@ class BombingMode {
     ctx.globalAlpha = 0.3; ctx.drawImage(TOP.planeShadow, pl.x + 12 - 14, pl.y + 18 - 13); ctx.globalAlpha = 1;
     ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.strokeRect(pl.x - 3.5, pl.y - 0.5, 7, 1); ctx.strokeRect(pl.x - 0.5, pl.y - 3.5, 1, 7);
     ctx.save(); ctx.translate(pl.x, pl.y - 6); ctx.scale(1 - Math.abs(pl.bank) * 0.18, 1); ctx.drawImage(TOP.plane[fr], -14, -13); ctx.restore();
-    ctx.globalAlpha = 0.45; for (const c of this.clouds) { ctx.fillStyle = '#e8e8e0'; ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, 7); ctx.arc(c.x + c.r * 0.8, c.y + 4, c.r * 0.7, 0, 7); ctx.arc(c.x - c.r * 0.7, c.y + 3, c.r * 0.6, 0, 7); ctx.fill(); } ctx.globalAlpha = 1;
+    for (const [i, c] of this.clouds.entries()) { ctx.drawImage(CLOUDS[i % 3], c.x - 32, c.y - 17, 48 * c.r / 20, 26 * c.r / 20); } ctx.globalAlpha = 1;
     // HUD
     rect(0, 0, W, 14, 'rgba(0,0,0,.6)');
     txt('BASES ' + this.basesLeft(), 4, 3, '#ffd23a'); txt('SCORE ' + this.score, W / 2 + 10, 3, '#f4ecd0', 'center');

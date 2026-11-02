@@ -157,13 +157,26 @@ class SurvivalMode {
   }
   draw() { if (this.phase === 'build') this.drawBuild(); else this.drawSurvive(); }
   drawBuild() {
-    rect(0, 0, W, H, '#2e2a1e');
-    srand(3); for (let i = 0; i < 300; i++) rect(rnd() * W, rnd() * H, 2, 1, pick(['#3a3424', '#24201a', '#34301e']));
+    if (!this.arena) {
+      const [c, x] = mk(W, H); srand(8);
+      x.fillStyle = '#4a4630'; x.fillRect(0, 0, W, H);
+      for (let i = 0; i < 1400; i++) { x.fillStyle = pick(['#423e28', '#524e36', '#3c3824', '#5a5638', '#4a5a22']); x.fillRect(rnd() * W, rnd() * H, 1 + rnd() * 3, 1); }
+      for (let i = 0; i < 60; i++) { const gx = rnd() * W, gy = rnd() * H; x.fillStyle = pick(['#6e8e2e', '#4a6a22', '#9ab040']); x.fillRect(gx, gy, 1, 2); x.fillRect(gx + 1, gy - 1, 1, 3); x.fillRect(gx + 2, gy, 1, 2); }
+      for (let i = 0; i < 14; i++) { const rx = rnd() * W, ry = rnd() * H; x.fillStyle = '#3a3a3a'; x.fillRect(rx, ry + 1, 4, 2); x.fillStyle = '#8a8a8a'; x.fillRect(rx, ry, 4, 2); }
+      // trench with sandbags along the top
+      x.fillStyle = '#1a140c'; x.fillRect(0, 18, W, 8); for (let i = 0; i < W; i += 9) { x.fillStyle = pick(['#b59a62', '#a88d58', '#c0a46a']); x.fillRect(i, 16, 8, 4); x.fillStyle = '#6a5636'; x.fillRect(i, 19, 8, 1); }
+      // barbed-wire fence around the build area
+      const fx0 = 60, fy0 = 26, fx1 = 260, fy1 = 146;
+      x.fillStyle = '#4a2e18'; for (let i = fx0; i <= fx1; i += 20) { x.fillRect(i, fy0, 2, 6); x.fillRect(i, fy1 - 2, 2, 6); } for (let j = fy0; j <= fy1; j += 20) { x.fillRect(fx0, j, 2, 6); x.fillRect(fx1, j, 2, 6); }
+      x.fillStyle = '#8a8a8a'; for (let i = fx0; i <= fx1; i += 3) { x.fillRect(i, fy0 + 2 + (i % 2), 2, 1); x.fillRect(i, fy1 + (i % 2), 2, 1); } for (let j = fy0; j <= fy1; j += 3) { x.fillRect(fx0 + (j % 2), j, 1, 2); x.fillRect(fx1 + (j % 2), j, 1, 2); }
+      this.arena = c;
+    }
+    ctx.drawImage(this.arena, 0, 0);
     rect(0, 0, W, 18, '#14160e');
     txt('BUILD: ' + Math.ceil(this.buildT) + 's', 6, 5, this.buildT < 10 ? '#ff5a4a' : '#ffd23a');
     box(256, 2, 62, 14, '#3a2a1a', '#ffd23a'); txt('READY!', 287, 5, '#ffd23a', 'center');
     // the ground grid (dirt), drawn back to front so walls overlap nicely
-    for (let y = 0; y < this.GH; y++) for (let x = 0; x < this.GW; x++) { const [X, Y] = this.tileXY(x, y); rect(X, Y, 16, 12, (x + y) % 2 ? '#5a4a32' : '#54452e'); }
+    for (let y = 0; y < this.GH; y++) for (let x = 0; x < this.GW; x++) { const [X, Y] = this.tileXY(x, y); ctx.globalAlpha = (x + y) % 2 ? 0.22 : 0.1; rect(X, Y, 16, 12, '#2a1a0e'); ctx.globalAlpha = 1; }
     for (let y = 0; y < this.GH; y++) {
       for (let x = 0; x < this.GW; x++) {
         const [X, Y] = this.tileXY(x, y), i = this.idx(x, y);
@@ -204,7 +217,8 @@ class SurvivalMode {
     else decals.push({ x: p.x, y: p.y, r: 0.5, img: SPLATS[2] });
     decals.push({ x: p.x, y: p.y, r: 0.2, fill: 'rgba(0,0,0,.45)' });
     if (this.aim) decals.push({ x: this.aim.x + 0.5, y: this.aim.y + 0.5, r: 0.62, stroke: '#7dff6a' });
-    Ray.render(Ray.chase(this.map, p, 1.9, 0.78, -16), this.map, sprites, { decals, skyImg: SKY.dusk, floor: FLOOR.dirt, fog: '52,42,34', fogDist: 12 });
+    Ray.render(Ray.chase(this.map, p, 1.9, 0.78, -16), this.map, sprites, { decals, skyImg: SKY.dusk, floor: FLOOR.dirt, fog: '255,216,160', fogDist: 22 });
+    (this.weather || (this.weather = new Weather('dust'))).draw(p.a);
     // crosshair + wall health
     const a = this.aim; const cc = a ? '#7dff6a' : '#f4ecd0';
     if (a) { const mat = MATS[this.g[a.gi]]; bar(W / 2 - 30, 24, 60, 6, this.hp[a.gi] / mat.hp, '#7dff6a'); txt(mat.name, W / 2, 32, '#f4ecd0', 'center'); if (this.hp[a.gi] < mat.hp) txt(In.touch ? 'A: REPAIR' : 'SPACE: REPAIR', W / 2, 42, '#ffd23a', 'center'); }

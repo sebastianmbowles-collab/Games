@@ -1,7 +1,7 @@
 // ================= MODE 5 (story chapter 2): BUILDING — third person =================
 const PART = (() => {
   const P = {};
-  const icon = (name, fn) => { const [c, x] = mk(28, 22); srand(name.length * 31); fn(x); P[name] = c; };
+  const icon = (name, fn) => { const [c, x] = mk(28, 22); srand(name.length * 31); fn(x); P[name] = outlined(c); };
   icon('casing', x => { x.fillStyle = '#5a5648'; x.beginPath(); x.ellipse(14, 11, 12, 8, 0, 0, 7); x.fill(); x.fillStyle = '#e8e4d8'; x.beginPath(); x.ellipse(14, 11, 11, 7, 0, 0, 7); x.fill(); x.fillStyle = '#fff'; x.fillRect(8, 6, 8, 2); x.fillStyle = '#a8322c'; x.fillRect(12, 4, 3, 14); });
   icon('fin', x => { x.fillStyle = '#7c8a90'; x.beginPath(); x.moveTo(26, 11); x.lineTo(4, 1); x.lineTo(8, 11); x.lineTo(4, 21); x.closePath(); x.fill(); x.fillStyle = '#4a5458'; x.fillRect(8, 10, 18, 2); });
   icon('fuse', x => { x.fillStyle = '#c8a040'; x.fillRect(4, 6, 14, 10); x.fillStyle = '#e8c860'; x.fillRect(4, 6, 14, 2); x.fillStyle = '#d22'; x.beginPath(); x.arc(21, 11, 4, 0, 7); x.fill(); x.fillStyle = '#fff'; x.fillRect(20, 9, 1, 1); });

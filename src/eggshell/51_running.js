@@ -7,9 +7,9 @@ SPR.bomber = (() => { // the Rotten bomber, seen from below
   x.fillStyle = '#121410'; [8, 18, 36, 46].forEach(e => x.fillRect(e, 6, 3, 9));
   x.fillStyle = '#6f8a2a'; x.beginPath(); x.arc(12, 10.5, 2, 0, 7); x.fill(); x.beginPath(); x.arc(44, 10.5, 2, 0, 7); x.fill();
   x.fillStyle = 'rgba(200,200,200,.35)'; [9, 19, 37, 47].forEach(e => x.fillRect(e - 3, 5, 9, 1));
-  return c;
+  return outlined(c);
 })();
-SPR.cover = (() => { const [c, x] = mk(30, 14); srand(5); for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) { x.fillStyle = pick(['#b59a62', '#a88d58', '#c0a46a']); x.beginPath(); x.ellipse(5 + i * 7 + r * 3.5, 11 - r * 4, 4, 2.6, 0, 0, 7); x.fill(); x.fillStyle = '#6a5636'; x.fillRect(8 + i * 7 + r * 3.5, 10 - r * 4, 1, 2); } return c; })();
+SPR.cover = outlined((() => { const [c, x] = mk(30, 14); srand(5); for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) { x.fillStyle = pick(['#b59a62', '#a88d58', '#c0a46a']); x.beginPath(); x.ellipse(5 + i * 7 + r * 3.5, 11 - r * 4, 4, 2.6, 0, 0, 7); x.fill(); x.fillStyle = '#6a5636'; x.fillRect(8 + i * 7 + r * 3.5, 10 - r * 4, 1, 2); } return c; })());
 SPR.rubble = (() => { const [c, x] = mk(28, 12); srand(6); for (let i = 0; i < 22; i++) { x.fillStyle = pick(['#6a6058', '#8a3b2a', '#5a524a', '#7c7b74', '#3a3430']); const w = 3 + rnd() * 6; x.fillRect(14 + (rnd() - 0.5) * (24 - w) - w / 2 + 2, 12 - rnd() * 9 * (1 - Math.abs(rnd() - 0.5)) - 3, w, 3); } return c; })();
 SPR.sign = (() => { const [c, x] = mk(24, 20); x.fillStyle = '#4a3a22'; x.fillRect(11, 8, 2, 12); x.fillStyle = '#e8c020'; x.fillRect(0, 0, 24, 9); x.fillStyle = '#111'; x.fillRect(1, 1, 22, 7); x.fillStyle = '#e8c020'; x.font = '6px monospace'; x.fillText('BUNKER', 1, 7); return c; })();
 SPR.fire = (() => { const fr = []; for (let f = 0; f < 4; f++) { const [c, x] = mk(16, 20); srand(30 + f); for (let i = 0; i < 30; i++) { const y = rnd() * 18; x.fillStyle = y < 6 ? '#ffd040' : y < 12 ? '#ff7a20' : '#c02a10'; x.fillRect(8 + (rnd() - 0.5) * (20 - y) * 0.6, 20 - y - 2, 2, 2); } fr.push(c); } return fr; })();
@@ -213,7 +213,8 @@ class RunningMode {
     ctx.save();
     const roll = 0;
     if (roll) { ctx.translate(W / 2, H / 2); ctx.rotate(roll); ctx.scale(1.3, 1.3); ctx.translate(-W / 2, -H / 2); }
-    Ray.render(cam, this.map, sprites, { decals, skyImg: SKY.town, floor: FLOOR.cobble, fog: '46,20,12', fogDist: 13 });
+    Ray.render(cam, this.map, sprites, { decals, skyImg: SKY.town, floor: FLOOR.cobble, fog: '200,226,240', fogDist: 24 });
+    (this.weather || (this.weather = new Weather('embers'))).draw(p.a);
     ctx.restore();
     // helmet rim, top of screen
     // HUD: compass to bunker

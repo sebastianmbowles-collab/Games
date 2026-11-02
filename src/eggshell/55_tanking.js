@@ -10,7 +10,7 @@ function makeTankFront(body, big) {
   x.fillStyle = '#0a0a08'; x.beginPath(); x.arc(w / 2, h * 0.3, h * 0.1, 0, 7); x.fill();
   x.fillStyle = '#6f8a2a'; x.beginPath(); x.ellipse(w / 2, h * 0.65, 4, 5, 0, 0, 7); x.fill(); x.fillStyle = '#111'; x.fillRect(w / 2 - 2, h * 0.62, 1, 1); x.fillRect(w / 2 + 1, h * 0.62, 1, 1);
   if (big) { x.fillStyle = '#222'; x.fillRect(w * 0.72, 0, 1, h * 0.2); x.fillStyle = '#6f8a2a'; x.fillRect(w * 0.73, 0, 9, 6); x.fillStyle = 'rgba(120,200,60,.7)'; for (let i = 0; i < 4; i++) x.fillRect(w * 0.25 + i * 7, h * 0.02 + (i % 2) * 2, 1, 4); }
-  return c;
+  return outlined(c);
 }
 SPR.etank = makeTankFront('#4a5238');
 // our tank, seen from behind (barrel pointing away from you)
@@ -26,7 +26,7 @@ function makeTankBack(lvl) {
   if (lvl >= 1) { x.fillStyle = '#121410'; x.fillRect(0, 26, 11, 6); x.fillStyle = '#5a3a20'; x.fillRect(2, 28, 7, 2); }
   if (lvl >= 2) { x.fillStyle = '#1a1a14'; x.fillRect(19, 0, 6, 3); x.fillStyle = '#3a3a34'; x.fillRect(16, 7, 3, 2); }
   if (lvl >= 3) { x.fillStyle = '#111'; x.fillRect(14, 16, 6, 2); x.fillRect(26, 22, 5, 2); x.fillRect(24, 13, 1, 6); }
-  return c;
+  return outlined(c);
 }
 SPR.mytank = [0, 1, 2, 3].map(makeTankBack);
 SPR.stinker = makeTankFront('#5f7a24', true);
@@ -235,7 +235,8 @@ class TankingMode {
       if (this.recoil > 0.6) sprites.push({ x: p.x + Math.cos(p.a) * 0.75, y: p.y + Math.sin(p.a) * 0.75, img: BOOM[1], w: 0.6, h: 0.6, z: 0.2 });
       if (lvl >= 2) sprites.push({ x: bx, y: by, img: SPR.fire[((this.t * 8) | 0) % 4], w: 0.3, h: 0.4, z: 0.6 });
     } else sprites.push({ x: p.x, y: p.y, img: SPR.wreck, w: 1.2, h: 0.55 }, { x: p.x, y: p.y, img: SPR.fire[((this.t * 8) | 0) % 4], w: 0.8, h: 1, z: 0.2 });
-    Ray.render(Ray.chase(this.map, p, 2.4, 0.85, -14 - this.recoil * 3), this.map, sprites, { decals: this.decals, skyImg: SKY.storm, floor: FLOOR.mud, fog: '62,60,40', fogDist: 17 });
+    Ray.render(Ray.chase(this.map, p, 2.4, 0.85, -14 - this.recoil * 3), this.map, sprites, { decals: this.decals, skyImg: SKY.storm, floor: FLOOR.mud, fog: '200,208,216', fogDist: 24 });
+    (this.weather || (this.weather = new Weather('rain'))).draw(p.a);
     // rotten egg goo on the periscope
     for (const g of this.goo) { ctx.globalAlpha = Math.min(1, g.t); ctx.fillStyle = '#7d8f3a'; ctx.beginPath(); ctx.ellipse(g.x, g.y, g.r, g.r * 0.8, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#a0b048'; ctx.beginPath(); ctx.ellipse(g.x - 3, g.y - 3, g.r * 0.4, g.r * 0.3, 0, 0, 7); ctx.fill(); rect(g.x - 2, g.y + g.r * 0.6, 3, (2.5 - g.t) * 14, '#7d8f3a'); }
     ctx.globalAlpha = 1;

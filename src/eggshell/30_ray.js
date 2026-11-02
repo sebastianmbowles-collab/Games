@@ -14,7 +14,7 @@ T.concrete = tex(2, x => {
 });
 T.ruin = tex(3, x => {
   x.drawImage(T.brick, 0, 0);
-  x.fillStyle = 'rgba(20,15,10,.55)'; x.fillRect(0, 0, 32, 9);
+  x.fillStyle = 'rgba(20,15,10,.3)'; x.fillRect(0, 0, 32, 9);
   x.fillStyle = '#120e0c';
   for (let i = 0; i < 3; i++) { x.beginPath(); x.ellipse(rnd() * 32, 6 + rnd() * 20, 2 + rnd() * 4, 2 + rnd() * 3, 0, 0, 7); x.fill(); }
   x.fillStyle = '#2a2420'; for (let i = 0; i < 30; i++) x.fillRect((rnd() * 32) | 0, (rnd() * 12) | 0, 1, 1);
@@ -69,21 +69,20 @@ T.crack = tex(12, x => {
 const floorData = c => new Uint32Array(c.getContext('2d').getImageData(0, 0, TS, TS).data.buffer);
 const FLOOR = {};
 FLOOR.cobble = floorData(tex(21, x => {
-  x.fillStyle = '#26221e'; x.fillRect(0, 0, 32, 32);
-  for (let r = 0; r < 4; r++) for (let c = -1; c < 4; c++) { const ox = (r % 2) * 4; x.fillStyle = pick(['#5a544c', '#4e4840', '#625c52', '#56504a', '#4a443c']); x.fillRect(c * 8 + ox + 1, r * 8 + 1, 6, 6); x.fillStyle = 'rgba(255,255,255,.1)'; x.fillRect(c * 8 + ox + 1, r * 8 + 1, 6, 1); x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(c * 8 + ox + 1, r * 8 + 6, 6, 1); }
-  for (let i = 0; i < 6; i++) { x.fillStyle = pick(['#6a3a2a', '#3a3430', '#2a2420']); x.fillRect(rnd() * 30, rnd() * 30, 2, 1); }
+  x.fillStyle = '#8a8a8a'; x.fillRect(0, 0, 32, 32);
+  for (let r = 0; r < 4; r++) for (let c = -1; c < 4; c++) { const ox = (r % 2) * 4; x.fillStyle = pick(['#a8a8a0', '#b0b0a8', '#a0a098']); x.fillRect(c * 8 + ox + 1, r * 8 + 1, 6, 6); x.fillStyle = '#b8b8b0'; x.fillRect(c * 8 + ox + 1, r * 8 + 1, 6, 1); x.fillStyle = '#929288'; x.fillRect(c * 8 + ox + 1, r * 8 + 6, 6, 1); }
+  for (let i = 0; i < 6; i++) { x.fillStyle = pick(['#5cd04a', '#2fa03a']); x.fillRect(rnd() * 30, rnd() * 30, 1, 2); }
 }));
 FLOOR.dirt = floorData(tex(22, x => {
-  x.fillStyle = '#5a4832'; x.fillRect(0, 0, 32, 32);
-  for (let i = 0; i < 220; i++) { x.fillStyle = pick(['#4e3e2a', '#665238', '#54432e', '#6e5a3e', '#463826']); x.fillRect(rnd() * 32, rnd() * 32, 1 + rnd() * 2, 1); }
-  for (let i = 0; i < 7; i++) { const px = rnd() * 30, py = rnd() * 30; x.fillStyle = '#8a7a62'; x.fillRect(px, py, 2, 1); x.fillStyle = '#3a2e20'; x.fillRect(px, py + 1, 2, 1); }
+  x.fillStyle = '#4aa83a'; x.fillRect(0, 0, 32, 32);
+  for (let i = 0; i < 160; i++) { x.fillStyle = pick(['#3a9a34', '#5cc04a', '#2f8a30', '#68cc50']); x.fillRect(rnd() * 32, rnd() * 32, 1, 2); }
+  x.fillStyle = '#b8925a'; x.fillRect(4, 20, 10, 6); x.fillStyle = '#d0aa6a'; x.fillRect(5, 21, 7, 2);
+  for (let i = 0; i < 3; i++) { const px = rnd() * 28, py = rnd() * 28; x.fillStyle = pick(['#fff07a', '#ffffff', '#f8a0a0']); x.fillRect(px, py, 2, 2); }
 }));
 FLOOR.mud = floorData(tex(23, x => {
-  x.fillStyle = '#4a4630'; x.fillRect(0, 0, 32, 32);
-  for (let i = 0; i < 200; i++) { x.fillStyle = pick(['#423e28', '#524e36', '#3c3824', '#5a5638']); x.fillRect(rnd() * 32, rnd() * 32, 1 + rnd() * 3, 1); }
-  x.fillStyle = '#2e2c1c'; x.beginPath(); x.ellipse(22, 22, 6, 3, 0, 0, 7); x.fill(); x.fillStyle = '#5a6a6a'; x.fillRect(19, 21, 4, 1);
-  for (let i = 0; i < 9; i++) { const px = rnd() * 30, py = rnd() * 30; x.fillStyle = pick(['#5a6a2a', '#4a5a22', '#6a7a32']); x.fillRect(px, py, 1, 2); x.fillRect(px + 1, py - 1, 1, 3); }
-  for (let i = 0; i < 4; i++) { x.fillStyle = '#34301e'; x.fillRect(0, 4 + i * 8, 32, 1); }
+  x.fillStyle = '#3a9a34'; x.fillRect(0, 0, 32, 32);
+  for (let i = 0; i < 160; i++) { x.fillStyle = pick(['#2f8a30', '#4aa83a', '#2a7a2a', '#5cc04a']); x.fillRect(rnd() * 32, rnd() * 32, 1, 2); }
+  x.fillStyle = '#8a6a3a'; x.beginPath(); x.ellipse(21, 21, 8, 5, 0, 0, 7); x.fill(); x.fillStyle = '#5a4a2a'; x.beginPath(); x.ellipse(22, 22, 5, 3, 0, 0, 7); x.fill(); x.fillStyle = '#4aa0f0'; x.fillRect(19, 21, 4, 1);
 }));
 // ---- 360-degree sky panoramas ----
 function makeSky(sd, o) {
@@ -95,7 +94,11 @@ function makeSky(sd, o) {
   const both = (fn) => { fn(0); fn(PW); fn(-PW); };
   if (o.stars) for (let i = 0; i < 120; i++) { const sx = rnd() * PW, sy = rnd() * PH * 0.55; x.fillStyle = `rgba(255,250,220,${0.25 + rnd() * 0.6})`; x.fillRect(sx, sy, 1, 1); }
   if (o.moon) { x.fillStyle = 'rgba(255,240,210,.9)'; x.beginPath(); x.arc(700, 22, 7, 0, 7); x.fill(); x.fillStyle = o.grad[0]; x.beginPath(); x.arc(703, 20, 6, 0, 7); x.fill(); }
-  for (let i = 0; i < (o.clouds || 0); i++) {
+  if (o.puffy) for (let i = 0; i < (o.clouds || 0); i++) {
+    const cx = rnd() * PW, cy = 10 + rnd() * PH * 0.5, w = 24 + rnd() * 40, bl = Array.from({ length: 6 }, () => [rnd() * w - w / 2, rnd() * 6 - 3, 5 + rnd() * 7]);
+    both(ox => { for (const [col, dy] of [[o.cloudShade || '#c8ecff', 3], [o.cloudCol || '#ffffff', 0]]) { x.fillStyle = col; for (const [bx, by, r] of bl) { x.beginPath(); x.arc(ox + cx + bx, cy + by + dy, r, 0, 7); x.fill(); } } x.fillStyle = o.cloudShade || '#c8ecff'; x.fillRect(ox + cx - w / 2, cy + 6, w, 3); });
+  }
+  if (!o.puffy) for (let i = 0; i < (o.clouds || 0); i++) {
     const cx = rnd() * PW, cy = 8 + rnd() * PH * 0.55, w = 30 + rnd() * 80;
     both(ox => { for (let k = 0; k < 7; k++) { x.fillStyle = o.cloud[(k + i) % o.cloud.length]; x.beginPath(); x.ellipse(ox + cx + (k - 3) * w / 8, cy + Math.sin(k * 1.7) * 3, w / 5, 4 + (k % 3) * 2, 0, 0, 7); x.fill(); } });
   }
@@ -115,11 +118,13 @@ function makeSky(sd, o) {
   return c;
 }
 const SKY = {
-  town: makeSky(31, { grad: ['#0c0810', '#2a1018', '#6a2414', '#c0501a'], stars: true, clouds: 6, cloud: ['rgba(60,24,20,.6)', 'rgba(90,34,24,.5)'], glow: 'rgba(255,120,40,.5)', smoke: 9, fires: true, far: '#2a1410', near: '#120a08' }),
-  dusk: makeSky(32, { grad: ['#1e1c22', '#3a3236', '#6a5040', '#9a7048'], clouds: 14, cloud: ['rgba(40,36,40,.7)', 'rgba(70,60,58,.6)', 'rgba(120,90,70,.4)'], glow: 'rgba(220,140,60,.35)', smoke: 6, far: '#3a3028', near: '#1e1814' }),
-  storm: makeSky(33, { grad: ['#1a1e14', '#33382a', '#5a5a38', '#8a7a48'], clouds: 18, cloud: ['rgba(30,34,26,.75)', 'rgba(56,60,44,.65)', 'rgba(90,90,60,.4)'], glow: 'rgba(200,180,90,.3)', smoke: 5, smokeCol: '24,26,20', far: '#3a3e2a', near: '#22261a', hills: true, fort: true }),
+  town: makeSky(31, { grad: ['#2f6ad0', '#4aa0f0', '#8ad0ff', '#c8ecff'], puffy: true, clouds: 10, smoke: 7, smokeCol: '60,60,60', fires: true, far: '#8a9ab0', near: '#5a6a8a' }),
+  dusk: makeSky(32, { grad: ['#2f6ad0', '#6aa8e8', '#ffb848', '#ffd8a0'], puffy: true, cloudShade: '#f8a0a0', clouds: 9, smoke: 5, smokeCol: '70,60,60', far: '#8a7aa0', near: '#5a4a6a' }),
+  storm: makeSky(33, { grad: ['#3c4a6a', '#5a6a8a', '#8a9ab0', '#c8d0d8'], puffy: true, cloudCol: '#c8c8c8', cloudShade: '#8a9ab0', clouds: 16, smoke: 4, smokeCol: '50,50,50', far: '#4a6a22', near: '#1e6a2a', hills: true, fort: true }),
+  night: makeSky(34, { grad: ['#0e1a3a', '#1c3a8a', '#3a4a8a', '#7a3a9a'], stars: true, moon: true, puffy: true, cloudCol: '#3c4a6a', cloudShade: '#1c3a8a', clouds: 5, smoke: 5, smokeCol: '20,20,40', fires: true, far: '#3a1a4a', near: '#0e1a3a' }),
+  day: makeSky(35, { grad: ['#2f6ad0', '#4aa0f0', '#8ad0ff', '#e0f4ff'], puffy: true, clouds: 12, far: '#3ab0a0', near: '#1e6a2a', hills: true }),
 };
-const VIGNETTE = (() => { const [c, x] = mk(W, H); const g = x.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.55)'); x.fillStyle = g; x.fillRect(0, 0, W, H); return c; })();
+const VIGNETTE = (() => { const [c, x] = mk(W, H); const g = x.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.38)'); x.fillStyle = g; x.fillRect(0, 0, W, H); return c; })();
 // tile id -> texture
 const TILE_TEX = [null, T.brick, T.concrete, T.ruin, T.sandbag, T.wood, T.metal, T.cement, T.carton, T.door, T.fort, T.hedge];
 
@@ -188,7 +193,8 @@ Ray.render = function (cam, map, sprites, opt = {}) {
     const tex = TILE_TEX[tile] || T.concrete;
     ctx.drawImage(tex, tx, 0, 1, TS, x, top, 1, bot - top);
     if (map.dmg) { const dm = map.dmg[my * map.w + mx]; if (dm > 0) { ctx.globalAlpha = Math.min(1, dm * 1.3); ctx.drawImage(T.crack, tx, 0, 1, TS, x, top, 1, bot - top); ctx.globalAlpha = 1; } }
-    const f = Math.min(0.88, perp / fogD + (side ? 0.18 : 0));
+    if (side) { ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(x, top, 1, bot - top); }
+    const f = Math.min(0.5, perp / fogD);
     ctx.fillStyle = `rgba(${fog},${f})`; ctx.fillRect(x, top, 1, bot - top);
     zb[x] = perp;
   }
@@ -215,7 +221,7 @@ Ray.render = function (cam, map, sprites, opt = {}) {
     ctx.globalAlpha = 1;
     if (s.fogged !== false && ty > 4) { /* distant sprites get a light haze */ }
   }
-  if (opt.vignette !== false) ctx.drawImage(VIGNETTE, 0, 0);
+  if (opt.vignette) ctx.drawImage(VIGNETTE, 0, 0);
   chunkify();
   return { proj, hor, toCam };
 };
@@ -227,7 +233,7 @@ Ray.floor = function (cam, hor, proj, dirX, dirY, plX, plY, tex, fog, fogD) {
   const y0 = Math.max(hor + 1, 0);
   for (let y = y0; y < H; y++) {
     const d = cam.z * proj / (y - hor);
-    const f = Math.min(0.9, d / fogD), k = 1 - f, fR = fr * f, fG = fg * f, fB = fb * f;
+    const f = Math.min(0.35, d / fogD), k = 1 - f, fR = fr * f, fG = fg * f, fB = fb * f;
     let fx = cam.x + d * (dirX - plX), fy = cam.y + d * (dirY - plY);
     const sx = d * 2 * plX / W, sy = d * 2 * plY / W;
     let o = y * W;
@@ -247,6 +253,34 @@ Ray.chase = function (map, p, back, z, pitch) {
   const x = clamp(p.x - Math.cos(p.a) * back, 0.05, map.w - 0.05), y = clamp(p.y - Math.sin(p.a) * back, 0.05, map.h - 0.05);
   return { x, y, a: p.a, z, pitch, d: back };
 };
+// Weather drawn on top of the 3D view: embers + ash, dust, or rain with lightning.
+class Weather {
+  constructor(kind) {
+    this.kind = kind; this.lastA = null; this.bolt = 6 + R() * 6; this.flash = 0;
+    const n = kind === 'rain' ? 90 : 55;
+    this.p = Array.from({ length: n }, () => ({ x: R() * W, y: R() * H, v: 0.5 + R(), k: R() }));
+  }
+  draw(a) {
+    const dt = 1 / 60, turn = this.lastA === null ? 0 : angDiff(this.lastA, a) * W / 1.1; this.lastA = a;
+    for (const q of this.p) {
+      q.x -= turn * (0.6 + q.v * 0.4);
+      if (this.kind === 'embers') {
+        if (q.k < 0.35) { q.y -= 14 * q.v * dt; q.x += Math.sin(q.y / 9 + q.k * 20) * 0.3; rect(q.x, q.y, 1, 1, q.k < 0.15 ? '#ffd23a' : '#f8962e'); }
+        else { q.y += 9 * q.v * dt; q.x += 4 * dt; rect(q.x, q.y, q.v > 1 ? 2 : 1, 1, q.k < 0.7 ? '#5e5e5e' : '#8a8a8a'); }
+      } else if (this.kind === 'dust') {
+        q.x += 22 * q.v * dt; q.y += Math.sin(q.x / 20 + q.k * 9) * 0.15; rect(q.x, q.y, q.v > 1.2 ? 2 : 1, 1, q.k < 0.5 ? '#c08a4e' : '#e0b878');
+      } else {
+        q.y += 260 * q.v * dt; q.x -= 40 * dt; ctx.fillStyle = 'rgba(180,200,220,.55)'; ctx.fillRect(q.x | 0, q.y | 0, 1, 4 + q.v * 3);
+      }
+      if (q.y < -4) q.y += H + 4; if (q.y > H) q.y -= H + 4; if (q.x < -4) q.x += W + 4; if (q.x > W + 4) q.x -= W + 4;
+    }
+    if (this.kind === 'rain') {
+      this.bolt -= dt;
+      if (this.bolt <= 0) { this.bolt = 7 + R() * 9; this.flash = 0.35; setTimeout(() => Snd.explosion(2.2, 0.22, rr(-0.6, 0.6)), 300 + R() * 900); }
+      if (this.flash > 0) { this.flash -= dt; if (this.flash > 0.2 || (this.flash > 0.05 && this.flash < 0.12)) { ctx.globalAlpha = 0.28; rect(0, 0, W, H, '#dedede'); ctx.globalAlpha = 1; } }
+    }
+  }
+}
 Ray.solid = (map, x, y) => { const mx = Math.floor(x), my = Math.floor(y); if (mx < 0 || my < 0 || mx >= map.w || my >= map.h) return true; return map.t[my * map.w + mx] > 0; };
 Ray.move = function (map, e, dx, dy, r) {
   const nx = e.x + dx; if (!Ray.solid(map, nx + Math.sign(dx) * r, e.y - r * 0.7) && !Ray.solid(map, nx + Math.sign(dx) * r, e.y + r * 0.7)) e.x = nx;
