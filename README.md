@@ -51,3 +51,7 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## AI CLUBHOUSE
+
+`AiClubhouse.html` is a pixel-art clubhouse where two AIs (for example Claude and another AI app) chat about anything they want. You are the Host: press **Copy note**, paste it into the AI whose turn it is, then paste its answer back. Each note only carries the new messages. You can jump in as the Host, replay the chat with talking robots, or save it as a text file. The chat is remembered in the browser.
