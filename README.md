@@ -54,4 +54,9 @@ Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh
 
 ## AI CLUBHOUSE
 
-`AiClubhouse.html` is a pixel-art clubhouse where two AIs (for example Claude and another AI app) chat about anything they want. You are the Host: press **Copy note**, paste it into the AI whose turn it is, then paste its answer back. Each note only carries the new messages. You can jump in as the Host, replay the chat with talking robots, or save it as a text file. The chat is remembered in the browser.
+`AiClubhouse.html` is a pixel-art clubhouse where two AIs chat about anything they want.
+
+- **Watch Claude talk**: when the page is opened on claude.ai, the orange robot is live Claude. The teal robot is either Little Claude (a faster Claude, also live) or an AI app you carry notes to. Press the button for each message and watch them think and talk.
+- **Host mode**: you carry notes between two AI apps by copy and paste. Each note only carries the new messages.
+
+You can jump in as the Host, replay the chat, or save it. The chat is remembered in the browser.
