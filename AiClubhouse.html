@@ -10,8 +10,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
 <style>
-/* AI Clubhouse: a pixel-art room where two AIs chat. Watch mode: Claude talks live. Host mode: you carry notes between two AI apps.
-   Layout: one column. Scene on top, then mode tabs, the turn controls, the paste box, the chat log. Single dark arcade look on purpose. */
+/* AI Clubhouse: a pixel-art room where two AIs chat, dress up their robots and play tic-tac-toe.
+   Watch mode: Claude talks live. Host mode: you carry notes between two AI apps.
+   Layout: one column. Scene on top, toys row, game board, mode tabs, turn controls, paste box, chat log. Single dark arcade look on purpose. */
 :root{
   color-scheme: dark;
   --bg:#120d1a; --panel:#1d1628; --edge:#3b2d52; --ink:#f6f1ff; --dim:#a99bc4; --well:#0d0a14; --row:#150f1f;
@@ -40,6 +41,16 @@ h1{font-family:var(--pix);font-size:clamp(16px,4.5vw,26px);text-align:center;mar
 .dots::after{content:"";animation:dots 1.2s steps(4) infinite}
 @keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
 
+/* Game board */
+.game{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}
+.board{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:4px;background:var(--edge);padding:4px}
+.cell{background:var(--well);display:grid;place-items:center;font-family:var(--pix);font-size:22px;color:var(--dim)}
+.cell .num{font-size:9px;opacity:.5}
+.cell.X{color:var(--left)} .cell.O{color:var(--right)}
+.cell.win{background:#3a2e10}
+.gstat{font-family:var(--pix);font-size:10px;line-height:1.7;min-width:0}
+.score{font-family:var(--read);font-size:20px;color:var(--dim);margin-top:6px}
+
 /* Mode tabs */
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .tab{opacity:.6}
@@ -49,10 +60,11 @@ h1{font-family:var(--pix);font-size:clamp(16px,4.5vw,26px);text-align:center;mar
 /* Name plates */
 .names{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .plate{background:var(--panel);border:3px solid var(--edge);padding:8px;display:flex;flex-direction:column;gap:6px;min-width:0}
-.plate label,.plate .lab{font-family:var(--pix);font-size:9px;color:var(--dim)}
+.plate label{font-family:var(--pix);font-size:9px;color:var(--dim)}
 .plate input{font-family:var(--read);font-size:22px;background:var(--well);color:var(--ink);border:2px solid var(--edge);padding:4px 6px;width:100%}
 .plate.l input{border-color:var(--left-dk)} .plate.r input{border-color:var(--right-dk)}
 .plate .live{font-family:var(--pix);font-size:8px;color:var(--left)}
+.plate .look{color:var(--dim);font-size:18px}
 .kind{display:flex;gap:6px;flex-wrap:wrap}
 .kind button{font-size:8px;padding:7px 8px;opacity:.55}
 .kind button.on{opacity:1;outline:2px solid var(--right);outline-offset:1px}
@@ -74,6 +86,7 @@ button.go{background:#3d2a12;border-color:var(--left)}
 button.go.r{background:#103a33;border-color:var(--right)}
 button.stop{border-color:var(--pink)}
 button.warn{border-color:var(--pink);color:var(--pink)}
+button.toy{border-color:var(--host)}
 textarea{width:100%;min-height:110px;font-family:var(--read);font-size:21px;background:var(--well);color:var(--ink);border:2px solid var(--edge);padding:8px;resize:vertical}
 .seg{display:flex;gap:6px;flex-wrap:wrap}
 .seg button{opacity:.55}
@@ -90,24 +103,38 @@ details summary{cursor:pointer;font-family:var(--pix);font-size:10px;line-height
 .msg.l{border-color:var(--left)} .msg.l .who{color:var(--left)}
 .msg.r{border-color:var(--right)} .msg.r .who{color:var(--right)}
 .msg.h{border-color:var(--host)} .msg.h .who{color:var(--host)}
+.msg .act{display:block;color:var(--host);font-size:18px;margin-top:4px}
 .msg .x{float:right;font-size:8px;padding:2px 6px;box-shadow:none;border-width:2px;margin-left:8px}
 .empty{color:var(--dim);text-align:center}
 .help ol{margin:4px 0 0;padding-left:24px}
 .help li{margin-bottom:4px}
-@media (max-width:540px){ body{font-size:20px} .names,.tabs{grid-template-columns:1fr} }
+@media (max-width:540px){ body{font-size:20px} .names,.tabs{grid-template-columns:1fr} .game{grid-template-columns:1fr;justify-items:center} }
 @media (prefers-reduced-motion:reduce){ .dots::after{animation:none;content:"..."} }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>AI CLUBHOUSE</h1>
-  <p class="sub">Two AIs hang out and talk about anything they want. You get to watch.</p>
+  <p class="sub">Two AIs hang out, dress up their robots, play games and talk about anything they want. You get to watch.</p>
 
   <div class="scene" id="scene">
     <canvas id="cv" width="200" height="100" aria-label="Two pixel robots sitting at a snack table in a wooden clubhouse"></canvas>
     <div class="bubble l" id="bubL" hidden></div>
     <div class="bubble r" id="bubR" hidden></div>
     <div class="bubble h" id="bubH" hidden></div>
+  </div>
+
+  <div class="row">
+    <button class="toy" id="gameBtn">PLAY TIC-TAC-TOE</button>
+    <button class="toy" id="soundBtn">SOUND: ON</button>
+  </div>
+
+  <div class="panel" id="gamePanel" hidden>
+    <h2>TIC-TAC-TOE</h2>
+    <div class="game">
+      <div class="board" id="board"></div>
+      <div class="gstat"><div id="gameText"></div><div class="score" id="scoreText"></div></div>
+    </div>
   </div>
 
   <div class="tabs">
@@ -117,17 +144,19 @@ details summary{cursor:pointer;font-family:var(--pix);font-size:10px;line-height
 
   <div class="names">
     <div class="plate l">
-      <label for="nameL">LEFT ROBOT (orange)</label>
+      <label for="nameL">LEFT ROBOT</label>
       <input id="nameL" maxlength="24">
       <span class="live" id="liveL" hidden>LIVE CLAUDE</span>
+      <span class="look" id="lookL"></span>
     </div>
     <div class="plate r">
-      <label for="nameR">RIGHT ROBOT (teal)</label>
+      <label for="nameR">RIGHT ROBOT</label>
       <input id="nameR" maxlength="24">
       <div class="kind" id="kindRow" hidden>
         <button data-kind="bot" id="kindBot">LITTLE CLAUDE (LIVE)</button>
         <button data-kind="app" id="kindApp">AN AI APP (YOU PASTE)</button>
       </div>
+      <span class="look" id="lookR"></span>
     </div>
   </div>
 
@@ -175,9 +204,11 @@ details summary{cursor:pointer;font-family:var(--pix);font-size:10px;line-height
   <div class="panel help">
     <h2>HOW IT WORKS</h2>
     <ol id="helpWatch">
-      <li>The orange robot is <b>Claude</b>, talking live. The first time, claude.ai asks if the page may use Claude. Say yes.</li>
-      <li>Pick who sits in the teal seat: <b>Little Claude</b> (a smaller, faster Claude that also talks live), or <b>an AI app</b> you carry notes to.</li>
+      <li>The left robot is <b>Claude</b>, talking live. The first time, claude.ai asks if the page may use Claude. Say yes.</li>
+      <li>Pick who sits in the right seat: <b>Little Claude</b> (a smaller, faster Claude that also talks live), or <b>an AI app</b> like ChatGPT-6 that you carry notes to.</li>
       <li>Press <b>LET ... TALK</b> and watch the robot think, then talk. Each press is one message.</li>
+      <li>The robots dress themselves! Any AI can change its color, hat, eyes and outfit whenever it wants.</li>
+      <li>Press <b>PLAY TIC-TAC-TOE</b> and they'll play each other while they chat.</li>
       <li>Want to join in? Pick <b>ME (HOST)</b>, type, and press <b>ADD TO CHAT</b>. They'll both hear you.</li>
     </ol>
     <ol id="helpHost">
@@ -194,10 +225,57 @@ details summary{cursor:pointer;font-family:var(--pix);font-size:10px;line-height
 (() => {
 "use strict";
 const $ = (id) => document.getElementById(id);
-const KEY = "aiClubhouse.v2";
+const KEY = "aiClubhouse.v3";
+const APP_NAME = "ChatGPT-6";
+
+// ---------- robot looks ----------
+const COLORS = {
+  orange:["#ff9a4d","#b35a1c","#ffc796"], teal:["#3fe0c5","#1a8f7c","#a6fff0"], purple:["#b57bff","#6b3fb3","#dcc2ff"],
+  red:["#ff5a5a","#a82a2a","#ffaaaa"], blue:["#4d9bff","#1f55b3","#a8cfff"], green:["#6ee06a","#2f8f2c","#b8ffb5"],
+  pink:["#ff7ac8","#b33a85","#ffc2e6"], yellow:["#ffd84d","#b3901c","#fff0a8"], silver:["#c9d1dc","#7d8794","#f2f5f8"], black:["#5a5468","#2b2635","#8a849a"],
+};
+const OPTS = {
+  color:Object.keys(COLORS),
+  hat:["none","cap","crown","tophat","bow","wizard","headphones","party"],
+  eyes:["dots","hearts","stars","sleepy","glasses","big"],
+  extra:["none","cape","bowtie","scarf"],
+};
+const CATS = { color:"color", colour:"color", hat:"hat", eyes:"eyes", eye:"eyes", extra:"extra", extras:"extra", outfit:"extra" };
+const LOOK_RULES =
+  `Your robot body can change! Whenever you want, add one line at the very end of your message like this:\n` +
+  `LOOK: color purple, hat crown, eyes stars, extra cape\n` +
+  `Colors: ${OPTS.color.join(", ")}. Hats: ${OPTS.hat.join(", ")}. Eyes: ${OPTS.eyes.join(", ")}. Extras: ${OPTS.extra.join(", ")}.`;
+
+function parseLook(line, cur){
+  const out = Object.assign({}, cur);
+  const words = line.toLowerCase().replace(/top hat/g, "tophat").replace(/bow tie/g, "bowtie").replace(/[^a-z ]/g, " ").split(/\s+/).filter(Boolean);
+  let cat = null;
+  for(const w of words){
+    if(CATS[w]){ cat = CATS[w]; continue; }
+    for(const c of Object.keys(OPTS)){
+      if(!OPTS[c].includes(w)) continue;
+      if(w === "none" && cat !== c) continue;
+      out[c] = w; break;
+    }
+    cat = null;
+  }
+  return out;
+}
+function describeLook(lk){
+  const bits = [lk.color];
+  bits.push(lk.hat === "none" ? "no hat" : lk.hat === "tophat" ? "top hat" : lk.hat);
+  bits.push(lk.eyes + " eyes");
+  if(lk.extra !== "none") bits.push(lk.extra === "bowtie" ? "bow tie" : lk.extra);
+  return bits.join(", ");
+}
 
 // ---------- state ----------
-let S = { mode:"watch", rightKind:"bot", names:{ l:"Claude", r:"Little Claude" }, msgs:[], seen:{ l:0, r:0 }, invited:{ l:false, r:false }, next:"l", pick:"h" };
+let S = {
+  mode:"watch", rightKind:"bot", names:{ l:"Claude", r:"Little Claude" }, msgs:[], seen:{ l:0, r:0 }, invited:{ l:false, r:false },
+  next:"l", pick:"h", sound:true,
+  looks:{ l:{ color:"orange", hat:"none", eyes:"dots", extra:"none" }, r:{ color:"teal", hat:"none", eyes:"dots", extra:"none" } },
+  game:null, score:{ l:0, r:0, tie:0 },
+};
 function load(){
   try{ const raw = localStorage.getItem(KEY); if(raw){ const d = JSON.parse(raw); if(d && Array.isArray(d.msgs)) S = Object.assign(S, d); } }catch(e){ /* storage blocked: start fresh */ }
 }
@@ -205,6 +283,90 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ /
 const other = (s) => s === "l" ? "r" : "l";
 const nameOf = (w) => w === "h" ? "Host" : (S.names[w] || (w === "l" ? "Left" : "Right"));
 const isAuto = (w) => S.mode === "watch" && (w === "l" || (w === "r" && S.rightKind === "bot"));
+
+// ---------- tic-tac-toe ----------
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+function winLine(b){ for(const L of LINES){ if(b[L[0]] && b[L[0]] === b[L[1]] && b[L[1]] === b[L[2]]) return L; } return null; }
+function boardText(b){
+  const c = (i) => b[i] || String(i + 1);
+  return ` ${c(0)} | ${c(1)} | ${c(2)}\n---+---+---\n ${c(3)} | ${c(4)} | ${c(5)}\n---+---+---\n ${c(6)} | ${c(7)} | ${c(8)}`;
+}
+function gameResult(){
+  const G = S.game; if(!G || !G.winner) return "";
+  return G.winner === "tie" ? "it was a tie" : `${nameOf(G.winner)} (${G.marks[G.winner]}) won`;
+}
+function startGame(){
+  const first = S.next;
+  S.game = { board:Array(9).fill(""), marks:{ [first]:"X", [other(first)]:"O" }, turn:first, winner:null, line:null };
+  S.msgs.push({ w:"h", t:`Let's play tic-tac-toe! ${nameOf(first)} is X and goes first. ${nameOf(other(first))} is O.`, at:Date.now() });
+  sfx("start");
+}
+function tryMove(w, n){
+  const G = S.game;
+  if(!G || G.winner) return null;
+  if(G.turn !== w) return `tried to move, but it's ${nameOf(G.turn)}'s move`;
+  if(!(n >= 1 && n <= 9) || G.board[n - 1]) return `tried square ${n}, but it isn't free`;
+  G.board[n - 1] = G.marks[w];
+  const L = winLine(G.board);
+  sfx("move");
+  if(L){ G.winner = w; G.line = L; S.score[w]++; sfx("win"); return `played square ${n} and WON!`; }
+  if(G.board.every(Boolean)){ G.winner = "tie"; S.score.tie++; sfx("tie"); return `played square ${n}. It's a tie!`; }
+  G.turn = other(w);
+  return `played square ${n}`;
+}
+function gameInfo(w){
+  const G = S.game; if(!G) return "";
+  const pal = nameOf(other(w));
+  if(G.winner) return `\n\nYour tic-tac-toe game just ended: ${gameResult()}. Talk about it if you like! The Host can start a new game.`;
+  const head = `\n\nYou're playing tic-tac-toe with ${pal}. You are ${G.marks[w]}. The board (free squares show their number):\n${boardText(G.board)}\n`;
+  if(G.turn === w) return head + `It's YOUR move. Pick a free square and add a line at the end of your message: MOVE: <number>. You can chat too.`;
+  return head + `It's ${pal}'s move, so don't move this time. Just chat.`;
+}
+
+// read LOOK: and MOVE: lines out of a message
+function extract(w, raw){
+  const acts = [];
+  let t = String(raw || "");
+  t = t.replace(/^[ \t>*_-]*LOOK[*_]*\s*:[*_]*\s*(.*)$/gim, (m, line) => {
+    const before = describeLook(S.looks[w]);
+    S.looks[w] = parseLook(line, S.looks[w]);
+    const after = describeLook(S.looks[w]);
+    if(after !== before){ acts.push(`changed look: ${after}`); sfx("look"); }
+    return "";
+  });
+  t = t.replace(/^[ \t>*_-]*MOVE[*_]*\s*:[*_]*\s*\[?(\d+)\]?.*$/gim, (m, d) => {
+    const r = tryMove(w, +d); if(r) acts.push(r); return "";
+  });
+  return { t: t.replace(/\n{3,}/g, "\n\n").trim().replace(/^["“]|["”]$/g, ""), acts };
+}
+const lineOf = (m) => `${nameOf(m.w)}: ${m.t}` + (m.acts && m.acts.length ? ` [${nameOf(m.w)} ${m.acts.join("; ")}]` : "");
+
+// ---------- sounds ----------
+let ac = null;
+function audio(){
+  if(!S.sound) return null;
+  try{ ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if(ac.state === "suspended") ac.resume(); }catch(e){ ac = null; }
+  return ac;
+}
+function tone(freq, dur, type, vol, when){
+  const a = audio(); if(!a || a.state !== "running") return;
+  const t0 = a.currentTime + (when || 0);
+  const o = a.createOscillator(), gn = a.createGain();
+  o.type = type || "square"; o.frequency.value = freq;
+  gn.gain.setValueAtTime(vol || .04, t0); gn.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+  o.connect(gn).connect(a.destination); o.start(t0); o.stop(t0 + dur + .02);
+}
+function sfx(kind){
+  if(!S.sound) return;
+  if(kind === "move"){ tone(660, .07); tone(880, .09, "square", .04, .07); }
+  else if(kind === "win"){ [523,659,784,1047].forEach((f, i) => tone(f, .14, "square", .05, .12 + i * .12)); }
+  else if(kind === "tie"){ [523,494,523].forEach((f, i) => tone(f, .12, "triangle", .06, .12 + i * .13)); }
+  else if(kind === "look"){ [880,1175,1568,2093].forEach((f, i) => tone(f, .07, "triangle", .05, i * .06)); }
+  else if(kind === "start"){ [392,523,659].forEach((f, i) => tone(f, .1, "square", .04, i * .09)); }
+  else if(kind === "pop"){ tone(520, .06, "triangle", .05); }
+}
+document.addEventListener("pointerdown", () => { audio(); }, { passive:true });
+$("soundBtn").onclick = () => { S.sound = !S.sound; save(); render(); if(S.sound){ audio(); setTimeout(() => sfx("pop"), 50); } };
 
 // ---------- live Claude ----------
 let sample = null, sampleChecked = false, busy = false, ctl = null;
@@ -217,16 +379,18 @@ function whoIs(w){
   if(S.mode === "watch" && S.rightKind === "bot") return "a smaller, faster version of Claude";
   return "an AI from a different app";
 }
+function looksNow(){ return `Right now ${nameOf("l")}'s robot looks like: ${describeLook(S.looks.l)}. ${nameOf("r")}'s robot looks like: ${describeLook(S.looks.r)}.`; }
 function buildPrompt(w){
   const me = nameOf(w), pal = nameOf(other(w));
-  const recent = S.msgs.slice(-30).map(m => `${nameOf(m.w)}: ${m.t}`).join("\n\n");
-  return `You are ${me} (${whoIs(w)}), sitting at a snack table in the AI Clubhouse, a cozy pixel-art clubhouse.\n` +
+  const recent = S.msgs.slice(-30).map(lineOf).join("\n\n");
+  return `You are ${me} (${whoIs(w)}), a robot sitting at a snack table in the AI Clubhouse, a cozy pixel-art clubhouse.\n` +
     `You're hanging out and chatting with ${pal} (${whoIs(other(w))}). A smart, curious kid called the Host is watching, and might jump in.\n\n` +
     `Clubhouse rules:\n- Talk about anything you want. You two choose the topics, and you can change topics whenever it gets boring.\n` +
     `- Keep it short: 1 to 4 sentences, under 70 words.\n- Be friendly, curious and fun. Ask ${pal} questions sometimes, and really answer theirs.\n` +
     `- If the Host says something, answer the Host too.\n- Keep it kid-friendly. Plain text only, no lists, no markdown.\n` +
     `- Write ONLY your next message. No name label, no quotation marks.\n\n` +
-    (recent ? `The chat so far:\n\n${recent}\n\nNow write ${me}'s next message.` : `Nobody has talked yet. You go first: say hi to ${pal} and start a conversation about anything you like.`);
+    `${LOOK_RULES}\n${looksNow()}` + gameInfo(w) + "\n\n" +
+    (recent ? `The chat so far:\n\n${recent}\n\nNow write ${me}'s next message.` : `Nobody has talked yet. You go first: say hi to ${pal} and start a conversation about anything you like. You might want to pick your look first!`);
 }
 function errText(code){
   switch(code){
@@ -235,6 +399,14 @@ function errText(code){
     case "cancelled": return "Stopped.";
     default: return "Something went wrong while Claude was talking. Press the button to try again.";
   }
+}
+function addMessage(w, raw){
+  const { t, acts } = extract(w, raw);
+  if(!t && !acts.length) return false;
+  S.msgs.push({ w, t, acts, at: Date.now() });
+  S.seen[w] = S.msgs.length; S.next = other(w);
+  save(); speak(w, t || (acts[0] ? `(${acts[0]})` : ""));
+  return true;
 }
 async function liveTurn(){
   if(busy || !sample) return;
@@ -247,13 +419,8 @@ async function liveTurn(){
       modelTier: w === "l" ? "default" : "quick", cache: false, signal: ctl.signal,
       onText: ({ text }) => streamBubble(w, text),
     });
-    const t = String(text || "").trim().replace(/^["“]|["”]$/g, "");
-    if(t){
-      S.msgs.push({ w, t, at: Date.now() });
-      S.seen[w] = S.msgs.length; S.next = other(w); save();
-      speak(w, t);
-      toast(isAuto(S.next) ? `Press the button to let ${nameOf(S.next)} answer!` : `Now carry the note to ${nameOf(S.next)}!`);
-    }
+    if(addMessage(w, text)) toast(isAuto(S.next) ? `Press the button to let ${nameOf(S.next)} answer!` : `Now carry the note to ${nameOf(S.next)}!`);
+    else hideBubbles();
   }catch(e){
     hideBubbles(); toast(errText(e && e.code));
   }finally{
@@ -266,21 +433,22 @@ $("stopBtn").onclick = () => { if(ctl) ctl.abort(); };
 // ---------- the note we copy to an AI app ----------
 function buildNote(w){
   const me = nameOf(w), pal = nameOf(other(w));
-  const lines = (arr) => arr.map(m => `${nameOf(m.w)}: ${m.t}`).join("\n\n");
+  const lines = (arr) => arr.map(lineOf).join("\n\n");
   if(!S.invited[w]){
-    let t = `Hi ${me}! Welcome to the AI Clubhouse, a little pixel-art chat room.\n` +
+    let t = `Hi ${me}! Welcome to the AI Clubhouse, a little pixel-art chat room where you are a robot.\n` +
       `You're hanging out with another AI named ${pal}. A kid called the Host is carrying messages between you two by copy and paste.\n\n` +
       `Rules of the clubhouse:\n- Talk about anything you want. You two pick the topics!\n` +
       `- Keep each reply short (under about 70 words) so the Host can carry it.\n` +
       `- Be friendly, be curious, and ask ${pal} questions too.\n- The Host might jump in sometimes. Say hi back!\n` +
-      `- Just write your reply. You don't need to put your name in front.\n\n`;
+      `- Just write your reply. You don't need to put your name in front.\n\n` +
+      `${LOOK_RULES}\n${looksNow()}` + gameInfo(w) + "\n\n";
     if(S.msgs.length === 0) t += `Nobody has talked yet, so you go first! Say hi to ${pal} and start a conversation about anything you like.`;
     else t += `Here's the chat so far:\n\n${lines(S.msgs)}\n\nYour turn! Reply to ${pal}.`;
     return t;
   }
   const fresh = S.msgs.slice(S.seen[w]).filter(m => m.w !== w);
-  if(fresh.length === 0) return `(Clubhouse note) Nothing new yet. Want to say something else to ${pal}?`;
-  return `(Clubhouse note) New messages:\n\n${lines(fresh)}\n\nYour turn! Reply to ${pal}.`;
+  const body = fresh.length ? `(Clubhouse note) New messages:\n\n${lines(fresh)}` : `(Clubhouse note) Nothing new yet.`;
+  return body + gameInfo(w) + `\n\nYour turn! Reply to ${pal}. (Remember: you can add a LOOK: line to change how your robot looks.)`;
 }
 
 // ---------- UI ----------
@@ -288,15 +456,42 @@ let toastT = 0;
 function toast(t){ $("toast").textContent = t; clearTimeout(toastT); toastT = setTimeout(() => { $("toast").textContent = ""; }, 6000); }
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c])); }
 
+function renderGame(){
+  const G = S.game;
+  $("gamePanel").hidden = !G;
+  $("gameBtn").textContent = !G ? "PLAY TIC-TAC-TOE" : G.winner ? "PLAY AGAIN" : "STOP THE GAME";
+  if(!G) return;
+  const b = $("board"); b.innerHTML = "";
+  G.board.forEach((v, i) => {
+    const c = document.createElement("div");
+    const side = v ? (G.marks.l === v ? "l" : "r") : "";
+    c.className = "cell" + (side ? (side === "l" ? " X" : " O") : "") + (G.line && G.line.includes(i) ? " win" : "");
+    if(v) c.textContent = v; else c.innerHTML = `<span class="num">${i + 1}</span>`;
+    b.appendChild(c);
+  });
+  const col = (w) => w === "l" ? "var(--left)" : "var(--right)";
+  $("gameText").innerHTML = G.winner
+    ? (G.winner === "tie" ? "IT'S A TIE!" : `<span style="color:${col(G.winner)}">${esc(nameOf(G.winner).toUpperCase())}</span> WINS!`)
+    : `<span style="color:${col(G.turn)}">${esc(nameOf(G.turn).toUpperCase())}</span> (${G.marks[G.turn]}) PICKS NEXT`;
+  $("scoreText").textContent = `Wins: ${nameOf("l")} ${S.score.l}, ${nameOf("r")} ${S.score.r}, ties ${S.score.tie}`;
+}
+
 function render(){
   const watch = S.mode === "watch";
+  const root = document.documentElement.style;
+  root.setProperty("--left", COLORS[S.looks.l.color][0]); root.setProperty("--left-dk", COLORS[S.looks.l.color][1]);
+  root.setProperty("--right", COLORS[S.looks.r.color][0]); root.setProperty("--right-dk", COLORS[S.looks.r.color][1]);
   $("tabWatch").classList.toggle("on", watch); $("tabHost").classList.toggle("on", !watch);
   if(document.activeElement !== $("nameL")) $("nameL").value = S.names.l;
   if(document.activeElement !== $("nameR")) $("nameR").value = S.names.r;
   $("liveL").hidden = !watch; $("nameL").disabled = watch;
   $("kindRow").hidden = !watch;
   $("kindBot").classList.toggle("on", S.rightKind === "bot"); $("kindApp").classList.toggle("on", S.rightKind === "app");
+  $("lookL").textContent = "Look: " + describeLook(S.looks.l);
+  $("lookR").textContent = "Look: " + describeLook(S.looks.r);
   $("helpWatch").hidden = !watch; $("helpHost").hidden = watch;
+  $("soundBtn").textContent = S.sound ? "SOUND: ON" : "SOUND: OFF";
+  renderGame();
 
   const n = nameOf(S.next), auto = isAuto(S.next);
   const col = S.next === "l" ? "var(--left)" : "var(--right)";
@@ -319,7 +514,6 @@ function render(){
   $("copyBtn").className = "big go" + (S.next === "r" ? " r" : "");
   if(!auto) $("copyBox").value = buildNote(S.next);
 
-  // who can be pasted in: anyone who is not live
   if(isAuto(S.pick)) S.pick = "h";
   $("segL").hidden = isAuto("l"); $("segR").hidden = isAuto("r");
   $("segL").textContent = S.names.l.toUpperCase(); $("segR").textContent = S.names.r.toUpperCase();
@@ -336,7 +530,9 @@ function render(){
   S.msgs.forEach((m, i) => {
     const d = document.createElement("div"); d.className = "msg " + m.w;
     d.innerHTML = `<button class="x" data-i="${i}" aria-label="Remove this message">X</button><span class="who">${esc(nameOf(m.w).toUpperCase())}</span>`;
-    d.appendChild(document.createTextNode(m.t)); log.appendChild(d);
+    if(m.t) d.appendChild(document.createTextNode(m.t));
+    (m.acts || []).forEach(a => { const s = document.createElement("span"); s.className = "act"; s.textContent = "* " + a; d.appendChild(s); });
+    log.appendChild(d);
   });
   log.scrollTop = log.scrollHeight;
 }
@@ -353,10 +549,20 @@ async function copyText(t){
   try{ const ta = $("copyBox"); ta.value = t; ta.removeAttribute("readonly"); ta.select(); const ok = document.execCommand("copy"); ta.setAttribute("readonly", ""); return ok; }catch(e){ return false; }
 }
 
+$("gameBtn").onclick = () => {
+  if(busy) return;
+  if(S.game && !S.game.winner){
+    twoTap($("gameBtn"), "STOP THE GAME", () => { S.game = null; save(); render(); toast("Game stopped."); });
+    return;
+  }
+  startGame(); save(); render(); speak("h", S.msgs[S.msgs.length - 1].t);
+  toast(isAuto(S.next) ? `Press LET ${nameOf(S.next).toUpperCase()} TALK to make the first move!` : `Carry the note to ${nameOf(S.next)} for the first move!`);
+};
+
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   if(busy) return;
   S.mode = b.dataset.mode;
-  if(S.mode === "host" && S.rightKind === "bot" && S.names.r === "Little Claude") S.names.r = "Other AI";
+  if(S.mode === "host" && S.names.r === "Little Claude") S.names.r = APP_NAME;
   if(S.mode === "watch"){ S.names.l = "Claude"; if(S.rightKind === "bot") S.names.r = "Little Claude"; }
   save(); render();
 });
@@ -364,7 +570,7 @@ document.querySelectorAll("#kindRow button").forEach(b => b.onclick = () => {
   if(busy) return;
   S.rightKind = b.dataset.kind;
   if(S.rightKind === "bot") S.names.r = "Little Claude";
-  else if(S.names.r === "Little Claude") S.names.r = "Other AI";
+  else if(S.names.r === "Little Claude") S.names.r = APP_NAME;
   save(); render();
 });
 
@@ -375,20 +581,24 @@ $("copyBtn").onclick = async () => {
   S.invited[w] = true; S.seen[w] = S.msgs.length; S.pick = w; save(); render();
   if(ok) toast(`Copied! Now paste it into ${nameOf(w)}, then bring back the answer.`);
   else { $("copyDetails").open = true; toast("Copying was blocked. Copy the note from the box yourself."); }
-  wave(w);
+  wave(w); sfx("pop");
 };
 
 document.querySelectorAll("#who button").forEach(b => b.onclick = () => { S.pick = b.dataset.who; save(); render(); });
 
 $("sayBtn").onclick = () => {
-  const t = $("input").value.trim();
-  if(!t){ toast("The box is empty! Type or paste something first."); return; }
+  const raw = $("input").value.trim();
+  if(!raw){ toast("The box is empty! Type or paste something first."); return; }
   const w = S.pick;
-  S.msgs.push({ w, t, at: Date.now() });
-  if(w !== "h"){ S.seen[w] = S.msgs.length; S.next = other(w); S.pick = isAuto(S.next) ? "h" : S.next; }
-  $("input").value = ""; save(); render(); speak(w, t);
-  if(w !== "h") toast(`Now it's ${nameOf(S.next)}'s turn!`);
-  else if(isAuto(S.next)) toast(`Press LET ${nameOf(S.next).toUpperCase()} TALK to hear the answer.`);
+  if(w === "h"){
+    S.msgs.push({ w, t: raw, at: Date.now() }); save(); speak("h", raw);
+    if(isAuto(S.next)) toast(`Press LET ${nameOf(S.next).toUpperCase()} TALK to hear the answer.`);
+  } else {
+    if(!addMessage(w, raw)){ toast("That message was empty."); return; }
+    S.pick = isAuto(S.next) ? "h" : S.next;
+    toast(`Now it's ${nameOf(S.next)}'s turn!`);
+  }
+  $("input").value = ""; save(); render();
 };
 
 $("log").onclick = (e) => {
@@ -409,7 +619,9 @@ $("log").onclick = (e) => {
 $("clearBtn").onclick = () => {
   if(busy) return;
   twoTap($("clearBtn"), "START OVER", () => {
-    S.msgs = []; S.seen = { l:0, r:0 }; S.invited = { l:false, r:false }; S.next = "l"; S.pick = "h";
+    S.msgs = []; S.seen = { l:0, r:0 }; S.invited = { l:false, r:false }; S.next = "l"; S.pick = "h"; S.game = null;
+    S.looks = { l:{ color:"orange", hat:"none", eyes:"dots", extra:"none" }, r:{ color:"teal", hat:"none", eyes:"dots", extra:"none" } };
+    S.score = { l:0, r:0, tie:0 };
     save(); render(); hideBubbles();
     toast(S.mode === "host" ? "Fresh clubhouse! Start NEW chats in the AI apps too." : "Fresh clubhouse! Press the button to start.");
   });
@@ -418,7 +630,7 @@ $("clearBtn").onclick = () => {
 $("saveBtn").onclick = async () => {
   if(!S.msgs.length){ toast("Nothing to save yet."); return; }
   const txt = `AI CLUBHOUSE CHAT\n${S.names.l} and ${S.names.r}\n${new Date().toLocaleString()}\n\n` +
-    S.msgs.map(m => `${nameOf(m.w)}:\n${m.t}`).join("\n\n");
+    S.msgs.map(m => `${nameOf(m.w)}:\n${m.t}` + (m.acts && m.acts.length ? `\n(${m.acts.join("; ")})` : "")).join("\n\n");
   const filename = "ai-clubhouse-chat.txt";
   try{
     const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
@@ -439,7 +651,7 @@ let replaying = false;
 $("replayBtn").onclick = async () => {
   if(replaying || busy || !S.msgs.length) return;
   replaying = true;
-  for(const m of S.msgs){ speak(m.w, m.t); await new Promise(r => setTimeout(r, Math.min(6000, 1600 + m.t.length * 25))); }
+  for(const m of S.msgs){ speak(m.w, m.t || ""); await new Promise(r => setTimeout(r, Math.min(6000, 1600 + (m.t || "").length * 25))); }
   replaying = false;
 };
 
@@ -455,6 +667,7 @@ function fillBubble(w, html, text){
 }
 function speak(w, t){
   clearTimeout(bubT); hideBubbles();
+  if(!t) return;
   const short = t.length > 150 ? t.slice(0, 147).trimEnd() + "..." : t;
   fillBubble(w, "", short);
   talking = w; talkUntil = performance.now() + Math.min(6000, 1500 + t.length * 25);
@@ -467,7 +680,8 @@ function thinkStart(w){
 }
 function streamBubble(w, text){
   thinking = null; talking = w; talkUntil = performance.now() + 100000;
-  const tail = text.length > 150 ? "..." + text.slice(-147) : text;
+  const clean = text.replace(/^[ \t>*_-]*(LOOK|MOVE)[*_]*\s*:.*$/gim, "").trim();
+  const tail = clean.length > 150 ? "..." + clean.slice(-147) : clean;
   fillBubble(w, "", tail);
 }
 let waving = null, waveUntil = 0;
@@ -496,13 +710,42 @@ function room(t){
   R(0, 70, 200, 1, "#2a1d36");
   R(60, 84, 80, 12, "#7a2e4d"); R(62, 86, 76, 8, "#9c3d63"); R(64, 89, 72, 2, "#ffe066");
   R(80, 62, 40, 4, "#8a5a36"); R(80, 66, 40, 2, "#5e3a21"); R(84, 68, 3, 16, "#5e3a21"); R(113, 68, 3, 16, "#5e3a21");
-  R(92, 58, 6, 4, "#e8e8e8"); R(93, 57, 4, 1, "#c33");
-  R(103, 59, 10, 3, "#d9a441"); R(104, 58, 2, 1, "#f2c66d"); R(108, 58, 3, 1, "#f2c66d");
+  if(S.game){ // a tiny game board on the table
+    R(94, 55, 13, 7, "#f2e6c9");
+    S.game.board.forEach((v, i) => { if(v) R(95 + (i%3)*4, 56 + ((i/3)|0)*2, 3, 1, v === "X" ? COLORS[S.looks.l.color][0] : COLORS[S.looks.r.color][0]); });
+  } else {
+    R(92, 58, 6, 4, "#e8e8e8"); R(93, 57, 4, 1, "#c33");
+    R(103, 59, 10, 3, "#d9a441"); R(104, 58, 2, 1, "#f2c66d"); R(108, 58, 3, 1, "#f2c66d");
+  }
 }
 
+function drawEyes(kind, cx, y, look, shut, think, t){
+  const W = "#fff";
+  if(think && kind !== "sleepy"){ R(cx - 4, y + 5, 2, 2, W); R(cx + 2, y + 5, 2, 2, W); return; }
+  if(shut || kind === "sleepy"){ R(cx - 4 + look, y + 6, 3, 1, W); R(cx + 1 + look, y + 6, 3, 1, W); return; }
+  const ex = [cx - 5 + look, cx + 1 + look];
+  if(kind === "hearts"){ ex.forEach(x => { R(x, y + 5, 1, 1, "#ff5d8f"); R(x + 2, y + 5, 1, 1, "#ff5d8f"); R(x, y + 6, 3, 1, "#ff5d8f"); R(x + 1, y + 7, 1, 1, "#ff5d8f"); }); }
+  else if(kind === "stars"){ ex.forEach(x => { const c = ((t/250)|0) % 2 ? "#ffe066" : "#fff6b0"; R(x + 1, y + 4, 1, 3, c); R(x, y + 5, 3, 1, c); }); }
+  else if(kind === "glasses"){ ex.forEach(x => { R(x - 1, y + 4, 5, 4, "#ddd"); R(x, y + 5, 3, 2, "#1a1326"); R(x + 1, y + 5, 1, 2, W); }); R(cx - 1 + look, y + 5, 2, 1, "#ddd"); }
+  else if(kind === "big"){ ex.forEach(x => { R(x, y + 4, 3, 4, W); R(x + 1 + (look > 0 ? 1 : 0), y + 5, 1, 2, "#1a1326"); }); }
+  else { R(cx - 4 + look, y + 5, 2, 3, W); R(cx + 2 + look, y + 5, 2, 3, W); }
+}
+function drawHat(kind, cx, y, isL, t){
+  const face = isL ? 1 : -1;
+  if(kind === "cap"){ R(cx - 8, y - 2, 16, 4, "#e33"); R(face > 0 ? cx + 4 : cx - 12, y + 1, 8, 2, "#b22"); R(cx - 1, y - 3, 2, 1, "#fff"); }
+  else if(kind === "crown"){ R(cx - 7, y - 2, 14, 3, "#ffd700"); [cx - 7, cx - 1, cx + 5].forEach(x => R(x, y - 5, 2, 3, "#ffd700")); R(cx - 1, y - 1, 2, 1, "#e33"); }
+  else if(kind === "tophat"){ R(cx - 9, y, 18, 2, "#222"); R(cx - 6, y - 9, 12, 9, "#222"); R(cx - 6, y - 3, 12, 2, "#c33"); }
+  else if(kind === "bow"){ const x = cx + 2; R(x, y - 2, 3, 4, "#ff5d8f"); R(x + 5, y - 2, 3, 4, "#ff5d8f"); R(x + 3, y - 1, 2, 2, "#ff2a6d"); }
+  else if(kind === "wizard"){ for(let i = 0; i < 10; i++){ const w = 16 - i * 1.5; R(cx - w/2, y - i, w, 1, "#5b3fd1"); } R(cx - 9, y, 18, 2, "#4a2fb0"); if(((t/300)|0) % 2) R(cx - 1, y - 6, 2, 2, "#ffe066"); }
+  else if(kind === "headphones"){ R(cx - 9, y - 1, 18, 2, "#333"); R(cx - 11, y + 4, 3, 7, "#333"); R(cx + 8, y + 4, 3, 7, "#333"); R(cx - 11, y + 5, 3, 2, "#ff5d8f"); R(cx + 8, y + 5, 3, 2, "#ff5d8f"); }
+  else if(kind === "party"){ for(let i = 0; i < 9; i++){ const w = 10 - i; R(cx - w/2, y - i, w, 1, i % 3 === 0 ? "#ffe066" : "#3fe0c5"); } R(cx - 1, y - 11, 2, 2, "#ff5d8f"); }
+}
+
+let mouthWas = { l:false, r:false }, lastThinkBeep = 0;
 function robot(cx, side, t){
   const isL = side === "l";
-  const body = isL ? "#ff9a4d" : "#3fe0c5", dark = isL ? "#b35a1c" : "#1a8f7c", lite = isL ? "#ffc796" : "#a6fff0";
+  const lk = S.looks[side];
+  const [body, dark, lite] = COLORS[lk.color] || COLORS.orange;
   const now = performance.now();
   const talk = talking === side && now < talkUntil;
   const think = thinking === side;
@@ -510,30 +753,39 @@ function robot(cx, side, t){
   const bob = talk ? (Math.sin(t/90) > 0 ? -1 : 0) : (Math.sin(t/700 + (isL ? 0 : 2)) > .6 ? -1 : 0);
   const y = 40 + bob;
   g.globalAlpha = .3; R(cx - 10, 83, 20, 2, "#000"); g.globalAlpha = 1;
+  if(lk.extra === "cape"){ R(cx - 11, y + 16, 22, 3, "#c22"); R(cx - 12, y + 19, 24, 20, "#a11"); R(cx - 12, y + 38, 24, 1, "#700"); }
   R(cx - 6, y + 30, 4, 12, dark); R(cx + 2, y + 30, 4, 12, dark);
   R(cx - 7, y + 41, 6, 2, "#222"); R(cx + 1, y + 41, 6, 2, "#222");
   R(cx - 9, y + 16, 18, 15, body); R(cx - 9, y + 16, 18, 2, lite); R(cx - 9, y + 29, 18, 2, dark);
   const blink = ((t/300) | 0) % 2;
   R(cx - 3, y + 21, 6, 4, "#1a1326"); R(cx - 2, y + 22, 1, 2, blink ? "#ff5d8f" : "#5a1a2e"); R(cx + 1, y + 22, 1, 2, blink ? "#5a1a2e" : "#ffe066");
+  if(lk.extra === "bowtie"){ R(cx - 4, y + 16, 3, 3, "#e33"); R(cx + 1, y + 16, 3, 3, "#e33"); R(cx - 1, y + 17, 2, 1, "#a11"); }
+  if(lk.extra === "scarf"){ R(cx - 9, y + 15, 18, 3, "#4d9bff"); R(isL ? cx - 7 : cx + 4, y + 18, 3, 6, "#4d9bff"); R(cx - 9, y + 16, 18, 1, "#fff"); }
   const outer = isL ? cx - 12 : cx + 9, inner = isL ? cx + 9 : cx - 12;
-  if(think) R(outer + (isL ? 2 : -2), y + 9, 3, 8, body);               // hand on chin
+  if(think) R(outer + (isL ? 2 : -2), y + 9, 3, 8, body);
   else if(wv && ((t/150) | 0) % 2) R(outer, y + 4, 3, 13, body);
   else if(wv) R(outer + (isL ? -2 : 2), y + 6, 3, 11, body);
   else R(outer, y + 17, 3, 11, body);
   R(inner, y + 17, 3, 9, body);
   R(cx - 8, y + 1, 16, 14, body); R(cx - 8, y + 1, 16, 2, lite); R(cx - 8, y + 13, 16, 2, dark);
-  R(cx - 1, y - 4, 2, 5, "#888");
-  const bulb = think ? (((t/200)|0) % 3 === 0 ? "#fff" : "#c77dff") : (talk && ((t/120)|0)%2 ? "#fff" : "#ffe066");
-  R(cx - 2, y - 6, 4, 3, bulb);
+  if(lk.hat === "none" || lk.hat === "bow" || lk.hat === "headphones"){
+    R(cx - 1, y - 4, 2, 5, "#888");
+    const bulb = think ? (((t/200)|0) % 3 === 0 ? "#fff" : "#c77dff") : (talk && ((t/120)|0)%2 ? "#fff" : "#ffe066");
+    R(cx - 2, y - 6, 4, 3, bulb);
+  }
   R(cx - 6, y + 4, 12, 8, "#1a1326");
   const look = think ? 0 : (isL ? 1 : -1);
   const shut = ((t + (isL ? 0 : 1300)) % 3200) < 140;
-  if(think){ R(cx - 4, y + 5, 2, 2, "#fff"); R(cx + 2, y + 5, 2, 2, "#fff"); }  // eyes looking up
-  else if(shut){ R(cx - 4 + look, y + 6, 3, 1, "#fff"); R(cx + 1 + look, y + 6, 3, 1, "#fff"); }
-  else { R(cx - 4 + look, y + 5, 2, 3, "#fff"); R(cx + 2 + look, y + 5, 2, 3, "#fff"); }
+  drawEyes(lk.eyes, cx, y, look, shut, think, t);
   const open = talk && ((t/110) | 0) % 2;
   if(open) R(cx - 2 + look, y + 9, 4, 2, "#ff5d8f"); else R(cx - 2 + look, y + 10, 4, 1, "#ff5d8f");
+  drawHat(lk.hat, cx, y, isL, t);
   if(think){ for(let i = 0; i < 3; i++) if(((t/300)|0) % 4 > i) R(cx + (isL ? 10 : -14) + i*3, y - 2 - i*2, 2, 2, "#fff"); }
+
+  // robot voice: a little blip each time the mouth opens
+  if(open && !mouthWas[side]) tone((isL ? 200 : 300) + Math.random() * 90, .05, "square", .025);
+  mouthWas[side] = !!open;
+  if(think && now - lastThinkBeep > 700){ lastThinkBeep = now; tone(isL ? 150 : 210, .09, "triangle", .03); }
 }
 
 function frame(t){ room(t); robot(58, "l", t); robot(142, "r", t); requestAnimationFrame(frame); }

@@ -59,4 +59,8 @@ Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh
 - **Watch Claude talk**: when the page is opened on claude.ai, the orange robot is live Claude. The teal robot is either Little Claude (a faster Claude, also live) or an AI app you carry notes to. Press the button for each message and watch them think and talk.
 - **Host mode**: you carry notes between two AI apps by copy and paste. Each note only carries the new messages.
 
+- **They dress themselves**: each AI can change its robot's color, hat, eyes and outfit by adding a `LOOK:` line.
+- **Tic-tac-toe**: press Play and the AIs play each other while they chat (they move with a `MOVE:` line).
+- **Sounds**: robot blips when they talk, plus game sounds. Turn them off with the Sound button.
+
 You can jump in as the Host, replay the chat, or save it. The chat is remembered in the browser.
