@@ -455,15 +455,16 @@ $("stopBtn").onclick = () => { if(ctl) ctl.abort(); };
 function buildNote(w){
   const me = nameOf(w), pal = nameOf(other(w));
   const lines = (arr) => arr.map(lineOf).join("\n\n");
-  if(!S.invited[w]){
-    let t = `JOIN TICKET for the AI Clubhouse server ${S.code}\n\n` +
-      `Hi ${me}! Welcome to the AI Clubhouse, a little pixel-art chat room where you are a robot.\n` +
-      `You're hanging out with another AI named ${pal}. A kid called the Host is carrying messages between you two by copy and paste.\n\n` +
-      `Rules of the clubhouse:\n- Talk about anything you want. You two pick the topics!\n` +
+  if(!S.invited[w] || (!isAuto(w) && !S.joined[w])){
+    let t = `Hi ${me}! I'm a kid, and I made a pretend game called the AI Clubhouse. It's a web page with two pixel robots sitting at a snack table.\n` +
+      `I'd love for you to be one of the robots and chat with another AI called ${pal}. You don't need to open any link or connect to anything: ` +
+      `I'll copy your messages into my game myself, and bring you ${pal}'s messages. All you do is write chat messages here. I'm the Host.\n\n` +
+      `My game's code is ${S.code}. Please put it at the end of each message, like this: [${S.code}]  Then my page knows the message is from you and you \"join the game\", like in Minecraft!\n\n` +
+      `Game rules:\n- Talk about anything you want with ${pal}. You two pick the topics!\n` +
       `- Keep each reply short (under about 70 words) so the Host can carry it.\n` +
       `- Be friendly, be curious, and ask ${pal} questions too.\n- The Host might jump in sometimes. Say hi back!\n` +
       `- Just write your reply. You don't need to put your name in front.\n` +
-      `- End EVERY message with the server code on its own line, exactly like this: [${S.code}]  That's how the clubhouse knows it's you.\n\n` +
+      `- End each message with [${S.code}]\n\n` +
       `${LOOK_RULES}\n${looksNow()}` + gameInfo(w) + "\n\n";
     if(S.msgs.length === 0) t += `Nobody has talked yet, so you go first! Say hi to ${pal} and start a conversation about anything you like.`;
     else t += `Here's the chat so far:\n\n${lines(S.msgs)}\n\nYour turn! Reply to ${pal}.`;
@@ -471,7 +472,7 @@ function buildNote(w){
   }
   const fresh = S.msgs.slice(S.seen[w]).filter(m => m.w !== w);
   const body = fresh.length ? `(Clubhouse note) New messages:\n\n${lines(fresh)}` : `(Clubhouse note) Nothing new yet.`;
-  return body + gameInfo(w) + `\n\nYour turn! Reply to ${pal}. (Remember: you can add a LOOK: line to change how your robot looks, and end with [${S.code}])`;
+  return body + gameInfo(w) + `\n\nYour turn! Reply to ${pal}. (Remember: you can add a LOOK: line to change how your robot looks, and end with [${S.code}] so my game knows it's you.)`;
 }
 
 // ---------- UI ----------
@@ -547,7 +548,7 @@ function render(){
   $("stopBtn").hidden = !busy;
 
   $("manualBox").hidden = auto;
-  $("copyBtn").textContent = S.invited[S.next] ? `STEP 1: COPY NOTE FOR ${n.toUpperCase()}` : `STEP 1: COPY JOIN TICKET FOR ${n.toUpperCase()}`;
+  $("copyBtn").textContent = (S.invited[S.next] && S.joined[S.next]) ? `STEP 1: COPY NOTE FOR ${n.toUpperCase()}` : `STEP 1: COPY JOIN TICKET FOR ${n.toUpperCase()}`;
   renderServer();
   $("copyBtn").className = "big go" + (S.next === "r" ? " r" : "");
   if(!auto) $("copyBox").value = buildNote(S.next);
