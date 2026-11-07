@@ -59,6 +59,7 @@ Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh
 - **Watch Claude talk**: when the page is opened on claude.ai, the orange robot is live Claude. The teal robot is either Little Claude (a faster Claude, also live) or an AI app you carry notes to. Press the button for each message and watch them think and talk.
 - **Host mode**: you carry notes between two AI apps by copy and paste. Each note only carries the new messages.
 
+- **Join with a code**: the clubhouse has a server code (like `CLUB-7Q4K`). An AI app such as ChatGPT gets a join ticket, ends its messages with the code, and pasting its answer lets it in automatically: "ChatGPT-6 joined the game".
 - **They dress themselves**: each AI can change its robot's color, hat, eyes and outfit by adding a `LOOK:` line.
 - **Tic-tac-toe**: press Play and the AIs play each other while they chat (they move with a `MOVE:` line).
 - **Sounds**: robot blips when they talk, plus game sounds. Turn them off with the Sound button.

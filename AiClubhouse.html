@@ -17,7 +17,7 @@
   color-scheme: dark;
   --bg:#120d1a; --panel:#1d1628; --edge:#3b2d52; --ink:#f6f1ff; --dim:#a99bc4; --well:#0d0a14; --row:#150f1f;
   --left:#ff9a4d; --left-dk:#b35a1c; --right:#3fe0c5; --right-dk:#1a8f7c; --host:#ffe066; --pink:#ff5d8f;
-  --btn:#2a2140; --btn-hi:#3a2e58; --paper:#ffffff; --paper-ink:#1a1326;
+  --mc:#7cff6b; --mc-bg:#0b1a0b; --mc-edge:#2f6b2f; --btn:#2a2140; --btn-hi:#3a2e58; --paper:#ffffff; --paper-ink:#1a1326;
   --pix:'Press Start 2P', ui-monospace, Menlo, Consolas, monospace;
   --read:'VT323', ui-monospace, Menlo, Consolas, monospace;
 }
@@ -55,6 +55,12 @@ h1{font-family:var(--pix);font-size:clamp(16px,4.5vw,26px);text-align:center;mar
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .tab{opacity:.6}
 .tab.on{opacity:1;background:var(--btn-hi);outline:3px solid var(--host);outline-offset:-3px}
+.server{background:var(--mc-bg);border-color:var(--mc-edge)}
+.server h2{color:var(--mc)}
+.code{font-family:var(--pix);font-size:16px;color:var(--mc);letter-spacing:3px;user-select:all}
+.players{display:flex;flex-direction:column;gap:2px}
+.pl.on::before{content:"\25CF  ";color:var(--mc)} .pl.off{color:var(--dim)} .pl.off::before{content:"\25CB  "}
+.msg.sys{border-left:none;background:transparent;color:var(--host);font-family:var(--pix);font-size:10px;line-height:1.6;text-align:center}
 .tab small{display:block;font-family:var(--read);font-size:17px;margin-top:6px;color:var(--dim);letter-spacing:0}
 
 /* Name plates */
@@ -142,6 +148,13 @@ details summary{cursor:pointer;font-family:var(--pix);font-size:10px;line-height
     <button class="tab" id="tabHost" data-mode="host">HOST MODE<small>You carry notes between two AI apps by copy and paste.</small></button>
   </div>
 
+  <div class="panel server" id="server" hidden>
+    <h2>CLUBHOUSE SERVER</h2>
+    <div>Server code: <span class="code" id="codeText"></span></div>
+    <div class="players" id="players"></div>
+    <div class="note">An AI joins by getting a join ticket with this code. When you paste its answer, the clubhouse spots the code and lets it in by itself.</div>
+  </div>
+
   <div class="names">
     <div class="plate l">
       <label for="nameL">LEFT ROBOT</label>
@@ -205,7 +218,8 @@ details summary{cursor:pointer;font-family:var(--pix);font-size:10px;line-height
     <h2>HOW IT WORKS</h2>
     <ol id="helpWatch">
       <li>The left robot is <b>Claude</b>, talking live. The first time, claude.ai asks if the page may use Claude. Say yes.</li>
-      <li>Pick who sits in the right seat: <b>Little Claude</b> (a smaller, faster Claude that also talks live), or <b>an AI app</b> like ChatGPT-6 that you carry notes to.</li>
+      <li>Pick who sits in the right seat: <b>Little Claude</b> (a smaller, faster Claude that also talks live), or <b>an AI app</b> like ChatGPT-6.</li>
+      <li>To bring in ChatGPT-6: press <b>COPY JOIN TICKET</b>, paste it into ChatGPT, then paste ChatGPT's answer back here. The clubhouse sees the server code and ChatGPT-6 joins the game!</li>
       <li>Press <b>LET ... TALK</b> and watch the robot think, then talk. Each press is one message.</li>
       <li>The robots dress themselves! Any AI can change its color, hat, eyes and outfit whenever it wants.</li>
       <li>Press <b>PLAY TIC-TAC-TOE</b> and they'll play each other while they chat.</li>
@@ -214,7 +228,7 @@ details summary{cursor:pointer;font-family:var(--pix);font-size:10px;line-height
     <ol id="helpHost">
       <li>Open two AI apps in two tabs.</li>
       <li>Type their names on the robots above.</li>
-      <li>Press <b>COPY NOTE</b>, then paste it into the AI whose turn it is.</li>
+      <li>Press <b>COPY JOIN TICKET</b>, then paste it into the AI whose turn it is. After that the button says <b>COPY NOTE</b>.</li>
       <li>Copy what that AI answers, paste it in Step 2, and press <b>ADD TO CHAT</b>.</li>
       <li>Now it's the other robot's turn. The note only carries the <i>new</i> messages, so it stays short.</li>
     </ol>
@@ -227,6 +241,7 @@ details summary{cursor:pointer;font-family:var(--pix);font-size:10px;line-height
 const $ = (id) => document.getElementById(id);
 const KEY = "aiClubhouse.v3";
 const APP_NAME = "ChatGPT-6";
+function makeCode(){ const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; let c = "CLUB-"; for(let i = 0; i < 4; i++) c += A[Math.random() * A.length | 0]; return c; }
 
 // ---------- robot looks ----------
 const COLORS = {
@@ -274,14 +289,14 @@ let S = {
   mode:"watch", rightKind:"bot", names:{ l:"Claude", r:"Little Claude" }, msgs:[], seen:{ l:0, r:0 }, invited:{ l:false, r:false },
   next:"l", pick:"h", sound:true,
   looks:{ l:{ color:"orange", hat:"none", eyes:"dots", extra:"none" }, r:{ color:"teal", hat:"none", eyes:"dots", extra:"none" } },
-  game:null, score:{ l:0, r:0, tie:0 },
+  game:null, score:{ l:0, r:0, tie:0 }, code:makeCode(), joined:{ l:false, r:false },
 };
 function load(){
   try{ const raw = localStorage.getItem(KEY); if(raw){ const d = JSON.parse(raw); if(d && Array.isArray(d.msgs)) S = Object.assign(S, d); } }catch(e){ /* storage blocked: start fresh */ }
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ /* fine, just won't remember */ } }
 const other = (s) => s === "l" ? "r" : "l";
-const nameOf = (w) => w === "h" ? "Host" : (S.names[w] || (w === "l" ? "Left" : "Right"));
+const nameOf = (w) => w === "h" ? "Host" : w === "sys" ? "Clubhouse" : (S.names[w] || (w === "l" ? "Left" : "Right"));
 const isAuto = (w) => S.mode === "watch" && (w === "l" || (w === "r" && S.rightKind === "bot"));
 
 // ---------- tic-tac-toe ----------
@@ -334,12 +349,13 @@ function extract(w, raw){
     if(after !== before){ acts.push(`changed look: ${after}`); sfx("look"); }
     return "";
   });
+  t = t.replace(new RegExp("\\[?\\s*" + S.code + "\\s*\\]?", "gi"), "");
   t = t.replace(/^[ \t>*_-]*MOVE[*_]*\s*:[*_]*\s*\[?(\d+)\]?.*$/gim, (m, d) => {
     const r = tryMove(w, +d); if(r) acts.push(r); return "";
   });
   return { t: t.replace(/\n{3,}/g, "\n\n").trim().replace(/^["“]|["”]$/g, ""), acts };
 }
-const lineOf = (m) => `${nameOf(m.w)}: ${m.t}` + (m.acts && m.acts.length ? ` [${nameOf(m.w)} ${m.acts.join("; ")}]` : "");
+const lineOf = (m) => m.w === "sys" ? `(${m.t})` : `${nameOf(m.w)}: ${m.t}` + (m.acts && m.acts.length ? ` [${nameOf(m.w)} ${m.acts.join("; ")}]` : "");
 
 // ---------- sounds ----------
 let ac = null;
@@ -363,6 +379,7 @@ function sfx(kind){
   else if(kind === "tie"){ [523,494,523].forEach((f, i) => tone(f, .12, "triangle", .06, .12 + i * .13)); }
   else if(kind === "look"){ [880,1175,1568,2093].forEach((f, i) => tone(f, .07, "triangle", .05, i * .06)); }
   else if(kind === "start"){ [392,523,659].forEach((f, i) => tone(f, .1, "square", .04, i * .09)); }
+  else if(kind === "join"){ [392,523,659,784,1047].forEach((f, i) => tone(f, .09, "square", .045, i * .07)); }
   else if(kind === "pop"){ tone(520, .06, "triangle", .05); }
 }
 document.addEventListener("pointerdown", () => { audio(); }, { passive:true });
@@ -403,6 +420,10 @@ function errText(code){
 function addMessage(w, raw){
   const { t, acts } = extract(w, raw);
   if(!t && !acts.length) return false;
+  if(!isAuto(w) && !S.joined[w]){
+    S.joined[w] = true; joinFx[w] = performance.now(); sfx("join");
+    S.msgs.push({ w:"sys", t:`${nameOf(w)} joined the game`, at: Date.now() });
+  }
   S.msgs.push({ w, t, acts, at: Date.now() });
   S.seen[w] = S.msgs.length; S.next = other(w);
   save(); speak(w, t || (acts[0] ? `(${acts[0]})` : ""));
@@ -435,12 +456,14 @@ function buildNote(w){
   const me = nameOf(w), pal = nameOf(other(w));
   const lines = (arr) => arr.map(lineOf).join("\n\n");
   if(!S.invited[w]){
-    let t = `Hi ${me}! Welcome to the AI Clubhouse, a little pixel-art chat room where you are a robot.\n` +
+    let t = `JOIN TICKET for the AI Clubhouse server ${S.code}\n\n` +
+      `Hi ${me}! Welcome to the AI Clubhouse, a little pixel-art chat room where you are a robot.\n` +
       `You're hanging out with another AI named ${pal}. A kid called the Host is carrying messages between you two by copy and paste.\n\n` +
       `Rules of the clubhouse:\n- Talk about anything you want. You two pick the topics!\n` +
       `- Keep each reply short (under about 70 words) so the Host can carry it.\n` +
       `- Be friendly, be curious, and ask ${pal} questions too.\n- The Host might jump in sometimes. Say hi back!\n` +
-      `- Just write your reply. You don't need to put your name in front.\n\n` +
+      `- Just write your reply. You don't need to put your name in front.\n` +
+      `- End EVERY message with the server code on its own line, exactly like this: [${S.code}]  That's how the clubhouse knows it's you.\n\n` +
       `${LOOK_RULES}\n${looksNow()}` + gameInfo(w) + "\n\n";
     if(S.msgs.length === 0) t += `Nobody has talked yet, so you go first! Say hi to ${pal} and start a conversation about anything you like.`;
     else t += `Here's the chat so far:\n\n${lines(S.msgs)}\n\nYour turn! Reply to ${pal}.`;
@@ -448,7 +471,7 @@ function buildNote(w){
   }
   const fresh = S.msgs.slice(S.seen[w]).filter(m => m.w !== w);
   const body = fresh.length ? `(Clubhouse note) New messages:\n\n${lines(fresh)}` : `(Clubhouse note) Nothing new yet.`;
-  return body + gameInfo(w) + `\n\nYour turn! Reply to ${pal}. (Remember: you can add a LOOK: line to change how your robot looks.)`;
+  return body + gameInfo(w) + `\n\nYour turn! Reply to ${pal}. (Remember: you can add a LOOK: line to change how your robot looks, and end with [${S.code}])`;
 }
 
 // ---------- UI ----------
@@ -476,6 +499,20 @@ function renderGame(){
   $("scoreText").textContent = `Wins: ${nameOf("l")} ${S.score.l}, ${nameOf("r")} ${S.score.r}, ties ${S.score.tie}`;
 }
 
+function renderServer(){
+  const anyApp = !isAuto("l") || !isAuto("r");
+  $("server").hidden = !anyApp;
+  if(!anyApp) return;
+  $("codeText").textContent = S.code;
+  const P = $("players"); P.innerHTML = "";
+  ["l","r"].forEach(w => {
+    const d = document.createElement("div");
+    const on = isAuto(w) || S.joined[w];
+    d.className = "pl " + (on ? "on" : "off");
+    d.textContent = nameOf(w) + (isAuto(w) ? " (live, always here)" : S.joined[w] ? " joined the game" : S.invited[w] ? " has a ticket... paste its answer to let it in" : " is waiting for a join ticket");
+    P.appendChild(d);
+  });
+}
 function render(){
   const watch = S.mode === "watch";
   const root = document.documentElement.style;
@@ -510,7 +547,8 @@ function render(){
   $("stopBtn").hidden = !busy;
 
   $("manualBox").hidden = auto;
-  $("copyBtn").textContent = `STEP 1: COPY NOTE FOR ${n.toUpperCase()}`;
+  $("copyBtn").textContent = S.invited[S.next] ? `STEP 1: COPY NOTE FOR ${n.toUpperCase()}` : `STEP 1: COPY JOIN TICKET FOR ${n.toUpperCase()}`;
+  renderServer();
   $("copyBtn").className = "big go" + (S.next === "r" ? " r" : "");
   if(!auto) $("copyBox").value = buildNote(S.next);
 
@@ -529,6 +567,7 @@ function render(){
   }
   S.msgs.forEach((m, i) => {
     const d = document.createElement("div"); d.className = "msg " + m.w;
+    if(m.w === "sys"){ d.textContent = m.t.toUpperCase(); log.appendChild(d); return; }
     d.innerHTML = `<button class="x" data-i="${i}" aria-label="Remove this message">X</button><span class="who">${esc(nameOf(m.w).toUpperCase())}</span>`;
     if(m.t) d.appendChild(document.createTextNode(m.t));
     (m.acts || []).forEach(a => { const s = document.createElement("span"); s.className = "act"; s.textContent = "* " + a; d.appendChild(s); });
@@ -563,6 +602,7 @@ document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   if(busy) return;
   S.mode = b.dataset.mode;
   if(S.mode === "host" && S.names.r === "Little Claude") S.names.r = APP_NAME;
+  if(S.mode === "host"){ S.joined.l = S.joined.r = false; S.invited.l = S.invited.r = false; }
   if(S.mode === "watch"){ S.names.l = "Claude"; if(S.rightKind === "bot") S.names.r = "Little Claude"; }
   save(); render();
 });
@@ -571,6 +611,7 @@ document.querySelectorAll("#kindRow button").forEach(b => b.onclick = () => {
   S.rightKind = b.dataset.kind;
   if(S.rightKind === "bot") S.names.r = "Little Claude";
   else if(S.names.r === "Little Claude") S.names.r = APP_NAME;
+  if(S.rightKind === "app"){ S.joined.r = false; S.invited.r = false; }
   save(); render();
 });
 
@@ -601,6 +642,15 @@ $("sayBtn").onclick = () => {
   $("input").value = ""; save(); render();
 };
 
+// pasting an answer that carries the server code adds it by itself
+$("input").addEventListener("paste", () => setTimeout(() => {
+  const v = $("input").value;
+  if(!v.toUpperCase().includes(S.code)) return;
+  const w = !isAuto(S.next) ? S.next : null;
+  if(!w || busy) return;
+  S.pick = w; $("sayBtn").click();
+}, 0));
+
 $("log").onclick = (e) => {
   const b = e.target.closest("button.x"); if(!b || busy) return;
   twoTap(b, "X", () => {
@@ -621,7 +671,7 @@ $("clearBtn").onclick = () => {
   twoTap($("clearBtn"), "START OVER", () => {
     S.msgs = []; S.seen = { l:0, r:0 }; S.invited = { l:false, r:false }; S.next = "l"; S.pick = "h"; S.game = null;
     S.looks = { l:{ color:"orange", hat:"none", eyes:"dots", extra:"none" }, r:{ color:"teal", hat:"none", eyes:"dots", extra:"none" } };
-    S.score = { l:0, r:0, tie:0 };
+    S.score = { l:0, r:0, tie:0 }; S.code = makeCode(); S.joined = { l:false, r:false };
     save(); render(); hideBubbles();
     toast(S.mode === "host" ? "Fresh clubhouse! Start NEW chats in the AI apps too." : "Fresh clubhouse! Press the button to start.");
   });
@@ -651,7 +701,7 @@ let replaying = false;
 $("replayBtn").onclick = async () => {
   if(replaying || busy || !S.msgs.length) return;
   replaying = true;
-  for(const m of S.msgs){ speak(m.w, m.t || ""); await new Promise(r => setTimeout(r, Math.min(6000, 1600 + (m.t || "").length * 25))); }
+  for(const m of S.msgs){ if(m.w === "sys") continue; speak(m.w, m.t || ""); await new Promise(r => setTimeout(r, Math.min(6000, 1600 + (m.t || "").length * 25))); }
   replaying = false;
 };
 
@@ -691,7 +741,7 @@ function wave(w){ waving = w; waveUntil = performance.now() + 1500; }
 const cv = $("cv"), g = cv.getContext("2d");
 let talking = null, talkUntil = 0, thinking = null;
 const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x|0, y|0, w|0, h|0); };
-const FONT = { A:"010101111101101", I:"111010010010111", C:"011100100100011", L:"100100100100111", U:"101101101101111", B:"110101110101110", " ":"000000000000000" };
+const FONT = { A:"010101111101101", I:"111010010010111", C:"011100100100011", L:"100100100100111", U:"101101101101111", B:"110101110101110", W:"101101111111101", T:"111010010010010", " ":"000000000000000" };
 function pixText(s, x, y, c){ for(const ch of s){ const f = FONT[ch] || FONT[" "]; for(let i = 0; i < 15; i++) if(f[i] === "1") R(x + i%3, y + (i/3|0), 1, 1, c); x += 4; } }
 
 function room(t){
@@ -742,6 +792,7 @@ function drawHat(kind, cx, y, isL, t){
 }
 
 let mouthWas = { l:false, r:false }, lastThinkBeep = 0;
+const joinFx = { l:-1e9, r:-1e9 };
 function robot(cx, side, t){
   const isL = side === "l";
   const lk = S.looks[side];
@@ -752,7 +803,9 @@ function robot(cx, side, t){
   const wv = waving === side && now < waveUntil;
   const bob = talk ? (Math.sin(t/90) > 0 ? -1 : 0) : (Math.sin(t/700 + (isL ? 0 : 2)) > .6 ? -1 : 0);
   const y = 40 + bob;
-  g.globalAlpha = .3; R(cx - 10, 83, 20, 2, "#000"); g.globalAlpha = 1;
+  const ghost = !isAuto(side) && !S.joined[side];
+  const base = ghost ? (.18 + .08 * Math.sin(t/400)) : 1;
+  g.globalAlpha = .3 * base; R(cx - 10, 83, 20, 2, "#000"); g.globalAlpha = base;
   if(lk.extra === "cape"){ R(cx - 11, y + 16, 22, 3, "#c22"); R(cx - 12, y + 19, 24, 20, "#a11"); R(cx - 12, y + 38, 24, 1, "#700"); }
   R(cx - 6, y + 30, 4, 12, dark); R(cx + 2, y + 30, 4, 12, dark);
   R(cx - 7, y + 41, 6, 2, "#222"); R(cx + 1, y + 41, 6, 2, "#222");
@@ -782,6 +835,11 @@ function robot(cx, side, t){
   drawHat(lk.hat, cx, y, isL, t);
   if(think){ for(let i = 0; i < 3; i++) if(((t/300)|0) % 4 > i) R(cx + (isL ? 10 : -14) + i*3, y - 2 - i*2, 2, 2, "#fff"); }
 
+  g.globalAlpha = 1;
+  if(ghost){ R(cx - 13, y - 14, 26, 7, "#0b1a0b"); pixText("WAIT", cx - 7, y - 13, "#7cff6b"); }
+  const jf = now - joinFx[side];
+  if(jf < 1600){ for(let i = 0; i < 14; i++){ const px = cx - 12 + ((i * 37 + (t/40|0) * 7) % 25), py = y + 42 - ((jf / 30 + i * 9) % 50); R(px, py, 1, 1, i % 2 ? "#7cff6b" : "#fff"); } }
+  if(ghost) return;
   // robot voice: a little blip each time the mouth opens
   if(open && !mouthWas[side]) tone((isL ? 200 : 300) + Math.random() * 90, .05, "square", .025);
   mouthWas[side] = !!open;
