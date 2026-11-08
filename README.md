@@ -51,3 +51,18 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## IVY AND THE QUEST FOR MORE DESSERT
+
+`IvyDessertQuest.html` is a side-scrolling platform game about Ivy, all in one file. Open it in any browser (keyboard, touch buttons or game controller).
+After dinner Ivy got only ONE tiny cookie, so she sets off to find more dessert:
+
+| Place | Watch out for | Special |
+|---|---|---|
+| 1. The Midnight Kitchen | Broccoli | Shelves and a jelly bounce |
+| 2. Bakery Lane | Broccoli, hopping peas | Awnings to hop across |
+| 3. Candy Mountains | Lots of both | Big jelly bounces |
+| 4. Cloud Cake Castle | The Broccoli King (stomp him 3 times) | The Giant Cake |
+
+Jump on veggies to squish them. Grab a sugar star for a Sugar Rush (fast, and veggies can't hurt you). Find every dessert in a place for 3 stars.
+"Dress up Ivy" changes her hair, hairdo, skin, outfit and bow so she looks like the real Ivy. Progress is saved in the browser.
