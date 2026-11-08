@@ -54,13 +54,13 @@ function bossDefeated(B){
     playCut(STORY.twist,()=>{
       G.final=true; const A=G.arena;
       G.boss=makeBoss('cakeeater',(A.x0+A.x1)/2+120,A.floor); G.boss.final=true; G.boss.hp=G.boss.max=6; G.boss.awake=true; G.boss.y=-200;
-      G.shake=30; sfx.boss(); startMusic(9,true); mode='play'; showGame(); toast('SECRET FINAL BOSS: THE CAKE EATER!','#ff8ec2');
+      G.shake=30; sfx.boss(); stopMusic(); playSong('final'); mode='play'; showGame(); toast('SECRET FINAL BOSS: THE CAKE EATER!','#ff8ec2');
     });
     return;
   }
   if(B.final){
     save.done['7-4']=1; save.villains.licorice=1; save.villains.cakeeater=1; save.beatGame=true; save.best['7-4']=Math.max(save.best['7-4']||0,G.cups); persist();
-    stopMusic(); sfx.win(); for(const p of G.players) p.state='happy';
+    stopMusic(); playSong('ending'); for(const p of G.players) p.state='happy';
     playCut(STORY.ending,()=>{
       if(count(save.stars)>=21) playCut(STORY.secret,()=>{ save.secretEnd=true; persist(); showEnd(true); });
       else showEnd(false);

@@ -335,7 +335,7 @@ function startLevel(id){
     else if(b.id==='charge') p.meter=100; else if(b.id==='rainbow') p.rainT=1200; else if(b.id==='mega') p.megaT=900; } } }
   if(used.length){ persist(); toast('Using: '+used.join(', ')); }
   G.cam=0; mode='play'; showGame(); audio();
-  startMusic(L.wi+1,false);
+  playSong(songForLevel(false));
 }
 
 // ---------- Big update ----------
@@ -365,7 +365,7 @@ function update(){
     G.arena.locked=true;
     for(let y=0;y<12;y++) G.grid[y][G.arena.wall]='W';
     for(const p of G.players) if(p.x<G.arena.x0+10){ p.x=G.arena.x0+40; p.y=G.arena.floor-p.h; p.vx=p.vy=0; }
-    G.boss.awake=true; sfx.boss(); startMusic(G.L.wi+1,true);
+    G.boss.awake=true; sfx.boss(); playSong(songForLevel(true));
     const lines=STORY.boss[G.boss.id]; if(lines&&G.L.kind!=='rematch') playCut(lines,()=>{ mode='play'; showGame(); });
   }
   if(G.boss) updateBoss(G.boss);
@@ -393,7 +393,7 @@ function stepFx(){
 }
 function levelDone(){
   if(mode!=='play') return;
-  mode='done'; sfx.win(); stopMusic();
+  mode='done'; stopMusic(); playSong('win');
   const id=G.id;
   if(G.L.kind!=='rematch'){
     save.done[id]=1; save.best[id]=Math.max(save.best[id]||0,G.cups);

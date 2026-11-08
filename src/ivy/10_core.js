@@ -75,28 +75,3 @@ const sfx={
   select:()=>tone(660,.07,'triangle',.06),
 };
 
-// ---------- Music: a tiny tune that changes for every world ----------
-const music={timer:null,step:0,next:0,mel:null,bass:null,spb:.15,seed:0};
-function startMusic(seed,boss=false){
-  stopMusic(); if(!save.music) return; const a=audio(); if(!a) return;
-  const r=mulberry(seed*7+3);
-  const root=boss?110:[131,147,165,175,196,220][seed%6];
-  const scale=boss?[0,3,5,7,10,12,15]:[0,2,4,7,9,12,14,16];
-  const hz=s=>root*2*Math.pow(2,s/12);
-  music.mel=[]; let idx=3;
-  for(let i=0;i<32;i++){ if(r()<(i%4===0?.9:.45)){ idx=clamp(idx+ri(r,-2,2),0,scale.length-1); music.mel.push(hz(scale[idx])); } else music.mel.push(0); }
-  const prog=boss?[0,0,3,5]:[0,5,3,4];
-  music.bass=prog.map(d=>root*Math.pow(2,(scale[d%scale.length]-12)/12));
-  music.spb=boss?.12:.15; music.step=0; music.next=a.currentTime+.1;
-  music.timer=setInterval(()=>{
-    if(!ac||!save.music) return;
-    while(music.next<ac.currentTime+.3){
-      const s=music.step, f=music.mel[s%32];
-      if(f) note(f,music.next,music.spb*1.6,'triangle',.028);
-      if(s%4===0) note(music.bass[Math.floor(s/8)%4],music.next,music.spb*3,'square',.018);
-      if(s%2===1) note(2400,music.next,.03,'square',.006);
-      music.step++; music.next+=music.spb;
-    }
-  },90);
-}
-function stopMusic(){ clearInterval(music.timer); music.timer=null; }

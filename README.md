@@ -74,5 +74,6 @@ Lord Licorice has stolen every dessert in the world. Ivy and Sebastian travel ac
 - Power-ups: Sugar Cupcake, Candy Shield, Mega Cookie, Rainbow Lollipop.
 - Every level hides a golden spoon (behind a fake wall), a hidden star and a dessert card. The x-2 levels hide a secret door that unlocks a secret level.
 - Dessert Shop (costumes and power-ups for coins), Card Album, Boss Rematch, and a secret ending for finding all 21 hidden stars.
+- Soundtrack: 13 songs written as notes in `src/ivy/15_music.js` (title, one per world, bonus, boss, final boss, victory, ending), with melody, bass, sparkle notes and drums.
 
 Source lives in `src/ivy/`; rebuild the file with `sh src/ivy/build.sh`.

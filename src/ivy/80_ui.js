@@ -16,7 +16,7 @@ function bossPreview(id,w,h,face=-1){ const D=BOSSES[id]; const s=Math.min(w/(D.
 
 // ---------- Title ----------
 function showTitle(){
-  G=null; mode='menu'; stopMusic();
+  G=null; mode='menu'; if(ac) playSong('title');
   ui(`<h1><small>Ivy and the</small>Quest for More Dessert</h1>
     <canvas id="pv" width="520" height="300" style="width:260px;height:150px"></canvas>
     <p>Save the Dessert Kingdom and find the legendary Ultimate Dessert!</p>
@@ -25,7 +25,7 @@ function showTitle(){
 }
 // ---------- Map ----------
 function showMap(){
-  G=null; mode='menu'; stopMusic();
+  G=null; mode='menu'; if(ac) playSong('title');
   const spoons=count(save.spoons), stars=count(save.stars), cards=count(save.cards), vill=count(save.villains);
   const tabs=[...WORLDS.map((W,i)=>({i,label:W.key+'. '+W.name,ok:worldUnlocked(i)})),...BONUS.map((W,b)=>({i:7+b,label:W.name,ok:spoons>=W.need&&isUnlocked(W.key+'-1')||spoons>=W.need,need:W.need}))];
   if(!tabs[curWorld]||!tabs[curWorld].ok) curWorld=0;
@@ -109,7 +109,7 @@ function showSettings(back='title'){
 function pause(){ if(mode!=='play') return; mode='pause'; stopMusic();
   ui(`<h2>Snack break!</h2><button class="btn" data-a="resume">Keep going</button><button class="btn mint" data-a="restart">Start level over</button><button class="btn choc" data-a="map">Back to map</button>
     <div><button class="btn small mint" data-a="toggleSound" data-v="pause">Sound: ${save.sound?'on':'off'}</button><button class="btn small mint" data-a="toggleMusic" data-v="pause">Music: ${save.music?'on':'off'}</button></div>`); }
-function resume(){ if(mode!=='pause') return; mode='play'; showGame(); startMusic(G.L.wi+1,!!(G.boss&&G.boss.awake)); }
+function resume(){ if(mode!=='pause') return; mode='play'; showGame(); playSong(songForLevel(!!(G.boss&&G.boss.awake))); }
 function nextLevelId(id){
   const L=LEVELS[id]; if(!L) return null;
   if(L.kind==='secret') return null;
@@ -134,7 +134,7 @@ function showOver(){
     <button class="btn" data-a="restart">Try again</button><button class="btn choc" data-a="map">Map</button>`);
 }
 function showEnd(secret){
-  mode='menu'; stopMusic();
+  mode='menu';
   ui(`<h1>THE END</h1><canvas id="pv" width="520" height="300" style="width:260px;height:150px"></canvas>
     <div class="stats"><span class="chip">🥄 ${count(save.spoons)}/28</span><span class="chip">⭐ ${count(save.stars)}/21</span><span class="chip">🃏 ${count(save.cards)}/21</span><span class="chip">🪙 ${save.coins}</span></div>
     ${secret?'<p><b>You saw the secret ending!</b></p>':`<p>Find all 21 hidden stars to unlock the secret ending and discover who created the Dessert Kingdom!</p>`}
@@ -179,7 +179,7 @@ const ACT={
   wear(v){ save.wear[shopTab]=v; persist(); sfx.select(); showShop(); },
   buyBoost(v){ const b=BOOSTS.find(x=>x.id===v); if(save.coins>=b.price){ save.coins-=b.price; save.boosts[v]=(save.boosts[v]||0)+1; persist(); sfx.coin(); } showShop(); },
   toggleSound(v){ save.sound=!save.sound; persist(); v==='pause'?(mode='play',pause()):showSettings(v); },
-  toggleMusic(v){ save.music=!save.music; persist(); if(!save.music) stopMusic(); v==='pause'?(mode='play',pause()):showSettings(v); },
+  toggleMusic(v){ save.music=!save.music; persist(); if(!save.music) stopMusic(); else if(mode==='menu') playSong('title'); v==='pause'?(mode='play',pause()):showSettings(v); },
   resetAsk(){ ui(`<h2>Are you sure?</h2><p>This wipes ALL progress: levels, coins, costumes, spoons, stars and cards.</p><button class="btn choc" data-a="settings">No, keep it</button><button class="btn" data-a="resetYes">Yes, start over</button>`); },
   resetYes(){ save=JSON.parse(JSON.stringify(SAVE0)); persist(); curWorld=0; showTitle(); },
   cutNext,
