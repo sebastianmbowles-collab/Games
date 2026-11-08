@@ -54,15 +54,25 @@ Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh
 
 ## IVY AND THE QUEST FOR MORE DESSERT
 
-`IvyDessertQuest.html` is a side-scrolling platform game about Ivy, all in one file. Open it in any browser (keyboard, touch buttons or game controller).
-After dinner Ivy got only ONE tiny cookie, so she sets off to find more dessert:
+`IvyDessertQuest.html` is a colourful 2D platform adventure starring Ivy and her big brother Sebastian, all in one file. Open it in any browser (keyboard, touch buttons or game controllers). 1 or 2 players.
+Lord Licorice has stolen every dessert in the world. Ivy and Sebastian travel across seven kingdoms to stop him:
 
-| Place | Watch out for | Special |
+| World | Levels | Boss |
 |---|---|---|
-| 1. The Midnight Kitchen | Broccoli | Shelves and a jelly bounce |
-| 2. Bakery Lane | Broccoli, hopping peas | Awnings to hop across |
-| 3. Candy Mountains | Lots of both | Big jelly bounces |
-| 4. Cloud Cake Castle | The Broccoli King (stomp him 3 times) | The Giant Cake |
+| 1. Candy Forest | Sweet Beginnings, Lollipop Woods, The Chocolate River | Ginger Grim |
+| 2. Gingerbread Kingdom | Biscuit Village, Cookie Caves, The Crumb Mines | Crumb Goblin |
+| 3. Frosting Peaks | Ice Cream Slopes, Frozen Sprinkle Lake, The Melting Glacier | Meltmaster |
+| 4. Donut Mountains | Sprinkle Valley, Donut Hills, Jellybean Jungle | Donut Doom |
+| 5. The Sugar Kingdom | Sugar Gardens, Candy Cane Castle, The Magical Bakery | The Candy Wizard |
+| 6. Chocolate Volcano | Cocoa Caverns, Caramel Lava, The Chocolate Factory | The Cake Eater |
+| 7. Licorice Castle | The Dark Bakery, The Royal Kitchen, The Dessert Vault | Lord Licorice, then a secret final boss |
+| Bonus: Pudding Isles (10 spoons) | | Chocobun, Cupcake Chaos, Jelly Jaws |
+| Bonus: Royal Pudding Vault (20 spoons) | | Marshmallow Max, Captain Custard |
 
-Jump on veggies to squish them. Grab a sugar star for a Sugar Rush (fast, and veggies can't hurt you). Find every dessert in a place for 3 stars.
-"Dress up Ivy" changes her hair, hairdo, skin, outfit and bow so she looks like the real Ivy. Progress is saved in the browser.
+- Moves: run, jump, double jump, climb ladders, swim through chocolate, bounce on marshmallows.
+- Abilities: Ivy's Sugar Rush and Sebastian's Big Brother Boost (fill the meter with cupcakes and coins).
+- Power-ups: Sugar Cupcake, Candy Shield, Mega Cookie, Rainbow Lollipop.
+- Every level hides a golden spoon (behind a fake wall), a hidden star and a dessert card. The x-2 levels hide a secret door that unlocks a secret level.
+- Dessert Shop (costumes and power-ups for coins), Card Album, Boss Rematch, and a secret ending for finding all 21 hidden stars.
+
+Source lives in `src/ivy/`; rebuild the file with `sh src/ivy/build.sh`.
