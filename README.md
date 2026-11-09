@@ -69,5 +69,11 @@ You are an earthworm. Its clitellum (the fat band near its head where worm cocoo
 | 8. Sky Holes | Holes to the sky where little birds dive down at you |
 | 9. Centipede Run | Fast centipedes and a bit of everything |
 | 10. BOSS: The Bird | Survive 60 seconds: it grabs you and drops you (wiggle free!) and drops flaming egg bombs |
+| 11. Garden Rows | Above ground at last: chickens, apple trees that drop apples, hay bales |
+| 12. Pig Pen | Pigs charge when they see you; bounce on their backs |
+| 13. Crow Field | Crows dive from the sky; hide under the hay |
+| 14. Hay Barn | Bouncy sheep, big cows, barn doors and a hay loft |
+| 15. BOSS: The Farmer | Survive 60 seconds of flaming pitchforks (low ones to jump, high ones that burn) and stampeding pigs, cows and sheep |
+| 16. SECRET: The Beetle | A giant dung beetle deep underground rolls dung balls, charges with its horn and bursts up from below |
 
-A boss comes every 5 levels. Still to come: World 3 (the Farmer) and a secret Beetle boss. Progress is saved in the browser.
+A boss comes every 5 levels. Beating the Farmer unlocks the secret Beetle boss, and beating the Beetle shows the ending. Progress is saved in the browser.

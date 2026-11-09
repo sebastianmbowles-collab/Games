@@ -53,6 +53,7 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
 .keys[open] summary{margin-bottom:6px}
 .titleui{position:fixed;left:0;right:0;top:41%;display:flex;justify-content:center;z-index:6;pointer-events:none}
 .titleui .btn{pointer-events:auto}
+.endui{top:auto;bottom:calc(32% + env(safe-area-inset-bottom,0px))}
 .btn.big{font-size:18px;padding:16px 30px;animation:bob 1s steps(2) infinite}
 @keyframes bob{50%{transform:translateY(-4px)}}
 #pauseBtn{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:calc(8px + env(safe-area-inset-right,0px));width:40px;height:40px;border:4px solid var(--ink);background:var(--tan);box-shadow:inset -3px -3px 0 var(--brown),inset 3px 3px 0 #ffe0b8;font:12px var(--font);color:var(--ink);z-index:5;cursor:pointer;padding:0}
@@ -81,11 +82,14 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
   <button class="btn green big" id="startBtn">▶ START</button>
 </div>
 
+<div class="titleui endui" id="ending" hidden>
+  <button class="btn green big" id="endBtn">MENU</button>
+</div>
+
 <div class="overlay" id="menu" hidden>
   <div class="panel">
     <h2>CHOOSE A LEVEL</h2>
     <div id="worlds"></div>
-    <div class="soon">World 3: The Farmer (11-15) coming soon…</div>
     <details class="keys">
       <summary>HOW TO PLAY</summary>
       <div><b>Arrow keys or A D</b> crawl (slooow)</div>
@@ -348,14 +352,15 @@ function loadLevel(i) {
   const L = LEVELS[i];
   const width = L.w;
   const real = builder(width); L.build(real);
-  theme = THEMES[L.world];
+  theme = THEMES[L.theme || L.world];
+  if (L.open) for (let x = 1; x < width - 1; x++) for (let y = 0; y < 2; y++) if (real.g[y][x] === '#') real.g[y][x] = ' '; // open sky
 
   lv = {
     def: L, w: width, grid: real.g, entities: [], enemies: [], pickups: [], platforms: [],
     drips: [], drops: [], cracks: [], clumps: [], particles: [], signs: [], checkpoints: [],
     doors: new Map(), webs: [], webPatches: [], baby: null, exit: null,
     seeds: 0, totalSeeds: 0, start: { x: 0, y: 0 }, respawn: null, shake: 0,
-    boss: null, bossTimer: BOSS_TIME, intro: L.boss ? 2.5 : 0, done: false, camX: 0, camY: 0, decor: [], holes: real.holes, crumble: new Map(), squash: new Map(), eggs: [], fires: [],
+    boss: null, bossTimer: BOSS_TIME, intro: L.boss ? 2.5 : 0, done: false, camX: 0, camY: 0, decor: [], holes: real.holes, crumble: new Map(), squash: new Map(), eggs: [], fires: [], forks: [], balls: [], trees: [],
   };
   const G = lv.grid;
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < width; x++) {
@@ -371,6 +376,11 @@ function loadLevel(i) {
       case 'm': lv.enemies.push({ kind: 'mole', x: px + 3, y: py + TILE - 26, w: 26, h: 26, baseY: py + TILE, up: 0, st: 'hidden', t: 0, dead: false }); G[y][x] = ' '; break;
       case '-': lv.platforms.push({ x: px, y: py, w: 64, h: 14, ox: px, oy: py, axis: 'x', range: 3 * TILE, t: Math.random() * 6, dx: 0, dy: 0 }); G[y][x] = ' '; break;
       case '|': lv.platforms.push({ x: px, y: py, w: 64, h: 14, ox: px, oy: py, axis: 'y', range: 3 * TILE, t: Math.random() * 6, dx: 0, dy: 0 }); G[y][x] = ' '; break;
+      case 'n': lv.enemies.push(makeAnimal('chicken', px, py)); G[y][x] = ' '; break;
+      case 'g': lv.enemies.push(makeAnimal('pig', px, py)); G[y][x] = ' '; break;
+      case 'e': lv.enemies.push(makeAnimal('sheep', px, py)); G[y][x] = ' '; break;
+      case 'w': lv.enemies.push(makeAnimal('cow', px, py)); G[y][x] = ' '; break;
+      case 'A': { const t = { x: px + 16, y: py }; lv.trees.push(t); lv.cracks.push({ x: px + 16, y: py + 16, t: rand(1, 3), warn: 0, tree: t }); G[y][x] = ' '; break; }
       case 'k': lv.enemies.push({ kind: 'centipede', x: px + 2, y: py + TILE - 14, w: 46, h: 14, vx: -95, vy: 0, dead: false, squish: 0 }); G[y][x] = ' '; break;
       case 'r': lv.enemies.push(makeSparrow(px, py)); G[y][x] = ' '; break;
       case 'W': lv.drips.push({ x: px + 16, y: py + TILE, t: rand(0, 1.8) }); break;
@@ -395,6 +405,8 @@ function loadLevel(i) {
   }
   if (L.boss === 'spider') lv.boss = makeSpider();
   if (L.boss === 'bird') lv.boss = makeBird();
+  if (L.boss === 'farmer') lv.boss = makeFarmer();
+  if (L.boss === 'beetle') lv.boss = makeBeetle();
   lv.respawn = { ...lv.start };
   player = makePlayer(lv.start.x, lv.start.y);
   lv.camX = 0; lv.camY = 0;
@@ -431,7 +443,7 @@ function tileAt(x, y) {
 }
 function isSolidTile(x, y, who) {
   const ch = tileAt(x, y);
-  if (ch === '#' || ch === 'B' || ch === 'W' || ch === 'F' || ch === 'S') return true;
+  if (ch === '#' || ch === 'B' || ch === 'W' || ch === 'F' || ch === 'S' || ch === 'H') return true;
   if (ch === 'c') return !crumbleGone(x, y);
   if (ch === 'D') {
     if (!doorClosed(x, y)) return false;
@@ -761,7 +773,7 @@ function updateEnemies(dt) {
   const p = player;
   for (const e of lv.enemies) {
     if (e.dead) { e.squish += dt; continue; }
-    if (updateEnemy2(e, dt)) continue;
+    if (updateEnemy2(e, dt) || updateEnemy3(e, dt)) continue;
     if (e.kind === 'mole') {
       const near = Math.abs((p.x + p.w / 2) - (e.x + e.w / 2)) < 110 && Math.abs(p.y - e.y) < 90;
       e.t -= dt;
@@ -832,13 +844,13 @@ function updateWorld(dt) {
     if (c.t <= 0 && c.warn <= 0) { c.warn = 0.8; }
     if (c.warn > 0) {
       c.warn -= dt;
-      if (Math.random() < 0.4) lv.particles.push({ x: c.x + rand(-10, 10), y: c.y, vx: 0, vy: 60, life: 0.5, max: 0.5, color: '#7a5032', size: 2, grav: true });
-      if (c.warn <= 0) { lv.clumps.push({ x: c.x - 11, y: c.y, w: 22, h: 22, vy: 0, rot: 0 }); c.t = rand(2.2, 3.6); }
+      if (Math.random() < 0.4) lv.particles.push({ x: c.x + rand(c.tree ? -30 : -10, c.tree ? 30 : 10), y: c.y, vx: 0, vy: 60, life: 0.5, max: 0.5, color: c.tree ? PAL.green : '#7a5032', size: 2, grav: true });
+      if (c.warn <= 0) { if (c.tree) treeDrop({ x: c.x + rand(-28, 28), y: c.y }); else lv.clumps.push({ x: c.x - 11, y: c.y, w: 22, h: 22, vy: 0, rot: 0 }); c.t = rand(2.2, 3.6); }
     }
   }
   for (const k of lv.clumps) {
     k.vy = Math.min(k.vy + GRAVITY * dt, 700); k.y += k.vy * dt; k.rot += dt * 4;
-    if (aabb(k, player)) { k.dead = true; hurt(15, k.x + 11); burst(k.x + 11, k.y + 11, '#7a5032', 14); }
+    if (aabb(k, player)) { k.dead = true; hurt(k.apple ? 10 : 15, k.x + 11); burst(k.x + 11, k.y + 11, k.apple ? PAL.red : '#7a5032', 14); }
     else if (boxHitsSolid(k.x, k.y, k.w, k.h) || inMud(k) || k.y > ROWS * TILE) {
       k.dead = true; burst(k.x + 11, k.y + 18, '#7a5032', 12, 140); beep(80, 0.12, 'sawtooth', 0.05);
     }
@@ -938,7 +950,9 @@ function findFloorBelow(x, y) {
 //  CAMERA + MAIN LOOP
 // ============================================================
 function updateCamera(k) {
-  const target = player.x + player.w / 2 - viewW / 2 + player.face * 40;
+  let target = player.x + player.w / 2 - viewW / 2 + player.face * 40;
+  // in the Farmer fight, keep both the worm and the farmer on screen
+  if (lv.def.boss === 'farmer' && lv.boss) target = (player.x + player.w / 2 + lv.boss.x) / 2 - viewW / 2;
   const maxX = lv.w * TILE - viewW;
   let want = maxX <= 0 ? maxX / 2 : clamp(target, 0, maxX);
   lv.camX += (want - lv.camX) * k;
@@ -960,7 +974,7 @@ function frame(now) {
       updateBaby(dt);
       updateEnemies(dt);
       if (lv.boss) {
-        if (lv.def.boss === 'spider') updateSpider(dt); else updateBird(dt);
+        ({ spider: updateSpider, bird: updateBird, farmer: updateFarmer, beetle: updateBeetle })[lv.def.boss](dt);
         if (!lv.done) {
           lv.bossTimer -= dt;
           if (lv.bossTimer <= 0) bossBeaten();
@@ -971,6 +985,7 @@ function frame(now) {
     updateCamera(Math.min(1, dt * 6));
   }
   if (lv) draw();
+  else if (endingMode) drawEnding();
   else drawMenuBackground();
   requestAnimationFrame(frame);
 }
@@ -1262,6 +1277,12 @@ function dirtTile(v, top, bot, left = false, right = false, deep = false) {
       return;
     }
     g.rect(0, 0, 16, 16, T.dirt);
+    if (T.wood) { // barn floor boards
+      for (const y of [0, 8]) { g.rect(0, y + 7, 16, 1, T.speck); g.px(2 + (v & 1) * 8, y + 3, T.shadow); }
+      g.rect(v * 4, 0, 1, 7, T.speck); g.rect(15 - v * 3, 8, 1, 7, T.speck);
+      if (top) g.rect(0, 0, 16, 1, T.topHi);
+      return;
+    }
     for (let i = 0; i < 6; i++) g.px(Math.floor(hash(v, i) * 16), Math.floor(hash(i, v + 9) * 16), T.speck);
     for (let i = 0; i < 2; i++) {
       const x = Math.floor(hash(v + 3, i) * 13), y = 3 + Math.floor(hash(i + 5, v) * 10);
@@ -1489,6 +1510,8 @@ function present() {
 
 // ---------- background: two layers that slide slower than the tunnel (parallax)
 function drawBackdrop(c, cx, cy) {
+  if (theme.sky) return drawSkyBackdrop(c, cx, cy);
+  if (theme.barn) return drawBarnBackdrop(c, cx, cy);
   const T = performance.now() / 1000;
   c.fillStyle = theme.bg; c.fillRect(0, 0, LW, LO_H);
   // far away: big faint stalactites and stalagmites
@@ -1546,6 +1569,11 @@ const decorSprite = (type, v) => sprite('decor' + type + v, 12, type === 'hang' 
     g.rect(2, 9, 8, 2, PAL.cream); g.rect(1, 8, 2, 2, PAL.cream); g.rect(1, 10, 2, 2, PAL.cream);
     g.rect(9, 8, 2, 2, PAL.cream); g.rect(9, 10, 2, 2, PAL.cream);
     g.outline(PAL.plum);
+  } else if (type === 'flower') {
+    g.line(6, 11, 6, 5, PAL.dkgreen); g.px(5, 8, PAL.green); g.px(7, 9, PAL.green);
+    const col = flowerColors[v % 4];
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [1, -1], [-1, 1]]) g.px(6 + dx, 4 + dy, col);
+    g.px(6, 4, col === PAL.yellow ? PAL.orange : PAL.yellow);
   } else if (type === 'hang') {
     const len = 12 + v * 3;
     for (let y = 0; y < len; y++) g.px(5 + Math.round(Math.sin(y * 0.5 + v) * 1.3), y, PAL.brown);
@@ -1558,7 +1586,10 @@ function placeDecor() {
     if (G[y][x] !== ' ') continue;
     const r = hash(x * 3 + 1, y * 7 + 2), v = Math.floor(hash(y + 1, x) * 4);
     if (G[y + 1][x] === '#') {
-      const type = r < 0.16 ? 'tuft' : r < 0.24 ? 'pebbles' : r < 0.29 ? 'shroom' : r < 0.33 ? 'crystal' : r < 0.35 ? 'bone' : null;
+      const type = theme.sky ? (r < 0.18 ? 'tuft' : r < 0.32 ? 'flower' : r < 0.37 ? 'pebbles' : null)
+        : theme.barn ? (r < 0.2 ? 'tuft' : r < 0.26 ? 'pebbles' : null)
+        : theme.id === 5 ? (r < 0.1 ? 'pebbles' : r < 0.26 ? 'crystal' : r < 0.3 ? 'shroom' : r < 0.33 ? 'bone' : null)
+        : (r < 0.16 ? 'tuft' : r < 0.24 ? 'pebbles' : r < 0.29 ? 'shroom' : r < 0.33 ? 'crystal' : r < 0.35 ? 'bone' : null);
       if (type) lv.decor.push({ type, v, x: x * 16 + Math.floor(hash(x, y) * 5) + 2, y: (y + 1) * 16 });
     }
     if (G[y - 1][x] === '#' && r > 0.8) lv.decor.push({ type: 'hang', v, x: x * 16 + 2, y: y * 16 });
@@ -1591,6 +1622,7 @@ function drawDecor(c) {
 }
 // a soft light around the worm; the edges of the screen fade into the dark
 function drawLight(c) {
+  if (theme.sky) return; // it's daytime up here
   const px = L(player.x + player.w / 2), py = L(player.y);
   const R = Math.max(LW, LO_H) * 0.75;
   const g = c.createRadialGradient(px, py, 36, px, py, R);
@@ -1677,6 +1709,7 @@ function draw() {
   c.setTransform(1, 0, 0, 1, -camLo + sx, -camLoY + sy);
 
   drawSky(c);
+  drawTrees(c);
   drawGlows(c);
   drawTiles(c);
   drawDecor(c);
@@ -1685,7 +1718,7 @@ function draw() {
   drawPlatforms(c);
   drawPickups(c);
   drawEnemies(c);
-  if (lv.boss) { if (lv.def.boss === 'spider') drawSpider(c); else drawBird(c); }
+  if (lv.boss) ({ spider: drawSpider, bird: drawBird, farmer: drawFarmer, beetle: drawBeetleBoss })[lv.def.boss](c);
   drawPlayer(c);
   drawBaby(c);
   drawMud(c);
@@ -1806,14 +1839,14 @@ function drawPickups(c) {
     c.fillStyle = PAL.blue; c.fillRect(L(d.x) - 1, L(d.y), 2, 1);
   }
   for (const k of lv.clumps) {
-    const s = clumpSprite();
+    const s = k.apple ? appleSprite() : clumpSprite();
     c.drawImage(Math.floor(k.rot) % 2 ? s.l : s.r, L(k.x), L(k.y));
   }
 }
 
 function drawEnemies(c) {
   for (const e of lv.enemies) {
-    if (drawEnemy2(c, e)) continue;
+    if (drawEnemy2(c, e) || drawEnemy3(c, e)) continue;
     if (e.dead && e.squish > 0.6) continue;
     const cx = e.x + e.w / 2, by = e.y + e.h;
     if (e.kind === 'mole') {
@@ -2414,6 +2447,7 @@ function drawTile2(c, ch, x, y) {
     return true;
   }
   if (ch === '^') { c.drawImage(thornTile().r, px, py); return true; }
+  if (ch === 'H') { c.drawImage(hayTile().r, px, py); return true; }
   if (ch === 'c') {
     if (crumbleGone(x, y)) {
       c.fillStyle = theme.shadow;
@@ -2431,7 +2465,7 @@ function drawEnemy2(c, e) {
   let s, flip;
   if (e.kind === 'sparrow') {
     if (e.st === 'wait') return true;
-    s = sparrowSprite(e.st === 'dive' ? 1 : Math.floor(time * 12) % 2);
+    s = (theme.sky ? crowSprite : sparrowSprite)(e.st === 'dive' ? 1 : Math.floor(time * 12) % 2);
     flip = false;
   } else if (e.kind === 'centipede') {
     s = centipedeSprite(Math.floor(time * 14 + e.x * 0.02) % 2);
@@ -2475,10 +2509,655 @@ function drawBird(c) {
 }
 
 // ============================================================
+//  WORLD 3: THE FARM  +  SECRET BOSS: THE BEETLE  +  THE END
+//  The worm pops out above ground! New things: chickens (n), pigs (g),
+//  sheep (e), cows (w), crows (r on open sky), apple trees (A),
+//  hay bales (H), THE FARMER, and the secret giant dung BEETLE.
+// ============================================================
+Object.assign(THEMES, {
+  3: { id: 3, sky: true, bg: PAL.cyan, far: PAL.green, rock: PAL.dkgreen, rockHi: PAL.green, root: PAL.dkbrown,
+       dirt: PAL.dkbrown, speck: PAL.plum, peb: PAL.brown, pebHi: PAL.clay, top: PAL.brown, topHi: PAL.clay,
+       deep: PAL.plum, deepSpeck: PAL.dkbrown, deepDot: PAL.ink, shadow: PAL.plum, grass: PAL.green },
+  4: { id: 4, barn: true, bg: PAL.dkbrown, far: PAL.plum, rock: PAL.plum, rockHi: PAL.dkbrown, root: PAL.plum,
+       dirt: PAL.brown, speck: PAL.dkbrown, peb: PAL.clay, pebHi: PAL.tan, top: PAL.clay, topHi: PAL.tan,
+       deep: PAL.dkbrown, deepSpeck: PAL.plum, deepDot: PAL.plum, shadow: PAL.dkbrown, grass: null, wood: true },
+  5: { id: 5, bg: PAL.ink, far: PAL.purple, rock: PAL.purple, rockHi: PAL.magenta, root: PAL.purple,
+       dirt: PAL.dkslate, speck: PAL.night, peb: PAL.slate, pebHi: PAL.steel, top: PAL.slate, topHi: PAL.steel,
+       deep: PAL.night, deepSpeck: PAL.dkslate, deepDot: PAL.ink, shadow: PAL.night, grass: null },
+});
+BOSS_INFO.farmer = { title: 'THE FARMER!', name: 'farmer', emoji: '👨‍🌾' };
+BOSS_INFO.beetle = { title: 'THE BEETLE!', name: 'beetle', emoji: '🪲' };
+WORLD_NAMES[3] = 'World 3: The Farm';
+WORLD_NAMES[4] = 'Secret!';
+
+LEVELS.push(
+  {
+    name: 'Garden Rows', world: 3, theme: 3, open: true, w: 110,
+    signs: [
+      'You made it to the surface! Watch out for chickens. They peck!',
+      'Apples fall from the trees. BONK! Watch for the shaking leaves.',
+      'Hay bales make good stairs.',
+      'The farm is close. Keep going!',
+    ],
+    build(b) {
+      b.ground(0, 109, 15);
+      b.put(2, 14, 'P'); b.put(5, 14, '1');
+      b.put(10, 14, 'H'); b.put(20, 14, 'H'); b.put(15, 14, 'n');
+      b.put(24, 14, '2'); b.put(30, 9, 'A'); b.put(37, 9, 'A'); b.fill(32, 11, 35, 11, 'o');
+      b.put(42, 14, 'C'); b.put(44, 14, '3');
+      b.put(47, 14, 'H'); b.fill(48, 13, 48, 14, 'H'); b.fill(49, 12, 49, 14, 'H'); b.fill(50, 11, 50, 14, 'H'); b.put(50, 10, 'o'); b.put(49, 11, 'o');
+      b.fill(54, 15, 58, 17, ' '); b.fill(55, 11, 57, 11, 'o');
+      b.put(61, 14, 'H'); b.put(76, 14, 'H'); b.put(65, 14, 'n'); b.put(71, 14, 'n');
+      b.put(82, 9, 'A'); b.put(86, 14, 'C'); b.put(84, 14, 'h');
+      b.put(90, 14, 'H'); b.put(99, 14, 'H'); b.put(94, 14, 'n');
+      b.put(102, 14, '4'); b.put(106, 14, 'E');
+    },
+  },
+  {
+    name: 'Pig Pen', world: 3, theme: 3, open: true, w: 116,
+    signs: [
+      'Pigs charge when they see you! Land on a pig\'s back to bounce off it.',
+      'A muddy pig pond. Splish splash!',
+      'A pig in a pit! Bounce on its back to get across.',
+    ],
+    build(b) {
+      b.ground(0, 115, 15);
+      b.put(2, 14, 'P'); b.put(5, 14, '1');
+      b.put(11, 14, 'H'); b.put(28, 14, 'H'); b.put(19, 14, 'g');
+      b.put(31, 14, '2'); b.fill(34, 15, 40, 16, 'M'); b.fill(36, 11, 38, 11, 'o');
+      b.put(44, 14, 'C');
+      b.fill(48, 13, 48, 14, 'H'); b.fill(68, 13, 68, 14, 'H'); b.put(54, 14, 'g'); b.put(62, 14, 'g'); b.fill(57, 10, 59, 10, 'o');
+      b.put(71, 14, '3');
+      b.fill(74, 15, 84, 16, ' '); b.put(79, 16, 'g'); b.fill(77, 9, 81, 9, 'o');
+      b.put(88, 14, 'C'); b.put(92, 9, 'A');
+      b.put(96, 14, 'H'); b.put(108, 14, 'H'); b.put(102, 14, 'g');
+      b.put(112, 14, 'E');
+    },
+  },
+  {
+    name: 'Crow Field', world: 3, theme: 3, open: true, w: 116,
+    signs: [
+      'Crows dive down from the sky! Wait until they fly away.',
+      'Hide under the hay to stay safe!',
+      'Dry clumps of dirt crumble. Hurry!',
+    ],
+    build(b) {
+      b.ground(0, 115, 15);
+      b.put(2, 14, 'P'); b.put(5, 14, '1');
+      for (const x of [14, 30, 46, 62, 80, 98]) b.put(x, 2, 'r');
+      b.put(18, 14, '2'); b.fill(21, 12, 25, 12, 'H'); b.put(21, 13, 'H'); b.fill(23, 14, 24, 14, 'o');
+      b.put(34, 9, 'A'); b.put(38, 14, 'n'); b.put(35, 14, 'H'); b.put(42, 14, 'H');
+      b.put(45, 14, 'C'); b.put(48, 14, '3');
+      b.fill(51, 15, 59, 17, ' '); b.fill(53, 13, 54, 13, 'c'); b.fill(57, 12, 58, 12, 'c'); b.put(55, 9, 'o');
+      b.fill(64, 12, 68, 12, 'H'); b.put(64, 13, 'H'); b.fill(66, 14, 67, 14, 'o');
+      b.put(74, 14, 'g'); b.put(71, 14, 'H'); b.put(86, 14, 'H');
+      b.put(90, 14, 'C'); b.put(94, 9, 'A');
+      b.fill(100, 12, 104, 12, 'H'); b.put(104, 13, 'H'); b.fill(101, 14, 102, 14, 'o');
+      b.put(112, 14, 'E');
+    },
+  },
+  {
+    name: 'Hay Barn', world: 3, theme: 4, w: 120,
+    signs: [
+      'Inside the barn! Sheep are fluffy and super bouncy. Cows are big. Stay away from them!',
+      'Bounce on a sheep to reach the hay loft.',
+      'Pitchforks on the floor. Ouch!',
+      'Next: THE FARMER! Get ready…',
+    ],
+    build(b) {
+      b.ground(0, 119, 15);
+      b.put(2, 14, 'P'); b.put(5, 14, '1');
+      b.put(9, 14, 'H'); b.put(22, 14, 'H'); b.put(15, 14, 'e');
+      b.fill(26, 12, 28, 14, 'H'); b.fill(26, 11, 28, 11, 'o');
+      b.put(32, 14, 'H'); b.fill(48, 13, 48, 14, 'H'); b.put(39, 14, 'w');
+      b.fill(52, 2, 52, 14, 'D');
+      b.put(55, 14, 'C'); b.put(57, 14, '2');
+      b.fill(60, 9, 67, 9, 'H'); b.fill(61, 8, 66, 8, 'o'); b.put(63, 14, 'e');
+      b.put(70, 14, 'H'); b.put(90, 14, 'H'); b.put(75, 14, 'w'); b.put(84, 14, 'w');
+      b.put(92, 14, '3'); b.fill(94, 14, 95, 14, '^');
+      b.put(98, 14, 'C'); b.put(102, 14, 'e'); b.put(99, 14, 'H'); b.put(108, 14, 'H');
+      b.fill(103, 9, 108, 9, 'H'); b.fill(104, 8, 107, 8, 'o');
+      b.put(112, 14, '4'); b.put(116, 14, 'E');
+    },
+  },
+  {
+    name: 'BOSS: The Farmer', world: 3, theme: 3, open: true, w: 34, boss: 'farmer',
+    signs: [],
+    build(b) {
+      b.ground(0, 33, 15);
+      b.fill(5, 11, 8, 11, 'H'); b.fill(12, 9, 17, 9, 'H'); b.fill(21, 11, 24, 11, 'H');
+      b.put(4, 14, 'P');
+    },
+  },
+  {
+    name: 'SECRET: The Beetle', world: 4, theme: 5, w: 34, boss: 'beetle', secret: true,
+    signs: [],
+    build(b) {
+      b.ground(0, 33, 15);
+      b.fill(3, 10, 7, 10, '#'); b.fill(26, 10, 30, 10, '#'); b.fill(14, 7, 19, 7, '#');
+      b.put(3, 2, 'W'); b.put(30, 2, 'W');
+      b.put(16, 14, 'P');
+    },
+  },
+);
+
+// ---------- farm animals
+function makeAnimal(kind, px, py) {
+  const size = { chicken: [26, 22, 70], pig: [52, 30, 40], sheep: [44, 30, 30], cow: [72, 44, 34] }[kind];
+  return { kind, x: px + 2, y: py + TILE - size[1], w: size[0], h: size[1], vx: -size[2], base: size[2], vy: 0, dead: false, squish: 0, t: rand(0, 2), st: 'walk', onGround: false };
+}
+// walk back and forth, turning at walls and edges (runners from the farmer just keep running)
+function walker(e, dt) {
+  e.vy = Math.min(e.vy + GRAVITY * dt, MAX_FALL);
+  const hit = moveBox(e, e.vx * dt, e.vy * dt);
+  e.onGround = hit.down;
+  if (hit.down) e.vy = 0;
+  if (e.runner) { if (hit.left || hit.right || e.x < 24) { e.dead = true; e.squish = 0.6; burst(e.x + e.w / 2, e.y + e.h / 2, PAL.cream, 10); } return; }
+  if (hit.left || hit.right) e.vx = -e.vx;
+  else if (hit.down) {
+    const aheadX = e.vx > 0 ? e.x + e.w + 2 : e.x - 2;
+    if (!isSolidTile(Math.floor(aheadX / TILE), Math.floor((e.y + e.h + 4) / TILE))) e.vx = -e.vx;
+  }
+  if (e.y > ROWS * TILE + 50) e.dead = true;
+}
+// big animals: landing on their backs bounces you; bumping into them (except sheep) hurts
+function bigAnimalTouch(e) {
+  const p = player;
+  if (!aabb(p, e) || lv.done) return;
+  const feet = p.y + p.h;
+  if (p.vy > 40 && feet - e.y < 16) {
+    p.y = e.y - p.h; p.vy = e.kind === 'sheep' ? -820 : -560; p.onGround = false; p.riding = null;
+    e.squish = 0.25;
+    if (e.kind === 'sheep') beep(220, 0.3, 'triangle', 0.09, 300);
+    else if (e.kind === 'pig') beep(160, 0.2, 'square', 0.08, -60);
+    else beep(110, 0.35, 'sawtooth', 0.07, -30);
+    burst(p.x + p.w / 2, e.y, e.kind === 'sheep' ? PAL.white : PAL.pink, 6, 90);
+  } else if (e.kind !== 'sheep') hurt(e.kind === 'cow' ? 20 : 18, e.x + e.w / 2);
+}
+function updateEnemy3(e, dt) {
+  const p = player;
+  if (e.kind === 'chicken') {
+    walker(e, dt);
+    e.t -= dt;
+    if (e.t <= 0 && e.onGround) { e.vy = -280; e.t = rand(1, 2.5); beep(1200, 0.06, 'square', 0.03); }
+    if (aabb(p, e) && !lv.done) touchEnemy(e);
+    return true;
+  }
+  if (e.kind === 'pig' || e.kind === 'sheep' || e.kind === 'cow') {
+    if (e.squish > 0 && !e.dead) e.squish = Math.max(0, e.squish - dt);
+    if (e.kind === 'pig' && !e.runner) {
+      // a pig charges when it sees the worm in front of it
+      const dx = (p.x + p.w / 2) - (e.x + e.w / 2), ahead = Math.sign(dx) === Math.sign(e.vx);
+      if (e.st === 'walk' && ahead && Math.abs(dx) < 260 && Math.abs(p.y - e.y) < 50) { e.st = 'charge'; e.t = 1.3; e.vx = Math.sign(e.vx) * 250; beep(150, 0.2, 'square', 0.07, -40); }
+      if (e.st === 'charge') { e.t -= dt; if (e.t <= 0) { e.st = 'rest'; e.t = 1; e.vx = Math.sign(e.vx) * 1; } }
+      else if (e.st === 'rest') { e.t -= dt; if (e.t <= 0) { e.st = 'walk'; e.vx = Math.sign(e.vx || -1) * e.base; } }
+    }
+    walker(e, dt);
+    if (!e.dead) bigAnimalTouch(e);
+    return true;
+  }
+  return false;
+}
+
+// ---------- apple trees (they shake, then drop an apple)
+function treeDrop(c) {
+  lv.clumps.push({ x: c.x - 8, y: c.y, w: 16, h: 16, vy: 0, rot: 0, apple: true });
+}
+
+// ---------- THE FARMER
+function makeFarmer() {
+  const gy = 15 * TILE;
+  return { x: 29 * TILE, y: gy - 112, w: 72, h: 112, st: 'idle', t: 0, throwT: 2, animalT: 4, dir: -1, walkT: 0, leaving: false, arm: 0, home: 29 * TILE };
+}
+function updateFarmer(dt) {
+  const s = lv.boss, p = player;
+  const anger = 1 - lv.bossTimer / BOSS_TIME;
+  if (s.leaving) { s.x += 90 * dt; return; }
+  s.walkT += dt;
+  if (s.st === 'idle') {
+    s.x = s.home + Math.sin(s.walkT * 0.8) * 48;
+    s.throwT -= dt; s.animalT -= dt;
+    if (s.throwT <= 0) { s.st = 'windup'; s.t = 0.55; s.kind = Math.random() < 0.6 ? 'low' : 'arc'; }
+    else if (s.animalT <= 0) { s.st = 'whistle'; s.t = 0.7; beep(1500, 0.15, 'sine', 0.08, 300); setTimeout(() => beep(1900, 0.2, 'sine', 0.08, -300), 160); }
+  } else if (s.st === 'windup') {
+    s.t -= dt;
+    if (s.t <= 0) {
+      const hx = s.x - 10, gy = 15 * TILE;
+      if (s.kind === 'low') {
+        lv.forks.push({ x: hx, y: gy - 14, vx: -(330 + anger * 140), vy: 0, grav: 0, st: 'fly' });
+      } else {
+        const vy = -560, tFly = 2 * 560 / GRAVITY;
+        const tx = p.x + p.w / 2 + rand(-40, 40);
+        lv.forks.push({ x: hx, y: s.y + 20, vx: (tx - hx) / tFly, vy, grav: GRAVITY, st: 'fly' });
+      }
+      beep(260, 0.25, 'sawtooth', 0.07, -160);
+      s.st = 'idle'; s.throwT = Math.max(0.9, 2.3 - anger * 1.3);
+    }
+  } else if (s.st === 'whistle') {
+    s.t -= dt;
+    if (s.t <= 0) {
+      const kind = ['pig', 'cow', 'sheep'][Math.floor(Math.random() * 3)];
+      const a = makeAnimal(kind, s.x - 40, 14 * TILE);
+      a.runner = true; a.vx = -{ pig: 230, cow: 130, sheep: 160 }[kind] * (1 + anger * 0.4);
+      lv.enemies.push(a);
+      s.st = 'idle'; s.animalT = Math.max(3.2, 6.5 - anger * 3);
+    }
+  }
+  const fb = { x: s.x - 30, y: s.y + 10, w: 60, h: s.h - 10 };
+  if (aabb(fb, p)) hurt(20, s.x);
+  for (const f of lv.forks) {
+    if (f.st === 'fly') {
+      f.vy += f.grav * dt; f.x += f.vx * dt; f.y += f.vy * dt;
+      const tip = { x: f.x - 22, y: f.y - 7, w: 44, h: 14 };
+      if (aabb(tip, p)) { hurt(18, f.x); f.dead = true; burst(f.x, f.y, PAL.orange, 10); }
+      else if (f.grav && f.vy > 0 && isSolidTile(Math.floor(f.x / TILE), Math.floor((f.y + 8) / TILE))) {
+        f.st = 'stuck'; f.t = 1.6; f.y = Math.floor((f.y + 8) / TILE) * TILE - 8;
+        lv.fires.push({ x: f.x - 26, y: f.y - 6, w: 52, h: 14, life: 1.6 });
+        beep(120, 0.2, 'sawtooth', 0.06);
+      }
+      if (f.x < 36 || f.y > ROWS * TILE + 40) { f.dead = true; burst(Math.max(f.x, 40), f.y, PAL.orange, 6); }
+    } else if ((f.t -= dt) <= 0) f.dead = true;
+  }
+  lv.forks = lv.forks.filter(f => !f.dead);
+  for (const fi of lv.fires) { fi.life -= dt; if (aabb(fi, p)) hurt(10, fi.x + fi.w / 2); }
+  lv.fires = lv.fires.filter(f => f.life > 0);
+}
+
+// ---------- THE BEETLE (secret boss): a giant dung beetle
+function makeBeetle() {
+  const gy = 15 * TILE;
+  return { x: 27 * TILE, y: gy - 64, w: 104, h: 64, dir: -1, st: 'idle', t: 1.5, ballT: 2.5, chargeT: 7, burrowT: 13, legT: 0, leaving: false, mx: 0, sink: 0 };
+}
+function updateBeetle(dt) {
+  const s = lv.boss, p = player;
+  const anger = 1 - lv.bossTimer / BOSS_TIME;
+  const gy = 15 * TILE;
+  s.legT += dt;
+  if (s.leaving) { s.x += s.dir * 120 * dt; return; }
+  const pcx = p.x + p.w / 2;
+  if (s.st === 'idle') {
+    s.dir = pcx < s.x + s.w / 2 ? -1 : 1;
+    s.ballT -= dt; s.chargeT -= dt; s.burrowT -= dt;
+    if (s.burrowT <= 0) { s.st = 'dig'; s.t = 0.7; beep(80, 0.6, 'sawtooth', 0.08, -20); }
+    else if (s.chargeT <= 0) { s.st = 'scrape'; s.t = 0.9; }
+    else if (s.ballT <= 0) { s.st = 'push'; s.t = 0.5; }
+  } else if (s.st === 'push') {
+    s.t -= dt;
+    if (s.t <= 0) {
+      const bx = s.dir < 0 ? s.x - 24 : s.x + s.w + 24;
+      lv.balls.push({ x: bx, y: gy - 24, r: 22, vx: s.dir * (230 + anger * 120), vy: -100, rot: 0 });
+      beep(140, 0.25, 'square', 0.07, -50);
+      s.st = 'idle'; s.ballT = Math.max(1.3, 3 - anger * 1.5);
+    }
+  } else if (s.st === 'scrape') {
+    s.t -= dt;
+    if (Math.random() < 0.5) lv.particles.push({ x: s.x + s.w / 2 - s.dir * 40, y: gy - 4, vx: -s.dir * rand(40, 120), vy: rand(-120, -40), life: 0.5, max: 0.5, color: theme.top, size: 3, grav: true });
+    if (s.t <= 0) { s.st = 'charge'; beep(200, 0.4, 'sawtooth', 0.08, 200); }
+  } else if (s.st === 'charge') {
+    const hit = moveBox(s, s.dir * (440 + anger * 120) * dt, 0);
+    if (hit.left || hit.right) { s.st = 'dizzy'; s.t = 1.2; lv.shake = 0.4; beep(70, 0.4, 'sawtooth', 0.1); burst(s.x + (s.dir > 0 ? s.w : 0), s.y + 20, theme.top, 16, 200); }
+  } else if (s.st === 'dizzy') {
+    s.t -= dt;
+    if (s.t <= 0) { s.st = 'idle'; s.dir = -s.dir; s.chargeT = Math.max(4, 8 - anger * 3.5); }
+  } else if (s.st === 'dig') {
+    s.t -= dt; s.sink = Math.min(1, s.sink + dt / 0.7);
+    if (Math.random() < 0.6) burst(s.x + s.w / 2 + rand(-40, 40), gy, theme.top, 1, 120);
+    if (s.t <= 0) { s.st = 'under'; s.t = 1.6 - anger * 0.4; s.mx = s.x + s.w / 2; }
+  } else if (s.st === 'under') {
+    s.t -= dt;
+    s.mx += clamp(pcx - s.mx, -280 * dt, 280 * dt);
+    if (Math.random() < 0.5) burst(s.mx + rand(-20, 20), gy, theme.top, 1, 80);
+    if (s.t <= 0) { s.st = 'burst'; s.t = 0.7; s.x = clamp(s.mx - s.w / 2, TILE, (lv.w - 1) * TILE - s.w); s.sink = 1; lv.shake = 0.4; beep(60, 0.5, 'sawtooth', 0.1, 60); burst(s.mx, gy, theme.top, 24, 260); }
+  } else if (s.st === 'burst') {
+    s.t -= dt; s.sink = Math.max(0, s.sink - dt / 0.25);
+    if (s.t <= 0) { s.st = 'idle'; s.burrowT = Math.max(7, 13 - anger * 5); s.ballT = 1.2; }
+  }
+  s.y = gy - s.h + s.sink * s.h;
+  // touching the beetle: land on its shell to bounce, otherwise OUCH
+  if (s.st !== 'under' && s.sink < 0.8 && aabb(s, p) && !lv.done) {
+    if (p.vy > 40 && p.y + p.h - s.y < 18 && s.st !== 'burst') { p.vy = -600; p.onGround = false; beep(300, 0.15, 'square', 0.07, 200); }
+    else hurt(s.st === 'burst' ? 25 : 20, s.x + s.w / 2);
+  }
+  // rolling dung balls
+  for (const b of lv.balls) {
+    b.vy = Math.min(b.vy + GRAVITY * dt, MAX_FALL);
+    b.x += b.vx * dt; b.y += b.vy * dt; b.rot += b.vx * dt / b.r;
+    if (b.y + b.r > gy) { b.y = gy - b.r; b.vy = Math.abs(b.vx) > 300 ? -220 : 0; }
+    if (b.x < TILE + b.r || b.x > (lv.w - 1) * TILE - b.r) { b.dead = true; burst(b.x, b.y, PAL.dkbrown, 14, 160); beep(90, 0.15, 'sawtooth', 0.05); }
+    if (Math.hypot(b.x - pcx, b.y - (p.y + p.h / 2)) < b.r + 10) hurt(20, b.x);
+  }
+  lv.balls = lv.balls.filter(b => !b.dead);
+}
+
+// ---------- sprites
+const hayTile = () => sprite('hay', 16, 16, g => {
+  g.rect(0, 1, 16, 15, PAL.amber);
+  g.rect(0, 1, 16, 1, PAL.yellow); g.rect(0, 15, 16, 1, PAL.orange);
+  for (let i = 0; i < 9; i++) g.px(Math.floor(hash(i, 3) * 16), 2 + Math.floor(hash(3, i) * 12), i % 2 ? PAL.yellow : PAL.orange);
+  g.rect(4, 1, 1, 15, PAL.rust); g.rect(11, 1, 1, 15, PAL.rust);
+  g.px(2, 0, PAL.yellow); g.px(9, 0, PAL.yellow); g.px(14, 0, PAL.amber);
+});
+function chickenSprite(f) {
+  return sprite('chicken' + f, 16, 16, g => {
+    g.line(6, 12, 6 + (f ? 1 : -1), 15, PAL.amber); g.line(9, 12, 9 + (f ? -1 : 1), 15, PAL.amber);
+    g.poly([[1, 4], [5, 8], [2, 10]], PAL.white);
+    g.ellipse(7.5, 9, 5.5, 4.5, PAL.white);
+    g.ellipse(11, 5, 3, 3, PAL.white);
+    g.shade({ [PAL.white]: PAL.silver });
+    g.rect(10, 1, 2, 2, PAL.red); g.px(12, 2, PAL.red);
+    g.rect(14, 5, 2, 1, PAL.amber); g.px(13, 7, PAL.red);
+    g.px(12, 4, PAL.ink);
+    g.line(5, 8, 9, 10, PAL.silver);
+    g.outline();
+  });
+}
+function pigSprite(f) {
+  return sprite('pig' + f, 30, 18, g => {
+    for (const [x, d] of [[6, 0], [10, 1], [18, 0], [22, 1]]) g.rect(x + ((d + f) % 2), 12, 3, 5, PAL.magenta);
+    g.ellipse(14, 9, 11.5, 6.5, PAL.pink);
+    g.ellipse(24, 7, 5, 5, PAL.pink);
+    g.shade({ [PAL.pink]: PAL.magenta }, { [PAL.pink]: PAL.peach });
+    g.poly([[21, 1], [24, 3], [20, 4]], PAL.magenta);
+    g.rect(27, 6, 3, 4, PAL.peach); g.px(28, 7, PAL.magenta); g.px(28, 9, PAL.magenta);
+    g.px(24, 5, PAL.ink);
+    g.line(2, 6, 1, 4, PAL.magenta); g.px(0, 5, PAL.magenta);
+    g.outline();
+  });
+}
+function sheepSprite(f) {
+  return sprite('sheep' + f, 26, 18, g => {
+    for (const x of [6, 10, 15, 19]) g.rect(x + (f && x % 2 ? 1 : 0), 12, 2, 5, PAL.night);
+    for (const [x, y, r] of [[6, 8, 5], [11, 6, 5.5], [16, 7, 5], [10, 11, 5], [16, 11, 4.5], [4, 11, 3.5]]) g.ellipse(x, y, r, r * 0.9, PAL.white);
+    g.shade({ [PAL.white]: PAL.silver });
+    g.ellipse(22, 8, 3.5, 4, PAL.night);
+    g.px(23, 7, PAL.white); g.px(19, 5, PAL.night);
+    g.outline();
+  });
+}
+function cowSprite(f) {
+  return sprite('cow' + f, 40, 26, g => {
+    for (const [x, d] of [[6, 0], [11, 1], [25, 0], [30, 1]]) g.rect(x + ((d + f) % 2), 18, 3, 7, PAL.white);
+    g.rect(3, 6, 30, 13, PAL.white);
+    g.ellipse(18, 6, 15, 3, PAL.white);
+    g.ellipse(34, 9, 5, 6, PAL.white);
+    g.shade({ [PAL.white]: PAL.silver });
+    for (const [x, y, w, h] of [[7, 7, 6, 4], [18, 10, 7, 5], [26, 5, 4, 3], [12, 14, 3, 3]]) g.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, PAL.ink);
+    g.ellipse(37, 12, 3, 2.5, PAL.pink); g.px(37, 12, PAL.magenta);
+    g.px(34, 7, PAL.ink); g.rect(31, 2, 2, 2, PAL.cream); g.rect(36, 2, 2, 2, PAL.cream);
+    g.ellipse(14, 19, 2.5, 1.5, PAL.pink);
+    g.line(2, 7, 0, 14, PAL.white);
+    g.outline();
+  });
+}
+function crowSprite(f) {
+  return sprite('crow' + f, 22, 16, g => {
+    g.ellipse(11, 9, 6, 4.5, PAL.night);
+    g.ellipse(15, 6, 3.5, 3.2, PAL.night);
+    if (f) g.poly([[6, 7], [12, 7], [7, 0]], PAL.dkslate); else g.poly([[6, 9], [12, 9], [6, 15]], PAL.dkslate);
+    g.poly([[5, 8], [0, 6], [1, 10]], PAL.night);
+    g.shade({}, { [PAL.night]: PAL.slate });
+    g.poly([[18, 5], [22, 6.5], [18, 8]], PAL.amber);
+    g.px(16, 5, PAL.red);
+    g.outline();
+  });
+}
+const appleSprite = () => sprite('apple', 10, 10, g => {
+  g.ellipse(5, 6, 4.2, 3.8, PAL.red); g.shade({ [PAL.red]: PAL.dkred }, { [PAL.red]: PAL.pink });
+  g.px(5, 1, PAL.dkbrown); g.rect(6, 1, 2, 1, PAL.green); g.px(3, 4, PAL.white);
+  g.outline();
+});
+const canopySprite = () => sprite('canopy', 48, 32, g => {
+  for (const [x, y, r] of [[12, 18, 11], [24, 12, 13], [36, 18, 11], [24, 22, 12], [16, 10, 8], [32, 10, 8]]) g.ellipse(x, y, r, r * 0.85, PAL.green);
+  g.shade({ [PAL.green]: PAL.dkgreen }, { [PAL.green]: '#9de64e' });
+  for (const [x, y] of [[10, 16], [22, 9], [33, 15], [27, 22], [16, 23], [38, 21]]) { g.rect(x, y, 2, 2, PAL.red); g.px(x, y, PAL.pink); }
+  g.outline(PAL.forest || '#265c42');
+});
+const forkSprite = f => sprite('fork' + f, 30, 11, g => {
+  g.line(9, 5, 29, 5, PAL.brown); g.line(10, 6, 28, 6, PAL.dkbrown);
+  g.rect(7, 1, 2, 9, PAL.steel);
+  for (const y of [1, 5, 9]) g.line(1, y, 7, y, PAL.silver);
+  for (const [x, y] of [[0, 0], [2, 4], [0, 8], [3, 1], [1, 6]]) g.px(x + (f ? 1 : 0), y + (f ? 1 : 0), (x + y + f) % 2 ? PAL.orange : PAL.yellow);
+  g.px(f ? 4 : 5, f ? 3 : 7, PAL.red);
+  g.outline();
+});
+function farmerSprite(f) {
+  return sprite('farmer' + f, 44, 58, g => {
+    // legs and boots
+    g.rect(14, 44, 6, 10, PAL.navy); g.rect(24, 44, 6, 10, PAL.navy);
+    g.rect(12, 53, 9, 4, PAL.dkbrown); g.rect(23, 53, 9, 4, PAL.dkbrown);
+    // body: red checked shirt and blue overalls
+    g.rect(11, 22, 22, 24, PAL.red);
+    for (let y = 22; y < 46; y += 3) for (let x = 11; x < 33; x += 3) g.px(x, y, PAL.dkred);
+    g.rect(13, 28, 18, 18, PAL.blue); g.rect(15, 22, 3, 7, PAL.blue); g.rect(26, 22, 3, 7, PAL.blue);
+    g.shade({ [PAL.blue]: PAL.navy });
+    g.rect(19, 31, 6, 4, PAL.navy); g.px(16, 24, PAL.amber); g.px(27, 24, PAL.amber);
+    // back arm
+    g.rect(32, 24, 5, 14, PAL.red); g.rect(32, 37, 5, 4, PAL.peach);
+    // head, beard and big straw hat
+    g.ellipse(22, 15, 7, 7.5, PAL.peach);
+    g.ellipse(22, 20, 7, 4.5, PAL.clay);
+    g.rect(16, 13, 3, 2, PAL.white); g.px(17, 14, PAL.ink);
+    g.line(15, 11, 19, 12, PAL.dkbrown);
+    g.rect(14, 17, 2, 2, PAL.pink);
+    g.ellipse(22, 9, 15, 3, PAL.yellow); g.rect(14, 2, 16, 7, PAL.yellow);
+    g.rect(14, 7, 16, 2, PAL.red);
+    g.shade({ [PAL.yellow]: PAL.amber });
+    // front arm (raised up with a pitchfork when about to throw)
+    if (f === 1) {
+      g.rect(5, 12, 6, 12, PAL.red); g.rect(5, 9, 6, 4, PAL.peach);
+      g.line(8, 0, 8, 30, PAL.brown, 2);
+    } else {
+      g.rect(6, 24, 6, 14, PAL.red); g.rect(6, 37, 6, 4, PAL.peach);
+      g.line(4, 12, 4, 56, PAL.brown, 2);
+      g.rect(1, 8, 7, 1, PAL.steel); for (const x of [1, 4, 7]) g.line(x, 2, x, 8, PAL.silver);
+    }
+    g.outline();
+  });
+}
+const dungSprite = () => sprite('dung', 24, 24, g => {
+  g.ellipse(12, 12, 11, 11, PAL.dkbrown);
+  g.shade({ [PAL.dkbrown]: PAL.plum }, { [PAL.dkbrown]: PAL.brown });
+  for (const [x, y] of [[6, 7], [14, 5], [17, 12], [9, 15], [13, 18], [5, 12]]) { g.px(x, y, PAL.brown); g.px(x + 1, y + 1, PAL.plum); }
+  g.px(10, 9, PAL.amber); g.px(16, 16, PAL.green);
+  g.outline();
+});
+function beetleBossSprite(f) {
+  return sprite('bigbeetle' + f, 56, 34, g => {
+    for (let i = 0; i < 3; i++) { const x = 14 + i * 10, d = (i + f) % 2 ? 2 : -2; g.line(x, 24, x + d, 33, PAL.ink, 2); g.line(x + d, 33, x + d + 3, 33, PAL.ink); }
+    g.ellipse(24, 22, 20, 17, PAL.purple, true);
+    g.rect(4, 21, 40, 3, PAL.night);
+    g.shade({ [PAL.purple]: PAL.night }, { [PAL.purple]: PAL.magenta });
+    g.line(24, 6, 24, 21, PAL.night);
+    g.rect(13, 9, 4, 2, PAL.pink); g.px(12, 11, PAL.pink); g.rect(30, 10, 2, 1, PAL.magenta);
+    g.ellipse(46, 20, 6, 5.5, PAL.night);
+    g.poly([[48, 17], [52, 4], [55, 1], [54, 8], [53, 18]], PAL.dkslate);
+    g.line(52, 5, 54, 2, PAL.slate);
+    g.rect(47, 18, 2, 2, PAL.hot);
+    g.outline();
+  });
+}
+const crownSprite = () => sprite('crown', 12, 8, g => {
+  g.poly([[0, 8], [0, 1], [3, 4], [6, 0], [9, 4], [12, 1], [12, 8]], PAL.yellow);
+  g.shade({ [PAL.yellow]: PAL.amber }); g.px(6, 5, PAL.red); g.px(2, 6, PAL.cyan); g.px(10, 6, PAL.cyan);
+  g.outline();
+});
+const flowerColors = [PAL.red, PAL.yellow, PAL.white, PAL.magenta];
+
+// ---------- drawing for World 3
+function drawSkyBackdrop(c, cx, cy) {
+  const T = performance.now() / 1000;
+  const g = c.createLinearGradient(0, 0, 0, LO_H);
+  g.addColorStop(0, PAL.blue); g.addColorStop(1, PAL.cyan);
+  c.fillStyle = g; c.fillRect(0, 0, LW, LO_H);
+  // sun
+  c.fillStyle = PAL.yellow; c.fillRect(LW - 46, 18 - Math.round(cy * 0.1), 14, 14);
+  c.fillStyle = PAL.white; c.fillRect(LW - 44, 20 - Math.round(cy * 0.1), 4, 4);
+  // clouds drifting slowly
+  const o0 = Math.round(cx * 0.1 + T * 3);
+  c.fillStyle = PAL.white;
+  for (let i = Math.floor(o0 / 90) - 1; i <= Math.floor((o0 + LW) / 90) + 1; i++) {
+    const x = i * 90 - o0 + Math.round(hash(i, 40) * 40), y = 20 + Math.round(hash(i, 41) * 40) - Math.round(cy * 0.1);
+    c.fillRect(x, y, 26, 6); c.fillRect(x + 5, y - 4, 12, 5); c.fillRect(x + 14, y - 2, 9, 3);
+    c.fillStyle = PAL.silver; c.fillRect(x, y + 5, 26, 1); c.fillStyle = PAL.white;
+  }
+  const horizon = LO_H + Math.round((ROWS * 16 - LO_H) * 0.3) - Math.round(cy * 0.3) - 60;
+  // far hills with a red barn
+  const o1 = Math.round(cx * 0.2);
+  c.fillStyle = '#9de64e';
+  for (let x = 0; x < LW; x++) { const wx = x + o1; c.fillRect(x, horizon - Math.round(Math.sin(wx * 0.02) * 10 + Math.sin(wx * 0.007) * 14), 1, 200); }
+  for (let i = Math.floor(o1 / 260) - 1; i <= Math.floor((o1 + LW) / 260) + 1; i++) {
+    const x = i * 260 - o1 + 80, base = horizon - Math.round(Math.sin((x + o1) * 0.02) * 10 + Math.sin((x + o1) * 0.007) * 14);
+    c.fillStyle = PAL.dkred; c.fillRect(x, base - 22, 30, 22);
+    c.fillStyle = PAL.red; c.beginPath(); c.moveTo(x - 3, base - 22); c.lineTo(x + 15, base - 34); c.lineTo(x + 33, base - 22); c.fill();
+    c.fillStyle = PAL.white; c.fillRect(x + 11, base - 14, 8, 14); c.fillStyle = PAL.dkred; c.fillRect(x + 12, base - 13, 6, 13);
+  }
+  // nearer hills and a fence
+  const o2 = Math.round(cx * 0.45);
+  c.fillStyle = PAL.green;
+  for (let x = 0; x < LW; x++) { const wx = x + o2; c.fillRect(x, horizon + 24 - Math.round(Math.sin(wx * 0.03) * 8), 1, 200); }
+  c.fillStyle = PAL.tan;
+  const fy = horizon + 30;
+  c.fillRect(0, fy, LW, 1); c.fillRect(0, fy + 5, LW, 1);
+  for (let x = -((o2 * 1) % 24); x < LW; x += 24) { c.fillRect(x, fy - 3, 2, 12); }
+}
+function drawBarnBackdrop(c, cx, cy) {
+  c.fillStyle = PAL.dkbrown; c.fillRect(0, 0, LW, LO_H);
+  const o = Math.round(cx * 0.5), oy = Math.round(cy * 0.5);
+  for (let x = -(o % 12); x < LW; x += 12) { c.fillStyle = PAL.plum; c.fillRect(x, 0, 1, LO_H); c.fillStyle = '#8a4d3c'; c.fillRect(x + 1, 0, 1, LO_H); }
+  for (let i = Math.floor(o / 120) - 1; i <= Math.floor((o + LW) / 120) + 1; i++) {
+    const x = i * 120 - o + 40, y = 50 - oy;
+    // a window with sky
+    c.fillStyle = PAL.plum; c.fillRect(x - 2, y - 2, 28, 28);
+    c.fillStyle = PAL.cyan; c.fillRect(x, y, 24, 24);
+    c.fillStyle = PAL.white; c.fillRect(x + 4, y + 6, 8, 2);
+    c.fillStyle = PAL.dkbrown; c.fillRect(x + 11, y, 2, 24); c.fillRect(x, y + 11, 24, 2);
+    // hay pile
+    c.fillStyle = PAL.orange; c.beginPath(); c.moveTo(x + 50, 250 - oy); c.lineTo(x + 70, 210 - oy); c.lineTo(x + 92, 250 - oy); c.fill();
+    c.fillStyle = PAL.amber; c.fillRect(x + 62, 225 - oy, 2, 1); c.fillRect(x + 72, 232 - oy, 2, 1);
+  }
+  c.fillStyle = PAL.plum; for (let y = 40 - oy; y < LO_H; y += 90) c.fillRect(0, y, LW, 3);
+}
+function drawTrees(c) {
+  for (const t of lv.trees) {
+    if (L(t.x) < camLo - 40 || L(t.x) > camLo + LW + 40) continue;
+    const top = L(t.y), floor = L(findFloorBelow(t.x, t.y + TILE));
+    c.fillStyle = PAL.dkbrown; c.fillRect(L(t.x) - 3, top, 7, floor - top);
+    c.fillStyle = PAL.brown; c.fillRect(L(t.x) - 2, top, 2, floor - top);
+    const shake = lv.cracks.find(k => k.tree === t && k.warn > 0) ? Math.round(rand(-1, 1)) : 0;
+    c.drawImage(canopySprite().r, L(t.x) - 24 + shake, top - 22);
+  }
+}
+function drawEnemy3(c, e) {
+  const cx = e.x + e.w / 2, by = e.y + e.h;
+  let s;
+  const f = Math.floor(time * (e.st === 'charge' || e.runner ? 14 : 7) + e.x * 0.02) % 2;
+  if (e.kind === 'chicken') s = chickenSprite(f);
+  else if (e.kind === 'pig') s = pigSprite(f);
+  else if (e.kind === 'sheep') s = sheepSprite(f);
+  else if (e.kind === 'cow') s = cowSprite(f);
+  else return false;
+  const img = e.vx > 0 ? s.r : s.l;
+  if (e.dead) {
+    if (e.squish > 0.6) return true;
+    c.globalAlpha = 1 - e.squish / 0.6;
+    const h = Math.max(2, Math.round(s.h * 0.35));
+    c.drawImage(img, L(cx) - Math.round(s.w * 0.65), L(by) - h, Math.round(s.w * 1.3), h);
+    c.globalAlpha = 1;
+    return true;
+  }
+  const sq = e.squish > 0 ? 2 : 0;
+  c.drawImage(img, L(cx) - (s.w >> 1) - sq, L(by) - s.h + 1 + sq, s.w + sq * 2, s.h - sq);
+  if (e.st === 'charge') { c.fillStyle = PAL.white; c.fillRect(L(e.vx > 0 ? e.x : e.x + e.w) - (e.vx > 0 ? 4 : -2), L(by) - 3, 2, 2); }
+  return true;
+}
+function drawFarmer(c) {
+  const s = lv.boss;
+  const spr = farmerSprite(s.st === 'windup' ? 1 : 0);
+  c.drawImage(spr.r, L(s.x) - 22, L(s.y + s.h) - 58);
+  if (s.st === 'whistle') ptext('♪', L(s.x) - 16 - camLo, L(s.y) - 14 - camLoY + Math.round(Math.sin(time * 12) * 2), 2, PAL.white, 'center');
+  for (const fi of lv.fires) {
+    c.globalAlpha = Math.min(1, fi.life * 2);
+    c.drawImage(fireSprite(Math.floor(time * 10) % 2).r, L(fi.x) - 1, L(fi.y + fi.h) - 10);
+    c.globalAlpha = 1;
+  }
+  for (const fk of lv.forks) {
+    const fs = forkSprite(Math.floor(time * 12) % 2);
+    c.save();
+    c.translate(L(fk.x), L(fk.y));
+    const ang = fk.st === 'stuck' ? -Math.PI / 2 : Math.atan2(fk.vy, fk.vx) - Math.PI;
+    c.rotate(fk.st === 'stuck' ? Math.PI / 2 : ang);
+    c.drawImage(fs.r, -15, -5);
+    c.restore();
+  }
+}
+function drawBeetleBoss(c) {
+  const s = lv.boss, gy = L(15 * TILE);
+  if (s.st === 'under') {
+    // a bump of dirt moving under the ground
+    const x = L(s.mx);
+    c.fillStyle = theme.top; c.fillRect(x - 10, gy - 3, 20, 3); c.fillRect(x - 6, gy - 5, 12, 2);
+    c.fillStyle = theme.topHi; c.fillRect(x - 6, gy - 5, 12, 1);
+    if (s.t < 0.5 && Math.floor(time * 12) % 2) { c.fillStyle = PAL.red; c.fillRect(x - 1, gy - 14, 2, 6); c.fillRect(x - 1, gy - 6, 2, 1); }
+  } else {
+    const spr = beetleBossSprite(Math.floor(s.legT * (s.st === 'charge' ? 16 : 6)) % 2);
+    const visible = Math.round(34 * (1 - s.sink));
+    const shake = s.st === 'scrape' || s.st === 'dizzy' ? Math.round(rand(-1, 1)) : 0;
+    if (visible > 0) {
+      const img = s.dir > 0 ? spr.r : spr.l;
+      c.drawImage(img, 0, 0, 56, visible, L(s.x + s.w / 2) - 28 + shake, gy - visible, 56, visible);
+    }
+    if (s.st === 'dizzy') for (let i = 0; i < 3; i++) { const a = time * 6 + i * 2.1; c.fillStyle = PAL.yellow; c.fillRect(L(s.x + s.w / 2) + Math.round(Math.cos(a) * 12), gy - 40 + Math.round(Math.sin(a) * 3), 2, 2); }
+  }
+  for (const b of lv.balls) {
+    const ds = dungSprite();
+    c.save(); c.translate(L(b.x), L(b.y)); c.rotate(Math.round(b.rot * 2) / 2); c.drawImage(ds.r, -12, -12); c.restore();
+  }
+}
+
+// ---------- THE END
+let endingMode = false;
+function drawEnding() {
+  const t = performance.now() / 1000, c = lctx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.imageSmoothingEnabled = false;
+  theme = THEMES[3];
+  drawSkyBackdrop(c, t * 10, 80);
+  const gy = LO_H - 36;
+  for (let x = 0; x <= LW / 16 + 1; x++) {
+    for (let y = 0; y < 3; y++) c.drawImage(dirtTile(Math.floor(hash(x, y + 20) * 4), y === 0, false, false, false, y === 2).r, x * 16, gy + y * 16);
+    if (hash(x, 3) > 0.5) {
+      const v = Math.floor(hash(x, 4) * 4);
+      c.drawImage(decorSprite('flower', v).r, x * 16 + 2, gy - 12);
+    }
+  }
+  // the big worm, wearing a crown, and lots of happy baby worms
+  const S = LW >= 280 ? 3 : 2;
+  const ws = wormSprite('crawl' + (Math.floor(t * 5) % 4), true, false);
+  const wx = Math.round(LW / 2 - 20 * S), wy = gy - 16 * S + S;
+  c.drawImage(ws.r, wx, wy, 40 * S, 16 * S);
+  c.drawImage(crownSprite().r, wx + 30 * S - 12, wy + 6 * S - 15, 24, 16);
+  for (let i = 0; i < 8; i++) {
+    const side = i < 4 ? -1 : 1, k = i % 4;
+    const bx = Math.round(LW / 2 + side * (20 * S + 14 + k * 22));
+    const hop = Math.round(Math.abs(Math.sin(t * 4 + i * 0.9)) * (10 + k * 3));
+    const bs = babySprite(Math.floor(t * 10 + i) % 2);
+    c.drawImage(side > 0 ? bs.r : bs.l, bx - 12, gy - 16 - hop + 2, 24, 16);
+  }
+  waveText('THE END', LW / 2, 10, clamp(Math.floor((LW - 16) / (textWidth('THE END') + 4)), 2, 4), PAL.yellow, PAL.orange, t, true);
+  const lines = ['YOU FINISHED THE QUEST OF LIFE!', 'THE WORM BEAT THE SPIDER, THE BIRD,', 'THE FARMER AND THE SECRET BEETLE.', 'NOW IT LIVES HAPPILY EVER AFTER', 'WITH ALL ITS BABY WORMS.'];
+  const ty = 52;
+  c.globalAlpha = 0.55; c.fillStyle = PAL.ink; c.fillRect((LW >> 1) - 110, ty - 4, 220, lines.length * 11 + 6); c.globalAlpha = 1;
+  lines.forEach((l, i) => ptext(l, LW / 2, ty + i * 11, 1, i === 0 ? PAL.yellow : PAL.white, 'center'));
+  present();
+}
+
+// ============================================================
 //  MENUS
 // ============================================================
 const menuEl = document.getElementById('menu');
 const titleEl = document.getElementById('title');
+const endingEl = document.getElementById('ending');
+document.getElementById('endBtn').onclick = openLevels;
 document.getElementById('startBtn').onclick = () => { sfx.seed(); openLevels(); };
 document.getElementById('backBtn').onclick = toTitle;
 window.addEventListener('keydown', e => {
@@ -2499,7 +3178,7 @@ function buildLevelGrid() {
       if (L.world !== wnum) return;
       const btn = document.createElement('button');
       btn.className = 'lv' + (L.boss ? ' boss' : '');
-      btn.innerHTML = (L.boss ? BOSS_INFO[L.boss].emoji : (i + 1)) + '<small>' + (L.boss ? 'BOSS' : L.name) + '</small>';
+      btn.innerHTML = (L.secret && i + 1 > unlocked) ? '?<small>???</small>' : (L.boss ? BOSS_INFO[L.boss].emoji : (i + 1)) + '<small>' + (L.boss ? (L.secret ? 'SECRET BOSS' : 'BOSS') : L.name) + '</small>';
       btn.disabled = i + 1 > unlocked;
       btn.onclick = () => startLevel(i);
       grid.appendChild(btn);
@@ -2511,17 +3190,24 @@ function startLevel(i) {
   try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) { /* fine */ }
   setViewRows(LEVELS[i].boss ? 18 : 13);
   loadLevel(i);
-  titleEl.hidden = true;
+  titleEl.hidden = true; endingEl.hidden = true; endingMode = false;
   menuEl.hidden = true; msgEl.hidden = true; pauseBtn.hidden = false;
   state = 'play'; showTouch();
   for (const k in keys) keys[k] = false;
 }
 function toMenu() { openLevels(); }
+function showEnding() {
+  state = 'menu'; lv = null; setViewRows(13); endingMode = true;
+  titleEl.hidden = true; menuEl.hidden = true; msgEl.hidden = true; pauseBtn.hidden = true; endingEl.hidden = false; showTouch();
+  sfx.win(); setTimeout(sfx.win, 700);
+}
 function toTitle() {
+  endingMode = false; endingEl.hidden = true;
   state = 'menu'; lv = null; setViewRows(13); theme = THEMES[1];
   titleEl.hidden = false; menuEl.hidden = true; msgEl.hidden = true; pauseBtn.hidden = true; showTouch();
 }
 function openLevels() {
+  endingMode = false; endingEl.hidden = true;
   state = 'menu'; lv = null; setViewRows(13); theme = THEMES[1];
   buildLevelGrid();
   titleEl.hidden = true; menuEl.hidden = false; msgEl.hidden = true; pauseBtn.hidden = true; showTouch();
@@ -2558,7 +3244,8 @@ function levelComplete() {
     [[LEVELS[next].boss ? 'Fight the boss! ' + BOSS_INFO[LEVELS[next].boss].emoji : 'Next level ▶', () => startLevel(next)], ['Play again', () => startLevel(levelIndex)], ['Menu', toMenu]]), 500);
 }
 function bossBeaten() {
-  lv.done = true; lv.boss.leaving = true; lv.webs = []; lv.webPatches = []; lv.eggs = []; lv.fires = [];
+  lv.done = true; lv.boss.leaving = true; lv.webs = []; lv.webPatches = []; lv.eggs = []; lv.fires = []; lv.forks = []; lv.balls = [];
+  for (const e of lv.enemies) if (e.runner && !e.dead) { e.dead = true; e.squish = 0; }
   if (player.carried) { player.carried = false; player.vy = 0; }
   player.webbed = false;
   sfx.win();
@@ -2568,10 +3255,18 @@ function bossBeaten() {
     setTimeout(() => showMsg('You survived the Spider! 🕷️',
       'The spider got tired and ran away up its thread. World 1 is complete! Now the worm digs up toward the surface… where THE BIRD is waiting.',
       [['World 2 ▶', () => startLevel(levelIndex + 1)], ['Menu', toMenu], again]), 1600);
-  } else {
+  } else if (lv.def.boss === 'bird') {
     setTimeout(() => showMsg('You survived the Bird! 🐦',
-      'The bird got tired and flew away. World 2 is complete! The Farmer is coming in World 3…',
-      [['Menu', toMenu], again]), 1600);
+      'The bird got tired and flew away. World 2 is complete! Now the worm pops out at the top… right into the FARM.',
+      [['World 3 ▶', () => startLevel(levelIndex + 1)], ['Menu', toMenu], again]), 1600);
+  } else if (lv.def.boss === 'farmer') {
+    setTimeout(() => showMsg('You survived the Farmer! 👨‍🌾',
+      'The farmer got tired and went home for a nap. You did it! … But wait. The ground is shaking. Something BIG is coming up from deep underground…',
+      [['??? ▶', () => startLevel(levelIndex + 1)], ['Menu', toMenu], again]), 1600);
+  } else {
+    setTimeout(() => showMsg('YOU BEAT THE SECRET BOSS! 🪲',
+      'The giant beetle rolled away with its dung ball and never came back. The worm is the champion of the whole underground!',
+      [['See the ending ▶', showEnding], ['Menu', toMenu], again]), 1600);
   }
 }
 
@@ -2581,7 +3276,7 @@ toTitle();
 requestAnimationFrame(frame);
 
 // for testing from the browser console
-window.__worm = { get lv() { return lv; }, get player() { return player; }, startLevel, get state() { return state; } };
+window.__worm = { get lv() { return lv; }, get player() { return player; }, startLevel, showEnding, get state() { return state; } };
 </script>
 </body>
 </html>
