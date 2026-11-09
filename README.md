@@ -51,3 +51,18 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## THE QUEST OF LIFE FOR A WORM
+
+`WormQuest.html` is an underground platformer, all in one file. Open it in any browser (keyboard, or touch buttons on a tablet or phone).
+You are a worm with a saddle. Crawling is very slow, so you hold a button to charge a jump, aim it, and let go. You can also shoot baby worms that fly out, grab seeds and water, break soft dirt, and come back.
+
+| Level | What's new |
+|---|---|
+| 1. Wiggle School | Tutorial: crawl, charged jump, baby worms, soft dirt, beetles |
+| 2. The Blinking Door | Doors (and floors) that switch on and off |
+| 3. Drippy Caves | Drip stones that heal you, mud ponds, dirt falling from the ceiling |
+| 4. Bug Tunnels | Ants, beetles, moles and moving roots |
+| 5. BOSS: The Spider | Survive 60 seconds of webs and drop attacks |
+
+A boss comes every 5 levels. Still to come: World 2 (the Bird), World 3 (the Farmer) and a secret Beetle boss. Progress is saved in the browser.
