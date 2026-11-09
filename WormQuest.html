@@ -1696,6 +1696,7 @@ function waveText(str, cx, y, size, color, shadow, t, bold) {
     x += (textWidth(ch) + (bold ? 2 : 1.5)) * size;
   });
 }
+let titleTotals = null; // seed score shown on the title (worked out once per visit)
 function drawMenuBackground() {
   const t = performance.now() / 1000, c = lctx;
   c.setTransform(1, 0, 0, 1, 0, 0);
@@ -1708,6 +1709,23 @@ function drawMenuBackground() {
     const wx = x + base;
     c.drawImage(dirtTile(Math.floor(hash(wx, 0) * 4), false, true).r, x * 16 - off, -6);
     if (hash(wx, 5) > 0.7) c.drawImage(decorSprite('hang', wx & 3).r, x * 16 - off + 2, 10);
+    else if (hash(wx, 9) > 0.7) { // a drip stone with water dripping down
+      c.drawImage(stalactiteTile().r, x * 16 - off, 10);
+      const fall = (t * 70 + wx * 37) % 150, dy = 26 + fall;
+      if (dy < gy) { c.fillStyle = PAL.cyan; c.fillRect(x * 16 - off + 7, dy, 2, 3); }
+      else if (dy < gy + 8) { c.fillStyle = PAL.cyan; c.fillRect(x * 16 - off + 4, gy - 2, 1, 1); c.fillRect(x * 16 - off + 11, gy - 3, 1, 1); }
+    }
+  }
+  // fireflies floating around
+  for (let i = 0; i < 14; i++) {
+    const fx = ((hash(i, 1) * LW + t * (6 + hash(i, 2) * 10)) % (LW + 20)) - 10;
+    const fy = 44 + hash(i, 3) * (gy - 70) + Math.sin(t * 1.3 + i * 2) * 8;
+    if (Math.sin(t * 2 + i * 1.7) > -0.3) {
+      const X = Math.round(fx), Y = Math.round(fy);
+      c.fillStyle = PAL.amber; c.fillRect(X - 1, Y, 4, 2); c.fillRect(X, Y - 1, 2, 4);
+      c.fillStyle = PAL.yellow; c.fillRect(X, Y, 2, 2);
+      c.fillStyle = PAL.white; c.fillRect(X, Y, 1, 1);
+    }
   }
   // glowing things and the ground
   for (let x = -1; x <= LW / 16 + 1; x++) {
@@ -1724,6 +1742,18 @@ function drawMenuBackground() {
       c.drawImage(s.r, x * 16 - off + 4, gy - 26 + Math.round(Math.sin(t * 3 + wx) * 2));
     }
   }
+  // a mole popping up out of the ground (it scrolls past with the dirt)
+  for (let x = -1; x <= LW / 16 + 1; x++) {
+    const wx = x + base;
+    if (hash(wx, 99) < 0.88) continue;
+    const mx = x * 16 - off + 8, up = clamp(Math.sin(t * 2 + wx) * 2, 0, 1), hp = Math.round(16 * up);
+    if (hp > 0) c.drawImage(moleSprite().r, 0, 0, 18, hp, mx - 9, gy - hp, 18, hp);
+    c.drawImage(moundSprite().r, mx - 11, gy - 4);
+  }
+  // an ant and a beetle crawling toward the worm
+  const antX = LW + 20 - ((t * 38) % (LW + 80)), beeX = LW + 20 - ((t * 26 + LW * 0.6) % (LW + 80));
+  c.drawImage(antSprite(Math.floor(t * 10) % 2).l, Math.round(antX), gy - 10);
+  c.drawImage(beetleSprite(Math.floor(t * 8) % 2).l, Math.round(beeX), gy - 12);
   // the spider, dangling on its thread
   const sx = Math.round(LW * 0.88), sy = Math.round(70 + Math.sin(t * 1.3) * 12);
   c.fillStyle = PAL.silver; c.fillRect(sx, 10, 1, sy - 28);
@@ -1733,9 +1763,19 @@ function drawMenuBackground() {
   const ws = wormSprite('crawl' + (Math.floor(t * 7) % 4), true, false);
   const wx = Math.round(LW * 0.4 - 20 * S), wy = gy - 15 * S + S;
   c.drawImage(ws.r, wx, wy, 40 * S, 16 * S);
-  // a baby worm hopping in front
+  // a baby worm hopping in front, and more following behind
   const hop = Math.round(Math.abs(Math.sin(t * 4)) * 14);
   c.drawImage(babySprite(Math.floor(t * 10) % 2).r, wx + 40 * S + 2, gy - 16 - hop + 2, 24, 16);
+  for (let k = 0; k < 3; k++) {
+    const h2 = Math.round(Math.abs(Math.sin(t * 4 - (k + 1) * 0.8)) * (10 - k * 2));
+    c.drawImage(babySprite(Math.floor(t * 10 + k) % 2).r, wx - 22 - k * 20, gy - 12 - h2 + 1, 18, 12);
+  }
+  // every so often THE BIRD flies across
+  const bp = (t % 15) / 15;
+  if (bp < 0.4) {
+    const bx = -60 + (bp / 0.4) * (LW + 120), by = Math.round(30 + Math.sin(t * 3) * 5);
+    c.drawImage(birdSprite(Math.floor(t * 8) % 2).r, Math.round(bx) - 30, by - 20);
+  }
   // edges of the screen fade into the dark
   const g = c.createRadialGradient(LW / 2, LO_H / 2, 40, LW / 2, LO_H / 2, Math.max(LW, LO_H) * 0.75);
   g.addColorStop(0, 'rgba(24,20,37,0)'); g.addColorStop(1, 'rgba(24,20,37,0.55)');
@@ -1746,6 +1786,11 @@ function drawMenuBackground() {
     const small = clamp(Math.floor((LW - 16) / (textWidth('THE QUEST OF LIFE') + 17)), 1, 2);
     waveText('THE QUEST OF LIFE', LW / 2, 12, small, PAL.cream, PAL.brown, t, true);
     waveText('FOR A WORM', LW / 2, 12 + 9 * small + 6, big, PAL.pink, PAL.magenta, t + 0.4, false);
+    // progress and a hint at the bottom
+    if (!titleTotals) titleTotals = seedTotals();
+    const lvls = Math.min(unlocked, LEVELS.length);
+    ptext('LEVELS: ' + lvls + '/' + LEVELS.length + '   SEEDS: ' + titleTotals[0] + '/' + titleTotals[1], LW - 6, LO_H - 12, 1, PAL.yellow, 'right');
+    if (Math.floor(t * 2) % 2) ptext('PRESS SPACE OR TAP START', 6, LO_H - 12, 1, PAL.cream, 'left');
   }
   present();
 }
@@ -3329,6 +3374,7 @@ function showEnding() {
   sfx.win(); setTimeout(sfx.win, 700);
 }
 function toTitle() {
+  titleTotals = null;
   endingMode = false; endingEl.hidden = true; playSong('cave');
   state = 'menu'; lv = null; setViewRows(13); theme = THEMES[1];
   titleEl.hidden = false; menuEl.hidden = true; msgEl.hidden = true; pauseBtn.hidden = true; showTouch();
