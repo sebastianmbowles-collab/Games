@@ -78,8 +78,10 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
 #touch{position:fixed;inset:0;pointer-events:none;z-index:4}
 .tb{position:absolute;pointer-events:auto;border:4px solid rgba(234,212,170,.7);background:rgba(24,20,37,.35);color:var(--cream);font:16px var(--font);display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.5;touch-action:none;box-sizing:border-box}
 .tb.down{background:rgba(234,212,170,.35)}
-#tLeft{left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));width:72px;height:72px}
-#tRight{left:calc(100px + env(safe-area-inset-left,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));width:72px;height:72px}
+/* the joystick: push left/right to crawl; while holding jump it aims; push up to shoot up */
+#tStick{position:absolute;pointer-events:auto;touch-action:none;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));width:124px;height:124px;border-radius:50%;border:4px solid rgba(234,212,170,.5);background:rgba(24,20,37,.25);box-sizing:border-box}
+#tStick::before{content:"";position:absolute;inset:22px;border-radius:50%;border:2px dashed rgba(234,212,170,.25)}
+#tKnob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(246,117,122,.85);border:4px solid #181425;box-shadow:inset -4px -4px 0 #b55088,inset 4px 4px 0 #ffb3b6;box-sizing:border-box;pointer-events:none}
 #tShoot{right:calc(126px + env(safe-area-inset-right,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));width:68px;height:68px;font-size:8px}
 #tJump{right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));width:96px;height:96px;font-size:9px;background:rgba(246,117,122,.35);border-color:rgba(246,117,122,.85)}
 </style>
@@ -89,10 +91,9 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
 <button id="pauseBtn" hidden aria-label="Pause">II</button>
 
 <div id="touch" hidden>
-  <div class="tb" id="tLeft">◀</div>
-  <div class="tb" id="tRight">▶</div>
+  <div id="tStick"><div id="tKnob"></div></div>
   <div class="tb" id="tShoot">BABY<br>WORM</div>
-  <div class="tb" id="tJump">HOLD<br>&amp; DRAG</div>
+  <div class="tb" id="tJump">HOLD<br>TO JUMP</div>
 </div>
 
 <div class="titleui" id="title" hidden>
@@ -117,7 +118,7 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
       <div><b>Arrow keys or A D</b> crawl (slooow)</div>
       <div><b>Hold SPACE</b> charge a jump, use the arrow keys to aim, let go to fly</div>
       <div><b>X</b> shoot a baby worm (hold UP to shoot up)</div>
-      <div><b>Touch</b> hold the pink button and drag where you want to go</div>
+      <div><b>Touch</b> joystick to crawl; hold the pink button, aim with the joystick, let go to jump</div>
       <div><b>P / Esc</b> pause</div>
       <div><b>M</b> music on/off</div>
     </details>
@@ -523,7 +524,7 @@ function moveBox(o, dx, dy, who) {
 //  INPUT
 // ============================================================
 const keys = {};
-const touch = { left: false, right: false, jump: false, shoot: false, aimAngle: null };
+const touch = { left: false, right: false, up: false, jump: false, shoot: false, aimAngle: null, stickAngle: null };
 let shootPressed = false, mashPressed = false;
 window.addEventListener('keydown', e => {
   if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Space'].includes(e.key) || e.code === 'Space') e.preventDefault();
@@ -551,8 +552,35 @@ function holdButton(id, on, off) {
   el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   return el;
 }
-holdButton('tLeft', () => touch.left = true, () => touch.left = false);
-holdButton('tRight', () => touch.right = true, () => touch.right = false);
+// ---- the joystick
+const stickEl = document.getElementById('tStick'), knobEl = document.getElementById('tKnob');
+let stickId = null;
+function moveStick(e) {
+  const r = stickEl.getBoundingClientRect(), R = r.width * 0.36;
+  let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const d = Math.hypot(dx, dy);
+  if (d > R) { dx *= R / d; dy *= R / d; }
+  knobEl.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+  const dead = R * 0.3;
+  touch.left = dx < -dead; touch.right = dx > dead; touch.up = dy < -dead;
+  if (d > dead) {
+    let a = Math.atan2(-dy, dx) * 180 / Math.PI;
+    if (a < 0) a = dx >= 0 ? 10 : 170; // pointing down: aim low instead
+    touch.stickAngle = clamp(a, 10, 170);
+  } else touch.stickAngle = null;
+}
+function releaseStick() {
+  stickId = null; knobEl.style.transform = '';
+  touch.left = touch.right = touch.up = false; touch.stickAngle = null;
+}
+stickEl.addEventListener('pointerdown', e => {
+  e.preventDefault(); stickId = e.pointerId; mashPressed = true;
+  try { stickEl.setPointerCapture(e.pointerId); } catch (_) { /* fine */ }
+  moveStick(e);
+});
+stickEl.addEventListener('pointermove', e => { if (e.pointerId === stickId) moveStick(e); });
+stickEl.addEventListener('pointerup', e => { if (e.pointerId === stickId) releaseStick(); });
+stickEl.addEventListener('pointercancel', e => { if (e.pointerId === stickId) releaseStick(); });
 holdButton('tShoot', () => { shootPressed = true; }, () => {});
 const jumpEl = holdButton('tJump', () => { touch.jump = true; touch.aimAngle = null; }, () => { touch.jump = false; });
 jumpEl.addEventListener('pointermove', e => {
@@ -569,7 +597,7 @@ cv.addEventListener('pointerdown', () => { mashPressed = true; });
 
 const left = () => keys.ArrowLeft || keys.KeyA || touch.left;
 const right = () => keys.ArrowRight || keys.KeyD || touch.right;
-const up = () => keys.ArrowUp || keys.KeyW;
+const up = () => keys.ArrowUp || keys.KeyW || touch.up;
 const jumpHeld = () => keys.Space || keys.KeyZ || touch.jump;
 
 // ============================================================
@@ -645,6 +673,7 @@ function updatePlayer(dt) {
       if (!p.charging) { p.charging = true; p.charge = 0; p.aim = p.face > 0 ? 62 : 118; }
       p.charge = Math.min(1, p.charge + dt / CHARGE_TIME);
       if (touch.aimAngle !== null && touch.jump) p.aim = touch.aimAngle;
+      else if (touch.stickAngle !== null) p.aim = touch.stickAngle; // aim with the joystick
       else {
         if (left()) p.aim = Math.min(170, p.aim + 110 * dt);
         if (right()) p.aim = Math.max(10, p.aim - 110 * dt);
