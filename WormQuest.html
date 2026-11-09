@@ -403,7 +403,7 @@ function makeBug(kind, px, py) {
   return { kind, x: px + 2, y: py + TILE - (ant ? 16 : 20), w: ant ? 28 : 28, h: ant ? 16 : 20, vx: ant ? -70 : -38, vy: 0, dead: false, squish: 0 };
 }
 function makePlayer(x, y) {
-  return { x, y, w: 30, h: 16, vx: 0, vy: 0, onGround: false, face: 1, charging: false, charge: 0, aim: 60,
+  return { x, y, w: 44, h: 16, vx: 0, vy: 0, onGround: false, face: 1, charging: false, charge: 0, aim: 60,
            hp: 100, inv: 0, webbed: false, mash: 0, mashNeed: 8, inMud: false, wiggle: 0, squash: 0, riding: null, hurtFlash: 0 };
 }
 
@@ -589,7 +589,7 @@ function updatePlayer(dt) {
   if (p.webbed) {
     p.vx = 0;
     if (mashPressed) { p.mash++; p.wiggle += 0.6; beep(300 + p.mash * 40, 0.05, 'square', 0.04); }
-    if (p.mash >= p.mashNeed) { p.webbed = false; p.mash = 0; p.inv = 0.8; burst(p.x + 15, p.y + 8, '#ffffff', 14); sfx.web(); }
+    if (p.mash >= p.mashNeed) { p.webbed = false; p.mash = 0; p.inv = 0.8; burst(p.x + p.w / 2, p.y + 8, '#ffffff', 14); sfx.web(); }
     else { p.hp -= 3 * dt; if (p.hp <= 0) die(); }
   }
 
@@ -609,7 +609,7 @@ function updatePlayer(dt) {
       p.vx = 0;
     } else if (p.charging) {
       // LET GO: fly!
-      const power = (0.28 + 0.72 * p.charge) * JUMP_V * (p.inMud ? 0.82 : 1);
+      const power = (0.28 + 0.72 * p.charge) * JUMP_V * (p.inMud ? 0.9 : 1);
       const a = p.aim * Math.PI / 180;
       p.vx = Math.cos(a) * power; p.vy = -Math.sin(a) * power;
       p.onGround = false; p.charging = false; p.charge = 0; p.riding = null;
@@ -688,7 +688,7 @@ function updatePlayer(dt) {
   for (const c of lv.checkpoints) {
     if (!c.on && Math.abs(p.x + p.w / 2 - c.x) < 22 && Math.abs(p.y + p.h - c.y) < 40) {
       for (const o of lv.checkpoints) o.on = false;
-      c.on = true; lv.respawn = { x: c.x - 15, y: c.y - 16 };
+      c.on = true; lv.respawn = { x: c.x - 22, y: c.y - 16 };
       beep(660, 0.15, 'triangle', 0.08, 220);
       burst(c.x, c.y - 30, '#ffe066', 12);
     }
@@ -912,7 +912,7 @@ function updateSpider(dt) {
 function trapInWeb(n) {
   const p = player;
   p.webbed = true; p.mash = 0; p.mashNeed = n; p.charging = false; p.charge = 0;
-  sfx.web(); burst(p.x + 15, p.y + 8, '#ffffff', 10, 60);
+  sfx.web(); burst(p.x + p.w / 2, p.y + 8, '#ffffff', 10, 60);
 }
 function findFloorBelow(x, y) {
   const tx = Math.floor(x / TILE);
@@ -1051,24 +1051,28 @@ function sprite(key, w, h, paint) {
 }
 
 // ---------- the worm (with its saddle)
+// The worm has 9 round segments. When it crawls, a hump travels from its tail to its head.
+const WORM_SEGS = 9;
+const hump = c => Array.from({ length: WORM_SEGS }, (_, i) => -Math.max(0, 2 - Math.abs(i - c)));
 const WORM_POSES = {
-  crawl0: { sp: 2.9, ry: 3.2, offs: [0, 0, 0, 0, 0, 0] },
-  crawl1: { sp: 2.6, ry: 3.2, offs: [0, -1, -2, -1, 0, 0] },
-  crawl2: { sp: 2.6, ry: 3.2, offs: [0, 0, -1, -2, -1, 0] },
-  charge1: { sp: 2.3, ry: 3.6, offs: [0, 0, 0, 0, 0, 0] },
-  charge2: { sp: 1.9, ry: 4.0, offs: [0, 0, 0, 0, 0, 0] },
-  jump: { sp: 3.5, ry: 2.8, offs: [1, 1, 0, 0, -1, -1] },
+  crawl0: { sp: 2.8, ry: 3.2, offs: hump(1) },
+  crawl1: { sp: 2.6, ry: 3.2, offs: hump(3) },
+  crawl2: { sp: 2.6, ry: 3.2, offs: hump(5) },
+  crawl3: { sp: 2.6, ry: 3.2, offs: hump(7) },
+  charge1: { sp: 2.1, ry: 3.6, offs: Array(WORM_SEGS).fill(0) },
+  charge2: { sp: 1.7, ry: 4.0, offs: Array(WORM_SEGS).fill(0) },
+  jump: { sp: 3.2, ry: 2.8, offs: [2, 2, 1, 1, 0, 0, -1, -1, -1] },
 };
 function wormSprite(pose, rider, flash) {
-  return sprite('worm' + pose + rider + flash, 28, 15, g => {
-    const P = WORM_POSES[pose], n = 6, BODY = flash ? PAL.white : PAL.pink;
-    const x0 = 14 - P.sp * (n - 1) / 2, base = 10;
+  return sprite('worm' + pose + rider + flash, 40, 15, g => {
+    const P = WORM_POSES[pose], n = WORM_SEGS, BODY = flash ? PAL.white : PAL.pink;
+    const x0 = 20 - P.sp * (n - 1) / 2, base = 10;
     const cs = [];
     for (let i = 0; i < n; i++) {
       const cx = x0 + i * P.sp, cy = base + P.offs[i];
       const head = i === n - 1;
       cs.push([cx, cy]);
-      g.ellipse(cx, cy, (head ? 3.7 : 2.6 + 0.6 * i / n), P.ry * (head ? 1.08 : 1), BODY);
+      g.ellipse(cx, cy, (head ? 3.7 : 2.3 + 0.9 * i / n), P.ry * (head ? 1.08 : 1), BODY);
     }
     if (!flash) g.shade({ [PAL.pink]: PAL.magenta }, { [PAL.pink]: PAL.peach });
     // worm rings
@@ -1077,7 +1081,7 @@ function wormSprite(pose, rider, flash) {
       for (let y = 0; y < g.h; y++) if (g.get(rx, y) === PAL.pink) g.px(rx, y, PAL.magenta);
     }
     // the saddle
-    const sx = Math.round(x0 + 2.5 * P.sp), top = Math.round(base + (P.offs[2] + P.offs[3]) / 2 - P.ry) - 1;
+    const sx = Math.round(x0 + 4.5 * P.sp), top = Math.round(base + Math.min(P.offs[4], P.offs[5]) - P.ry) - 1;
     g.rect(sx - 3, top, 7, 2, PAL.brown);
     g.rect(sx - 3, top + 1, 7, 1, PAL.dkbrown);
     g.rect(sx - 4, top - 1, 1, 3, PAL.dkbrown);   // back of the saddle
@@ -1224,9 +1228,9 @@ const webPatchSprite = () => sprite('webpatch', 24, 6, g => {
   g.line(5, 5, 12, 0, PAL.white); g.line(18, 5, 12, 0, PAL.white);
   g.line(3, 4, 21, 4, PAL.white); g.line(7, 2, 17, 2, PAL.silver);
 });
-const webWrapSprite = () => sprite('webwrap', 26, 16, g => {
-  for (let i = 0; i < 4; i++) { g.line(1, 2 + i * 4, 24, 13 - i * 3, PAL.white); }
-  g.line(4, 0, 6, 15, PAL.silver); g.line(13, 0, 13, 15, PAL.silver); g.line(21, 0, 19, 15, PAL.silver);
+const webWrapSprite = () => sprite('webwrap', 38, 16, g => {
+  for (let i = 0; i < 4; i++) { g.line(1, 2 + i * 4, 36, 13 - i * 3, PAL.white); }
+  for (const x of [4, 12, 19, 26, 33]) g.line(x, 0, x + (x % 2 ? 1 : -1), 15, PAL.silver);
 });
 const rootPlatformSprite = () => sprite('root', 32, 12, g => {
   g.rect(1, 1, 30, 6, PAL.brown);
@@ -1624,12 +1628,12 @@ function drawMenuBackground() {
   c.drawImage(spiderSprite(Math.floor(t * 4) % 2).r, sx - 26, sy - 19);
   // a big worm with its saddle, crawling along
   const S = LW >= 280 ? 3 : 2;
-  const ws = wormSprite('crawl' + (Math.floor(t * 7) % 3), true, false);
-  const wx = Math.round(LW * 0.4 - 14 * S), wy = gy - 15 * S + S;
-  c.drawImage(ws.r, wx, wy, 28 * S, 15 * S);
+  const ws = wormSprite('crawl' + (Math.floor(t * 7) % 4), true, false);
+  const wx = Math.round(LW * 0.4 - 20 * S), wy = gy - 15 * S + S;
+  c.drawImage(ws.r, wx, wy, 40 * S, 15 * S);
   // a baby worm hopping in front
   const hop = Math.round(Math.abs(Math.sin(t * 4)) * 14);
-  c.drawImage(babySprite(Math.floor(t * 10) % 2).r, wx + 28 * S + 4, gy - 16 - hop + 2, 24, 16);
+  c.drawImage(babySprite(Math.floor(t * 10) % 2).r, wx + 40 * S + 2, gy - 16 - hop + 2, 24, 16);
   // edges of the screen fade into the dark
   const g = c.createRadialGradient(LW / 2, LO_H / 2, 40, LW / 2, LO_H / 2, Math.max(LW, LO_H) * 0.75);
   g.addColorStop(0, 'rgba(24,20,37,0)'); g.addColorStop(1, 'rgba(24,20,37,0.55)');
@@ -1835,14 +1839,14 @@ function drawPlayer(c) {
   let pose;
   if (p.charging) pose = p.charge > 0.55 ? 'charge2' : 'charge1';
   else if (!p.onGround) pose = 'jump';
-  else pose = 'crawl' + (Math.floor(p.wiggle) % 3);
+  else pose = 'crawl' + (Math.floor(p.wiggle) % 4);
   const s = wormSprite(pose, !lv.baby, p.hurtFlash > 0);
   const shake = p.charging && p.charge > 0.85 ? Math.round(Math.sin(time * 60)) : 0;
   if (lv.done && p.hp <= 0) c.globalAlpha = 0.5;
-  c.drawImage(p.face > 0 ? s.r : s.l, L(p.x + p.w / 2) - 14 + shake, L(p.y + p.h) - 15 + 2);
+  c.drawImage(p.face > 0 ? s.r : s.l, L(p.x + p.w / 2) - 20 + shake, L(p.y + p.h) - 15 + 2);
   c.globalAlpha = 1;
   if (p.webbed) {
-    c.drawImage(webWrapSprite().r, L(p.x + p.w / 2) - 13, L(p.y + p.h) - 15);
+    c.drawImage(webWrapSprite().r, L(p.x + p.w / 2) - 19, L(p.y + p.h) - 15);
     const wob = Math.round(Math.sin(time * 30));
     ptext('WIGGLE! ' + p.mash + '/' + p.mashNeed, L(p.x + p.w / 2) - camLo + wob, L(p.y) - 24 - camLoY, 1, PAL.yellow, 'center');
   }
@@ -1853,7 +1857,7 @@ function drawAim(c) {
   if (!p.charging || lv.done) return;
   const cx = p.x + p.w / 2, cy = p.y + p.h - 8;
   const a = p.aim * Math.PI / 180;
-  const power = (0.28 + 0.72 * p.charge) * JUMP_V * (p.inMud ? 0.82 : 1);
+  const power = (0.28 + 0.72 * p.charge) * JUMP_V * (p.inMud ? 0.9 : 1);
   let vx = Math.cos(a) * power, vy = -Math.sin(a) * power, x = cx, y = cy;
   c.fillStyle = PAL.white;
   for (let i = 0; i < 28; i++) {
