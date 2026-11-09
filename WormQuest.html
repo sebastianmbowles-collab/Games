@@ -40,8 +40,10 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
 .btn:active{box-shadow:inset 4px 4px 0 var(--magenta)}
 .btn.green{background:var(--green);box-shadow:inset -4px -4px 0 var(--dkgreen),inset 4px 4px 0 #9de64e}
 .btn.green:active{box-shadow:inset 4px 4px 0 var(--dkgreen)}
-.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
-.lv{font:inherit;font-size:16px;aspect-ratio:1;border:4px solid var(--ink);background:var(--tan);box-shadow:inset -3px -3px 0 var(--brown),inset 3px 3px 0 #ffe0b8;color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:2px;overflow:hidden}
+.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:6px 0}
+.menubtns{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-bottom:4px}
+.menubtns .btn{margin:2px;font-size:11px;padding:9px 12px}
+.lv{font:inherit;font-size:16px;height:64px;border:4px solid var(--ink);background:var(--tan);box-shadow:inset -3px -3px 0 var(--brown),inset 3px 3px 0 #ffe0b8;color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:2px;overflow:hidden}
 .lv small{font-size:6px;line-height:1.3}
 .lv.boss{background:var(--magenta);color:#fff;box-shadow:inset -3px -3px 0 #68386c,inset 3px 3px 0 var(--pink)}
 .lv:disabled{opacity:.35;cursor:not-allowed}
@@ -53,7 +55,22 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
 .keys[open] summary{margin-bottom:6px}
 .titleui{position:fixed;left:0;right:0;top:41%;display:flex;justify-content:center;z-index:6;pointer-events:none}
 .titleui .btn{pointer-events:auto}
-.endui{top:auto;bottom:calc(32% + env(safe-area-inset-bottom,0px))}
+.endui{top:calc(8px + env(safe-area-inset-top,0px));right:calc(8px + env(safe-area-inset-right,0px));left:auto;bottom:auto}
+.endui .btn.big{font-size:12px;padding:10px 16px;animation:none}
+@media (max-height:520px){
+  .panel{padding:10px 14px}
+  h2{font-size:13px;margin-bottom:6px}
+  .lv{height:28px;font-size:11px}
+  .panel{max-height:calc(100% - 16px)}
+  .menubtns .btn{padding:6px 10px;font-size:10px}
+  .lv small{display:none}
+  .world{margin-top:4px;font-size:8px}
+  .levels{gap:4px;margin:3px 0}
+  .btn.big{font-size:14px;padding:10px 20px}
+}
+.tb{background:rgba(24,20,37,.2)!important;border-color:rgba(234,212,170,.45)}
+.tb.down{background:rgba(234,212,170,.35)!important}
+#tJump{background:rgba(246,117,122,.22)!important}
 .btn.big{font-size:18px;padding:16px 30px;animation:bob 1s steps(2) infinite}
 @keyframes bob{50%{transform:translateY(-4px)}}
 #pauseBtn{position:fixed;top:calc(8px + env(safe-area-inset-top,0px));right:calc(8px + env(safe-area-inset-right,0px));width:40px;height:40px;border:4px solid var(--ink);background:var(--tan);box-shadow:inset -3px -3px 0 var(--brown),inset 3px 3px 0 #ffe0b8;font:12px var(--font);color:var(--ink);z-index:5;cursor:pointer;padding:0}
@@ -89,6 +106,11 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
 <div class="overlay" id="menu" hidden>
   <div class="panel">
     <h2>CHOOSE A LEVEL</h2>
+    <div class="menubtns">
+      <button class="btn green" id="playBtn">▶ PLAY</button>
+      <button class="btn" id="backBtn">BACK</button>
+      <button class="btn" id="goldBtn" hidden></button>
+    </div>
     <div id="worlds"></div>
     <details class="keys">
       <summary>HOW TO PLAY</summary>
@@ -97,9 +119,8 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
       <div><b>X</b> shoot a baby worm (hold UP to shoot up)</div>
       <div><b>Touch</b> hold the pink button and drag where you want to go</div>
       <div><b>P / Esc</b> pause</div>
+      <div><b>M</b> music on/off</div>
     </details>
-    <button class="btn green" id="playBtn">▶ PLAY</button>
-    <button class="btn" id="backBtn">BACK</button>
   </div>
 </div>
 
@@ -1096,8 +1117,10 @@ const WORM_POSES = {
 };
 const BAND = 5; // the clitellum covers segments 5 and 6 (the head is segment 8)
 function wormSprite(pose, babyReady, flash) {
-  return sprite('worm' + pose + babyReady + flash, 40, 16, g => {
-    const P = WORM_POSES[pose], n = WORM_SEGS, BODY = flash ? PAL.white : PAL.pink;
+  return sprite('worm' + pose + babyReady + flash + goldOn, 40, 16, g => {
+    const P = WORM_POSES[pose], n = WORM_SEGS;
+    const SKIN = goldOn ? PAL.yellow : PAL.pink, RING = goldOn ? PAL.amber : PAL.magenta, SHINE = goldOn ? PAL.white : PAL.peach;
+    const BODY = flash ? PAL.white : SKIN;
     const x0 = 20 - P.sp * (n - 1) / 2, base = 10;
     const cs = [];
     for (let i = 0; i < n; i++) {
@@ -1108,16 +1131,16 @@ function wormSprite(pose, babyReady, flash) {
     }
     // the clitellum: a fatter band over two segments
     const bx = (cs[BAND][0] + cs[BAND + 1][0]) / 2, by = (cs[BAND][1] + cs[BAND + 1][1]) / 2;
-    const BANDC = flash ? PAL.white : PAL.magenta; // dark pink
+    const BANDC = flash ? PAL.white : goldOn ? PAL.orange : PAL.magenta; // dark pink (orange on the gold worm)
     g.ellipse(bx, by - 0.3, P.sp * 0.8 + 1.6, P.ry * 1.12, BANDC);
-    if (!flash) g.shade({ [PAL.pink]: PAL.magenta, [BANDC]: PAL.purple }, { [PAL.pink]: PAL.peach, [BANDC]: babyReady ? PAL.pink : PAL.magenta });
+    if (!flash) g.shade({ [SKIN]: RING, [BANDC]: goldOn ? PAL.rust : PAL.purple }, { [SKIN]: SHINE, [BANDC]: babyReady ? (goldOn ? PAL.amber : PAL.pink) : BANDC });
     // worm rings (not on the band)
     if (!flash) for (let i = 1; i < n - 1; i++) {
       const rx = Math.round(x0 + (i + 0.5) * P.sp);
-      for (let y = 0; y < g.h; y++) if (g.get(rx, y) === PAL.pink) g.px(rx, y, PAL.magenta);
+      for (let y = 0; y < g.h; y++) if (g.get(rx, y) === SKIN) g.px(rx, y, RING);
     }
     // little dots on the band
-    if (!flash) { g.px(Math.round(bx) - 1, Math.round(by), PAL.purple); g.px(Math.round(bx) + 1, Math.round(by) - 1, PAL.purple); }
+    if (!flash) { const dot = goldOn ? PAL.rust : PAL.purple; g.px(Math.round(bx) - 1, Math.round(by), dot); g.px(Math.round(bx) + 1, Math.round(by) - 1, dot); }
     // face
     const [hx, hy] = cs[n - 1];
     const ex = Math.round(hx), ey = Math.round(hy) - 2;
@@ -1980,7 +2003,10 @@ function drawHUD(c) {
   c.drawImage(seedSprite().r, 7, 20);
   ptext(lv.seeds + '/' + lv.totalSeeds, 18, 22, 1, PAL.yellow);
   // level name (keep clear of the pause button)
-  ptext('LEVEL ' + (levelIndex + 1) + ': ' + lv.def.name, LW - 26, 7, 1, PAL.cream, 'right');
+  const nameRight = LW - Math.ceil((56 * dpr) / K) - 2;
+  const name = 'LEVEL ' + (levelIndex + 1) + ': ' + lv.def.name;
+  const nameLeft = lv.boss ? (LW >> 1) + 36 : 108;
+  ptext(nameRight - textWidth(name) >= nameLeft ? name : 'LEVEL ' + (levelIndex + 1), nameRight, 7, 1, PAL.cream, 'right');
 
   if (lv.boss) {
     const t = Math.max(0, Math.ceil(lv.bossTimer));
@@ -3144,12 +3170,77 @@ function drawEnding() {
     c.drawImage(side > 0 ? bs.r : bs.l, bx - 12, gy - 16 - hop + 2, 24, 16);
   }
   waveText('THE END', LW / 2, 10, clamp(Math.floor((LW - 16) / (textWidth('THE END') + 4)), 2, 4), PAL.yellow, PAL.orange, t, true);
-  const lines = ['YOU FINISHED THE QUEST OF LIFE!', 'THE WORM BEAT THE SPIDER, THE BIRD,', 'THE FARMER AND THE SECRET BEETLE.', 'NOW IT LIVES HAPPILY EVER AFTER', 'WITH ALL ITS BABY WORMS.'];
+  if (!drawEnding.totals) drawEnding.totals = seedTotals();
+  const [found, all] = drawEnding.totals;
+  const lines = ['YOU FINISHED THE QUEST OF LIFE!', 'THE WORM BEAT THE SPIDER, THE BIRD,', 'THE FARMER AND THE SECRET BEETLE.', 'NOW IT LIVES HAPPILY EVER AFTER', 'WITH ALL ITS BABY WORMS.', 'SEEDS FOUND: ' + found + ' OF ' + all, 'GOLD WORM UNLOCKED! (LEVEL MENU)'];
   const ty = 52;
   c.globalAlpha = 0.55; c.fillStyle = PAL.ink; c.fillRect((LW >> 1) - 110, ty - 4, 220, lines.length * 11 + 6); c.globalAlpha = 1;
-  lines.forEach((l, i) => ptext(l, LW / 2, ty + i * 11, 1, i === 0 ? PAL.yellow : PAL.white, 'center'));
+  lines.forEach((l, i) => ptext(l, LW / 2, ty + i * 11, 1, i === 0 || i >= 5 ? PAL.yellow : PAL.white, 'center'));
   present();
 }
+
+
+// ============================================================
+//  EXTRAS: music, the gold worm and the seed score
+// ============================================================
+function loadJSON(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }
+function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } }
+let goldUnlocked = loadJSON('wormQuest_goldUnlocked', false);
+let goldOn = loadJSON('wormQuest_goldOn', false) && goldUnlocked;
+let bestSeeds = loadJSON('wormQuest_seeds', {});
+let musicOn = loadJSON('wormQuest_music', true);
+function seedTotals() {
+  let found = 0, all = 0;
+  LEVELS.forEach((L, i) => {
+    const b = builder(L.w); L.build(b);
+    for (const row of b.g) for (const ch of row) if (ch === 'o') all++;
+    found += bestSeeds[i] || 0;
+  });
+  return [found, all];
+}
+// 8-bit songs: numbers are notes (60 = middle C), 0 = rest
+const SONGS = {
+  cave: { tempo: 0.19,
+    lead: [60,0,63,0,67,0,63,0, 65,0,63,0,60,0,58,0, 60,0,63,0,67,0,70,0, 67,0,65,0,63,0,0,0],
+    bass: [36,0,0,0,36,0,0,0, 32,0,0,0,32,0,0,0, 34,0,0,0,34,0,0,0, 31,0,0,0,31,0,0,0] },
+  forest: { tempo: 0.17,
+    lead: [67,0,71,74,0,71,69,0, 67,0,64,0,62,0,64,0, 67,0,71,74,76,0,74,0, 71,0,69,0,67,0,0,0],
+    bass: [43,0,50,0,43,0,50,0, 40,0,47,0,40,0,47,0, 36,0,43,0,36,0,43,0, 38,0,45,0,38,0,45,0] },
+  farm: { tempo: 0.16,
+    lead: [72,0,76,0,79,0,76,0, 77,0,76,0,74,0,72,0, 72,0,76,0,79,0,84,0, 81,0,79,0,77,74,72,0],
+    bass: [48,0,55,0,48,0,55,0, 53,0,57,0,53,0,57,0, 48,0,55,0,48,0,55,0, 55,0,50,0,55,0,48,0] },
+  boss: { tempo: 0.12,
+    lead: [69,0,69,72,0,69,76,0, 75,0,74,0,72,0,71,0, 69,0,69,72,0,69,77,0, 76,0,74,0,72,71,69,0],
+    bass: [45,45,0,45,45,0,45,0, 44,44,0,44,44,0,44,0, 43,43,0,43,43,0,43,0, 40,40,0,40,44,0,44,0] },
+  ending: { tempo: 0.2,
+    lead: [72,76,79,84,0,79,84,0, 81,77,81,84,0,0,0,0, 79,76,79,83,0,79,83,0, 84,0,0,0,0,0,0,0],
+    bass: [48,0,55,0,48,0,55,0, 53,0,60,0,53,0,60,0, 55,0,62,0,55,0,62,0, 48,0,55,0,48,0,0,0] },
+};
+let song = null, step = 0, nextNote = 0;
+function playSong(name) { if (song !== name) { song = name; step = 0; nextNote = 0; } }
+function musicNote(n, t, dur, type, vol) {
+  if (!n) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = 440 * Math.pow(2, (n - 69) / 12);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur);
+}
+setInterval(() => {
+  try {
+    if (!actx || !song || !musicOn || actx.state !== 'running' || state === 'paused' || state === 'msg') { if (actx) nextNote = 0; return; }
+    const S = SONGS[song];
+    if (nextNote < actx.currentTime) nextNote = actx.currentTime + 0.05;
+    while (nextNote < actx.currentTime + 0.25) {
+      const i = step % S.lead.length;
+      musicNote(S.lead[i], nextNote, S.tempo * 0.9, 'square', 0.025);
+      musicNote(S.bass[i], nextNote, S.tempo * 0.95, 'triangle', 0.06);
+      step++; nextNote += S.tempo;
+    }
+  } catch (e) { /* no music, that's ok */ }
+}, 50);
+function songFor(L) { return L.boss ? 'boss' : ({ 1: 'cave', 2: 'forest', 3: 'farm' })[L.world] || 'cave'; }
+function toggleMusic() { musicOn = !musicOn; saveJSON('wormQuest_music', musicOn); }
+window.addEventListener('keydown', e => { if (e.code === 'KeyM') toggleMusic(); });
 
 // ============================================================
 //  MENUS
@@ -3185,11 +3276,16 @@ function buildLevelGrid() {
     });
     box.append(head, grid);
   }
+  const gb = document.getElementById('goldBtn');
+  gb.hidden = !goldUnlocked;
+  gb.textContent = goldOn ? '🌟 GOLD WORM: ON' : '🌟 GOLD WORM: OFF';
+  gb.onclick = () => { goldOn = !goldOn; saveJSON('wormQuest_goldOn', goldOn); buildLevelGrid(); };
 }
 function startLevel(i) {
   try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) { /* fine */ }
   setViewRows(LEVELS[i].boss ? 18 : 13);
   loadLevel(i);
+  playSong(songFor(LEVELS[i]));
   titleEl.hidden = true; endingEl.hidden = true; endingMode = false;
   menuEl.hidden = true; msgEl.hidden = true; pauseBtn.hidden = false;
   state = 'play'; showTouch();
@@ -3198,16 +3294,18 @@ function startLevel(i) {
 function toMenu() { openLevels(); }
 function showEnding() {
   state = 'menu'; lv = null; setViewRows(13); endingMode = true;
+  playSong('ending'); drawEnding.totals = null;
+  if (!goldUnlocked) { goldUnlocked = true; saveJSON('wormQuest_goldUnlocked', true); }
   titleEl.hidden = true; menuEl.hidden = true; msgEl.hidden = true; pauseBtn.hidden = true; endingEl.hidden = false; showTouch();
   sfx.win(); setTimeout(sfx.win, 700);
 }
 function toTitle() {
-  endingMode = false; endingEl.hidden = true;
+  endingMode = false; endingEl.hidden = true; playSong('cave');
   state = 'menu'; lv = null; setViewRows(13); theme = THEMES[1];
   titleEl.hidden = false; menuEl.hidden = true; msgEl.hidden = true; pauseBtn.hidden = true; showTouch();
 }
 function openLevels() {
-  endingMode = false; endingEl.hidden = true;
+  endingMode = false; endingEl.hidden = true; playSong('cave');
   state = 'menu'; lv = null; setViewRows(13); theme = THEMES[1];
   buildLevelGrid();
   titleEl.hidden = true; menuEl.hidden = false; msgEl.hidden = true; pauseBtn.hidden = true; showTouch();
@@ -3226,7 +3324,7 @@ function showMsg(title, text, buttons) {
 }
 function pause() {
   if (state !== 'play') return;
-  showMsg('Paused', 'Take a break, little worm.', [['Keep going', resume], ['Restart level', () => startLevel(levelIndex)], ['Menu', toMenu]]);
+  showMsg('Paused', 'Take a break, little worm.', [['Keep going', resume], ['Restart level', () => startLevel(levelIndex)], [musicOn ? 'Music: ON' : 'Music: OFF', () => { toggleMusic(); state = 'play'; pause(); }], ['Menu', toMenu]]);
   state = 'paused';
 }
 function resume() { msgEl.hidden = true; pauseBtn.hidden = false; state = 'play'; showTouch(); last = performance.now(); }
@@ -3237,6 +3335,7 @@ function levelComplete() {
   if (lv.done) return;
   lv.done = true; sfx.win();
   unlock(levelIndex + 2);
+  if (lv.seeds > (bestSeeds[levelIndex] || 0)) { bestSeeds[levelIndex] = lv.seeds; saveJSON('wormQuest_seeds', bestSeeds); }
   const next = levelIndex + 1;
   const allSeeds = lv.seeds === lv.totalSeeds;
   setTimeout(() => showMsg('Level ' + (levelIndex + 1) + ' done!',
