@@ -54,7 +54,7 @@ Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh
 
 ## THE QUEST OF LIFE FOR A WORM
 
-`WormQuest.html` is an underground platformer, all in one file. Open it in any browser (keyboard, or touch buttons on a tablet or phone).
+`WormQuest.html` is an 8-bit pixel-art underground platformer, all in one file (same pixel look as Aliens VS Dinos: chunky pixels, Endesga 32 colours, pixel font). Open it in any browser (keyboard, or touch buttons on a tablet or phone).
 You are a worm with a saddle. Crawling is very slow, so you hold a button to charge a jump, aim it, and let go. You can also shoot baby worms that fly out, grab seeds and water, break soft dirt, and come back.
 
 | Level | What's new |
