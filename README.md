@@ -64,5 +64,10 @@ You are an earthworm. Its clitellum (the fat band near its head where worm cocoo
 | 3. Drippy Caves | Drip stones that heal you, mud ponds, dirt falling from the ceiling |
 | 4. Bug Tunnels | Ants, beetles, moles and moving roots |
 | 5. BOSS: The Spider | Survive 60 seconds of webs and drop attacks |
+| 6. Bouncy Shrooms | Bouncy green mushrooms and thorny roots |
+| 7. Crumbly Tunnels | Cracked dirt that crumbles under you, then grows back |
+| 8. Sky Holes | Holes to the sky where little birds dive down at you |
+| 9. Centipede Run | Fast centipedes and a bit of everything |
+| 10. BOSS: The Bird | Survive 60 seconds: it grabs you and drops you (wiggle free!) and drops flaming egg bombs |
 
-A boss comes every 5 levels. Still to come: World 2 (the Bird), World 3 (the Farmer) and a secret Beetle boss. Progress is saved in the browser.
+A boss comes every 5 levels. Still to come: World 3 (the Farmer) and a secret Beetle boss. Progress is saved in the browser.

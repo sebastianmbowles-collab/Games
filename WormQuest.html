@@ -84,9 +84,7 @@ p{margin:10px 0;font-size:11px;line-height:1.8}
 <div class="overlay" id="menu" hidden>
   <div class="panel">
     <h2>CHOOSE A LEVEL</h2>
-    <div class="world">World 1: The Spider Tunnels</div>
-    <div class="levels" id="levelGrid"></div>
-    <div class="soon">World 2: The Bird (6-10) coming soon…</div>
+    <div id="worlds"></div>
     <div class="soon">World 3: The Farmer (11-15) coming soon…</div>
     <details class="keys">
       <summary>HOW TO PLAY</summary>
@@ -199,6 +197,8 @@ function builder(width) {
     put(x, y, ch) { if (y >= 0 && y < ROWS && x >= 0 && x < width) g[y][x] = ch; },
     fill(x1, y1, x2, y2, ch) { for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) b.put(x, y, ch); },
     ground(x1, x2, top) { b.fill(x1, top, x2, ROWS - 1, '#'); },
+    holes: [],
+    hole(x1, x2) { for (let x = x1; x <= x2; x++) { g[0][x] = ' '; g[1][x] = ' '; b.holes.push(x); } }, // a hole to the sky
   };
   b.fill(0, 0, width - 1, 1, '#');          // ceiling
   b.fill(0, 0, 0, ROWS - 1, '#');           // left wall
@@ -348,13 +348,14 @@ function loadLevel(i) {
   const L = LEVELS[i];
   const width = L.w;
   const real = builder(width); L.build(real);
+  theme = THEMES[L.world];
 
   lv = {
     def: L, w: width, grid: real.g, entities: [], enemies: [], pickups: [], platforms: [],
     drips: [], drops: [], cracks: [], clumps: [], particles: [], signs: [], checkpoints: [],
     doors: new Map(), webs: [], webPatches: [], baby: null, exit: null,
     seeds: 0, totalSeeds: 0, start: { x: 0, y: 0 }, respawn: null, shake: 0,
-    boss: null, bossTimer: BOSS_TIME, intro: L.boss ? 2.5 : 0, done: false, camX: 0, camY: 0, decor: [],
+    boss: null, bossTimer: BOSS_TIME, intro: L.boss ? 2.5 : 0, done: false, camX: 0, camY: 0, decor: [], holes: real.holes, crumble: new Map(), squash: new Map(), eggs: [], fires: [],
   };
   const G = lv.grid;
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < width; x++) {
@@ -370,6 +371,8 @@ function loadLevel(i) {
       case 'm': lv.enemies.push({ kind: 'mole', x: px + 3, y: py + TILE - 26, w: 26, h: 26, baseY: py + TILE, up: 0, st: 'hidden', t: 0, dead: false }); G[y][x] = ' '; break;
       case '-': lv.platforms.push({ x: px, y: py, w: 64, h: 14, ox: px, oy: py, axis: 'x', range: 3 * TILE, t: Math.random() * 6, dx: 0, dy: 0 }); G[y][x] = ' '; break;
       case '|': lv.platforms.push({ x: px, y: py, w: 64, h: 14, ox: px, oy: py, axis: 'y', range: 3 * TILE, t: Math.random() * 6, dx: 0, dy: 0 }); G[y][x] = ' '; break;
+      case 'k': lv.enemies.push({ kind: 'centipede', x: px + 2, y: py + TILE - 14, w: 46, h: 14, vx: -95, vy: 0, dead: false, squish: 0 }); G[y][x] = ' '; break;
+      case 'r': lv.enemies.push(makeSparrow(px, py)); G[y][x] = ' '; break;
       case 'W': lv.drips.push({ x: px + 16, y: py + TILE, t: rand(0, 1.8) }); break;
       case 'F': lv.cracks.push({ x: px + 16, y: py + TILE, t: rand(1, 3), warn: 0 }); break;
       default:
@@ -391,6 +394,7 @@ function loadLevel(i) {
     }
   }
   if (L.boss === 'spider') lv.boss = makeSpider();
+  if (L.boss === 'bird') lv.boss = makeBird();
   lv.respawn = { ...lv.start };
   player = makePlayer(lv.start.x, lv.start.y);
   lv.camX = 0; lv.camY = 0;
@@ -427,7 +431,8 @@ function tileAt(x, y) {
 }
 function isSolidTile(x, y, who) {
   const ch = tileAt(x, y);
-  if (ch === '#' || ch === 'B' || ch === 'W' || ch === 'F') return true;
+  if (ch === '#' || ch === 'B' || ch === 'W' || ch === 'F' || ch === 'S') return true;
+  if (ch === 'c') return !crumbleGone(x, y);
   if (ch === 'D') {
     if (!doorClosed(x, y)) return false;
     // a door never closes on top of the worm: it waits until the worm is out
@@ -560,7 +565,7 @@ function die() {
   lv.done = true;
   setTimeout(() => {
     if (lv.def.boss) {
-      showMsg('Oh no!', 'The spider got you. Try again! You only have to survive the countdown.', [['Try again', () => startLevel(levelIndex)], ['Menu', toMenu]]);
+      showMsg('Oh no!', 'The ' + BOSS_INFO[lv.def.boss].name + ' got you. Try again! You only have to survive the countdown.', [['Try again', () => startLevel(levelIndex)], ['Menu', toMenu]]);
     } else {
       // checkpoint respawn with full health
       lv.done = false;
@@ -585,6 +590,12 @@ function updatePlayer(dt) {
   p.hurtFlash = Math.max(0, p.hurtFlash - dt);
   p.inMud = inMud(p);
 
+  // carried away by the bird: wiggle to get free!
+  if (p.carried) {
+    if (mashPressed) { p.mash++; p.wiggle += 0.6; beep(300 + p.mash * 40, 0.05, 'square', 0.04); }
+    if (p.mash >= p.mashNeed) dropFromBird(true);
+    return;
+  }
   // stuck in a spider web: wiggle (press buttons fast) to get out
   if (p.webbed) {
     p.vx = 0;
@@ -672,6 +683,7 @@ function updatePlayer(dt) {
     // standing on the bottom of the pond
     if (boxHitsSolid(p.x, p.y + 1, p.w, p.h, p)) p.onGround = true;
   }
+  world2Player(p);
   if (p.onGround && !p.charging && !left() && !right()) p.vx = 0;
 
   p.squash *= Math.pow(0.002, dt);
@@ -749,6 +761,7 @@ function updateEnemies(dt) {
   const p = player;
   for (const e of lv.enemies) {
     if (e.dead) { e.squish += dt; continue; }
+    if (updateEnemy2(e, dt)) continue;
     if (e.kind === 'mole') {
       const near = Math.abs((p.x + p.w / 2) - (e.x + e.w / 2)) < 110 && Math.abs(p.y - e.y) < 90;
       e.t -= dt;
@@ -788,6 +801,7 @@ function touchEnemy(e) {
 }
 
 function updateWorld(dt) {
+  world2Update(dt);
   // moving roots
   for (const pl of lv.platforms) {
     pl.t += dt;
@@ -946,7 +960,7 @@ function frame(now) {
       updateBaby(dt);
       updateEnemies(dt);
       if (lv.boss) {
-        updateSpider(dt);
+        if (lv.def.boss === 'spider') updateSpider(dt); else updateBird(dt);
         if (!lv.done) {
           lv.bossTimer -= dt;
           if (lv.bossTimer <= 0) bossBeaten();
@@ -1239,30 +1253,37 @@ const rootPlatformSprite = () => sprite('root', 32, 12, g => {
 
 // ---------- tiles (16x16 chunky pixels)
 function dirtTile(v, top, bot, left = false, right = false, deep = false) {
-  return sprite('dirt' + v + top + bot + left + right + deep, 16, 16, g => {
+  const T = theme;
+  return sprite('dirt' + T.id + v + top + bot + left + right + deep, 16, 16, g => {
     if (deep) {
-      g.rect(0, 0, 16, 16, PAL.plum);
-      for (let i = 0; i < 5; i++) g.px(Math.floor(hash(v, i) * 16), Math.floor(hash(i, v + 9) * 16), PAL.dkbrown);
-      g.px(Math.floor(hash(v, 30) * 15), Math.floor(hash(31, v) * 15), PAL.ink);
+      g.rect(0, 0, 16, 16, T.deep);
+      for (let i = 0; i < 5; i++) g.px(Math.floor(hash(v, i) * 16), Math.floor(hash(i, v + 9) * 16), T.deepSpeck);
+      g.px(Math.floor(hash(v, 30) * 15), Math.floor(hash(31, v) * 15), T.deepDot);
       return;
     }
-    g.rect(0, 0, 16, 16, PAL.dkbrown);
-    for (let i = 0; i < 6; i++) g.px(Math.floor(hash(v, i) * 16), Math.floor(hash(i, v + 9) * 16), PAL.plum);
+    g.rect(0, 0, 16, 16, T.dirt);
+    for (let i = 0; i < 6; i++) g.px(Math.floor(hash(v, i) * 16), Math.floor(hash(i, v + 9) * 16), T.speck);
     for (let i = 0; i < 2; i++) {
       const x = Math.floor(hash(v + 3, i) * 13), y = 3 + Math.floor(hash(i + 5, v) * 10);
-      g.rect(x, y, 3, 2, PAL.brown); g.px(x, y, PAL.clay); g.rect(x, y + 2, 3, 1, PAL.plum);
+      g.rect(x, y, 3, 2, T.peb); g.px(x, y, T.pebHi); g.rect(x, y + 2, 3, 1, T.speck);
     }
     if (top) {
-      g.rect(0, 0, 16, 3, PAL.brown); g.rect(0, 0, 16, 1, PAL.clay);
-      for (let x = 0; x < 16; x++) if (hash(x, v) > 0.6) g.px(x, 3, PAL.brown);
+      g.rect(0, 0, 16, 3, T.top); g.rect(0, 0, 16, 1, T.topHi);
+      for (let x = 0; x < 16; x++) if (hash(x, v) > 0.6) g.px(x, 3, T.top);
       if (v === 1) { g.px(4, 0, PAL.tan); g.px(11, 0, PAL.tan); }
     }
-    if (left) { g.rect(0, 0, 1, 16, PAL.brown); for (let y = 0; y < 16; y++) if (hash(y, v + 2) > 0.6) g.px(1, y, PAL.brown); }
-    if (right) { g.rect(15, 0, 1, 16, PAL.plum); for (let y = 0; y < 16; y++) if (hash(y + 3, v) > 0.6) g.px(14, y, PAL.plum); }
-    if (top) { g.rect(0, 0, 16, 1, PAL.clay); }
+    if (left) { g.rect(0, 0, 1, 16, T.top); for (let y = 0; y < 16; y++) if (hash(y, v + 2) > 0.6) g.px(1, y, T.top); }
+    if (right) { g.rect(15, 0, 1, 16, T.shadow); for (let y = 0; y < 16; y++) if (hash(y + 3, v) > 0.6) g.px(14, y, T.shadow); }
+    if (top) {
+      g.rect(0, 0, 16, 1, T.topHi);
+      if (T.grass) { // moss on top, near the surface
+        g.rect(0, 0, 16, 2, T.grass); g.rect(0, 0, 16, 1, '#9de64e');
+        for (let x = 0; x < 16; x++) if (hash(x + 5, v) > 0.5) g.px(x, 2, PAL.dkgreen);
+      }
+    }
     if (bot) {
-      g.rect(0, 15, 16, 1, PAL.plum);
-      for (let x = 0; x < 16; x++) if (hash(x + 7, v) > 0.65) g.px(x, 14, PAL.plum);
+      g.rect(0, 15, 16, 1, T.shadow);
+      for (let x = 0; x < 16; x++) if (hash(x + 7, v) > 0.65) g.px(x, 14, T.shadow);
     }
   });
 }
@@ -1297,9 +1318,9 @@ const mudTile = (surface, f) => sprite('mud' + surface + f, 16, 16, g => {
   }
   g.px(4 + f * 5, surface ? 9 : 5, PAL.dkbrown); g.px(11 - f * 3, 12, PAL.dkbrown);
 });
-const rockSprite = v => sprite('rock' + v, 26, 16, g => {
-  g.ellipse(13, 9, 8 + v * 2.5, 5 + v, PAL.night);
-  g.shade({}, { [PAL.night]: PAL.dkslate });
+const rockSprite = v => sprite('rock' + theme.id + v, 26, 16, g => {
+  g.ellipse(13, 9, 8 + v * 2.5, 5 + v, theme.rock);
+  g.shade({}, { [theme.rock]: theme.rockHi });
 });
 
 // ---------- pixel font (the same hand-made letters as Aliens VS Dinos)
@@ -1469,11 +1490,11 @@ function present() {
 // ---------- background: two layers that slide slower than the tunnel (parallax)
 function drawBackdrop(c, cx, cy) {
   const T = performance.now() / 1000;
-  c.fillStyle = PAL.ink; c.fillRect(0, 0, LW, LO_H);
+  c.fillStyle = theme.bg; c.fillRect(0, 0, LW, LO_H);
   // far away: big faint stalactites and stalagmites
   const o1 = Math.round(cx * 0.25), y1 = Math.round(cy * 0.25);
   const floor = LO_H + Math.round((ROWS * 16 - LO_H) * 0.25) - y1;
-  c.globalAlpha = 0.55; c.fillStyle = PAL.night;
+  c.globalAlpha = 0.55; c.fillStyle = theme.far;
   for (let i = Math.floor(o1 / 70) - 1; i <= Math.floor((o1 + LW) / 70) + 1; i++) {
     const x = i * 70 - o1 + Math.round(hash(i, 21) * 30);
     const w = 18 + hash(i, 22) * 30, h = 40 + hash(i, 23) * 70;
@@ -1489,7 +1510,7 @@ function drawBackdrop(c, cx, cy) {
     const y = 40 + Math.round(hash(i, 3) * 200) - oy;
     c.drawImage(rockSprite(Math.floor(hash(i, 5) * 3)).r, x, y);
     if (hash(i, 9) > 0.5) {
-      c.fillStyle = PAL.plum;
+      c.fillStyle = theme.root;
       const len = 30 + Math.floor(hash(i, 11) * 70);
       for (let k = 0; k < len; k++) c.fillRect(x + 12 + Math.round(Math.sin(k * 0.12 + i) * 2), 32 + k - oy, 1, 1);
     }
@@ -1655,14 +1676,16 @@ function draw() {
   if (lv.shake > 0) { sx = Math.round(rand(-2, 2)); sy = Math.round(rand(-2, 2)); }
   c.setTransform(1, 0, 0, 1, -camLo + sx, -camLoY + sy);
 
+  drawSky(c);
   drawGlows(c);
   drawTiles(c);
   drawDecor(c);
+  drawShafts(c);
   drawThings(c);
   drawPlatforms(c);
   drawPickups(c);
   drawEnemies(c);
-  if (lv.boss) drawSpider(c);
+  if (lv.boss) { if (lv.def.boss === 'spider') drawSpider(c); else drawBird(c); }
   drawPlayer(c);
   drawBaby(c);
   drawMud(c);
@@ -1679,12 +1702,13 @@ function draw() {
 function visibleCols() {
   return [Math.max(0, Math.floor(camLo / 16) - 1), Math.min(lv.w - 1, Math.ceil((camLo + LW) / 16) + 1)];
 }
-const isDirt = ch => ch === '#' || ch === 'F' || ch === 'B';
+const isDirt = ch => ch === '#' || ch === 'F' || ch === 'B' || ch === 'S';
 function drawTiles(c) {
   const [x1, x2] = visibleCols();
   for (let y = 0; y < ROWS; y++) for (let x = x1; x <= x2; x++) {
     const ch = lv.grid[y][x];
     if (ch === ' ' || ch === 'M') continue;
+    if (drawTile2(c, ch, x, y)) continue;
     const px = x * 16, py = y * 16;
     if (ch === '#' || ch === 'F') {
       let shx = 0;
@@ -1789,6 +1813,7 @@ function drawPickups(c) {
 
 function drawEnemies(c) {
   for (const e of lv.enemies) {
+    if (drawEnemy2(c, e)) continue;
     if (e.dead && e.squish > 0.6) continue;
     const cx = e.x + e.w / 2, by = e.y + e.h;
     if (e.kind === 'mole') {
@@ -1842,6 +1867,10 @@ function drawPlayer(c) {
   if (lv.done && p.hp <= 0) c.globalAlpha = 0.5;
   c.drawImage(p.face > 0 ? s.r : s.l, L(p.x + p.w / 2) - 20 + shake, L(p.y + p.h) - 15 + 2);
   c.globalAlpha = 1;
+  if (p.carried) {
+    const wob = Math.round(Math.sin(time * 30));
+    ptext('WIGGLE! ' + p.mash + '/' + p.mashNeed, L(p.x + p.w / 2) - camLo + wob, L(p.y) + 14 - camLoY, 1, PAL.yellow, 'center');
+  }
   if (p.webbed) {
     c.drawImage(webWrapSprite().r, L(p.x + p.w / 2) - 19, L(p.y + p.h) - 15);
     const wob = Math.round(Math.sin(time * 30));
@@ -1928,9 +1957,520 @@ function drawHUD(c) {
     ptext('0:' + String(t).padStart(2, '0'), cx, 16, 2, t <= 10 ? PAL.green : PAL.white, 'center');
     if (lv.intro > 0) {
       c.globalAlpha = 0.7; c.fillStyle = PAL.ink; c.fillRect(0, (LO_H >> 1) - 30, LW, 54); c.globalAlpha = 1;
-      ptext('THE SPIDER!', cx, (LO_H >> 1) - 24, 3, PAL.red, 'center');
+      ptext(BOSS_INFO[lv.def.boss].title, cx, (LO_H >> 1) - 24, 3, PAL.red, 'center');
       ptext('SURVIVE FOR 60 SECONDS!', cx, (LO_H >> 1) + 6, 1, PAL.white, 'center');
     }
+  }
+}
+
+// ============================================================
+//  WORLD 2: THE BIRD BURROWS
+//  Closer to the surface: lighter dirt, mossy green caves and holes
+//  to the sky. New things: bouncy mushrooms (S), thorny roots (^),
+//  crumbly dirt (c), diving birds (r), centipedes (k) and THE BIRD.
+// ============================================================
+const THEMES = {
+  1: { id: 1, bg: PAL.ink, far: PAL.night, rock: PAL.night, rockHi: PAL.dkslate, root: PAL.plum,
+       dirt: PAL.dkbrown, speck: PAL.plum, peb: PAL.brown, pebHi: PAL.clay, top: PAL.brown, topHi: PAL.clay,
+       deep: PAL.plum, deepSpeck: PAL.dkbrown, deepDot: PAL.ink, shadow: PAL.plum, grass: null },
+  2: { id: 2, bg: '#193c3e', far: '#265c42', rock: '#265c42', rockHi: PAL.dkgreen, root: PAL.dkbrown,
+       dirt: PAL.brown, speck: PAL.dkbrown, peb: PAL.clay, pebHi: PAL.tan, top: PAL.clay, topHi: PAL.tan,
+       deep: PAL.dkbrown, deepSpeck: PAL.plum, deepDot: PAL.plum, shadow: PAL.dkbrown, grass: PAL.green },
+};
+let theme = THEMES[1];
+const BOUNCE_V = 760;
+
+LEVELS.push(
+  {
+    name: 'Bouncy Shrooms', world: 2, w: 100,
+    signs: [
+      'Green mushrooms are bouncy! Crawl onto one and BOING!',
+      'Bounce up to the high ledge!',
+      'Thorny roots hurt! Jump over them.',
+      'Bounce across the big hole!',
+    ],
+    build(b) {
+      b.ground(0, 99, 15);
+      b.put(2, 14, 'P'); b.put(5, 14, '1');
+      b.put(10, 15, 'S'); b.fill(10, 9, 10, 11, 'o');
+      b.put(13, 14, '2'); b.put(16, 15, 'S');
+      b.ground(18, 23, 10); b.fill(19, 9, 22, 9, 'o');
+      b.put(27, 14, '3'); b.fill(30, 14, 32, 14, '^');
+      b.put(36, 14, 'C'); b.put(38, 14, '4');
+      b.fill(40, 15, 56, 17, ' ');
+      b.ground(44, 44, 14); b.put(44, 13, 'S');
+      b.ground(50, 50, 14); b.put(50, 13, 'S');
+      b.fill(46, 7, 48, 7, 'o');
+      b.ground(59, 59, 14); b.ground(67, 67, 14); b.put(63, 14, 'b');
+      b.fill(70, 14, 71, 14, '^'); b.put(74, 15, 'S');
+      b.ground(76, 81, 10); b.fill(77, 9, 80, 9, 'o');
+      b.put(84, 14, 'C');
+      b.ground(87, 87, 14); b.ground(94, 94, 14); b.put(90, 14, 'a');
+      b.put(97, 14, 'E');
+    },
+  },
+  {
+    name: 'Crumbly Tunnels', world: 2, w: 112,
+    signs: [
+      'Cracked dirt crumbles when you stand on it. Keep moving!',
+      'Crumbled dirt grows back after a little while.',
+      'Bounce up high for the seeds!',
+    ],
+    build(b) {
+      b.ground(0, 111, 15);
+      b.put(2, 14, 'P'); b.put(5, 14, '1');
+      b.fill(10, 15, 41, 17, ' ');
+      b.fill(12, 13, 14, 13, 'c'); b.fill(18, 12, 20, 12, 'c'); b.fill(24, 13, 26, 13, 'c');
+      b.fill(30, 11, 32, 11, 'c'); b.fill(36, 13, 38, 13, 'c');
+      b.put(13, 12, 'o'); b.put(19, 11, 'o'); b.put(25, 12, 'o'); b.put(31, 10, 'o'); b.put(37, 12, 'o');
+      b.put(43, 14, '2'); b.put(45, 14, 'C');
+      b.put(50, 1, 'F'); b.put(55, 1, 'F'); b.put(52, 2, 'W');
+      b.fill(58, 14, 59, 14, '^');
+      b.fill(63, 15, 68, 16, 'M');
+      b.put(70, 14, '3');
+      b.fill(72, 15, 92, 17, ' ');
+      b.fill(74, 13, 76, 13, 'c'); b.fill(80, 11, 82, 11, 'c');
+      b.fill(86, 15, 86, 17, '#'); b.put(86, 14, 'S');
+      b.fill(89, 12, 91, 12, 'c');
+      b.fill(84, 6, 88, 6, 'o');
+      b.put(96, 14, 'C');
+      b.ground(98, 98, 14); b.ground(105, 105, 14); b.put(101, 14, 'b');
+      b.put(108, 14, 'E');
+    },
+  },
+  {
+    name: 'Sky Holes', world: 2, w: 112,
+    signs: [
+      'Holes to the sky! Birds dive down through them. Wait until they fly back up, then GO!',
+      'You can squish a bird too, if you land on it!',
+      'Almost there!',
+    ],
+    build(b) {
+      b.ground(0, 111, 15);
+      for (const x of [12, 30, 50, 70, 90]) { b.hole(x, x + 1); b.put(x, 2, 'r'); b.put(x + 1, 10, 'o'); }
+      b.put(2, 14, 'P'); b.put(5, 14, '1');
+      b.put(22, 14, '2');
+      b.put(40, 14, 'C');
+      b.fill(44, 15, 47, 16, 'M');
+      b.fill(56, 14, 57, 14, '^');
+      b.put(60, 15, 'S'); b.ground(62, 66, 10); b.fill(63, 9, 65, 9, 'o');
+      b.put(76, 14, 'C'); b.put(80, 2, 'W');
+      b.fill(82, 15, 88, 17, ' '); b.fill(83, 13, 84, 13, 'c'); b.fill(86, 13, 87, 13, 'c');
+      b.put(100, 14, '3'); b.put(108, 14, 'E');
+    },
+  },
+  {
+    name: 'Centipede Run', world: 2, w: 124,
+    signs: [
+      'Centipedes are long and FAST. Land on them to squish them!',
+      'Next: THE BIRD. Get ready…',
+    ],
+    build(b) {
+      b.ground(0, 123, 15);
+      b.put(2, 14, 'P'); b.put(5, 14, '1');
+      b.ground(10, 10, 14); b.ground(24, 24, 14); b.put(16, 14, 'k');
+      b.fill(28, 2, 28, 14, 'D');
+      b.put(32, 15, 'S'); b.ground(34, 41, 10); b.put(38, 9, 'k'); b.fill(35, 9, 36, 9, 'o');
+      b.put(44, 14, 'C');
+      b.hole(48, 49); b.put(48, 2, 'r'); b.put(49, 10, 'o');
+      b.put(52, 14, 'm'); b.put(56, 14, 'm');
+      b.fill(60, 15, 76, 17, ' ');
+      b.put(63, 13, '-'); b.fill(68, 12, 70, 12, 'c'); b.put(73, 13, '-');
+      b.put(79, 14, 'C');
+      b.ground(82, 82, 14); b.ground(92, 92, 14); b.put(86, 14, 'k');
+      b.fill(95, 14, 96, 14, '^');
+      b.fill(100, 12, 105, 12, '#'); b.fill(100, 13, 100, 14, 'B'); b.fill(101, 14, 104, 14, 'o'); b.fill(105, 13, 105, 14, '#');
+      b.put(108, 14, '2'); b.hole(112, 113); b.put(120, 14, 'E');
+    },
+  },
+  {
+    name: 'BOSS: The Bird', world: 2, w: 34, boss: 'bird',
+    signs: [],
+    build(b) {
+      b.ground(0, 33, 15);
+      b.hole(6, 27);
+      b.fill(4, 11, 8, 11, '#'); b.fill(25, 11, 29, 11, '#'); b.fill(13, 8, 20, 8, '#');
+      b.put(11, 15, 'S'); b.put(22, 15, 'S');
+      b.put(3, 2, 'W'); b.put(30, 2, 'W');
+      b.put(16, 14, 'P');
+    },
+  },
+);
+const BOSS_INFO = {
+  spider: { title: 'THE SPIDER!', name: 'spider', emoji: '🕷️' },
+  bird: { title: 'THE BIRD!', name: 'bird', emoji: '🐦' },
+};
+const WORLD_NAMES = { 1: 'World 1: The Spider Tunnels', 2: 'World 2: The Bird Burrows' };
+
+// ---------- crumbly dirt
+function crumbleGone(x, y) { const s = lv.crumble.get(x + ',' + y); return !!(s && s.gone > 0); }
+function crumbleShake(x, y) { const s = lv.crumble.get(x + ',' + y); return s && s.t > 0 ? s.t : 0; }
+
+// ---------- things the worm can touch in World 2 (called every frame from updatePlayer)
+function world2Player(p) {
+  const fy = Math.floor((p.y + p.h + 2) / TILE);
+  const x1 = Math.floor((p.x + 2) / TILE), x2 = Math.floor((p.x + p.w - 3) / TILE);
+  if (p.onGround) {
+    let shroom = -1;
+    for (let tx = x1; tx <= x2; tx++) {
+      const ch = tileAt(tx, fy);
+      if (ch === 'S') shroom = tx;
+      if (ch === 'c') {
+        const k = tx + ',' + fy, s = lv.crumble.get(k);
+        if (!s || (s.t <= 0 && s.gone <= 0)) lv.crumble.set(k, { t: 0.75, gone: 0 });
+      }
+    }
+    if (shroom >= 0) { // BOING!
+      p.vy = -BOUNCE_V; p.onGround = false; p.charging = false; p.charge = 0; p.riding = null;
+      p.squash = -0.5;
+      lv.squash.set(shroom + ',' + fy, 0.25);
+      beep(180, 0.3, 'square', 0.08, 500);
+      burst(shroom * TILE + 16, fy * TILE, PAL.green, 8, 120);
+    }
+  }
+  // thorny roots (the bottom part of the tile is prickly)
+  const ty1 = Math.floor(p.y / TILE), ty2 = Math.floor((p.y + p.h - 1) / TILE);
+  for (let ty = ty1; ty <= ty2; ty++) for (let tx = x1; tx <= x2; tx++) {
+    if (tileAt(tx, ty) === '^' && p.y + p.h > ty * TILE + 14 && p.inv <= 0) {
+      hurt(20, tx * TILE + 16); p.vy = -420;
+    }
+  }
+}
+function world2Update(dt) {
+  for (const [k, s] of lv.crumble) {
+    if (s.t > 0) {
+      s.t -= dt;
+      if (s.t <= 0) {
+        s.gone = 3.5;
+        const [x, y] = k.split(',').map(Number);
+        burst(x * TILE + 16, y * TILE + 16, theme.dirt, 14, 120);
+        beep(110, 0.15, 'sawtooth', 0.05, -40);
+      }
+    } else if (s.gone > 0) {
+      s.gone -= dt;
+      if (s.gone <= 0) {
+        const [x, y] = k.split(',').map(Number);
+        if (overlapsTile(player, x, y)) s.gone = 0.3; // wait until the worm is out of the way
+        else lv.crumble.delete(k);
+      }
+    }
+  }
+  for (const [k, v] of lv.squash) { if (v - dt <= 0) lv.squash.delete(k); else lv.squash.set(k, v - dt); }
+}
+
+// ---------- birds in sky holes and centipedes
+function makeSparrow(px, py) {
+  return { kind: 'sparrow', hx: px + 16, x: px + 4, y: -70, w: 24, h: 18, homeY: -70, st: 'wait', t: 0.5, dead: false, squish: 0, vx: 1 };
+}
+function updateEnemy2(e, dt) {
+  const p = player;
+  if (e.kind === 'sparrow') {
+    const pc = p.x + p.w / 2;
+    if (e.st === 'wait') {
+      e.t -= dt; e.y = e.homeY;
+      if (e.t <= 0 && Math.abs(pc - e.hx) < 70 + p.w / 2) { e.st = 'peek'; e.t = 0.5; beep(1400, 0.08, 'square', 0.05); setTimeout(() => beep(1600, 0.08, 'square', 0.05), 90); }
+    } else if (e.st === 'peek') {
+      e.y += (8 - e.y) * Math.min(1, dt * 8); e.t -= dt;
+      if (e.t <= 0) { e.st = 'dive'; e.vy = 0; }
+    } else if (e.st === 'dive') {
+      e.vy = Math.min(e.vy + 2400 * dt, 700);
+      const ny = e.y + e.vy * dt;
+      if (ny > 2 * TILE && boxHitsSolid(e.x, ny, e.w, e.h)) { e.st = 'rest'; e.t = 0.5; }
+      else e.y = ny;
+      if (e.y > ROWS * TILE) { e.st = 'up'; }
+    } else if (e.st === 'rest') {
+      e.t -= dt; if (e.t <= 0) e.st = 'up';
+    } else if (e.st === 'up') {
+      e.y -= 300 * dt;
+      if (e.y <= e.homeY) { e.st = 'wait'; e.t = 1.4; }
+    }
+    if (e.st !== 'wait' && aabb(p, e) && !lv.done) touchEnemy(e);
+    return true;
+  }
+  return false;
+}
+
+// ---------- THE BIRD (boss of World 2)
+function makeBird() {
+  return { x: 17 * TILE, y: 96, vx: 150, st: 'fly', t: 0, eggT: 2.2, swoopT: 6, flap: 0, leaving: false, tx: 0, ty: 0 };
+}
+function updateBird(dt) {
+  const s = lv.boss, p = player;
+  const anger = 1 - lv.bossTimer / BOSS_TIME;
+  s.flap += dt * (s.st === 'dive' ? 0 : 10);
+  if (s.leaving) { s.y -= 220 * dt; s.x += 120 * dt; return; }
+  const minX = 4 * TILE, maxX = (lv.w - 4) * TILE;
+  if (s.st === 'fly') {
+    s.x += s.vx * (1 + anger * 0.6) * dt;
+    if (s.x < minX) { s.x = minX; s.vx = Math.abs(s.vx); }
+    if (s.x > maxX) { s.x = maxX; s.vx = -Math.abs(s.vx); }
+    s.y += (96 + Math.sin(time * 2) * 14 - s.y) * Math.min(1, dt * 4);
+    s.eggT -= dt; s.swoopT -= dt;
+    if (s.eggT <= 0) {
+      s.eggT = Math.max(0.9, 2.3 - anger * 1.4);
+      lv.eggs.push({ x: s.x, y: s.y + 26, vx: s.vx * 0.25, vy: 40, st: 'fall', t: 0 });
+      beep(500, 0.12, 'triangle', 0.06, -200);
+    }
+    if (s.swoopT <= 0) {
+      s.st = 'warn'; s.t = 0.85;
+      s.tx = p.x + p.w / 2; s.ty = p.y + p.h / 2;
+      beep(900, 0.35, 'sawtooth', 0.07, 600);
+    }
+  } else if (s.st === 'warn') {
+    s.t -= dt;
+    s.vx = s.tx >= s.x ? Math.abs(s.vx) : -Math.abs(s.vx);
+    if (s.t <= 0) s.st = 'dive';
+  } else if (s.st === 'dive') {
+    const dx = s.tx - s.x, dy = s.ty - 14 - s.y, d = Math.hypot(dx, dy) || 1;
+    const sp = 560 + anger * 160;
+    s.x += dx / d * Math.min(d, sp * dt); s.y += dy / d * Math.min(d, sp * dt);
+    if (!p.carried && p.inv <= 0 && !lv.done && Math.abs(s.x - (p.x + p.w / 2)) < 30 && Math.abs(s.y + 18 - (p.y + p.h / 2)) < 26) {
+      // GRABBED!
+      s.st = 'carry'; s.t = 1.6; s.vx = Math.random() < 0.5 ? -170 : 170;
+      p.carried = true; p.mash = 0; p.mashNeed = 6 + Math.round(anger * 4);
+      p.charging = false; p.charge = 0; p.webbed = false;
+      beep(300, 0.3, 'square', 0.08, 300);
+    } else if (d < 6) { s.st = 'rise'; }
+  } else if (s.st === 'carry') {
+    s.t -= dt;
+    s.y += (80 - s.y) * Math.min(1, dt * 2.5);
+    s.x = clamp(s.x + s.vx * dt, minX, maxX);
+    p.x = s.x - p.w / 2; p.y = s.y + 20; p.vx = 0; p.vy = 0;
+    if (s.t <= 0) dropFromBird(false);
+  } else if (s.st === 'rise') {
+    s.y -= 320 * dt;
+    if (s.y <= 96) { s.y = 96; s.st = 'fly'; s.swoopT = Math.max(3.2, 7 - anger * 3.5); }
+  }
+  // touching the bird hurts (when it isn't carrying you)
+  if (s.st !== 'carry' && !p.carried) {
+    const bb = { x: s.x - 26, y: s.y - 14, w: 52, h: 34 };
+    if (aabb(bb, p)) hurt(15, s.x);
+  }
+  // flaming egg bombs
+  for (const e of lv.eggs) {
+    if (e.st === 'fall') {
+      e.vy = Math.min(e.vy + 900 * dt, 600);
+      e.x += e.vx * dt; e.y += e.vy * dt;
+      const eb = { x: e.x - 8, y: e.y - 10, w: 16, h: 20 };
+      if (aabb(eb, p)) explodeEgg(e);
+      else if (boxHitsSolid(eb.x, eb.y, eb.w, eb.h)) {
+        e.st = 'fuse'; e.t = 0.7;
+        e.y = Math.floor((e.y + 10) / TILE) * TILE - 10;
+      }
+      if (e.y > ROWS * TILE + 40) e.dead = true;
+    } else if (e.st === 'fuse') {
+      e.t -= dt;
+      if (e.t <= 0) explodeEgg(e);
+    }
+  }
+  lv.eggs = lv.eggs.filter(e => !e.dead);
+  for (const f of lv.fires) {
+    f.life -= dt;
+    if (aabb(f, p)) hurt(10, f.x + f.w / 2);
+  }
+  lv.fires = lv.fires.filter(f => f.life > 0);
+}
+function explodeEgg(e) {
+  e.dead = true;
+  lv.shake = 0.3;
+  beep(90, 0.4, 'sawtooth', 0.1, -50);
+  for (const col of [PAL.yellow, PAL.orange, PAL.red, PAL.amber]) burst(e.x, e.y, col, 8, 220);
+  const p = player;
+  if (Math.hypot(p.x + p.w / 2 - e.x, p.y + p.h / 2 - e.y) < 64) hurt(20, e.x);
+  const floor = findFloorBelow(e.x, e.y);
+  if (floor - e.y < 40) lv.fires.push({ x: e.x - 26, y: floor - 14, w: 52, h: 14, life: 1.3 });
+}
+function dropFromBird(escaped) {
+  const p = player, s = lv.boss;
+  p.carried = false; p.mash = 0;
+  s.st = 'rise';
+  if (escaped) { p.vy = -150; p.inv = 0.8; burst(p.x + p.w / 2, p.y, PAL.cream, 12); sfx.web(); }
+  else { p.vy = 60; beep(400, 0.4, 'triangle', 0.08, -300); hurt(15); }
+}
+
+// ---------- World 2 sprites
+const shroomTile = squash => sprite('shroom' + squash, 16, 16, g => {
+  const top = squash ? 6 : 3;
+  g.rect(6, top + 5, 4, 16 - top - 5, PAL.cream); g.shade({ [PAL.cream]: PAL.tan });
+  g.ellipse(8, top + 6, 8, squash ? 5 : 6.5, PAL.green, true);
+  g.rect(0, top + 5, 16, 1, PAL.dkgreen);
+  g.shade({ [PAL.green]: PAL.dkgreen }, { [PAL.green]: '#9de64e' });
+  g.rect(3, top + 2, 2, 2, PAL.white); g.rect(10, top + 1, 2, 1, PAL.white); g.px(7, top + 3, PAL.white);
+  g.outline();
+});
+const thornTile = () => sprite('thorn', 16, 16, g => {
+  g.line(0, 15, 5, 9, PAL.dkbrown); g.line(5, 9, 9, 13, PAL.dkbrown); g.line(9, 13, 13, 8, PAL.dkbrown); g.line(13, 8, 15, 12, PAL.dkbrown);
+  g.line(1, 13, 6, 12, PAL.brown); g.line(8, 15, 12, 11, PAL.brown);
+  for (const [x, y] of [[4, 8], [8, 11], [12, 7], [2, 12], [14, 10], [10, 14], [6, 13]]) { g.px(x, y, PAL.cream); g.px(x, y - 1, PAL.white); }
+  g.outline();
+});
+const crumbleTile = () => sprite('crumble' + theme.id, 16, 16, g => {
+  g.rect(0, 0, 16, 16, theme.peb);
+  g.rect(0, 0, 16, 2, theme.topHi);
+  g.line(2, 2, 6, 7, theme.speck); g.line(6, 7, 4, 13, theme.speck); g.line(6, 7, 11, 5, theme.speck); g.line(11, 5, 14, 11, theme.speck); g.line(9, 12, 13, 15, theme.speck);
+  g.rect(0, 15, 16, 1, theme.shadow);
+  g.px(9, 9, theme.pebHi); g.px(2, 10, theme.pebHi);
+});
+function sparrowSprite(f) {
+  return sprite('sparrow' + f, 22, 16, g => {
+    g.ellipse(11, 9, 6, 4.5, PAL.brown);
+    g.ellipse(13, 10, 3.5, 3, PAL.orange);
+    g.ellipse(15, 6, 3.5, 3.2, PAL.brown);
+    if (f) g.poly([[6, 7], [12, 7], [7, 0]], PAL.dkbrown); else g.poly([[6, 9], [12, 9], [6, 15]], PAL.dkbrown);
+    g.poly([[5, 8], [0, 6], [1, 10]], PAL.dkbrown);
+    g.shade({ [PAL.brown]: PAL.dkbrown }, { [PAL.brown]: PAL.clay });
+    g.poly([[18, 5], [22, 6.5], [18, 8]], PAL.amber);
+    g.px(16, 5, PAL.ink);
+    g.outline();
+  });
+}
+function centipedeSprite(f) {
+  return sprite('centi' + f, 26, 10, g => {
+    for (let i = 0; i < 7; i++) {
+      const x = 3 + i * 3;
+      g.line(x, 6, x + ((i + f) % 2 ? 1 : -1), 9, PAL.ink);
+    }
+    for (let i = 0; i < 7; i++) g.ellipse(3 + i * 3, 5, 2.2, 2.4, i % 2 ? PAL.amber : PAL.orange);
+    g.ellipse(23, 4.5, 2.8, 2.6, PAL.rust);
+    g.shade({ [PAL.amber]: PAL.rust, [PAL.orange]: PAL.rust }, { [PAL.amber]: PAL.yellow, [PAL.orange]: PAL.amber });
+    g.line(24, 2, 25, 0, PAL.ink); g.line(22, 2, 22, 0, PAL.ink);
+    g.px(24, 4, PAL.white);
+    g.outline();
+  });
+}
+function birdSprite(f) { // f: 0 wings up, 1 wings down, 2 diving
+  return sprite('bird' + f, 60, 40, g => {
+    // tail
+    g.poly([[10, 18], [0, 12], [2, 24]], PAL.dkbrown);
+    // back wing
+    if (f === 0) g.poly([[18, 16], [34, 16], [16, 0]], PAL.dkbrown);
+    else if (f === 1) g.poly([[18, 20], [34, 20], [14, 36]], PAL.dkbrown);
+    // body
+    g.ellipse(26, 20, 15, 10, PAL.brown);
+    g.ellipse(32, 23, 9, 7, PAL.orange);
+    g.ellipse(42, 13, 8, 7.5, PAL.brown);
+    g.shade({ [PAL.brown]: PAL.dkbrown, [PAL.orange]: PAL.rust }, { [PAL.brown]: PAL.clay, [PAL.orange]: PAL.amber });
+    // front wing
+    if (f === 0) g.poly([[20, 17], [36, 17], [26, 2]], PAL.brown);
+    else if (f === 1) g.poly([[20, 21], [36, 21], [24, 37]], PAL.brown);
+    else g.poly([[14, 18], [36, 16], [10, 26]], PAL.brown);
+    // beak, angry eye and eyebrow
+    g.poly([[49, 11], [59, 14], [49, 17]], PAL.amber); g.line(50, 14, 57, 14, PAL.rust);
+    g.rect(43, 10, 3, 3, PAL.white); g.rect(44, 11, 2, 2, PAL.ink);
+    g.line(41, 8, 47, 10, PAL.ink);
+    // claws
+    g.line(26, 30, 25, 35, PAL.amber); g.line(31, 30, 32, 35, PAL.amber);
+    g.line(23, 35, 27, 35, PAL.amber); g.line(30, 35, 34, 35, PAL.amber);
+    g.outline();
+  });
+}
+function eggSprite(f) {
+  return sprite('egg' + f, 12, 16, g => {
+    g.poly(f ? [[3, 7], [5, 0], [7, 4], [9, 1], [9, 7]] : [[3, 7], [4, 2], [6, 5], [8, 0], [9, 7]], PAL.red);
+    g.poly(f ? [[4, 7], [6, 3], [8, 7]] : [[4, 7], [5, 4], [7, 2], [8, 7]], PAL.amber);
+    g.ellipse(6, 10.5, 4, 5, PAL.cream);
+    g.shade({ [PAL.cream]: PAL.tan }, { [PAL.cream]: PAL.white });
+    g.px(4, 9, PAL.orange); g.px(7, 12, PAL.orange);
+    g.outline();
+  });
+}
+function fireSprite(f) {
+  return sprite('fire' + f, 28, 10, g => {
+    for (let i = 0; i < 5; i++) {
+      const x = 2 + i * 5 + (f ? 1 : 0), h = 4 + ((i + f) % 3) * 2;
+      g.poly([[x, 10], [x + 2.5, 10 - h], [x + 5, 10]], PAL.red);
+      g.poly([[x + 1, 10], [x + 2.5, 10 - h + 3], [x + 4, 10]], PAL.amber);
+    }
+  });
+}
+
+// ---------- World 2 drawing
+function drawSky(c) {
+  for (const x of lv.holes) {
+    if (x * 16 < camLo - 16 || x * 16 > camLo + LW + 16) continue;
+    const g = c.createLinearGradient(0, 0, 0, 32);
+    g.addColorStop(0, PAL.blue); g.addColorStop(1, PAL.cyan);
+    c.fillStyle = g; c.fillRect(x * 16, 0, 16, 32);
+    c.fillStyle = PAL.white;
+    const cx = x * 16 + Math.floor((time * 4 + x * 7) % 16);
+    c.fillRect(cx, 8, 4, 2); c.fillRect(cx + 1, 7, 2, 1);
+  }
+}
+function drawShafts(c) {
+  c.globalAlpha = 0.13; c.fillStyle = PAL.yellow;
+  for (const x of lv.holes) {
+    if (x * 16 < camLo - 40 || x * 16 > camLo + LW + 40) continue;
+    const floor = L(findFloorBelow(x * TILE + 16, 2 * TILE));
+    c.beginPath(); c.moveTo(x * 16, 32); c.lineTo(x * 16 + 16, 32); c.lineTo(x * 16 + 22, floor); c.lineTo(x * 16 - 6, floor); c.fill();
+  }
+  c.globalAlpha = 1;
+}
+function drawTile2(c, ch, x, y) {
+  const px = x * 16, py = y * 16;
+  if (ch === 'S') {
+    // a mushroom set into the ground has dirt around it
+    if (isDirt(tileAt(x - 1, y)) && isDirt(tileAt(x + 1, y))) c.drawImage(dirtTile(Math.floor(hash(x, y) * 4), true, false).r, px, py);
+    c.drawImage(shroomTile(lv.squash.has(x + ',' + y)).r, px, py);
+    return true;
+  }
+  if (ch === '^') { c.drawImage(thornTile().r, px, py); return true; }
+  if (ch === 'c') {
+    if (crumbleGone(x, y)) {
+      c.fillStyle = theme.shadow;
+      for (let i = 0; i < 16; i += 4) { c.fillRect(px + i, py, 1, 1); c.fillRect(px + i, py + 15, 1, 1); }
+      return true;
+    }
+    const sh = crumbleShake(x, y) > 0 ? Math.round(rand(-1, 1)) : 0;
+    c.drawImage(crumbleTile().r, px + sh, py);
+    return true;
+  }
+  return false;
+}
+function drawEnemy2(c, e) {
+  const cx = e.x + e.w / 2, by = e.y + e.h;
+  let s, flip;
+  if (e.kind === 'sparrow') {
+    if (e.st === 'wait') return true;
+    s = sparrowSprite(e.st === 'dive' ? 1 : Math.floor(time * 12) % 2);
+    flip = false;
+  } else if (e.kind === 'centipede') {
+    s = centipedeSprite(Math.floor(time * 14 + e.x * 0.02) % 2);
+    flip = e.vx < 0;
+  } else return false;
+  const img = flip ? s.l : s.r;
+  if (e.dead) {
+    if (e.squish > 0.6) return true;
+    c.globalAlpha = 1 - e.squish / 0.6;
+    const h = Math.max(2, Math.round(s.h * 0.35));
+    c.drawImage(img, L(cx) - Math.round(s.w * 0.65), L(by) - h, Math.round(s.w * 1.3), h);
+    c.globalAlpha = 1;
+  } else c.drawImage(img, L(cx) - (s.w >> 1), L(by) - s.h + 1);
+  return true;
+}
+function drawBird(c) {
+  const s = lv.boss;
+  if (s.st === 'warn') {
+    // a red target where it's going to swoop
+    const tx = L(s.tx), ty = L(s.ty);
+    c.fillStyle = Math.floor(time * 10) % 2 ? PAL.red : PAL.hot;
+    c.fillRect(tx - 8, ty, 5, 1); c.fillRect(tx + 4, ty, 5, 1); c.fillRect(tx, ty - 8, 1, 5); c.fillRect(tx, ty + 4, 1, 5);
+    ptext('!', L(s.x) - camLo, L(s.y) - 34 - camLoY, 2, PAL.red, 'center');
+  }
+  const f = s.st === 'dive' ? 2 : Math.floor(s.flap) % 2;
+  const spr = birdSprite(f);
+  const ox = s.st === 'warn' ? Math.round(rand(-1, 1)) : 0;
+  c.drawImage(s.vx >= 0 ? spr.r : spr.l, L(s.x) - 30 + ox, L(s.y) - 20);
+  for (const e of lv.eggs) {
+    const blink = e.st === 'fuse' && Math.floor(e.t * 14) % 2;
+    const es = eggSprite(Math.floor(time * 10) % 2);
+    if (blink) c.globalAlpha = 0.5;
+    c.drawImage(es.r, L(e.x) - 6, L(e.y) - 10);
+    c.globalAlpha = 1;
+  }
+  for (const fi of lv.fires) {
+    c.globalAlpha = Math.min(1, fi.life * 2);
+    c.drawImage(fireSprite(Math.floor(time * 10) % 2).r, L(fi.x) - 1, L(fi.y + fi.h) - 10);
+    c.globalAlpha = 1;
   }
 }
 
@@ -1948,16 +2488,24 @@ const msgEl = document.getElementById('msg');
 const pauseBtn = document.getElementById('pauseBtn');
 
 function buildLevelGrid() {
-  const grid = document.getElementById('levelGrid');
-  grid.innerHTML = '';
-  LEVELS.forEach((L, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'lv' + (L.boss ? ' boss' : '');
-    btn.innerHTML = (L.boss ? '🕷️' : (i + 1)) + '<small>' + (L.boss ? 'BOSS' : L.name) + '</small>';
-    btn.disabled = i + 1 > unlocked;
-    btn.onclick = () => startLevel(i);
-    grid.appendChild(btn);
-  });
+  const box = document.getElementById('worlds');
+  box.innerHTML = '';
+  for (const wnum of [...new Set(LEVELS.map(L => L.world))]) {
+    const head = document.createElement('div');
+    head.className = 'world'; head.textContent = WORLD_NAMES[wnum];
+    const grid = document.createElement('div');
+    grid.className = 'levels';
+    LEVELS.forEach((L, i) => {
+      if (L.world !== wnum) return;
+      const btn = document.createElement('button');
+      btn.className = 'lv' + (L.boss ? ' boss' : '');
+      btn.innerHTML = (L.boss ? BOSS_INFO[L.boss].emoji : (i + 1)) + '<small>' + (L.boss ? 'BOSS' : L.name) + '</small>';
+      btn.disabled = i + 1 > unlocked;
+      btn.onclick = () => startLevel(i);
+      grid.appendChild(btn);
+    });
+    box.append(head, grid);
+  }
 }
 function startLevel(i) {
   try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (e) { /* fine */ }
@@ -1970,11 +2518,11 @@ function startLevel(i) {
 }
 function toMenu() { openLevels(); }
 function toTitle() {
-  state = 'menu'; lv = null; setViewRows(13);
+  state = 'menu'; lv = null; setViewRows(13); theme = THEMES[1];
   titleEl.hidden = false; menuEl.hidden = true; msgEl.hidden = true; pauseBtn.hidden = true; showTouch();
 }
 function openLevels() {
-  state = 'menu'; lv = null; setViewRows(13);
+  state = 'menu'; lv = null; setViewRows(13); theme = THEMES[1];
   buildLevelGrid();
   titleEl.hidden = true; menuEl.hidden = false; msgEl.hidden = true; pauseBtn.hidden = true; showTouch();
 }
@@ -2007,15 +2555,24 @@ function levelComplete() {
   const allSeeds = lv.seeds === lv.totalSeeds;
   setTimeout(() => showMsg('Level ' + (levelIndex + 1) + ' done!',
     'You found ' + lv.seeds + ' of ' + lv.totalSeeds + ' seeds.' + (allSeeds ? ' ALL OF THEM! 🌟' : ''),
-    [[LEVELS[next].boss ? 'Fight the boss! 🕷️' : 'Next level ▶', () => startLevel(next)], ['Play again', () => startLevel(levelIndex)], ['Menu', toMenu]]), 500);
+    [[LEVELS[next].boss ? 'Fight the boss! ' + BOSS_INFO[LEVELS[next].boss].emoji : 'Next level ▶', () => startLevel(next)], ['Play again', () => startLevel(levelIndex)], ['Menu', toMenu]]), 500);
 }
 function bossBeaten() {
-  lv.done = true; lv.boss.leaving = true; lv.webs = []; lv.webPatches = [];
+  lv.done = true; lv.boss.leaving = true; lv.webs = []; lv.webPatches = []; lv.eggs = []; lv.fires = [];
+  if (player.carried) { player.carried = false; player.vy = 0; }
   player.webbed = false;
   sfx.win();
-  setTimeout(() => showMsg('You survived the Spider! 🕷️',
-    'The spider got tired and ran away up its thread. World 1 is complete! The Bird is waiting in World 2…',
-    [['Menu', toMenu], ['Fight again', () => startLevel(levelIndex)]]), 1600);
+  unlock(levelIndex + 2);
+  const again = ['Fight again', () => startLevel(levelIndex)];
+  if (lv.def.boss === 'spider') {
+    setTimeout(() => showMsg('You survived the Spider! 🕷️',
+      'The spider got tired and ran away up its thread. World 1 is complete! Now the worm digs up toward the surface… where THE BIRD is waiting.',
+      [['World 2 ▶', () => startLevel(levelIndex + 1)], ['Menu', toMenu], again]), 1600);
+  } else {
+    setTimeout(() => showMsg('You survived the Bird! 🐦',
+      'The bird got tired and flew away. World 2 is complete! The Farmer is coming in World 3…',
+      [['Menu', toMenu], again]), 1600);
+  }
 }
 
 document.getElementById('playBtn').onclick = () => startLevel(Math.min(unlocked, LEVELS.length) - 1);
