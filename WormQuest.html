@@ -636,7 +636,7 @@ function updatePlayer(dt) {
     else if (up()) a = p.face > 0 ? 55 : 125;
     else a = p.face > 0 ? 0 : 180;
     const r = a * Math.PI / 180;
-    lv.baby = { x: p.x + p.w / 2, y: p.y + 6, vx: Math.cos(r) * 430, vy: -Math.sin(r) * 430, state: 'out', t: 0, carry: [] };
+    lv.baby = { x: p.x + p.w / 2 + p.face * 8, y: p.y + 4, vx: Math.cos(r) * 430, vy: -Math.sin(r) * 430, state: 'out', t: 0, carry: [] };
     sfx.shoot();
   }
 
@@ -1050,8 +1050,10 @@ function sprite(key, w, h, paint) {
   return s;
 }
 
-// ---------- the worm (with its saddle)
+// ---------- the worm
 // The worm has 9 round segments. When it crawls, a hump travels from its tail to its head.
+// Near its head is the clitellum: the fat, lighter band where worms make their egg cocoons.
+// In this game the baby worms shoot out of it! It's dark pink, with a shiny top when a baby is ready.
 const WORM_SEGS = 9;
 const hump = c => Array.from({ length: WORM_SEGS }, (_, i) => -Math.max(0, 2 - Math.abs(i - c)));
 const WORM_POSES = {
@@ -1063,8 +1065,9 @@ const WORM_POSES = {
   charge2: { sp: 1.7, ry: 4.0, offs: Array(WORM_SEGS).fill(0) },
   jump: { sp: 3.2, ry: 2.8, offs: [2, 2, 1, 1, 0, 0, -1, -1, -1] },
 };
-function wormSprite(pose, rider, flash) {
-  return sprite('worm' + pose + rider + flash, 40, 15, g => {
+const BAND = 5; // the clitellum covers segments 5 and 6 (the head is segment 8)
+function wormSprite(pose, babyReady, flash) {
+  return sprite('worm' + pose + babyReady + flash, 40, 16, g => {
     const P = WORM_POSES[pose], n = WORM_SEGS, BODY = flash ? PAL.white : PAL.pink;
     const x0 = 20 - P.sp * (n - 1) / 2, base = 10;
     const cs = [];
@@ -1074,24 +1077,18 @@ function wormSprite(pose, rider, flash) {
       cs.push([cx, cy]);
       g.ellipse(cx, cy, (head ? 3.7 : 2.3 + 0.9 * i / n), P.ry * (head ? 1.08 : 1), BODY);
     }
-    if (!flash) g.shade({ [PAL.pink]: PAL.magenta }, { [PAL.pink]: PAL.peach });
-    // worm rings
+    // the clitellum: a fatter band over two segments
+    const bx = (cs[BAND][0] + cs[BAND + 1][0]) / 2, by = (cs[BAND][1] + cs[BAND + 1][1]) / 2;
+    const BANDC = flash ? PAL.white : PAL.magenta; // dark pink
+    g.ellipse(bx, by - 0.3, P.sp * 0.8 + 1.6, P.ry * 1.12, BANDC);
+    if (!flash) g.shade({ [PAL.pink]: PAL.magenta, [BANDC]: PAL.purple }, { [PAL.pink]: PAL.peach, [BANDC]: babyReady ? PAL.pink : PAL.magenta });
+    // worm rings (not on the band)
     if (!flash) for (let i = 1; i < n - 1; i++) {
       const rx = Math.round(x0 + (i + 0.5) * P.sp);
       for (let y = 0; y < g.h; y++) if (g.get(rx, y) === PAL.pink) g.px(rx, y, PAL.magenta);
     }
-    // the saddle
-    const sx = Math.round(x0 + 4.5 * P.sp), top = Math.round(base + Math.min(P.offs[4], P.offs[5]) - P.ry) - 1;
-    g.rect(sx - 3, top, 7, 2, PAL.brown);
-    g.rect(sx - 3, top + 1, 7, 1, PAL.dkbrown);
-    g.rect(sx - 4, top - 1, 1, 3, PAL.dkbrown);   // back of the saddle
-    g.rect(sx + 3, top - 2, 2, 2, PAL.dkbrown);   // the horn at the front
-    g.px(sx + 3, top - 2, PAL.clay);
-    g.px(sx, top + 2, PAL.plum); g.px(sx, top + 3, PAL.silver); // stirrup
-    if (rider) { // a baby worm riding in the saddle
-      g.rect(sx - 2, top - 2, 4, 2, PAL.pink); g.rect(sx + 1, top - 3, 2, 1, PAL.pink);
-      g.px(sx - 2, top - 1, PAL.magenta); g.px(sx + 2, top - 3, PAL.ink);
-    }
+    // little dots on the band
+    if (!flash) { g.px(Math.round(bx) - 1, Math.round(by), PAL.purple); g.px(Math.round(bx) + 1, Math.round(by) - 1, PAL.purple); }
     // face
     const [hx, hy] = cs[n - 1];
     const ex = Math.round(hx), ey = Math.round(hy) - 2;
@@ -1626,11 +1623,11 @@ function drawMenuBackground() {
   const sx = Math.round(LW * 0.88), sy = Math.round(70 + Math.sin(t * 1.3) * 12);
   c.fillStyle = PAL.silver; c.fillRect(sx, 10, 1, sy - 28);
   c.drawImage(spiderSprite(Math.floor(t * 4) % 2).r, sx - 26, sy - 19);
-  // a big worm with its saddle, crawling along
+  // a big worm crawling along
   const S = LW >= 280 ? 3 : 2;
   const ws = wormSprite('crawl' + (Math.floor(t * 7) % 4), true, false);
   const wx = Math.round(LW * 0.4 - 20 * S), wy = gy - 15 * S + S;
-  c.drawImage(ws.r, wx, wy, 40 * S, 15 * S);
+  c.drawImage(ws.r, wx, wy, 40 * S, 16 * S);
   // a baby worm hopping in front
   const hop = Math.round(Math.abs(Math.sin(t * 4)) * 14);
   c.drawImage(babySprite(Math.floor(t * 10) % 2).r, wx + 40 * S + 2, gy - 16 - hop + 2, 24, 16);
