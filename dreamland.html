@@ -19,6 +19,9 @@
 html,body{height:100%;margin:0;overflow:hidden;background:#24124a;color:var(--cream);font-family:var(--f-body);-webkit-user-select:none;user-select:none;touch-action:none}
 canvas{display:block;width:100%;height:100%}
 #game{position:fixed;inset:0;overflow:hidden}
+#game canvas{filter:saturate(1.18) contrast(1.03)} /* bring the candy colours back after the film look */
+/* a soft vignette: the corners go a touch darker so the middle of the picture pops */
+#game::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(40,10,70,.38) 100%)}
 /* soft dark corners, like an old dreamy photo */
 /* a soft film grain over everything, so it feels crafted rather than plasticky */
 #game::before{content:"";position:absolute;inset:-50%;z-index:1;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
@@ -326,7 +329,7 @@ function loadModels(done) {
   // load the helpers one after another: the model loader, then the glow (bloom) effect
   const EX = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/';
   const files = ['loaders/GLTFLoader.js', 'shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js',
-    'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js'];
+    'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js', 'shaders/FXAAShader.js'];
   // download them all at the same time, but run them in order (async = false)
   const next = () => {
     let left = files.length;
@@ -359,6 +362,8 @@ renderer.setSize(innerWidth, innerHeight);
 // real shadows: things standing on the ground cast a soft shadow under them
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// film-style colour: very bright things roll off gently instead of turning into flat white
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.18;
 $('game').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xc493f2, 40, 230);
@@ -372,10 +377,14 @@ if (THREE.EffectComposer && THREE.UnrealBloomPass) {
     composer = new THREE.EffectComposer(renderer);
     composer.addPass(new THREE.RenderPass(scene, camera));
     composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .45, .35, .97));
+    if (THREE.FXAAShader) { composer.fxaa = new THREE.ShaderPass(THREE.FXAAShader); composer.addPass(composer.fxaa); } // smooths jagged edges
   } catch (e) { composer = null; }
 }
+function sizeComposer() { if (!composer) return; composer.setSize(innerWidth, innerHeight);
+  if (composer.fxaa) { const pr = renderer.getPixelRatio(); composer.fxaa.uniforms.resolution.value.set(1 / (innerWidth * pr), 1 / (innerHeight * pr)); } }
+sizeComposer();
 addEventListener('resize', () => {
-  renderer.setSize(innerWidth, innerHeight); if (composer) composer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth, innerHeight); sizeComposer();
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
 });
 
@@ -2027,7 +2036,7 @@ let gfx = saved.settings.gfx || 'auto', fancy = gfx !== 'fast', fpsT = 0, fpsN =
 function applyGfx() {
   renderer.shadowMap.enabled = fancy; sun.castShadow = fancy;
   renderer.setPixelRatio(fancy ? Math.min(devicePixelRatio, 1.5) : 1); renderer.setSize(innerWidth, innerHeight);
-  if (composer) composer.setSize(innerWidth, innerHeight);
+  sizeComposer();
   scene.traverse(o => { if (o.material && o.material.needsUpdate !== undefined && o.isMesh) o.material.needsUpdate = true; });
 }
 $('setGfx').value = gfx;
@@ -2889,12 +2898,12 @@ function updateBolts(dt) {
 {
   const a = makeArea('cloud', {
     title: 'Cloud City', sub: 'Jump from cloud to cloud. Don\'t look down!', goal: 'Reach the Storm Machine',
-    fog: [0xb8a0ff, 30, 170], next: 'mirror', h: () => -60,
+    fog: [0xb8a0ff, 30, 170], next: 'mirror', h: () => -60, bloom: .3,
     keyText: 'The storm clears… and a portal to the MIRROR MAZE opens.',
   });
   a.start = { x: 0, y: .1, z: 2, yaw: Math.PI };
   a.falls = 0; a.plats = [];
-  const puffM = [0xffffff, 0xfff0fb, 0xf0e6ff].map(c => mat(c, { flatShading: false, shininess: 20 }));
+  const puffM = [0xf6f0ff, 0xffe9f7, 0xe9e2ff].map(c => mat(c, { flatShading: false, shininess: 30, specular: 0xffd6f0 }));
   const stormM = mat(0x8a809a, { flatShading: false });
   // a cloud platform: a flat solid top with puffy balls around it
   const cloud = (x, y, z, r, kind = 'cloud', extra = {}) => {
