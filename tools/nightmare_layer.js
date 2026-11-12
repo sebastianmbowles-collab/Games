@@ -75,7 +75,7 @@ const NM = { fear: 0, flash: true, battery: 100, figures: [], whisperT: 4, boltT
     const g = new THREE.Group(), y = terrainH(x, z);
     const post = mesh(new THREE.CylinderGeometry(.05, .07, 1.6, 6), mat(0x2a2030)); post.position.y = .8; g.add(post);
     const lamp = mesh(new THREE.SphereGeometry(.16, 10, 8), glow(0xffc070)); lamp.position.y = 1.7; g.add(lamp);
-    const h = halo(0xffb060, 3.2, .75); h.position.y = 1.7; g.add(h);
+    const h = halo(0xffb060, 2.1, .5); h.position.y = 1.7; g.add(h);
     const l = new THREE.PointLight(0xffa050, 1.1, 7, 1.6); l.position.y = 1.8; g.add(l);
     g.position.set(x, y, z); scene.add(g); return { x, z, g, l, h, area: 'home' };
   });
@@ -344,7 +344,7 @@ function nightmareTick(dt, time) {
   const L = (area, pts) => pts.forEach(([x, z]) => { const a = AREAS[area], g = new THREE.Group(), y = a.h(x, z);
     const post = mesh(new THREE.CylinderGeometry(.05, .07, 1.6, 6), mat(0x2a2030)); post.position.y = .8; g.add(post);
     const lamp = mesh(new THREE.SphereGeometry(.16, 10, 8), glow(0xffc070)); lamp.position.y = 1.7; g.add(lamp);
-    const h = halo(0xffb060, 3.2, .75); h.position.y = 1.7; g.add(h); const l = new THREE.PointLight(0xffa050, 1.1, 7, 1.6); l.position.y = 1.8; g.add(l);
+    const h = halo(0xffb060, 2.1, .5); h.position.y = 1.7; g.add(h); const l = new THREE.PointLight(0xffa050, 1.1, 7, 1.6); l.position.y = 1.8; g.add(l);
     g.position.set(x, y < -20 ? topAt(a, x, z) : y, z); a.group.add(g); NM.lanterns.push({ x, z, g, l, h, area }); });
   // the five levels, in order
   const LEVELS = [
