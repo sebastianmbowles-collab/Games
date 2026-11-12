@@ -217,6 +217,9 @@ body.angry #fear .angerRow{display:block}
 body.title #breath,body.cine #breath{display:none}
 #game{transition:transform .8s ease}
 #game.tilt{transform:rotate(9deg) scale(1.18)}
+/* the nightmare: less candy, more contrast, and a heavier, blacker vignette */
+#game canvas{filter:saturate(1.02) contrast(1.1) brightness(.96)}
+#game::after{background:radial-gradient(ellipse at 50% 45%,transparent 45%,rgba(0,0,0,.62) 100%)}
 </style>
 </head>
 <body>
@@ -3241,7 +3244,8 @@ function updateBolts(dt) {
     if (ri === 2) messages.push({ m: bd, x: x + side * 7, y: 0, z, found: false, area: a.name }); // a hidden message on a blackboard
   });
   // hanging lamps (hanging UP from the floor of the ceiling world… and real ones on the real ceiling)
-  for (let z = 4; z < 80; z += 6) for (const x of [-12, 0, 12]) { const lamp = mesh(new THREE.CylinderGeometry(.5, .2, .3, 10), glow(0xd8c8a0)); lamp.position.set(x, H - .2, z); a.group.add(lamp); lamp.add(at(halo(0xfff2c8, 1.6, .25), 0, -.3, 0)); }
+  for (let z = 4; z < 80; z += 6) for (const x of [-12, 0, 12]) { const lamp = mesh(new THREE.CylinderGeometry(.5, .2, .3, 10), glow(0xfff0c8)); lamp.position.set(x, H - .2, z); a.group.add(lamp); lamp.add(at(halo(0xfff2c8, 2.2, .35), 0, -.3, 0));
+    if (x === 0 && z % 12 === 4) { const l = new THREE.PointLight(0xffd9a0, .9, 14, 1.4); l.position.set(0, H - 1.2, z); a.group.add(l); } } // warm pools of light along the corridor
   
   // upside-down clocks and a sign
   [[0, 3.4, .3, 0], [0, 3.4, 51.7, Math.PI]].forEach(([x, y, z, ry]) => { const c = mesh(new THREE.CylinderGeometry(.7, .7, .1, 20), mat(0xffffff)); c.rotation.x = Math.PI / 2; c.position.set(x, y, z); a.group.add(c);

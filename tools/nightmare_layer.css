@@ -44,3 +44,6 @@ body.angry #fear .angerRow{display:block}
 body.title #breath,body.cine #breath{display:none}
 #game{transition:transform .8s ease}
 #game.tilt{transform:rotate(9deg) scale(1.18)}
+/* the nightmare: less candy, more contrast, and a heavier, blacker vignette */
+#game canvas{filter:saturate(1.02) contrast(1.1) brightness(.96)}
+#game::after{background:radial-gradient(ellipse at 50% 45%,transparent 45%,rgba(0,0,0,.62) 100%)}
