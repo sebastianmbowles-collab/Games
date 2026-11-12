@@ -51,3 +51,10 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## PAINT SNAKE
+
+`PaintSnake.html` is a cute cartoon snake game, all in one file. Open it in any browser (touch, drag to steer; or arrow keys).
+A green googly-eyed snake leaves a paint stripe behind it. Close a loop to splat the inside with paint and catch anything inside, but only if your paint is the same color as the thing.
+Slither over paint pots to mix colors (red + blue = purple, red + yellow = orange, blue + yellow = green, all three = mud) and wash in the puddle to start over.
+Erasers munch your paint and bonk you; trap them in a loop to pop them. 8 levels, stars for not getting bonked, and progress is saved in the browser.
