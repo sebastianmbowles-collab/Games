@@ -51,3 +51,10 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## SNEAKY BUGS
+
+`SneakyBugs.html` is an original secret-traitor game, all in one file. Open it in any browser (keyboard or touch).
+You are a helper program inside a computer, building a video game with 5 to 11 computer-controlled players. Some of them are secretly Bugs.
+Helpers win by finishing every job (8 mini-games, including Snake) or voting out all the Bugs. Bugs win by zapping helpers or overheating the computer.
+It has 12 roles (Helper, Debugger, Scanner, Firewall, Tracker, Rebooter, Turbo, Bug, Mimic, Phantom, Lag Bug, Prankster), meetings with chat and voting, three kinds of sabotage, cable ports, security cameras and a map.
