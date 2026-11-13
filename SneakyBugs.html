@@ -38,7 +38,9 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid 
 #tr{position:absolute;top:10px;right:max(12px,env(safe-area-inset-right,0px));display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;max-width:38vw}
 #rolechip{font-weight:700;padding:6px 12px;border-radius:999px;background:var(--panel);border:2px solid var(--line);font-size:14px}
 .ib{width:40px;height:40px;border-radius:12px;background:var(--panel);border:2px solid var(--line);font-size:18px}
-#alert{position:absolute;top:64px;left:50%;transform:translateX(-50%);background:var(--bad);color:#fff;font-weight:700;padding:8px 16px;border-radius:12px;text-align:center;max-width:86vw;animation:pulse 1s infinite}
+#emo{position:absolute;top:58px;right:max(12px,env(safe-area-inset-right,0px));display:flex;gap:4px}
+.eb{width:36px;height:36px;border-radius:10px;background:var(--panel);border:2px solid var(--line);font-size:16px;padding:0}
+#alert{position:absolute;top:104px;left:50%;transform:translateX(-50%);background:var(--bad);color:#fff;font-weight:700;padding:8px 16px;border-radius:12px;text-align:center;max-width:86vw;animation:pulse 1s infinite}
 @keyframes pulse{50%{filter:brightness(1.35)}}
 #toast{position:absolute;top:30%;left:50%;transform:translateX(-50%);background:rgba(10,16,34,.92);border:2px solid var(--cyan);padding:10px 18px;border-radius:14px;font-weight:600;text-align:center;max-width:84vw;pointer-events:none;transition:opacity .3s}
 #acts{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:14px;display:flex;flex-wrap:wrap-reverse;gap:8px;justify-content:flex-end;max-width:min(330px,62vw)}
@@ -143,6 +145,7 @@ kbd{font:700 12px var(--mono);background:#0b1126;border:1px solid var(--line);bo
 <div id="hud" hidden>
   <div id="tl"><div id="barlab">Game built: 0%</div><div id="barwrap"><div id="bar"></div></div><ul id="tasks"></ul></div>
   <div id="tr"><span id="rolechip"></span><button class="ib" id="bMap" title="Map (M)">🗺️</button><button class="ib" id="bMute" title="Sound">🔊</button><button class="ib" id="bQuit" title="Quit to menu">✖</button></div>
+  <div id="emo"><button class="eb" data-e="0" title="Wave (1)">👋</button><button class="eb" data-e="1" title="Happy (2)">😄</button><button class="eb" data-e="2" title="Hmm (3)">🤔</button><button class="eb" data-e="3" title="Look! (4)">❗</button></div>
   <div id="alert" hidden></div>
   <div id="toast" style="opacity:0"></div>
   <div id="joy" hidden><div id="knob"></div></div>
@@ -186,6 +189,7 @@ kbd{font:700 12px var(--mono);background:#0b1126;border:1px solid var(--line);bo
         <li>Found a crashed helper? Press <kbd>R</kbd> to <b>report</b> it. Everyone meets, talks, and votes.</li>
         <li>You can also ring the <b>bell</b> in the CPU Core to call a meeting (once per game).</li>
         <li>Special roles use their power with <kbd>F</kbd>. Press <kbd>M</kbd> for the map.</li>
+        <li>Say hi! Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> to pop up an emoji. Nearby robots answer back.</li>
         <li>If something breaks (lights, fan, network), follow the red arrow and fix it fast!</li>
       </ul><div class="btns"><button class="big alt sm" data-back>← Back</button></div></div>
   </div>
@@ -332,6 +336,9 @@ let AC=null;
 function beep(f,d=.1,type='square',v=.05){ if(SAVE.mute)return; try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.value=v;g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){} }
 const jingle=(ns,gap=90)=>ns.forEach((n,i)=>setTimeout(()=>beep(n,.14,'triangle',.07),i*gap));
 
+const TUNE=[196,0,294,0,247,294,0,392,220,0,330,0,262,330,0,440,175,0,262,0,220,262,0,349,196,0,294,0,247,294,392,0];let tuneI=0;
+setInterval(()=>{ if(!G||G.phase!=='play'||SAVE.mute||!AC||document.hidden)return; const tense=!!G.sab,f=TUNE[tuneI++%TUNE.length];
+  if(f)beep(tense?f*.75:f,.2,'triangle',.02); if(tuneI%4===1)beep(tense?55:98,.12,'square',.01) },190);
 /* ---------- game state ---------- */
 let G=null,M=null,TW=null,OV=null,T=0,SPEED=1;
 const keys={},joy={x:0,y:0};
@@ -346,7 +353,7 @@ function newGame(){
   const ps=[];
   for(let i=0;i<n;i++){const a=i/n*Math.PI*2;
     ps.push({id:i,isHuman:i===0,name:i===0?(SAVE.name.trim()||'You'):names[i],color:COLORS[i===0?SAVE.color:cols[i-1]][1],hat:i===0?HATS[SAVE.hat]:(Math.random()<.5?pick(HATS):'none'),
-      x:1200+Math.cos(a)*120,y:800+Math.sin(a)*120,face:1,walk:0,alive:true,killCd:15,abCd:8,abUses:0,shieldBy:null,disguise:null,disT:0,invisT:0,turboT:0,inPort:-1,bell:1,
+      x:1200+Math.cos(a)*120,y:800+Math.sin(a)*120,face:1,walk:0,alive:true,killCd:15,abCd:8,abUses:0,shieldBy:null,disguise:null,disT:0,invisT:0,turboT:0,inPort:-1,bell:1,bub:'',bubT:0,
       path:[],state:'pause',wait:rand(.5,3),sus:{},gt:rand(10,16),reportT:0,seenBody:null,witness:null,sawPort:null,scans:[],scanned:{},portDest:-1,cur:null,sabId:0,selfRep:false})}
   let order=shuffle(ps.map(p=>p.id));const roleOf={};
   if(want!=='random'){roleOf[0]=want;order=order.filter(i=>i!==0)}
@@ -398,7 +405,7 @@ function endGame(w,why,prank){
 function crash(v,k){
   v.alive=false;v.disguise=null;v.invisT=0;v.inPort=-1;G.bodies.push({id:v.id,x:v.x,y:v.y});
   const seen=k&&k.invisT<=0;v.sawKiller=seen?lookId(k):null;if(v.sawKiller===v.id)v.sawKiller=k.id;
-  if(seen)for(const w of G.players)if(w.alive&&!w.isHuman&&w.id!==k.id&&w.team!=='b'&&dist(w,k)<visR(w)){const L=lookId(k)===w.id?k.id:lookId(k);w.sus[L]=100;w.witness={k:L,v:v.id}}
+  if(seen)for(const w of G.players)if(w.alive&&!w.isHuman&&w.id!==k.id&&w.team!=='b'&&dist(w,k)<visR(w)){const L=lookId(k)===w.id?k.id:lookId(k);w.sus[L]=100;w.witness={k:L,v:v.id};emote(w,'😱',2)}
   if(v.isHuman){toast('You got zapped! You are a ghost now. You can still finish your jobs.',5);closeMG();closeOV();show('sabwin',0)}
   beep(90,.35,'sawtooth',.08);G.hudKey='';
   if(v.isHuman||!G.me.alive||dist(G.me,v)<visR(G.me)){burst(v.x,v.y,'#ffd45e',20);burst(v.x,v.y,'#ff5d78',8,90);SHAKE=.35;if(v.isHuman)FLASH=.6}
@@ -436,6 +443,11 @@ function usePower(p){ // returns true when used
   }
   p.abCd=r.cd;return true }
 
+/* ---------- emotes ---------- */
+const EMO=['👋','😄','🤔','❗'];
+function emote(p,e,t=1.6){p.bub=e;p.bubT=t}
+function myEmote(i){ if(!G||G.phase!=='play'||TW||OV)return; const me=G.me; if(!me.alive||me.inPort>=0)return; emote(me,EMO[i],2);beep(700+i*90,.06,'triangle');
+  for(const q of G.players)if(q.alive&&!q.isHuman&&q.inPort<0&&dist(q,me)<180&&Math.random()<.75)setTimeout(()=>G&&G.phase==='play'&&q.alive&&emote(q,pick(i===3?['❓','👀','😮']:['👋','😄','🤖','💙']),1.6),300+Math.random()*700) }
 /* ---------- bots ---------- */
 function go(p,room,pt){p.path=pathTo(p,room,pt)}
 function follow(p,dt){ if(!p.path.length)return true; const t=p.path[0],d=dist(p,t),sp=speedOf(p)*dt;
@@ -458,7 +470,7 @@ function botStep(p,dt){
   // bodies: report (or reboot)
   if(p.reportT>0){p.reportT-=dt;if(p.reportT<=0){const b=G.bodies.includes(p.seenBody)?p.seenBody:null;p.seenBody=null;
       if(b&&dist(p,b)<300){ if(p.role==='rebooter'&&p.abUses>0)revive(p,b); else{startMeeting(p,b);return} } }}
-  else if(!isBug||p.selfRep){for(const b of G.bodies)if(dist(p,b)<visR(p)){p.seenBody=b;p.reportT=rand(.7,1.7);break}}
+  else if(!isBug||p.selfRep){for(const b of G.bodies)if(dist(p,b)<visR(p)){p.seenBody=b;p.reportT=rand(.7,1.7);emote(p,'😱',2);break}}
   // helper powers
   if(p.role==='scanner'||p.role==='firewall'){if(p.abCd<=0&&Math.random()<dt*.5)usePower(p)}
   else if(p.role==='turbo'){if(p.abCd<=0&&Math.random()<dt*.1)usePower(p)}
@@ -476,13 +488,13 @@ function botStep(p,dt){
   }
   if(isBug&&!G.sab&&G.sabCd<=0&&Math.random()<dt*.035)startSab(pick(['lights','heat','jam']));
   // sabotage response
-  if(G.sab){ if(p.sabId!==G.sab.id){p.sabId=G.sab.id;if(!isBug&&Math.random()<{heat:.65,lights:.35,jam:.35}[G.sab.type]){const f=SPECIAL[G.sab.type];p.state='fix';go(p,roomAt(f.x,f.y),{x:f.x+rand(-25,25),y:f.y+rand(10,30)})}} }
+  if(G.sab){ if(p.sabId!==G.sab.id){p.sabId=G.sab.id;if(!isBug&&Math.random()<{heat:.65,lights:.35,jam:.35}[G.sab.type]){const f=SPECIAL[G.sab.type];emote(p,'❗',1.5);p.state='fix';go(p,roomAt(f.x,f.y),{x:f.x+rand(-25,25),y:f.y+rand(10,30)})}} }
   else if(p.state==='fix'){p.state='pause';p.wait=.5;p.path=[]}
   switch(p.state){
    case 'fix': if(follow(p,dt)&&G.sab){G.sab.fix+=dt;if(G.sab.fix>=4)endSab(true)} break;
-   case 'pause': p.wait-=dt;if(p.wait<=0)nextGoal(p);break;
-   case 'travel': if(follow(p,dt)){p.state='work';p.wait=rand(7,12)} break;
-   case 'work': p.wait-=dt;if(p.wait<=0){if(p.cur){p.cur.done=true;if(p.team==='h'){G.done++;if(checkWin())return}}p.cur=null;p.state='pause';p.wait=rand(1,5)} break;
+   case 'pause': p.wait-=dt;if(p.bubT<=0&&Math.random()<dt*.12)emote(p,nearestOther(p,90)?'👋':pick(['🎵','🤔','💤','😄']),1.5);if(p.wait<=0)nextGoal(p);break;
+   case 'travel': if(follow(p,dt)){p.state='work';p.wait=rand(7,12);if(Math.random()<.6)emote(p,pick(['🔧','💻','🎵','🤓']),2)} break;
+   case 'work': p.wait-=dt;if(p.wait<=0){if(p.cur){p.cur.done=true;if(p.team==='h'){G.done++;if(checkWin())return}}emote(p,pick(['✅','😄','👍']),1.3);p.cur=null;p.state='pause';p.wait=rand(1,5)} break;
    case 'wander': if(follow(p,dt)){p.state='pause';p.wait=rand(2,6)} break;
    case 'hunt':{p.huntT-=dt;const prey=G.players[p.prey];if(p.huntT<=0||!prey.alive||p.killCd>4){p.state='pause';p.wait=.3;break}
      p.repath-=dt;if(p.repath<=0){p.repath=1.2;const r=roomAt(prey.x,prey.y);if(r>=0)go(p,r,{x:prey.x,y:prey.y})}
@@ -542,7 +554,7 @@ function update(dt){
   G.sabCd-=dt;G.bellCd-=dt;G.lagT-=dt;
   if(G.tag){G.tag.t-=dt;if(G.tag.t<=0||!G.players[G.tag.id].alive)G.tag=null}
   if(G.sab&&G.sab.type==='heat'){G.sab.t-=dt;if(G.sab.t<=0){endGame('b','The computer overheated!');return}}
-  for(const p of G.players){p.disT-=dt;if(p.disT<=0)p.disguise=null;p.invisT-=dt;p.turboT-=dt;
+  for(const p of G.players){p.bubT-=dt;p.disT-=dt;if(p.disT<=0)p.disguise=null;p.invisT-=dt;p.turboT-=dt;
     if(p.isHuman){p.killCd-=dt;p.abCd-=dt;moveHuman(p,dt)}else{p.killCd-=dt;p.abCd-=dt;botStep(p,dt)}
     if(G.phase!=='play')return}
 }
@@ -573,7 +585,8 @@ function buildChat(rep,body){
   const bots=shuffle(G.players.filter(p=>!p.isHuman&&p.alive));let filler=0;
   for(const p of bots)if(p.team!=='b'&&p.witness&&G.players[p.witness.k].alive&&p.witness.k!==p.id){const k=G.players[p.witness.k];
     say(p,p.witness.v===p.id?`${k.name} zapped ME! Then I got rebooted!`:`I SAW ${k.name} zap ${nm(p.witness.v)}!`,{id:k.id,d:45});
-    if(!k.isHuman)say(k,pick(['That is NOT true!',`${p.name} is making that up!`,'What?! I was doing my jobs!']))}
+    if(!k.isHuman)say(k,pick(['That is NOT true!',`${p.name} is making that up!`,'What?! I was doing my jobs!']));
+    const o=bots.find(b=>b!==p&&b!==k&&b.team!=='b');if(o)say(o,pick(['Whoa!','I knew something was off!','Are you sure?','Uh oh...']))}
   for(const p of bots)if(p.team!=='b'){
     for(const s of p.scans)if(G.players[s.id].alive)say(p,s.bug?`My scanner says ${nm(s.id)} is a BUG!`:`I scanned ${nm(s.id)}. Not a Bug.`,{id:s.id,d:s.bug?60:-40});p.scans=[];
     if(p.sawPort!=null&&G.players[p.sawPort].alive&&!(p.witness&&p.witness.k===p.sawPort))say(p,`I saw ${nm(p.sawPort)} crawl through a cable port! Only Bugs can do that!`,{id:p.sawPort,d:45})}
@@ -586,6 +599,7 @@ function buildChat(rep,body){
       if(top)say(p,pick([`${top.name} is acting kind of glitchy...`,`I do not trust ${top.name}.`]),{id:top.id,d:6});
       else if(p.buddy!=null&&G.players[p.buddy].alive)say(p,`${nm(p.buddy)} was with me. They seem okay.`,{id:p.buddy,d:-8});
       else say(p,`I was in ${p.lastRoom} doing my jobs.`)}}
+  if(bots.length>2){const[a,b]=shuffle([...bots]);say(a,pick([`${b.name}, you are very quiet...`,`${b.name}, what do you think?`,'This is so stressful! My circuits are buzzing.']));say(b,pick(['I am thinking!','Shh, I am counting clues.','Let us look at who was alone.','Beep. No comment.']))}
   return L }
 function applyFx(from,fx){ if(!fx)return; for(const w of G.players)if(w.alive&&!w.isHuman&&w.team!=='b'&&w!==from&&w.id!==fx.id&&Math.abs(w.sus[fx.id]||0)<90)w.sus[fx.id]=(w.sus[fx.id]||0)+fx.d }
 function chatLine(p,t){const d=document.createElement('div');d.className='cl'+(p?'':' sys');d.innerHTML=p?`${mini(p)}<span><b style="--c:${p.color}">${esc(p.name)}:</b> ${esc(t)}</span>`:esc(t);$('chat').appendChild(d);$('chat').scrollTop=1e6;if(p)beep(500+p.id*40,.04,'sine',.03)}
@@ -786,6 +800,7 @@ function drawBot(c,x,y,col,o){
   c.restore();
   if(o.shield){c.strokeStyle='rgba(255,158,107,.9)';c.lineWidth=2;c.setLineDash([5,4]);c.beginPath();c.arc(x,y-2,30,T*2,T*2+6.283);c.stroke();c.setLineDash([])}
   if(o.name){c.globalAlpha=o.ghost?.6:(o.a==null?1:o.a);txt(c,o.name,x,y-44,12,o.nc||'#fff');c.globalAlpha=1}
+  if(o.bub){const by=Math.round(y-70+Math.sin(T*6)*2);c.fillStyle='#0b1020';c.fillRect(x-17,by-15,34,30);c.fillStyle='#fff';c.fillRect(x-15,by-13,30,26);c.fillRect(x-3,by+13,6,5);txt(c,o.bub,x,by+1,16)}
 }
 function drawBody(c,b){const p=G.players[b.id];c.save();c.translate(Math.round(b.x),Math.round(b.y)+8);c.rotate(Math.PI/2);c.imageSmoothingEnabled=false;c.scale(3,3);c.drawImage(sprite(p.color,'none',5),-7,-10);c.restore();
   c.fillStyle='#ffd45e';for(let i=0;i<4;i++){const a=T*5+i*1.7+b.x,r=22+Math.sin(T*9+i)*7;c.fillRect(Math.round(b.x+Math.cos(a)*r),Math.round(b.y+Math.sin(a)*r),4,4)}}
@@ -823,13 +838,26 @@ function drawMap(c){
   c.imageSmoothingEnabled=false;c.drawImage(MAPCV,0,0);
   c.fillStyle='rgba(111,227,255,.55)';HALLS.forEach((h,i)=>{const L=h.hz?h.w:h.h;for(let k=0;k<2;k++){const d=(T*70+i*90+k*L/2)%L;if(h.hz)c.fillRect(h.x+d,h.y+h.h/2-3+(k?10:-10),10,6);else c.fillRect(h.x+h.w/2-3+(k?10:-10),h.y+d,6,10)}});
   for(const r of ROOMS){c.globalAlpha=.45;txt(c,r.n.toUpperCase(),r.x+r.w/2,r.y+r.h/2+(r===ROOMS[0]?70:0),22,'#fff');c.globalAlpha=1}
+  DECOR.forEach(([k,x,y],i)=>{
+    if(k==='rack'){for(let j=0;j<3;j++)if(Math.sin(T*(3+j)+i*1.7+j)>0){c.fillStyle=j===1?'#5ef0b8':j?'#ffd45e':'#ff5d78';c.fillRect(x+8+j*8,y+8+((i+j)%5)*8,4,4)}}
+    else if(k==='speaker'){const ph=(T*.8+i*.37)%1;c.globalAlpha=1-ph;txt(c,'♪',x+16+Math.sin(ph*6+i)*8,y-6-ph*34,16,'#ffd45e');c.globalAlpha=1}
+    else if(k==='battery'){c.fillStyle='rgba(94,240,184,'+(.25+.25*Math.sin(T*3+i))+')';c.fillRect(x+8,y+16,16,12)}});
+  drawCrit(c);
   c.save();c.translate(600,1380);c.rotate(T*(G&&G.sab&&G.sab.type==='heat'?.5:4));c.fillStyle='rgba(111,227,255,.45)';for(let i=0;i<4;i++){c.rotate(Math.PI/2);c.fillRect(6,-8,44,16)}c.fillStyle='#ecf3ff';c.fillRect(-7,-7,14,14);c.restore();
 }
+/* ---------- bitlings: tiny critters that scurry around ---------- */
+const CRIT=[];
+function critInit(){for(let i=0;i<10;i++){const r=ROOMS[i%9];CRIT.push({x:r.x+r.w/2+rand(-80,80),y:r.y+r.h/2+rand(-60,60),path:[],wait:rand(0,3),col:pick(['#5ef0b8','#6fe3ff','#ffd45e','#ff9ad1']),f:1,run:0})}}
+function critStep(dt){for(const k of CRIT){k.run-=dt;
+  if(G&&G.phase==='play'&&k.run<=0)for(const p of G.players)if(p.alive&&p.inPort<0&&Math.abs(p.x-k.x)<55&&Math.abs(p.y-k.y)<55){k.run=1.6;k.wait=0;k.path=[];break}
+  if(!k.path.length){k.wait-=dt;if(k.wait<=0){const r=randi(0,8),R=ROOMS[r];k.path=pathTo(k,r,{x:R.x+rand(40,R.w-40),y:R.y+rand(40,R.h-40)});k.wait=rand(1,5)}continue}
+  const t=k.path[0],d=Math.hypot(t.x-k.x,t.y-k.y),sp=(k.run>0?270:80)*dt;if(d<=sp){k.x=t.x;k.y=t.y;k.path.shift()}else{if(Math.abs(t.x-k.x)>2)k.f=t.x<k.x?-1:1;k.x+=(t.x-k.x)/d*sp;k.y+=(t.y-k.y)/d*sp}}}
+function drawCrit(c){for(const k of CRIT){const x=Math.round(k.x),y=Math.round(k.y),w=k.path.length&&Math.floor(T*10)%2;c.fillStyle='rgba(0,0,0,.25)';c.fillRect(x-6,y+6,12,3);c.fillStyle=k.col;c.fillRect(x-6,y-4,12,8);c.fillRect(k.f>0?x+3:x-6,y-7,3,3);c.fillRect(x-5+(w?0:2),y+4,3,3);c.fillRect(x+2-(w?0:2),y+4,3,3);c.fillStyle='#0b1020';c.fillRect(k.f>0?x+1:x-4,y-2,3,3)}}
 /* ---------- sparks, shake, flash ---------- */
 const FX=[];let SHAKE=0,FLASH=0;
 function burst(x,y,col,n=14,sp=170){for(let i=0;i<n;i++){const a=rand(0,6.28),v=rand(.3,1)*sp;FX.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:rand(.35,.8),col})}}
 function fxStep(dt){SHAKE-=dt;FLASH-=dt;for(let i=FX.length-1;i>=0;i--){const p=FX[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.94;p.vy*=.94;p.l-=dt;if(p.l<=0)FX.splice(i,1)}}
-function drawFx(c){for(const p of FX){c.globalAlpha=Math.min(1,p.l*3);c.fillStyle=p.col;c.fillRect(Math.round(p.x)-3,Math.round(p.y)-3,6,6)}c.globalAlpha=1}
+function drawFx(c){for(const p of FX){c.globalAlpha=Math.min(1,p.l*3);c.fillStyle=p.col;const z=p.s||6;c.fillRect(Math.round(p.x-z/2),Math.round(p.y-z/2),z,z)}c.globalAlpha=1}
 function drawStations(c,me){
   const mine=new Set(me&&me.team!=='b'?me.tasks.filter(t=>!t.done).map(t=>t.s):[]);
   const tm=prop('term');c.imageSmoothingEnabled=false;
@@ -849,7 +877,7 @@ function drawPlayers(c,me,all){
     else if(p.invisT>0){if(all||(p!==me&&me.alive&&me.team!=='b'))continue;a=.4}
     if(!all&&me.alive&&p!==me&&dist(me,p)>visR(me))continue;
     const L=G.players[lookId(p)],mate=!all&&me.team==='b'&&p.team==='b';
-    drawBot(c,p.x,p.y,L.color,{moving:p.mv,face:p.face,walk:p.walk,hat:L.hat,ghost:!p.alive,a,name:L.name,nc:mate?'#ff8fa3':'#fff',shield:!all&&p.shieldBy===me.id&&me.role==='firewall'});
+    drawBot(c,p.x,p.y,L.color,{bub:p.bubT>0&&p.alive?p.bub:null,moving:p.mv,face:p.face,walk:p.walk,hat:L.hat,ghost:!p.alive,a,name:L.name,nc:mate?'#ff8fa3':'#fff',shield:!all&&p.shieldBy===me.id&&me.role==='firewall'});
   }
 }
 function arrow(c,cam,S,o,col,label){const dx=o.x-cam.x,dy=o.y-cam.y,d=Math.hypot(dx,dy);if(d*S<Math.min(VW,VH)*.38)return;const a=Math.atan2(dy,dx),r=Math.min(VW,VH)*.36;
@@ -919,7 +947,11 @@ let last=performance.now();
 function frame(now){
   const raw=Math.min(.05,(now-last)/1000);last=now;
   for(let i=0;i<SPEED;i++){T+=raw;if(G)update(raw);if(TW)mgFrame(raw)}
-  fxStep(raw);if(G)for(const p of G.players){p.mv=p.walk!==p._lw;p._lw=p.walk}
+  fxStep(raw);critStep(raw);
+  if(G&&G.phase==='play')for(const p of G.players){if(p.inPort>=0||!p.alive||p.invisT>0||dist(p,G.me)>520)continue;
+    if(p.mv&&Math.random()<raw*7)FX.push({x:p.x+rand(-6,6),y:p.y+18,vx:rand(-15,15),vy:rand(-25,-5),l:.35,s:4,col:'rgba(200,210,235,.55)'});
+    else if(p.state==='work'&&!p.isHuman&&Math.random()<raw*3)FX.push({x:p.x+rand(-14,14),y:p.y-30,vx:rand(-20,20),vy:rand(-50,-20),l:.5,s:4,col:'#6fe3ff'})}
+if(G)for(const p of G.players){p.mv=p.walk!==p._lw;p._lw=p.walk}
   render();if(G&&G.phase!=='end'){hud();if(OV)ovFrame()}
   requestAnimationFrame(frame);
 }
@@ -933,11 +965,12 @@ window.addEventListener('keydown',e=>{
   if(!G)return;
   if(G.phase==='reveal'&&(k==='enter'||k===' ')){beginPlay();return}
   if(e.repeat)return;
-  if(k==='e'||k===' ')doUse();else if(k==='r')doReport();else if(k==='q')doZap();else if(k==='f')doPower();else if(k==='x')doSab();else if(k==='v')doPort();else if(k==='m'){OV?closeOV():openOV('map')}
+  if(k==='e'||k===' ')doUse();else if(k==='r')doReport();else if(k==='q')doZap();else if(k==='f')doPower();else if(k==='x')doSab();else if(k==='v')doPort();else if(k==='m'){OV?closeOV():openOV('map')}else if(k>='1'&&k<='4')myEmote(+k-1)
 });
 window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
 window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
 const tap=(id,fn)=>$(id).addEventListener('click',fn);
+document.querySelectorAll('[data-e]').forEach(b=>b.addEventListener('click',()=>myEmote(+b.dataset.e)));
 tap('bUse',doUse);tap('bRep',doReport);tap('bZap',doZap);tap('bPow',doPower);tap('bSab',doSab);tap('bPort',doPort);
 tap('bMap',()=>OV?closeOV():openOV('map'));tap('mgX',closeMG);tap('ovX',closeOV);tap('sabX',()=>show('sabwin',0));tap('bGo',beginPlay);
 tap('bMute',()=>{SAVE.mute=!SAVE.mute;$('bMute').textContent=SAVE.mute?'🔇':'🔊';save()});
@@ -980,7 +1013,7 @@ function buildMenu(){
   tap('bStart',newGame);tap('bSnake',()=>openMG(MG.snake(true),'🐍 Snake arcade','arcade'));
   $('bMute').textContent=SAVE.mute?'🔇':'🔊';menuStats();
 }
-buildMap();buildMenu();resize();requestAnimationFrame(frame);
+buildMap();critInit();buildMenu();resize();requestAnimationFrame(frame);
 window.SB={get G(){return G},get M(){return M},set speed(v){SPEED=v},newGame,doKill,startSab,startMeeting,MG,openMG};
 </script>
 </body>
