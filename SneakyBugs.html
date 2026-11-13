@@ -62,10 +62,20 @@ h2{margin:0 0 8px;font-size:22px}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0}
 .row>label{font:700 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);width:74px}
 input[type=text],select{font:600 16px var(--display);background:#0b1126;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
-.sw{width:30px;height:30px;border-radius:9px;border:3px solid transparent;padding:0}
-.sw.on{border-color:#fff;transform:scale(1.12)}
-.hat{padding:6px 10px;border-radius:10px;background:#0b1126;border:2px solid var(--line);font-size:14px}
-.hat.on{border-color:var(--sun);color:var(--sun)}
+#locker{display:flex;gap:14px;flex-wrap:wrap;background:#0b1126;border:2px solid var(--line);border-radius:16px;padding:12px;margin:10px 0}
+#lockPrev{flex:none;width:136px;text-align:center;background:radial-gradient(circle at 50% 62%,#24336a,#0b1126 70%);border-radius:12px;padding:10px 0}
+#prevImg{width:112px;height:144px;image-rendering:pixelated;animation:bob 1.4s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-6px)}}
+#prevName{font-weight:700;font-size:17px;margin-top:4px}
+#lockSide{flex:1;min-width:210px}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tab{padding:6px 16px;border-radius:10px;background:var(--panel);border:2px solid var(--line);font-weight:700;font-size:15px}
+.tab.on{border-color:var(--sun);color:var(--sun)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:6px}
+.sw,.hat{padding:5px 4px;background:var(--panel);border:3px solid transparent;border-radius:12px}
+.sw img,.hat img{width:28px;height:36px;image-rendering:pixelated;display:block;margin:auto}
+.sw.on,.hat.on{border-color:var(--sun);background:var(--panel2)}
+@media (prefers-reduced-motion:reduce){#prevImg{animation:none}}
 .big{font-weight:700;font-size:20px;padding:12px 26px;border-radius:14px;border:0;background:var(--mint);color:#06241a}
 .big.alt{background:var(--panel2);color:var(--ink);border:2px solid var(--line)}
 .big.sm{font-size:15px;padding:9px 16px}
@@ -148,8 +158,11 @@ kbd{font:700 12px var(--mono);background:#0b1126;border:1px solid var(--line);bo
     <p class="sub">You are a tiny helper program inside Claude's computer, building a video game. But some helpers are secretly <b style="color:var(--bad)">Bugs</b> trying to crash everything. Finish the game, or find the Bugs and vote them out!</p>
     <div id="mMain">
       <div class="row"><label for="inName">Name</label><input type="text" id="inName" maxlength="10" value="You" style="width:140px"></div>
-      <div class="row"><label>Color</label><div id="swatches" style="display:flex;flex-wrap:wrap;gap:6px"></div></div>
-      <div class="row"><label>Hat</label><div id="hats" style="display:flex;flex-wrap:wrap;gap:6px"></div></div>
+      <div id="locker">
+        <div id="lockPrev"><img id="prevImg" alt="Your robot"><div id="prevName"></div></div>
+        <div id="lockSide"><div class="tabs"><button class="tab on" data-tab="swatches">Color</button><button class="tab" data-tab="hats">Hat</button></div>
+          <div id="swatches" class="grid"></div><div id="hats" class="grid" hidden></div></div>
+      </div>
       <div class="row"><label for="selRole">Role</label><select id="selRole"></select></div>
       <div class="row"><label for="selN">Players</label><select id="selN"></select>
         <label for="selB" style="width:auto">Bugs</label><select id="selB"><option>1</option><option>2</option><option>3</option></select></div>
@@ -712,6 +725,7 @@ const HATP={
  party:{oy:0,rows:['......yy......','......kk......','.....kkkk.....','.....kwkk.....','....kkkkkk....']},
  crown:{oy:1,rows:['...y..yy..y...','...yy.yy.yy...','...yyyyyyyy...','...yryyyyry...']},
  flower:{oy:0,rows:['......kk......','.....kyyk.....','.....kyyk.....','......kk......']},
+ propeller:{oy:1,rows:['..rrrrrrrrrr..']},
  headphones:{oy:4,rows:['...xxxxxxxx...','..x........x..','.x..........x.','.x..........x.','xx..........xx','xx..........xx','xx..........xx','xx..........xx']}};
 const SPR={},URLS={};
 // frames: 0 stand, 1 and 2 walk, 3 blink, 4 ghost, 5 crashed
@@ -722,7 +736,7 @@ function sprite(col,hat,f){const key=col+hat+f;if(SPR[key])return SPR[key];const
   rows.push(...(f===1?['..OO....OO..','........OO..']:f===2?['..OO....OO..','..OO........']:f===4?['..O.OO.OO.O.']:['..OO....OO..','..OO....OO..']));
   px(rows,pal,c,1,2);const H=HATP[hat];if(H)px(H.rows,pal,c,0,H.oy);
   return SPR[key]=cv}
-function miniURL(p){const k=p.color+p.hat;return URLS[k]||(URLS[k]=sprite(p.color,p.hat==='propeller'?'none':p.hat,0).toDataURL())}
+function miniURL(p){const k=p.color+p.hat;return URLS[k]||(URLS[k]=sprite(p.color,p.hat,0).toDataURL())}
 const mini=p=>`<img class="mini" alt="" src="${miniURL(p)}">`;
 function drawBot(c,x,y,col,o){
   const f=o.ghost?4:o.moving?(Math.floor(o.walk/1.7)%2?1:2):((T*.7+x*.013)%3<.12?3:0);
@@ -912,10 +926,14 @@ function toMenu(){G=null;M=null;closeMG();closeOV();show('sabwin',0);show('hud',
 function menuStats(){$('stats').textContent=SAVE.games?`Games played: ${SAVE.games} · Wins: ${SAVE.wins} · Best Snake score: ${SAVE.snake}`:'Tip: you can pick any role you like, or leave it on Surprise me.'}
 function buildMenu(){
   $('inName').value=SAVE.name;$('inName').addEventListener('input',e=>{SAVE.name=e.target.value;save()});
-  $('swatches').innerHTML=COLORS.map((c,i)=>`<button class="sw${i===SAVE.color?' on':''}" data-c="${i}" title="${c[0]}" aria-label="${c[0]}" style="background:${c[1]}"></button>`).join('');
-  $('swatches').addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;SAVE.color=+b.dataset.c;save();document.querySelectorAll('.sw').forEach(s=>s.classList.toggle('on',s===b))});
-  $('hats').innerHTML=HATS.map((h,i)=>`<button class="hat${i===SAVE.hat?' on':''}" data-h="${i}">${h==='none'?'No hat':h[0].toUpperCase()+h.slice(1)}</button>`).join('');
-  $('hats').addEventListener('click',e=>{const b=e.target.closest('[data-h]');if(!b)return;SAVE.hat=+b.dataset.h;save();document.querySelectorAll('.hat').forEach(s=>s.classList.toggle('on',s===b))});
+  const fake=(c,h)=>({color:COLORS[c][1],hat:HATS[h]});
+  const lock=()=>{$('swatches').innerHTML=COLORS.map((c,i)=>`<button class="sw${i===SAVE.color?' on':''}" data-c="${i}" title="${c[0]}" aria-label="${c[0]}"><img alt="" src="${miniURL(fake(i,0))}"></button>`).join('');
+    $('hats').innerHTML=HATS.map((h,i)=>`<button class="hat${i===SAVE.hat?' on':''}" data-h="${i}" title="${h==='none'?'No hat':h}" aria-label="${h==='none'?'No hat':h}"><img alt="" src="${miniURL(fake(SAVE.color,i))}"></button>`).join('');
+    $('prevImg').src=miniURL(fake(SAVE.color,SAVE.hat));$('prevName').textContent=SAVE.name.trim()||'You'};
+  lock();$('inName').addEventListener('input',lock);
+  $('swatches').addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;SAVE.color=+b.dataset.c;save();beep(600,.05);lock()});
+  $('hats').addEventListener('click',e=>{const b=e.target.closest('[data-h]');if(!b)return;SAVE.hat=+b.dataset.h;save();beep(700,.05);lock()});
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(o=>o.classList.toggle('on',o===t));show('swatches',t.dataset.tab==='swatches');show('hats',t.dataset.tab==='hats')}));
   $('selRole').innerHTML='<option value="random">🎲 Surprise me</option>'+Object.keys(ROLES).map(k=>`<option value="${k}">${ROLES[k].n} (${TEAMNAME[ROLES[k].team].replace('Team ','').replace('... just you','Solo')})</option>`).join('');
   $('selRole').value=SAVE.role;$('selRole').addEventListener('change',e=>{SAVE.role=e.target.value;save()});
   $('selN').innerHTML=[6,7,8,9,10,11,12].map(n=>`<option>${n}</option>`).join('');$('selN').value=SAVE.players;$('selN').addEventListener('change',e=>{SAVE.players=+e.target.value;save()});
