@@ -51,3 +51,25 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## THE NIGHT SHIFT
+
+`NightShift.html` is a first-person 3D psychological horror game, all in one file. Open it in any browser (mouse and keyboard, or touch; headphones recommended).
+You are the new night-shift employee at Morrow's Fuel & Mart on Highway 19, 3:00 AM to 6:00 AM, for seven nights. A sheet of rules is waiting on the counter, and every rule is a real mechanism:
+
+| Rule | What you actually have to do |
+|---|---|
+| 1. Lights | Never use the light switch, even when a caller tells you to |
+| 2. Yellow coat | Answer "The shop is closed", however he words the question |
+| 3. Twelve bottles | Count the fridge, restock after sales, leave a 13th alone |
+| 4. No door | The bell rings for real customers; never serve one who arrived without it |
+| 5. CAM 4 | Read the label before you look closer at a monitor |
+| 6. 3:33 | Do not open the staff toilet while it is knocking |
+| 7. Phone | Three rings then quiet: answer. A fourth ring: pull the cord |
+| 8. Behind the counter | Hold your eyes shut for a count of twenty |
+| 9. Reflection | A customer waving outside is fine; your own reflection is not |
+| 10. 5:59 | Leave by the front door in the last minute, not before, not after |
+
+Controls: W A S D to walk, mouse to look, click or E to use, R for the rules, hold Space to close your eyes, F to wave. On touch screens: left stick to walk, drag to look, tap to use.
+There are five endings. Evidence you find is written on the back of the rules sheet. Progress is saved in the browser.
+Source lives in `src/night-shift/`; rebuild the file with `npm run build:ns`.

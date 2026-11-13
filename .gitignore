@@ -26,3 +26,6 @@ standalone-build
 standalone-avd
 standalone-aa
 standalone-au
+standalone-ns
+ns.html
+src/night-shift/_all.js
