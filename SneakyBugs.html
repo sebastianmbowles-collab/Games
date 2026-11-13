@@ -163,7 +163,6 @@ kbd{font:700 12px var(--mono);background:#0b1126;border:1px solid var(--line);bo
         <div id="lockSide"><div class="tabs"><button class="tab on" data-tab="swatches">Color</button><button class="tab" data-tab="hats">Hat</button></div>
           <div id="swatches" class="grid"></div><div id="hats" class="grid" hidden></div></div>
       </div>
-      <div class="row"><label for="selRole">Role</label><select id="selRole"></select></div>
       <div class="row"><label for="selN">Players</label><select id="selN"></select>
         <label for="selB" style="width:auto">Bugs</label><select id="selB"><option>1</option><option>2</option><option>3</option></select></div>
       <div class="btns">
@@ -315,6 +314,7 @@ const HATS=['none','party','crown','propeller','flower','headphones'];
 /* ---------- saved settings ---------- */
 let SAVE={name:'You',color:0,hat:0,role:'random',players:10,bugs:2,wins:0,games:0,snake:0,mute:false};
 try{Object.assign(SAVE,JSON.parse(localStorage.getItem('sneakybugs')||'{}'))}catch(e){}
+SAVE.role='random'; // roles are always a surprise
 const save=()=>{try{localStorage.setItem('sneakybugs',JSON.stringify(SAVE))}catch(e){}};
 
 /* ---------- sound ---------- */
@@ -923,7 +923,7 @@ window.addEventListener('touchstart',touchy,{once:true,passive:true});
 
 /* ---------- menu ---------- */
 function toMenu(){G=null;M=null;closeMG();closeOV();show('sabwin',0);show('hud',0);show('end',0);show('meeting',0);show('reveal',0);show('menu',1);menuStats()}
-function menuStats(){$('stats').textContent=SAVE.games?`Games played: ${SAVE.games} · Wins: ${SAVE.wins} · Best Snake score: ${SAVE.snake}`:'Tip: you can pick any role you like, or leave it on Surprise me.'}
+function menuStats(){$('stats').textContent=SAVE.games?`Games played: ${SAVE.games} · Wins: ${SAVE.wins} · Best Snake score: ${SAVE.snake}`:'Your role is a surprise every game. Will you be a Helper or a Bug?'}
 function buildMenu(){
   $('inName').value=SAVE.name;$('inName').addEventListener('input',e=>{SAVE.name=e.target.value;save()});
   const fake=(c,h)=>({color:COLORS[c][1],hat:HATS[h]});
@@ -934,8 +934,6 @@ function buildMenu(){
   $('swatches').addEventListener('click',e=>{const b=e.target.closest('[data-c]');if(!b)return;SAVE.color=+b.dataset.c;save();beep(600,.05);lock()});
   $('hats').addEventListener('click',e=>{const b=e.target.closest('[data-h]');if(!b)return;SAVE.hat=+b.dataset.h;save();beep(700,.05);lock()});
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(o=>o.classList.toggle('on',o===t));show('swatches',t.dataset.tab==='swatches');show('hats',t.dataset.tab==='hats')}));
-  $('selRole').innerHTML='<option value="random">🎲 Surprise me</option>'+Object.keys(ROLES).map(k=>`<option value="${k}">${ROLES[k].n} (${TEAMNAME[ROLES[k].team].replace('Team ','').replace('... just you','Solo')})</option>`).join('');
-  $('selRole').value=SAVE.role;$('selRole').addEventListener('change',e=>{SAVE.role=e.target.value;save()});
   $('selN').innerHTML=[6,7,8,9,10,11,12].map(n=>`<option>${n}</option>`).join('');$('selN').value=SAVE.players;$('selN').addEventListener('change',e=>{SAVE.players=+e.target.value;save()});
   $('selB').value=SAVE.bugs;$('selB').addEventListener('change',e=>{SAVE.bugs=+e.target.value;save()});
   $('rolebook').innerHTML=Object.values(ROLES).map(r=>`<div class="rb" style="--c:${r.c}"><b>${r.n}</b>${r.d}</div>`).join('');
