@@ -51,3 +51,7 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## CLAWS VS FINS
+
+`ClawsVsFins.html` is chess at the bottom of the sea, all in one file: Crustaceans against Fish. Full chess rules (castling, en passant, promotion, check and checkmate). Play the computer at three levels or a friend on the same screen.

@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claws vs Fins: Ocean Chess</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{--deep:#053b5c;--sea:#0a6a94;--sand:#f6e3b0;--water:#7fd3e8;--claw:#ff7043;--claw2:#ffc9a8;--fin:#2979ff;--fin2:#b8dcff;--ink:#07304a;--gold:#ffd23f}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{font-family:Nunito,"Segoe UI",sans-serif;color:#fff;background:linear-gradient(#0d8fc2,var(--deep));
+  display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px 16px 24px;overflow-x:hidden}
+h1{font-family:"Baloo 2","Trebuchet MS",sans-serif;font-size:clamp(1.5rem,6vw,2.4rem);margin:0;text-shadow:0 3px 0 var(--ink);text-align:center;line-height:1.05}
+h1 .c{color:var(--claw2)} h1 .f{color:var(--fin2)}
+.bubble{position:fixed;bottom:-30px;border:2px solid rgba(255,255,255,.45);border-radius:50%;animation:rise linear infinite;pointer-events:none;z-index:0}
+@keyframes rise{to{transform:translateY(-110vh) translateX(20px)}}
+#status{font-family:"Baloo 2",sans-serif;font-size:1.25rem;background:var(--ink);padding:4px 16px;border-radius:99px;text-align:center;z-index:1}
+#status.check{background:#c62828}
+#wrap{width:min(100%,560px,calc(100vh - 250px));min-width:260px;z-index:1}
+#board{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border:6px solid var(--ink);border-radius:14px;overflow:hidden;box-shadow:0 10px 0 rgba(0,0,0,.25);container-type:inline-size}
+.sq{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;aspect-ratio:1;user-select:none;-webkit-tap-highlight-color:transparent}
+.sq.l{background:var(--sand)} .sq.d{background:var(--water)}
+.sq.sel{box-shadow:inset 0 0 0 4px var(--gold)}
+.sq.last{background-image:linear-gradient(rgba(255,210,63,.45),rgba(255,210,63,.45))}
+.sq.hint{background-image:linear-gradient(rgba(60,220,120,.5),rgba(60,220,120,.5))}
+.sq.danger{background-image:radial-gradient(circle,#ff5252 20%,transparent 75%)}
+.sq.mv::after{content:"";width:28%;height:28%;border-radius:50%;background:rgba(7,48,74,.35);position:absolute;z-index:3}
+.sq.cap::after{content:"";position:absolute;inset:6%;border-radius:50%;border:4px solid rgba(198,40,40,.75);z-index:3}
+.pc{width:84%;height:84%;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;font-size:7.4cqw;line-height:1;
+  box-shadow:0 3px 0 rgba(0,0,0,.3);transition:transform .15s}
+.pc.c{background:radial-gradient(circle at 35% 30%,#fff3ea,var(--claw2) 55%,var(--claw));border:2px solid #b23c17}
+.pc.f{background:radial-gradient(circle at 35% 30%,#f2f9ff,var(--fin2) 55%,var(--fin));border:2px solid #1546a0}
+.pc.P{width:68%;height:68%;font-size:5.6cqw}
+.pc .em{display:block}
+.pc.c.N .em{filter:hue-rotate(40deg)} .pc.f.N .em{filter:hue-rotate(120deg)} .pc.f.P .em{filter:hue-rotate(-40deg)} .pc.f.B .em{filter:hue-rotate(200deg) saturate(1.6)}
+.pc .bd{position:absolute;right:-8%;bottom:-8%;width:44%;height:44%;border-radius:50%;background:var(--ink);color:#fff;font-size:3.2cqw;
+  display:flex;align-items:center;justify-content:center;font-family:serif}
+.pc .cr{position:absolute;top:-30%;font-size:3.6cqw}
+.sq.sel .pc{transform:scale(1.1)}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;z-index:1}
+button{font-family:"Baloo 2",sans-serif;font-weight:800;font-size:1rem;border:0;border-radius:12px;padding:8px 16px;cursor:pointer;background:var(--gold);color:#3b2600;box-shadow:0 4px 0 #b88a00}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 #b88a00}
+button.alt{background:#fff;box-shadow:0 4px 0 #9bb}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.tray{min-height:1.6em;font-size:1.2rem;letter-spacing:2px;text-align:center;z-index:1}
+.ov{position:fixed;inset:0;background:rgba(5,35,60,.86);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;overflow:auto}
+.ov[hidden]{display:none}
+.card{background:#0c5f88;border:4px solid var(--ink);border-radius:20px;padding:18px;max-width:480px;width:100%;text-align:center;display:flex;flex-direction:column;gap:12px;max-height:100%;overflow:auto}
+.card h2{font-family:"Baloo 2",sans-serif;margin:0;font-size:1.6rem}
+.card p{margin:0}
+.opts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.opts button{background:#fff;box-shadow:0 4px 0 #9bb}
+.opts button.on{background:var(--gold);box-shadow:0 4px 0 #b88a00}
+.lbl{font-weight:800;color:var(--fin2);font-size:.9rem;text-transform:uppercase;letter-spacing:.06em}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.2);text-align:left}
+td.e{font-size:1.4rem;text-align:center}
+.promo button{font-size:1.8rem;padding:6px 14px}
+</style>
+</head>
+<body>
+<h1><span class="c">Claws</span> vs <span class="f">Fins</span></h1>
+<div id="status">Loading…</div>
+<div class="tray" id="trayTop"></div>
+<div id="wrap"><div id="board"></div></div>
+<div class="tray" id="trayBot"></div>
+<div class="row">
+  <button id="bNew">New game</button>
+  <button class="alt" id="bUndo">Undo</button>
+  <button class="alt" id="bHint">Hint</button>
+  <button class="alt" id="bHelp">Who is who?</button>
+</div>
+
+<div class="ov" id="menu"><div class="card">
+  <h2>🦀 Claws vs Fins 🐟</h2>
+  <p>Chess at the bottom of the sea. Crustaceans always go first!</p>
+  <div class="lbl">Play against</div>
+  <div class="opts" id="oMode"><button data-v="cpu" class="on">Computer</button><button data-v="pal">A friend</button></div>
+  <div id="cpuOpts" style="display:flex;flex-direction:column;gap:12px">
+    <div class="lbl">Your team</div>
+    <div class="opts" id="oSide"><button data-v="c" class="on">🦀 Crustaceans</button><button data-v="f">🐟 Fish</button></div>
+    <div class="lbl">Computer brain</div>
+    <div class="opts" id="oLvl"><button data-v="1">Minnow (easy)</button><button data-v="2" class="on">Dolphin (medium)</button><button data-v="3">Kraken (hard)</button></div>
+  </div>
+  <button id="bStart">Dive in!</button>
+</div></div>
+
+<div class="ov" id="help" hidden><div class="card">
+  <h2>Who is who?</h2>
+  <table id="helpT"></table>
+  <p>Trap the other team's <b>King</b> so it can't escape. That's <b>checkmate</b>!</p>
+  <button id="bHelpX">Got it</button>
+</div></div>
+
+<div class="ov" id="promo" hidden><div class="card promo">
+  <h2>Your little one made it across!</h2>
+  <p>What should it grow into?</p>
+  <div class="opts" id="promoO"></div>
+</div></div>
+
+<div class="ov" id="end" hidden><div class="card">
+  <h2 id="endT"></h2><p id="endP"></p>
+  <div class="row"><button id="bAgain">Play again</button><button class="alt" id="bLook">Look at board</button></div>
+</div></div>
+
+<script>
+'use strict';
+// ---------- Sea creatures ----------
+const ART={
+ c:{K:['🦀','King Crab'],Q:['🦞','Lobster Queen'],R:['🐚','Hermit Crab Tower'],B:['🦐','Mantis Shrimp'],N:['🦀','Hopping Fiddler Crab'],P:['🦐','Baby Krill']},
+ f:{K:['🐠','Clownfish King'],Q:['🦈','Shark Queen'],R:['🐡','Pufferfish Tower'],B:['🐟','Swordfish'],N:['🐟','Flying Fish'],P:['🐟','Minnow']}};
+const GLYPH={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟'};
+const MOVES={K:'1 step any way',Q:'Any way, as far as it likes',R:'Straight lines',B:'Diagonal lines',N:'Jumps in an L shape',P:'1 step forward, grabs diagonally'};
+const TEAM={c:'Crustaceans',f:'Fish'};
+const $=id=>document.getElementById(id);
+
+// ---------- Chess engine ----------
+// Board: 64 squares, index = row*8+col, row 0 is the Fish home row (top), row 7 the Crustacean home row.
+// A piece is a 2-letter string: team (c/f) + type (K Q R B N P).
+function newState(){
+  const b=Array(64).fill(null),back='RNBQKBNR';
+  for(let i=0;i<8;i++){b[i]='f'+back[i];b[8+i]='fP';b[48+i]='cP';b[56+i]='c'+back[i]}
+  return {b,turn:'c',cas:{cK:true,cQ:true,fK:true,fQ:true},ep:-1,half:0};
+}
+const clone=s=>({b:s.b.slice(),turn:s.turn,cas:{...s.cas},ep:s.ep,half:s.half});
+const opp=t=>t==='c'?'f':'c';
+const ND=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+const KD=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const BD=[[-1,-1],[-1,1],[1,-1],[1,1]],RD=[[-1,0],[1,0],[0,-1],[0,1]];
+
+function attacked(s,sq,by){ // is square sq attacked by team `by`?
+  const b=s.b,r=sq>>3,c=sq&7;
+  const pr=r+(by==='c'?1:-1);
+  if(pr>=0&&pr<8){if(c>0&&b[pr*8+c-1]===by+'P')return true;if(c<7&&b[pr*8+c+1]===by+'P')return true}
+  for(const[dr,dc]of ND){const R=r+dr,C=c+dc;if(R>=0&&R<8&&C>=0&&C<8&&b[R*8+C]===by+'N')return true}
+  for(const[dr,dc]of KD){const R=r+dr,C=c+dc;if(R>=0&&R<8&&C>=0&&C<8&&b[R*8+C]===by+'K')return true}
+  for(const[dirs,t]of[[BD,'B'],[RD,'R']])for(const[dr,dc]of dirs){
+    let R=r+dr,C=c+dc;
+    while(R>=0&&R<8&&C>=0&&C<8){const p=b[R*8+C];if(p){if(p[0]===by&&(p[1]===t||p[1]==='Q'))return true;break}R+=dr;C+=dc}
+  }
+  return false;
+}
+const kingSq=(s,t)=>s.b.indexOf(t+'K');
+const inCheck=(s,t)=>attacked(s,kingSq(s,t),opp(t));
+
+function pseudo(s){
+  const b=s.b,t=s.turn,o=opp(t),out=[];
+  for(let sq=0;sq<64;sq++){
+    const p=b[sq];if(!p||p[0]!==t)continue;
+    const r=sq>>3,c=sq&7,k=p[1];
+    if(k==='P'){
+      const d=t==='c'?-1:1,start=t==='c'?6:1,last=t==='c'?0:7,R=r+d;
+      const add=(to,x)=>{if(R===last)for(const pr of'QRBN')out.push({from:sq,to,promo:pr,...x});else out.push({from:sq,to,...x})};
+      if(R>=0&&R<8){
+        if(!b[R*8+c]){add(R*8+c);if(r===start&&!b[(r+2*d)*8+c])out.push({from:sq,to:(r+2*d)*8+c,dbl:true})}
+        for(const dc of[-1,1]){const C=c+dc;if(C<0||C>7)continue;const to=R*8+C;
+          if(b[to]&&b[to][0]===o)add(to);else if(to===s.ep)out.push({from:sq,to,ep:true})}
+      }
+    }else if(k==='N'||k==='K'){
+      for(const[dr,dc]of(k==='N'?ND:KD)){const R=r+dr,C=c+dc;if(R<0||R>7||C<0||C>7)continue;const q=b[R*8+C];if(!q||q[0]===o)out.push({from:sq,to:R*8+C})}
+      if(k==='K'){
+        const home=t==='c'?60:4;
+        if(sq===home&&!attacked(s,sq,o)){
+          if(s.cas[t+'K']&&b[home+3]===t+'R'&&!b[home+1]&&!b[home+2]&&!attacked(s,home+1,o))out.push({from:sq,to:home+2,castle:'K'});
+          if(s.cas[t+'Q']&&b[home-4]===t+'R'&&!b[home-1]&&!b[home-2]&&!b[home-3]&&!attacked(s,home-1,o))out.push({from:sq,to:home-2,castle:'Q'});
+        }
+      }
+    }else{
+      const dirs=k==='B'?BD:k==='R'?RD:KD;
+      for(const[dr,dc]of dirs){let R=r+dr,C=c+dc;
+        while(R>=0&&R<8&&C>=0&&C<8){const q=b[R*8+C];if(!q)out.push({from:sq,to:R*8+C});else{if(q[0]===o)out.push({from:sq,to:R*8+C});break}R+=dr;C+=dc}}
+    }
+  }
+  return out;
+}
+function play(s,m){ // returns a NEW state
+  const n=clone(s),b=n.b,p=b[m.from],t=p[0];
+  m.cap=b[m.to]||(m.ep?opp(t)+'P':null);
+  n.half=(p[1]==='P'||m.cap)?0:n.half+1;
+  b[m.to]=m.promo?t+m.promo:p;b[m.from]=null;
+  if(m.ep)b[m.to+(t==='c'?8:-8)]=null;
+  if(m.castle==='K'){b[m.to-1]=b[m.to+1];b[m.to+1]=null}
+  if(m.castle==='Q'){b[m.to+1]=b[m.to-2];b[m.to-2]=null}
+  n.ep=m.dbl?(m.from+m.to)/2:-1;
+  if(p[1]==='K'){n.cas[t+'K']=n.cas[t+'Q']=false}
+  for(const q of[m.from,m.to]){if(q===56)n.cas.cQ=false;if(q===63)n.cas.cK=false;if(q===0)n.cas.fQ=false;if(q===7)n.cas.fK=false}
+  n.turn=opp(t);return n;
+}
+function legal(s){const t=s.turn;return pseudo(s).filter(m=>!inCheck(play(s,m),t))}
+
+// ---------- Computer brain ----------
+const VAL={P:100,N:320,B:330,R:500,Q:900,K:0};
+function evalFor(s,t){ // score from team t's point of view
+  let v=0;const b=s.b;
+  for(let i=0;i<64;i++){const p=b[i];if(!p)continue;
+    const r=i>>3,c=i&7,k=p[1];let x=VAL[k];
+    const cen=3.5-Math.max(Math.abs(r-3.5),Math.abs(c-3.5)); // 0..3, bigger = closer to the middle
+    if(k==='P')x+=(p[0]==='c'?6-r:r-1)*8+cen*4;
+    else if(k==='N'||k==='B')x+=cen*10;
+    else if(k==='K')x-=cen*8;
+    v+=p[0]===t?x:-x}
+  return v;
+}
+function order(s,ms){for(const m of ms){const c=s.b[m.to];m.o=(c?VAL[c[1]]*10-VAL[s.b[m.from][1]]:0)+(m.promo?800:0)}return ms.sort((a,b)=>b.o-a.o)}
+function search(s,d,a,be){
+  const ms=legal(s);
+  if(!ms.length)return inCheck(s,s.turn)?-100000-d:0;
+  if(s.half>=100)return 0;
+  if(d===0)return evalFor(s,s.turn);
+  order(s,ms);
+  for(const m of ms){const v=-search(play(s,m),d-1,-be,-a);if(v>a)a=v;if(a>=be)break}
+  return a;
+}
+function bestMove(s,depth,wobble){
+  const ms=order(s,legal(s));let best=null,bv=-Infinity;
+  for(const m of ms){const v=-search(play(s,m),depth-1,-Infinity,Infinity)+Math.random()*wobble;if(v>bv){bv=v;best=m}}
+  return best;
+}
+
+// ---------- Game + screen ----------
+let S,hist,sel,moves,lastMv,hintMv,over,busy,cfg={mode:'cpu',side:'c',lvl:2};
+function flipped(){return cfg.mode==='cpu'&&cfg.side==='f'}
+function pieceEl(p){
+  const d=document.createElement('div');d.className='pc '+p[0]+' '+p[1];
+  d.innerHTML=(p[1]==='K'?'<span class="cr">👑</span>':'')+'<span class="em">'+ART[p[0]][p[1]][0]+'</span><span class="bd">'+GLYPH[p[1]]+'</span>';
+  return d;
+}
+function render(){
+  const B=$('board');B.innerHTML='';
+  const chk=!over||over==='mate'?inCheck(S,S.turn):false,ks=kingSq(S,S.turn);
+  for(let i=0;i<64;i++){
+    const sq=flipped()?63-i:i,r=sq>>3,c=sq&7,d=document.createElement('div');
+    d.className='sq '+((r+c)%2?'d':'l');d.dataset.sq=sq;
+    if(lastMv&&(sq===lastMv.from||sq===lastMv.to))d.classList.add('last');
+    if(hintMv&&(sq===hintMv.from||sq===hintMv.to))d.classList.add('hint');
+    if(sq===sel)d.classList.add('sel');
+    if(chk&&sq===ks)d.classList.add('danger');
+    const mv=moves.find(m=>m.to===sq);
+    if(mv)d.classList.add(S.b[sq]||mv.ep?'cap':'mv');
+    if(S.b[sq])d.appendChild(pieceEl(S.b[sq]));
+    B.appendChild(d);
+  }
+  // captured creatures
+  const start={P:8,N:2,B:2,R:2,Q:1},lost={c:'',f:''};
+  for(const t of'cf')for(const k of'QRBNP'){const n=start[k]-S.b.filter(p=>p===t+k).length;for(let j=0;j<n;j++)lost[t]+=ART[t][k][0]}
+  const bottom=flipped()?'f':'c';
+  $('trayBot').textContent=lost[opp(bottom)]; $('trayTop').textContent=lost[bottom];
+  const st=$('status');st.classList.toggle('check',chk&&!over);
+  if(!over){
+    const who=cfg.mode==='cpu'?(S.turn===cfg.side?'Your turn':'Computer is thinking…'):TEAM[S.turn]+"' turn";
+    st.textContent=(S.turn==='c'?'🦀 ':'🐟 ')+who+(chk?' — CHECK!':'');
+  }
+}
+function finish(){
+  const ms=legal(S);let t='',p='';
+  if(!ms.length){
+    if(inCheck(S,S.turn)){over='mate';const w=opp(S.turn);t=(w==='c'?'🦀 ':'🐟 ')+TEAM[w]+' win!';
+      p='Checkmate! The '+ART[S.turn].K[1]+' is trapped.'+(cfg.mode==='cpu'?(w===cfg.side?' You did it!':' The computer got you this time.'):'')}
+    else{over='draw';t='🤝 It\'s a tie!';p='Stalemate: no safe moves left, but nobody is in check.'}
+  }else if(S.half>=100){over='draw';t='🤝 It\'s a tie!';p='50 moves with no captures. Everyone swims home.'}
+  else if(S.b.filter(Boolean).length===2){over='draw';t='🤝 It\'s a tie!';p='Only the two kings are left.'}
+  if(over){$('status').textContent=t;$('endT').textContent=t;$('endP').textContent=p;setTimeout(()=>{$('end').hidden=false},500)}
+  return !!over;
+}
+function doMove(m){
+  hist.push({S,lastMv});S=play(S,m);lastMv=m;sel=-1;moves=[];hintMv=null;
+  if(!finish())render();else render();
+  if(!over&&cfg.mode==='cpu'&&S.turn!==cfg.side)cpuTurn();
+}
+function cpuTurn(){
+  busy=true;
+  setTimeout(()=>{const m=bestMove(S,cfg.lvl,cfg.lvl===1?120:cfg.lvl===2?25:5);busy=false;if(m)doMove(m)},350);
+}
+function tap(sq){
+  if(over||busy)return;
+  if(cfg.mode==='cpu'&&S.turn!==cfg.side)return;
+  const cands=moves.filter(m=>m.to===sq);
+  if(cands.length){
+    if(cands[0].promo){askPromo(cands);return}
+    doMove(cands[0]);return;
+  }
+  const p=S.b[sq];
+  if(p&&p[0]===S.turn&&sq!==sel){sel=sq;moves=legal(S).filter(m=>m.from===sq)}else{sel=-1;moves=[]}
+  hintMv=null;render();
+}
+function askPromo(cands){
+  const o=$('promoO');o.innerHTML='';
+  for(const m of cands){const b=document.createElement('button');b.textContent=ART[S.turn][m.promo][0];b.title=ART[S.turn][m.promo][1];
+    b.setAttribute('aria-label',ART[S.turn][m.promo][1]);
+    b.onclick=()=>{$('promo').hidden=true;doMove(m)};o.appendChild(b)}
+  $('promo').hidden=false;
+}
+function start(){
+  S=newState();hist=[];sel=-1;moves=[];lastMv=null;hintMv=null;over=null;busy=false;
+  $('menu').hidden=true;$('end').hidden=true;render();
+  if(cfg.mode==='cpu'&&cfg.side==='f')cpuTurn();
+}
+$('board').addEventListener('click',e=>{const d=e.target.closest('.sq');if(d)tap(+d.dataset.sq)});
+$('bNew').onclick=()=>{$('end').hidden=true;$('menu').hidden=false};
+$('bAgain').onclick=()=>{$('end').hidden=true;$('menu').hidden=false};
+$('bLook').onclick=()=>{$('end').hidden=true};
+$('bStart').onclick=start;
+$('bUndo').onclick=()=>{
+  if(busy||!hist.length)return;
+  let n=1;if(cfg.mode==='cpu'){n=S.turn===cfg.side?2:1;if(over&&S.turn!==cfg.side)n=1}
+  while(n-->0&&hist.length){const h=hist.pop();S=h.S;lastMv=h.lastMv}
+  if(cfg.mode==='cpu'&&S.turn!==cfg.side&&hist.length){const h=hist.pop();S=h.S;lastMv=h.lastMv}
+  over=null;sel=-1;moves=[];hintMv=null;$('end').hidden=true;render();
+  if(cfg.mode==='cpu'&&S.turn!==cfg.side)cpuTurn();
+};
+$('bHint').onclick=()=>{if(over||busy)return;if(cfg.mode==='cpu'&&S.turn!==cfg.side)return;hintMv=bestMove(S,2,0);sel=-1;moves=[];render()};
+$('bHelp').onclick=()=>{$('help').hidden=false};
+$('bHelpX').onclick=()=>{$('help').hidden=true};
+for(const[id,key]of[['oMode','mode'],['oSide','side'],['oLvl','lvl']])$(id).addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  cfg[key]=key==='lvl'?+b.dataset.v:b.dataset.v;
+  for(const x of $(id).children)x.classList.toggle('on',x===b);
+  $('cpuOpts').style.display=cfg.mode==='cpu'?'flex':'none';
+});
+// "Who is who" table
+$('helpT').innerHTML=[...'KQRBNP'].map(k=>'<tr><td class="e">'+ART.c[k][0]+'</td><td>'+ART.c[k][1]+'</td><td class="e">'+ART.f[k][0]+'</td><td>'+ART.f[k][1]+'</td><td>'+GLYPH[k]+' '+MOVES[k]+'</td></tr>').join('');
+// bubbles
+for(let i=0;i<14;i++){const b=document.createElement('div');b.className='bubble';const z=6+Math.random()*18;
+  b.style.cssText='left:'+Math.random()*100+'vw;width:'+z+'px;height:'+z+'px;animation-duration:'+(7+Math.random()*9)+'s;animation-delay:-'+Math.random()*12+'s';document.body.appendChild(b)}
+S=newState();hist=[];sel=-1;moves=[];render();
+window.__t={newState,legal,play,inCheck,bestMove,get S(){return S}};
+</script>
+</body>
+</html>
