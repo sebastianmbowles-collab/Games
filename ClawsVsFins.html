@@ -33,10 +33,12 @@ h1 .c{color:var(--claw2)} h1 .f{color:var(--fin2)}
   box-shadow:0 3px 0 rgba(0,0,0,.3);transition:transform .15s}
 .pc.c{background:radial-gradient(circle at 35% 30%,#fff3ea,var(--claw2) 55%,var(--claw));border:2px solid #b23c17}
 .pc.f{background:radial-gradient(circle at 35% 30%,#f2f9ff,var(--fin2) 55%,var(--fin));border:2px solid #1546a0}
-.pc.P{width:68%;height:68%;font-size:5.6cqw}
-.pc .em{display:block}
+.pc.P{width:70%;height:70%}
+.spr{width:96%;height:96%;overflow:visible;display:block}
+.tr{width:1.5em;height:1.5em;vertical-align:middle;overflow:visible}
+.big{width:2.2em;height:2.2em;vertical-align:middle;overflow:visible}
 .pc.c.N .em{filter:hue-rotate(40deg)} .pc.f.N .em{filter:hue-rotate(120deg)} .pc.f.P .em{filter:hue-rotate(-40deg)} .pc.f.B .em{filter:hue-rotate(200deg) saturate(1.6)}
-.pc .bd{position:absolute;right:-8%;bottom:-8%;width:44%;height:44%;border-radius:50%;background:var(--ink);color:#fff;font-size:3.2cqw;
+.pc .bd{position:absolute;right:-10%;bottom:-10%;width:38%;height:38%;border-radius:50%;background:var(--ink);color:#fff;font-size:3.2cqw;
   display:flex;align-items:center;justify-content:center;font-family:serif}
 .pc .cr{position:absolute;top:-30%;font-size:3.6cqw}
 .sq.sel .pc{transform:scale(1.1)}
@@ -75,13 +77,13 @@ td.e{font-size:1.4rem;text-align:center}
 </div>
 
 <div class="ov" id="menu"><div class="card">
-  <h2>🦀 Claws vs Fins 🐟</h2>
+  <h2><span id="mC"></span> Claws vs Fins <span id="mF"></span></h2>
   <p>Chess at the bottom of the sea. Crustaceans always go first!</p>
   <div class="lbl">Play against</div>
   <div class="opts" id="oMode"><button data-v="cpu" class="on">Computer</button><button data-v="pal">A friend</button></div>
   <div id="cpuOpts" style="display:flex;flex-direction:column;gap:12px">
     <div class="lbl">Your team</div>
-    <div class="opts" id="oSide"><button data-v="c" class="on">🦀 Crustaceans</button><button data-v="f">🐟 Fish</button></div>
+    <div class="opts" id="oSide"><button data-v="c" class="on">Crustaceans</button><button data-v="f">Fish</button></div>
     <div class="lbl">Computer brain</div>
     <div class="opts" id="oLvl"><button data-v="1">Minnow (easy)</button><button data-v="2" class="on">Dolphin (medium)</button><button data-v="3">Kraken (hard)</button></div>
   </div>
@@ -109,9 +111,30 @@ td.e{font-size:1.4rem;text-align:center}
 <script>
 'use strict';
 // ---------- Sea creatures ----------
-const ART={
- c:{K:['🦀','King Crab'],Q:['🦞','Lobster Queen'],R:['🐚','Hermit Crab Tower'],B:['🦐','Mantis Shrimp'],N:['🦀','Hopping Fiddler Crab'],P:['🦐','Baby Krill']},
- f:{K:['🐠','Clownfish King'],Q:['🦈','Shark Queen'],R:['🐡','Pufferfish Tower'],B:['🐟','Swordfish'],N:['🐟','Flying Fish'],P:['🐟','Minnow']}};
+const NAME={
+ c:{K:'King Crab',Q:'Lobster Queen',R:'Hermit Crab Tower',B:'Mantis Shrimp',N:'Hopping Fiddler Crab',P:'Baby Krill'},
+ f:{K:'Emperor Angelfish',Q:'Shark Queen',R:'Pufferfish Tower',B:'Swordfish',N:'Flying Fish',P:'Minnow'}};
+// Hand-drawn sprites: each one is a little SVG picture on a 100x100 canvas.
+const eye=(x,y,r)=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="#fff"/><circle cx="'+(x+r*.2)+'" cy="'+y+'" r="'+r*.5+'" fill="#111" stroke="none"/>';
+const crown=(x,y)=>'<path d="M'+x+' '+(y+24)+'v-22l9 12 9-16 9 16 9-12v22z" fill="#ffd23f" stroke="#8a6500"/><circle cx="'+(x+18)+'" cy="'+(y+17)+'" r="3" fill="#e53935" stroke="none"/>';
+const spikes=(()=>{let o='';for(let a=0;a<12;a++){const t=a*Math.PI/6,c=Math.cos(t),n=Math.sin(t);
+  o+='<path d="M'+(50+c*25-n*5)+' '+(52+n*25+c*5)+'L'+(50+c*38)+' '+(52+n*38)+'L'+(50+c*25+n*5)+' '+(52+n*25-c*5)+'z" fill="#2fa893"/>'}return o})();
+const C='#ff6b3d',C2='#ffb347',CL='#ffd9c2';
+const ARTW={
+cP:'<path d="M28 40Q50 18 72 38Q84 58 66 76Q54 86 40 80Q58 70 58 54Q54 42 34 50z" fill="'+C+'"/><path d="M40 80L28 78L34 90z" fill="'+C2+'"/><path d="M52 30L50 44M66 40L57 50M72 58L59 58M44 50L40 60M50 52L48 62M28 40Q14 30 10 16M30 37Q22 22 24 10" fill="none"/>'+eye(36,41,5),
+cB:'<path d="M33 82L50 97L67 82z" fill="#b45cff"/><ellipse cx="50" cy="58" rx="17" ry="30" fill="'+C+'"/><path d="M34 50H66M33 62H67M35 74H65M42 30L36 14M58 30L64 14M36 44L26 50M64 44L74 50" fill="none"/><circle cx="24" cy="52" r="10" fill="#ffd23f"/><circle cx="76" cy="52" r="10" fill="#ffd23f"/><circle cx="36" cy="13" r="7" fill="#7be0c3"/><circle cx="64" cy="13" r="7" fill="#7be0c3"/><circle cx="37" cy="13" r="3" fill="#111" stroke="none"/><circle cx="65" cy="13" r="3" fill="#111" stroke="none"/><path d="M44 40Q50 45 56 40" fill="none"/>',
+cN:'<path d="M28 72L14 84M30 78L20 93M72 72L86 84M70 78L80 93M30 60L18 50M68 58L74 42M42 54L40 38M56 54L56 38" fill="none"/><ellipse cx="50" cy="68" rx="26" ry="17" fill="'+C+'"/><circle cx="15" cy="47" r="6" fill="'+C+'"/><path d="M60 38Q58 10 84 6Q78 16 80 23Q92 18 95 30Q88 46 70 46z" fill="'+C2+'"/>'+eye(40,36,5)+eye(56,36,5)+'<path d="M42 72Q50 78 58 72" fill="none"/>',
+cR:'<circle cx="24" cy="86" r="9" fill="'+C+'"/><circle cx="76" cy="86" r="9" fill="'+C+'"/><ellipse cx="50" cy="80" rx="21" ry="12" fill="'+C+'"/><path d="M50 4L78 60Q80 72 50 72Q20 72 22 60z" fill="#e9a6c8"/><path d="M39 28Q50 34 61 28M31 44Q50 54 69 44M24 60Q50 70 76 60" fill="none"/>'+eye(43,80,5)+eye(57,80,5),
+cQ:'<path d="M46 28Q40 12 28 5M54 28Q60 12 72 5M40 42L24 32M60 42L76 32" fill="none"/><path d="M36 84L50 98L64 84z" fill="'+C2+'"/><ellipse cx="50" cy="64" rx="13" ry="26" fill="'+C+'"/><path d="M38 60H62M37 70H63M39 80H61" fill="none"/><ellipse cx="19" cy="22" rx="10" ry="15" transform="rotate(-20 19 22)" fill="'+C+'"/><ellipse cx="81" cy="22" rx="10" ry="15" transform="rotate(20 81 22)" fill="'+C+'"/><path d="M16 10L20 24M84 10L80 24" fill="none"/><circle cx="50" cy="40" r="14" fill="'+C+'"/>'+eye(44,40,4)+eye(56,40,4)+'<path d="M40 30L43 20L50 27L57 20L60 30z" fill="#ffd23f" stroke="#8a6500"/>',
+cK:'<path d="M24 70L8 78M26 76L12 90M30 82L22 96M76 70L92 78M74 76L88 90M70 82L78 96M26 58L14 46M74 58L86 46" fill="none"/><circle cx="12" cy="38" r="11" fill="'+C+'"/><circle cx="88" cy="38" r="11" fill="'+C+'"/><path d="M12 27V38M88 27V38" fill="none"/><ellipse cx="50" cy="68" rx="30" ry="19" fill="'+C+'"/>'+crown(32,24)+eye(41,62,6)+eye(59,62,6)+'<path d="M42 74Q50 80 58 74" fill="none"/>',
+fP:'<path d="M30 52L12 38V66z" fill="#5c9df2"/><ellipse cx="54" cy="52" rx="26" ry="14" fill="#a9d4ff"/><path d="M48 39L58 28L62 40z" fill="#5c9df2"/>'+eye(68,49,5)+'<path d="M52 46Q56 52 52 58" fill="none"/>',
+fN:'<path d="M26 58L8 42L14 58L8 76z" fill="#2c6fd6"/><path d="M46 64Q40 84 62 92Q56 78 58 66z" fill="#c9f0ff"/><ellipse cx="52" cy="58" rx="28" ry="12" fill="#4fa3ff"/><path d="M48 54Q38 16 80 10Q66 30 64 54z" fill="#c9f0ff"/><path d="M54 48Q52 30 66 20M58 50Q58 36 70 24" fill="none" stroke-width="1.5"/>'+eye(70,56,4.5),
+fB:'<path d="M22 56L6 34L12 56L6 80z" fill="#1d3f99"/><path d="M34 46Q38 12 62 20Q52 34 58 48z" fill="#1d3f99"/><path d="M20 56Q40 34 66 47L98 52L66 59Q40 74 20 56z" fill="#3b6fd9"/><path d="M40 60L36 74L50 63z" fill="#1d3f99"/>'+eye(60,51,4)+'<path d="M48 46Q51 54 48 62" fill="none"/>',
+fR:'<path d="M26 52L6 40V64z" fill="#2fa893"/>'+spikes+'<circle cx="50" cy="52" r="27" fill="#5fd6c4"/><path d="M30 64Q50 82 70 64Q50 72 30 64z" fill="#eafff9" stroke="none"/><path d="M44 58L34 68L50 66z" fill="#2fa893"/>'+eye(60,44,8)+'<circle cx="75" cy="60" r="4" fill="#d6336c"/>',
+fQ:'<path d="M16 60L2 32L24 54V64L4 84z" fill="#5f7696"/><path d="M46 46L56 14L68 46z" fill="#5f7696"/><path d="M8 60Q30 40 62 44Q84 46 96 58Q80 70 56 70Q30 72 8 60z" fill="#8499b8"/><path d="M34 68Q64 72 94 59Q80 70 56 70Q44 71 34 68z" fill="#eef3fa" stroke="none"/><path d="M52 66L46 86L66 68z" fill="#5f7696"/><path d="M58 50V60M63 50V60" fill="none"/><path d="M70 61L73 67L76 62L79 67L82 62L85 66L88 62" fill="#fff"/>'+eye(79,52,3.5)+'<path d="M72 46L84 49" fill="none"/>',
+fK:'<path d="M32 60L12 44V76z" fill="#ffd23f"/><ellipse cx="54" cy="62" rx="27" ry="22" fill="#2456d6"/><path d="M36 50Q54 56 73 50M30 62Q54 68 80 62M36 74Q54 80 73 74" fill="none" stroke="#ffd23f" stroke-width="4"/><path d="M50 82L46 94L62 84z" fill="#ffd23f"/>'+crown(36,18)+eye(69,58,5)+'<path d="M72 68Q76 70 79 67" fill="none"/>'};
+const OUT={c:'#6b1d0a',f:'#0b2a5c'};
+function spr(p,cls){return '<svg class="'+(cls||'spr')+'" viewBox="0 0 100 100" aria-hidden="true"><g stroke="'+OUT[p[0]]+'" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">'+ARTW[p]+'</g></svg>'}
 const GLYPH={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟'};
 const MOVES={K:'1 step any way',Q:'Any way, as far as it likes',R:'Straight lines',B:'Diagonal lines',N:'Jumps in an L shape',P:'1 step forward, grabs diagonally'};
 const TEAM={c:'Crustaceans',f:'Fish'};
@@ -225,7 +248,7 @@ let S,hist,sel,moves,lastMv,hintMv,over,busy,cfg={mode:'cpu',side:'c',lvl:2};
 function flipped(){return cfg.mode==='cpu'&&cfg.side==='f'}
 function pieceEl(p){
   const d=document.createElement('div');d.className='pc '+p[0]+' '+p[1];
-  d.innerHTML=(p[1]==='K'?'<span class="cr">👑</span>':'')+'<span class="em">'+ART[p[0]][p[1]][0]+'</span><span class="bd">'+GLYPH[p[1]]+'</span>';
+  d.innerHTML=spr(p)+'<span class="bd">'+GLYPH[p[1]]+'</span>';
   return d;
 }
 function render(){
@@ -245,23 +268,23 @@ function render(){
   }
   // captured creatures
   const start={P:8,N:2,B:2,R:2,Q:1},lost={c:'',f:''};
-  for(const t of'cf')for(const k of'QRBNP'){const n=start[k]-S.b.filter(p=>p===t+k).length;for(let j=0;j<n;j++)lost[t]+=ART[t][k][0]}
+  for(const t of'cf')for(const k of'QRBNP'){const n=start[k]-S.b.filter(p=>p===t+k).length;for(let j=0;j<n;j++)lost[t]+=spr(t+k,'tr')}
   const bottom=flipped()?'f':'c';
-  $('trayBot').textContent=lost[opp(bottom)]; $('trayTop').textContent=lost[bottom];
+  $('trayBot').innerHTML=lost[opp(bottom)]; $('trayTop').innerHTML=lost[bottom];
   const st=$('status');st.classList.toggle('check',chk&&!over);
   if(!over){
     const who=cfg.mode==='cpu'?(S.turn===cfg.side?'Your turn':'Computer is thinking…'):TEAM[S.turn]+"' turn";
-    st.textContent=(S.turn==='c'?'🦀 ':'🐟 ')+who+(chk?' — CHECK!':'');
+    st.innerHTML=spr(S.turn+'K','tr')+' '+who+(chk?' CHECK!':'');
   }
 }
 function finish(){
   const ms=legal(S);let t='',p='';
   if(!ms.length){
-    if(inCheck(S,S.turn)){over='mate';const w=opp(S.turn);t=(w==='c'?'🦀 ':'🐟 ')+TEAM[w]+' win!';
-      p='Checkmate! The '+ART[S.turn].K[1]+' is trapped.'+(cfg.mode==='cpu'?(w===cfg.side?' You did it!':' The computer got you this time.'):'')}
-    else{over='draw';t='🤝 It\'s a tie!';p='Stalemate: no safe moves left, but nobody is in check.'}
-  }else if(S.half>=100){over='draw';t='🤝 It\'s a tie!';p='50 moves with no captures. Everyone swims home.'}
-  else if(S.b.filter(Boolean).length===2){over='draw';t='🤝 It\'s a tie!';p='Only the two kings are left.'}
+    if(inCheck(S,S.turn)){over='mate';const w=opp(S.turn);t=TEAM[w]+' win!';
+      p='Checkmate! The '+NAME[S.turn].K+' is trapped.'+(cfg.mode==='cpu'?(w===cfg.side?' You did it!':' The computer got you this time.'):'')}
+    else{over='draw';t='It\'s a tie!';p='Stalemate: no safe moves left, but nobody is in check.'}
+  }else if(S.half>=100){over='draw';t='It\'s a tie!';p='50 moves with no captures. Everyone swims home.'}
+  else if(S.b.filter(Boolean).length===2){over='draw';t='It\'s a tie!';p='Only the two kings are left.'}
   if(over){$('status').textContent=t;$('endT').textContent=t;$('endP').textContent=p;setTimeout(()=>{$('end').hidden=false},500)}
   return !!over;
 }
@@ -288,8 +311,8 @@ function tap(sq){
 }
 function askPromo(cands){
   const o=$('promoO');o.innerHTML='';
-  for(const m of cands){const b=document.createElement('button');b.textContent=ART[S.turn][m.promo][0];b.title=ART[S.turn][m.promo][1];
-    b.setAttribute('aria-label',ART[S.turn][m.promo][1]);
+  for(const m of cands){const b=document.createElement('button');b.innerHTML=spr(S.turn+m.promo,'big');b.title=NAME[S.turn][m.promo];
+    b.setAttribute('aria-label',NAME[S.turn][m.promo]);
     b.onclick=()=>{$('promo').hidden=true;doMove(m)};o.appendChild(b)}
   $('promo').hidden=false;
 }
@@ -321,10 +344,11 @@ for(const[id,key]of[['oMode','mode'],['oSide','side'],['oLvl','lvl']])$(id).addE
   $('cpuOpts').style.display=cfg.mode==='cpu'?'flex':'none';
 });
 // "Who is who" table
-$('helpT').innerHTML=[...'KQRBNP'].map(k=>'<tr><td class="e">'+ART.c[k][0]+'</td><td>'+ART.c[k][1]+'</td><td class="e">'+ART.f[k][0]+'</td><td>'+ART.f[k][1]+'</td><td>'+GLYPH[k]+' '+MOVES[k]+'</td></tr>').join('');
+$('helpT').innerHTML=[...'KQRBNP'].map(k=>'<tr><td class="e">'+spr('c'+k,'big')+'</td><td>'+NAME.c[k]+'</td><td class="e">'+spr('f'+k,'big')+'</td><td>'+NAME.f[k]+'</td><td>'+GLYPH[k]+' '+MOVES[k]+'</td></tr>').join('');
 // bubbles
 for(let i=0;i<14;i++){const b=document.createElement('div');b.className='bubble';const z=6+Math.random()*18;
   b.style.cssText='left:'+Math.random()*100+'vw;width:'+z+'px;height:'+z+'px;animation-duration:'+(7+Math.random()*9)+'s;animation-delay:-'+Math.random()*12+'s';document.body.appendChild(b)}
+$('mC').innerHTML=spr('cK','big');$('mF').innerHTML=spr('fK','big');
 S=newState();hist=[];sel=-1;moves=[];render();
 window.__t={newState,legal,play,inCheck,bestMove,get S(){return S}};
 </script>
