@@ -112,6 +112,10 @@ kbd{font:700 12px var(--mono);background:#0b1126;border:1px solid var(--line);bo
 .mode.on{border-color:var(--sun);color:var(--sun)}
 .mode:disabled{opacity:.4}
 #mtHint{color:var(--dim);font-size:13.5px}
+#mtSay{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#mtSay .mode{font-size:13px;padding:6px 10px}
+#mtForm{display:flex;gap:6px;margin-top:8px}
+#mtIn{flex:1}
 #eject{text-align:center;padding:30px 0}
 #ejText{font-size:clamp(24px,5vw,38px);font-weight:700;text-wrap:balance}
 #ejBot{width:84px;height:108px;margin:0 auto 18px;background:center/contain no-repeat;image-rendering:pixelated;animation:fly 3s linear infinite}
@@ -196,10 +200,16 @@ kbd{font:700 12px var(--mono);background:#0b1126;border:1px solid var(--line);bo
     <div id="mtTop"><h2 id="mtTitle" style="margin:0">Meeting!</h2><span id="mtTimer"></span></div>
     <div id="mtBody" style="margin-top:10px"><div id="cards"></div><div id="chat"></div></div>
     <div id="mtModes" style="margin-top:10px">
-      <button class="mode on" data-m="vote">🗳️ Vote</button><button class="mode" data-m="accuse">👉 Accuse</button><button class="mode" data-m="trust">🤝 Stick up for</button>
+      <button class="mode on" data-m="vote">🗳️ Vote</button><button class="mode" data-m="accuse">👉 Accuse</button><button class="mode" data-m="trust">🤝 Stick up for</button><button class="mode" data-m="ask">❓ Ask someone</button>
       <button class="mode" id="bSkip">⏭️ Skip vote</button>
     </div>
     <div id="mtHint"></div>
+    <div id="mtSay">
+      <button class="mode" data-say="where">📍 Say where I was</button><button class="mode" data-say="all">🧭 Where was everyone?</button>
+      <button class="mode" data-say="who">🤔 Who do you think?</button><button class="mode" data-say="role">🎭 Say my role</button>
+      <button class="mode" data-say="help">🙅 It was not me!</button><button class="mode" data-say="skip">⏭️ Let's skip, no proof</button>
+    </div>
+    <form id="mtForm"><input type="text" id="mtIn" maxlength="80" autocomplete="off" placeholder="Type anything... try: Pixel is sus"><button class="mode" id="mtSend">Send</button></form>
   </div>
   <div id="eject" hidden><div id="ejBot"></div><div id="ejText"></div><p id="ejSub" class="sub" style="margin:10px auto"></p></div>
 </div></div>
@@ -550,8 +560,8 @@ function startMeeting(rep,body){
       if(q.alive&&dist(p,q)<180&&(!body||dist(q,body)>260)&&Math.abs(s)<90){s-=8;p.buddy=q.id}
       p.sus[q.id]=s}}
   if(body&&!rep.isHuman&&rep.team!=='b')for(const q of G.players)if(q.alive&&q.id!==rep.id&&dist(q,body)<240&&Math.abs(rep.sus[q.id]||0)<90)rep.sus[q.id]=(rep.sus[q.id]||0)+22;
-  M={t:0,rep,body,chat:buildChat(rep,body),shown:0,nextChat:.7,votes:{},voteAt:{},phase:'talk',talks:2,mode:'vote',len:me.alive?50:16,accused:[],out:-1};
-  for(const p of bots)M.voteAt[p.id]=me.alive?rand(10,24):rand(5,11);
+  M={t:0,rep,body,chat:buildChat(rep,body),shown:0,nextChat:.7,votes:{},voteAt:{},phase:'talk',talks:2,asks:3,said:{},skipBias:0,mode:'vote',len:me.alive?75:16,accused:[],out:-1};
+  for(const p of bots)M.voteAt[p.id]=me.alive?rand(14,30):rand(5,11);
   $('chat').innerHTML='';show('eject',0);show('mtMain',1);show('meeting',1);
   $('mtTitle').textContent=body?'💥 Crashed helper found!':'🔔 Bell meeting!';
   setMode('vote');renderCards();
@@ -585,23 +595,49 @@ function botVote(p){
       s=(c?s/c:0)+(p.push===q.id?25:0)+(M.accused.includes(q.id)?15:0);if(s>bs){bs=s;best=q}}
     return best&&bs>=14?best.id:-1}
   for(const q of cand){const s=p.sus[q.id]||0;if(s>bs){bs=s;best=q}}
-  return best&&bs>=32?best.id:-1 }
-function setMode(m){M.mode=m;document.querySelectorAll('#mtModes [data-m]').forEach(b=>{b.classList.toggle('on',b.dataset.m===m);b.disabled=!G.me.alive||M.phase!=='talk'||(b.dataset.m==='vote'?0 in M.votes:M.talks<=0)});
+  return best&&bs>=32+(M.skipBias||0)?best.id:-1 }
+function setMode(m){M.mode=m;document.querySelectorAll('#mtModes [data-m]').forEach(b=>{b.classList.toggle('on',b.dataset.m===m);b.disabled=!G.me.alive||M.phase!=='talk'||(b.dataset.m==='vote'?0 in M.votes:b.dataset.m==='ask'?M.asks<=0:M.talks<=0)});
+  const off=!G.me.alive||M.phase!=='talk';document.querySelectorAll('[data-say]').forEach(b=>b.disabled=off||!!M.said[b.dataset.say]);$('mtIn').disabled=$('mtSend').disabled=off;
   $('bSkip').disabled=!G.me.alive||M.phase!=='talk'||0 in M.votes;
-  $('mtHint').textContent=!G.me.alive?'You are a ghost. Watch what the others decide.':M.phase!=='talk'?'':m==='vote'?(0 in M.votes?'You voted. Waiting for the others...':'Tap a player to vote them out, or skip.'):m==='accuse'?`Tap a player to say you think they are a Bug. (${M.talks} left)`:`Tap a player to say you trust them. (${M.talks} left)`}
+  $('mtHint').textContent=!G.me.alive?'You are a ghost. Watch what the others decide.':M.phase!=='talk'?'':m==='vote'?(0 in M.votes?'You voted. Waiting for the others...':'Tap a player to vote them out, or skip.'):m==='accuse'?`Tap a player to say you think they are a Bug. (${M.talks} left)`:m==='ask'?`Tap a player to ask where they were. (${M.asks} left)`:`Tap a player to say you trust them. (${M.talks} left)`}
 function renderCards(){
   const me=G.me,tally=M.phase!=='talk';
   $('cards').innerHTML=G.players.map(p=>{const voters=tally?Object.keys(M.votes).filter(v=>M.votes[v]===p.id):[];
     return `<button class="pc${p.alive?'':' dead'}${p.isHuman?' me':''}${M.votes[0]===p.id?' sel':''}" data-id="${p.id}" ${p.alive?'':'disabled'}>${mini(p)}<span style="${me.team==='b'&&p.team==='b'?'color:var(--bad)':''}">${esc(p.name)}</span>${!tally&&p.alive&&p.id in M.votes?'<span class="tick">✔</span>':''}${voters.length?'<span class="dots">'+voters.map(v=>`<i style="--c:${G.players[v].color}"></i>`).join('')+'</span>':''}</button>`}).join('');
 }
+const later=(fn,i=0)=>setTimeout(()=>M&&M.phase==='talk'&&fn(),650+i*600);
+const fib=p=>p.team==='b'&&M.body&&p.lastRoom===placeName(M.body)?pick(ROOMS).n:p.lastRoom;
+function accuseFx(p){const me=G.me;applyFx(me,{id:p.id,d:14});M.accused.push(p.id);
+  for(const b of G.players)if(b.alive&&!b.isHuman&&b.team==='b'&&p.team!=='b')b.push=p.id;
+  if(!p.isHuman)later(()=>chatLine(p,pick(['Me?! No way!','I am not a Bug! I promise!','Why me? I was working!',`I was in ${fib(p)} the whole time!`])))}
+function askFx(p){later(()=>chatLine(p,pick([`I was in ${fib(p)}.`,`Me? I was in ${fib(p)} doing my jobs.`,`${fib(p)}. Ask anyone!`])))}
 function cardTap(id){ const me=G.me,p=G.players[id]; if(!M||M.phase!=='talk'||!me.alive||!p.alive)return;
   if(M.mode==='vote'){if(0 in M.votes||id===0)return;M.votes[0]=id;beep(600,.1)}
+  else if(M.mode==='ask'){if(M.asks<=0||id===0)return;M.asks--;chatLine(me,`${p.name}, where were you?`);askFx(p)}
   else{ if(M.talks<=0||id===0)return;M.talks--;
-    if(M.mode==='accuse'){chatLine(me,`I think ${p.name} is a Bug!`);applyFx(me,{id,d:14});M.accused.push(id);
-      for(const b of G.players)if(b.alive&&!b.isHuman&&b.team==='b'&&p.team!=='b')b.push=id;
-      if(!p.isHuman)setTimeout(()=>M&&M.phase==='talk'&&chatLine(p,pick(['Me?! No way!','I am not a Bug! I promise!','Why me? I was working!'])),700)}
+    if(M.mode==='accuse'){chatLine(me,`I think ${p.name} is a Bug!`);accuseFx(p)}
     else{chatLine(me,`I trust ${p.name}.`);applyFx(me,{id,d:-14})}}
-  setMode(M.talks<=0||M.mode==='vote'?'vote':M.mode);renderCards() }
+  const m=M.mode;setMode(m==='vote'||(m==='ask'?M.asks<=0:M.talks<=0)?'vote':m);renderCards() }
+function say(k,quiet){ const me=G.me; if(!M||M.phase!=='talk'||!me.alive||M.said[k])return; M.said[k]=1;
+  const bots=shuffle(G.players.filter(p=>p.alive&&!p.isHuman)),mine=t=>quiet||chatLine(me,t);
+  if(k==='where'){mine(`I was in ${me.lastRoom}.`);applyFx(me,{id:0,d:-8})}
+  else if(k==='all'){mine('Where was everyone?');bots.slice(0,5).forEach((p,i)=>later(()=>chatLine(p,`I was in ${fib(p)}.`),i))}
+  else if(k==='who'){mine('Who do you all think it is?');bots.slice(0,5).forEach((p,i)=>later(()=>{const v=botVote(p);chatLine(p,v>=0?pick([`My guess is ${G.players[v].name}.`,`I think it is ${G.players[v].name}.`,`${G.players[v].name}, for sure.`]):pick(['I really do not know.','No idea yet.','Not enough clues.']))},i))}
+  else if(k==='role'){const r=me.team==='b'?'Helper':ROLES[me.role].n;mine(`I am ${/^[AEIOU]/.test(r)?'an':'a'} ${r}!`);applyFx(me,{id:0,d:me.team==='b'?-5:-10});if(bots[0])later(()=>chatLine(bots[0],pick(['Hmm, okay.','That is what a Bug would say...','Good to know!'])))}
+  else if(k==='help'){mine('It was not me! I was doing my jobs!');applyFx(me,{id:0,d:-6});if(bots[0])later(()=>chatLine(bots[0],pick(['We will see...','I believe you.','Hmm.'])))}
+  else if(k==='skip'){mine('We do not have enough proof. Let us skip.');M.skipBias=14;if(bots[0])later(()=>chatLine(bots[0],pick(['Fair. I might skip.','Okay, but I am watching everyone.'])))}
+  setMode(M.mode) }
+function typed(t){ const me=G.me;t=t.trim().slice(0,80); if(!t||!M||M.phase!=='talk'||!me.alive)return; chatLine(me,t);
+  const low=t.toLowerCase(),p=G.players.find(q=>q.alive&&!q.isHuman&&low.includes(q.name.toLowerCase()));
+  if(p&&/where/.test(low)&&M.asks>0){M.asks--;askFx(p)}
+  else if(p&&M.talks>0&&/trust|safe|good|clear|innocent|not (a |the )?bug|with me|okay/.test(low)){M.talks--;applyFx(me,{id:p.id,d:-14});later(()=>chatLine(p,pick(['Thank you!','See? I am a good helper.'])))}
+  else if(p&&M.talks>0&&/sus|bug|vote|did it|liar|lying|zap|bad|sneaky|saw/.test(low)){M.talks--;accuseFx(p)}
+  else if(/where/.test(low)&&!M.said.all)say('all',true);
+  else if(/who|think/.test(low)&&!M.said.who)say('who',true);
+  else if(/skip/.test(low)&&!M.said.skip)say('skip',true);
+  else if(/not me|wasn.?t me|i am|i'm|i was/.test(low)&&!M.said.help)say('help',true);
+  else{const b=pick(G.players.filter(q=>q.alive&&!q.isHuman));if(b)later(()=>chatLine(b,pick(['Hmm.','Okay!','Interesting...','Beep boop.','Good point.'])))}
+  setMode(M.mode) }
 function meetingUpdate(dt){
   M.t+=dt;
   if(M.phase==='talk'){
@@ -909,6 +945,8 @@ tap('bQuit',toMenu);tap('bMenu',toMenu);tap('bAgain',newGame);
 document.querySelectorAll('[data-sab]').forEach(b=>b.addEventListener('click',()=>{show('sabwin',0);startSab(b.dataset.sab)}));
 $('cards').addEventListener('click',e=>{const b=e.target.closest('[data-id]');if(b)cardTap(+b.dataset.id)});
 document.querySelectorAll('#mtModes [data-m]').forEach(b=>b.addEventListener('click',()=>M&&setMode(b.dataset.m)));
+document.querySelectorAll('[data-say]').forEach(b=>b.addEventListener('click',()=>say(b.dataset.say)));
+$('mtForm').addEventListener('submit',e=>{e.preventDefault();typed($('mtIn').value);$('mtIn').value=''});
 tap('bSkip',()=>{if(M&&M.phase==='talk'&&G.me.alive&&!(0 in M.votes)){M.votes[0]=-1;setMode('vote');renderCards()}});
 // joystick
 const joyEl=$('joy'),knob=$('knob');let joyId=null;
