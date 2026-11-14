@@ -45,7 +45,7 @@
   #tabs { display: flex; border-top: 1px solid var(--line); flex: none; padding-bottom: env(safe-area-inset-bottom); background: var(--bg); }
   #tabs button { flex: 1; padding: 9px 0 8px; font-size: 22px; opacity: .4; position: relative; }
   #tabs button.on { opacity: 1; }
-  #tabs button small { display: block; font-size: 10px; font-weight: 700; margin-top: 1px; }
+  #tabs button small { display: block; font-size: 10px; white-space: nowrap; font-weight: 700; margin-top: 1px; }
   #tabs .dot { position: absolute; top: 6px; left: 58%; width: 9px; height: 9px; border-radius: 50%; background: var(--heart); display: none; }
 
   /* ---------- posts ---------- */
@@ -131,6 +131,49 @@
   #pad button { background: var(--tint); border-radius: 12px; font-size: 20px; }
   #pad button:active { background: #dccbff; }
 
+  /* ---------- videos ---------- */
+  #videos { background: #000; scroll-snap-type: y mandatory; }
+  .clip { position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; color: #fff; cursor: pointer; }
+  .post .clip { height: 340px; }
+  .stage { position: absolute; inset: 0; overflow: hidden; font-size: 96px; line-height: 1; }
+  .stage::after { content: ''; position: absolute; inset: 55% 0 0 0; background: linear-gradient(transparent, rgba(0,0,0,.55)); }
+  .act { position: absolute; }
+  .mid { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .mid > * { display: inline-block; }
+  .ground { position: absolute; left: 0; right: 0; bottom: 0; height: 24%; background: rgba(0,0,0,.18); }
+  .a-run { animation: run 2.6s linear infinite; }
+  .a-hop { animation: hop .55s cubic-bezier(.2,.6,.4,1) infinite alternate; }
+  .a-spin { animation: spin 1.6s linear infinite; }
+  .a-fall { animation: fall 2s linear infinite; font-size: 42px; }
+  .a-wob { animation: wob .38s ease-in-out infinite alternate; }
+  .a-pulse { animation: pulse 1.5s ease-in-out infinite alternate; }
+  .a-grow { animation: grow 6s ease-out infinite; transform-origin: 50% 100%; }
+  .a-shake { animation: shake .12s linear infinite alternate; }
+  .sq { width: 190px; height: 190px; border-radius: 24px; display: grid !important; place-items: center; animation: spin 6s linear infinite; }
+  .sq .sq { width: 70%; height: 70%; animation-duration: 3s; animation-direction: reverse; }
+  .ring { width: 80px; height: 80px; border-radius: 50%; border: 9px solid rgba(255,255,255,.25); border-top-color: #fff; animation: spin .9s linear infinite; }
+  @keyframes run { from { left: 105%; } to { left: -40%; } }
+  @keyframes hop { from { bottom: 20%; } to { bottom: 62%; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fall { from { top: -15%; } to { top: 105%; } }
+  @keyframes wob { from { transform: rotate(-22deg) translateY(0); } to { transform: rotate(22deg) translateY(-18px); } }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.5); } }
+  @keyframes grow { from { transform: scale(.15); } to { transform: scale(2.2); } }
+  @keyframes shake { from { transform: translate(-3px, 2px) rotate(-47deg); } to { transform: translate(3px, -2px) rotate(-43deg); } }
+  @keyframes vprog { from { width: 0; } to { width: 100%; } }
+  .clip:not(.playing) *, .clip.paused * { animation-play-state: paused !important; }
+  .vinfo { position: absolute; left: 14px; right: 76px; bottom: 20px; text-shadow: 0 1px 4px rgba(0,0,0,.6); z-index: 2; }
+  .vinfo b { font-size: 15px; }
+  .vinfo p { margin: 4px 0 0; font-size: 15px; line-height: 1.35; }
+  .vside { position: absolute; right: 10px; bottom: 26px; z-index: 2; text-align: center; }
+  .vlike { display: block; color: #fff; font-size: 12px; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.6); padding: 6px; }
+  .vlike i { display: block; font-style: normal; font-size: 34px; filter: grayscale(1) brightness(3); transition: transform .15s; }
+  .vlike.on i { filter: none; transform: scale(1.2); }
+  .vbar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.3); z-index: 2; }
+  .vbar i { display: block; height: 100%; background: #fff; animation: vprog 6s linear infinite; }
+  .vpause { position: absolute; inset: 0; display: none; place-items: center; font-size: 70px; background: rgba(0,0,0,.25); z-index: 3; }
+  .clip.paused .vpause { display: grid; }
+
   #off { position: absolute; inset: 0; background: #050507; color: #fff; z-index: 90; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; }
   #off.on { display: flex; }
   #off .em { font-size: 70px; }
@@ -145,6 +188,8 @@
   <div id="header"><span id="logo">scrollr</span><span id="dist">0.00 m</span></div>
 
   <div id="feed" class="screen on"><div id="spacer"></div><div id="posts"></div></div>
+
+  <div id="videos" class="screen"><div id="vspacer"></div></div>
 
   <div id="trophies" class="screen"><div class="pad"><h2>🏆 Trophies</h2><p class="sub" id="tcount"></p><div id="tlist"></div></div></div>
 
@@ -166,6 +211,7 @@
 
   <div id="tabs">
     <button data-tab="feed" class="on">🏠<small>Feed</small></button>
+    <button data-tab="videos">🎬<small>Videos</small></button>
     <button data-tab="trophies">🏆<small>Trophies</small><span class="dot" id="tdot"></span></button>
     <button data-tab="snake">🐍<small>Snake</small></button>
     <button data-tab="me">👤<small>Me</small></button>
@@ -189,7 +235,7 @@ const bag = items => { let left = []; return () => { if (!left.length) left = it
 
 /* ---------- saved progress ---------- */
 const KEY = 'doomscroll_v1';
-const fresh = () => ({ px: 0, likes: 0, swats: 0, polls: 0, eggs: 0, wraps: 0, rebel: 0, pets: 0, snakeBest: 0, snakePlays: 0, fastSwat: 0, grass: 0, owl: 0, got: {} });
+const fresh = () => ({ px: 0, likes: 0, swats: 0, polls: 0, eggs: 0, wraps: 0, rebel: 0, pets: 0, snakeBest: 0, snakePlays: 0, fastSwat: 0, grass: 0, owl: 0, vids: 0, got: {} });
 let S = fresh();
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
 let saveTimer = 0;
@@ -212,6 +258,9 @@ const TROPHIES = [
   ['like1', '❤️', 'Aww', 'Like your first post', () => S.likes >= 1],
   ['like25', '💕', 'Heart Machine', 'Like 25 posts', () => S.likes >= 25],
   ['like100', '💖', 'Loves Everything', 'Like 100 posts', () => S.likes >= 100],
+  ['vid1', '🎬', 'Movie Night', 'Watch a whole video', () => S.vids >= 1],
+  ['vid10', '📺', 'Binge Watcher', 'Watch 10 videos', () => S.vids >= 10],
+  ['vid50', '🍿', 'Square Eyes', 'Watch 50 videos', () => S.vids >= 50],
   ['swat1', '🪰', 'Swatter', 'Close a pop-up', () => S.swats >= 1],
   ['swat10', '🧹', 'Pop-up Sweeper', 'Close 10 pop-ups', () => S.swats >= 10],
   ['ninja', '🥷', 'Ninja Reflexes', 'Close a pop-up in under 1 second', () => S.fastSwat >= 1],
@@ -389,11 +438,12 @@ const makers = [
     toy.firstChild.onclick = () => { n++; S.pets++; toy.firstChild.textContent = n > 12 ? '😻' : n > 5 ? '😺' : '🐱'; toy.lastChild.textContent = 'purr'.padEnd(4 + Math.min(n, 24), 'r') + ` (${n} pets)`; check(); };
     return p;
   },
+  () => { const p = shell('<span class="tag">Video</span>'); p.appendChild(makeClip()); return p; },
   () => { // fake ending
     const p = el('div', 'post'); p.innerHTML = '<div class="text big" style="text-align:center;padding:30px 20px 6px">🎉 You\'re all caught up!</div><div class="text" style="text-align:center;color:var(--soft);padding-bottom:26px">…just kidding. There is no bottom. There was never a bottom.</div>'; return p;
   },
 ];
-const WEIGHTS = [5, 4, 4, 4, 2, 3, 2, 1.2, 1.2, 1, 1.2, .6];
+const WEIGHTS = [5, 4, 4, 4, 2, 3, 2, 1.2, 1.2, 1, 1.2, 3, .6];
 const TOTALW = WEIGHTS.reduce((a, b) => a + b, 0);
 let lastKind = -1;
 function makePost() {
@@ -401,12 +451,66 @@ function makePost() {
   lastKind = k; return makers[k]();
 }
 
+/* ---------- videos (little cartoons the game draws itself) ---------- */
+const VGRADS = ['linear-gradient(160deg,#ff7eb3,#7a3cff)', 'linear-gradient(160deg,#36d1dc,#5b86e5)', 'linear-gradient(160deg,#f7971e,#ff5f6d)', 'linear-gradient(160deg,#11998e,#38ef7d)', 'linear-gradient(160deg,#fc5c7d,#6a82fb)', 'linear-gradient(160deg,#f2994a,#f2c94c)'];
+const FOODS = [['pizza', '🍕'], ['donuts', '🍩'], ['tacos', '🌮'], ['waffles', '🧇'], ['pretzels', '🥨'], ['burgers', '🍔'], ['broccoli', '🥦']];
+const rain = (e, n) => Array.from({ length: n }, () => `<span class="act a-fall" style="left:${rnd(90)}%;animation-duration:${(1.2 + Math.random() * 1.6).toFixed(2)}s;animation-delay:-${(Math.random() * 3).toFixed(2)}s">${e}</span>`).join('');
+const SCENES = [
+  () => { const [a, e] = pick(ANIMALS); return { h: `<span class="ground"></span><span class="act a-run" style="bottom:20%">${e}</span>`, c: pick([`This ${a} has been running for 3 days. Nobody knows why.`, `${a} is late for school again`, `POV: the ${a} heard a snack bag open`]) }; },
+  () => { const [a, e] = pick(ANIMALS); return { h: `<span class="ground"></span><span class="act a-hop" style="left:50%;margin-left:-48px">${e}</span>`, c: `${a} discovers trampoline. Will not stop. Send help.` }; },
+  () => { const [, e] = pick(FOODS); return { h: `<div class="mid"><span class="a-spin">${e}</span></div>`, c: "It just spins. That's the whole video. You're still watching." }; },
+  () => { const [f, e] = pick(FOODS); return { h: rain(e, 14) + '<div class="mid"><span>☁️</span></div>', c: `Weather report: cloudy with a chance of ${f}.` }; },
+  () => { const d = [pick(ANIMALS)[1], pick(ANIMALS)[1], pick(ANIMALS)[1]]; return { h: `<div class="mid" style="font-size:76px">${d.map((e, i) => `<span class="a-wob" style="animation-delay:-${i * .19}s">${e}</span>`).join('')}</div>`, c: 'Dance practice is going GREAT. Nobody is on beat.' }; },
+  () => ({ bg: 'linear-gradient(#0b1030,#3a1c71)', h: rain('✨', 16) + '<div class="mid"><span class="a-shake">🚀</span></div>', c: 'Going to the Moon to leave a 1 star review.' }),
+  () => ({ h: '<span class="ground"></span><span class="act a-run" style="bottom:20%">🚚</span><span class="act a-run" style="bottom:20%;font-size:64px;animation-delay:.5s">🐕</span>', c: 'He will never catch the ice cream truck. He will never stop trying.' }),
+  () => ({ h: '<span class="ground"></span><div class="mid" style="align-items:flex-end;padding-bottom:22%"><span class="a-grow">🌱</span></div>', c: 'Watching a plant grow (10 hour version, part 1 of 900)' }),
+  () => ({ bg: '#1a1a2e', h: '<div class="mid"><div class="sq" style="background:#ff5fa2"><div class="sq" style="background:#ffd166"><div class="sq" style="background:#36d1dc"><div class="sq" style="background:#7a3cff"></div></div></div></div></div>', c: 'Oddly satisfying. Do not ask why.' }),
+  () => ({ bg: '#22252b', h: '<div class="mid"><div class="ring"></div></div>', c: 'This video is still loading. It has always been loading.' }),
+  () => ({ h: '<div class="mid"><span class="a-pulse">🐱</span></div>', c: 'He knows what you did.' }),
+  () => { const [f, e] = pick(FOODS); return { h: `<div class="mid" style="font-size:80px"><span class="a-wob">🧑‍🍳</span><span class="a-spin">${e}</span></div>`, c: `Cooking tutorial: how to make ${f}. Step 1: spin it. There is no step 2.` }; },
+];
+const watcher = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('playing', e.intersectionRatio >= .6)), { threshold: [0, .6, 1] });
+let lastScene = -1;
+function makeClip() {
+  let k; do k = rnd(SCENES.length); while (k === lastScene); lastScene = k;
+  const s = SCENES[k](), n = rnd(90000) + 100;
+  const c = el('div', 'clip', `<div class="stage" style="background:${s.bg || pick(VGRADS)}">${s.h}</div><div class="vinfo"><b>@${pick(USERS)[0]}</b><p>${s.c}</p></div><div class="vside"><button class="vlike" aria-label="like"><i>❤️</i><span>${n.toLocaleString()}</span></button></div><div class="vbar"><i></i></div><div class="vpause">▶</div>`);
+  // when the white bar fills up once, you watched the whole thing
+  c.querySelector('.vbar i').addEventListener('animationiteration', () => { if (!c.dataset.seen) { c.dataset.seen = 1; S.vids++; check(); } });
+  c.addEventListener('click', e => {
+    const l = e.target.closest('.vlike');
+    if (!l) return c.classList.toggle('paused');
+    if (!l.classList.contains('on')) { l.classList.add('on'); l.lastChild.textContent = (n + 1).toLocaleString(); S.likes++; check(); }
+  });
+  watcher.observe(c); return c;
+}
+const vids = $('videos'), vspacer = $('vspacer');
+let vSpacerH = 0, vLast = 0;
+function vfill() {
+  const h = vids.clientHeight; if (!h) return;
+  while (vids.scrollHeight - vids.scrollTop - h < h * 2) vids.appendChild(makeClip());
+  const clips = vids.querySelectorAll('.clip');
+  if (clips.length > 24) { // make the empty space first, then take the old videos away, so nothing jumps
+    vSpacerH += h * 10; vspacer.style.height = vSpacerH + 'px';
+    for (let i = 0; i < 10; i++) { watcher.unobserve(clips[i]); clips[i].remove(); }
+  }
+}
+vids.addEventListener('scroll', () => {
+  const d = Math.abs(vids.scrollTop - vLast); vLast = vids.scrollTop;
+  if (!d) return;
+  moved(d); vfill(); hud(); check();
+}, { passive: true });
+
 /* ---------- the endless feed ---------- */
 const feed = $('feed'), posts = $('posts'), spacer = $('spacer');
 let spacerH = 0, lastTop = 0, sessionPx = 0, nextPop = 2600, mileIdx = TALL.findIndex(t => t[0] > metres());
 if (mileIdx < 0) mileIdx = TALL.length;
 let pendingMile = null;
 
+function moved(d) {
+  S.px += d; sessionPx += d;
+  if (mileIdx < TALL.length && metres() >= TALL[mileIdx][0]) { pendingMile = TALL[mileIdx]; mileIdx++; }
+}
 function fill() {
   // add new posts at the bottom whenever you get close to it
   while (feed.scrollHeight - feed.scrollTop - feed.clientHeight < 1800) {
@@ -416,7 +520,7 @@ function fill() {
   // swap far-away old posts for empty space, so the phone never gets slow
   if (posts.children.length > 70) {
     const before = posts.offsetHeight;
-    for (let i = 0; i < 25; i++) posts.firstChild.remove();
+    for (let i = 0; i < 25; i++) { posts.firstChild.querySelectorAll('.clip').forEach(c => watcher.unobserve(c)); posts.firstChild.remove(); }
     spacerH += before - posts.offsetHeight; spacer.style.height = spacerH + 'px';
   }
   if (spacerH > 4e6) { const cut = spacerH - 2000; spacerH = 2000; spacer.style.height = '2000px'; feed.scrollTop -= cut; lastTop = feed.scrollTop; }
@@ -433,8 +537,7 @@ function hud() {
 feed.addEventListener('scroll', () => {
   const d = Math.abs(feed.scrollTop - lastTop); lastTop = feed.scrollTop;
   if (!d) return;
-  S.px += d; sessionPx += d;
-  if (mileIdx < TALL.length && metres() >= TALL[mileIdx][0]) { pendingMile = TALL[mileIdx]; mileIdx++; }
+  moved(d);
   if (sessionPx > nextPop && !popOpen) { nextPop = sessionPx + 3200 + rnd(3200); popUp(); }
   fill(); hud(); check();
 }, { passive: true });
@@ -500,6 +603,7 @@ function show(name) {
   if (name === 'me') drawMe();
   if (name === 'snake') drawSnake(); else stopSnake();
   if (name === 'feed') { feed.scrollTop = lastTop; fill(); }
+  if (name === 'videos') { vids.scrollTop = vLast; vfill(); }
 }
 document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { if (b.dataset.tab === 'feed' && tab === 'feed') return; show(b.dataset.tab); });
 
@@ -512,7 +616,7 @@ function compareLine() {
 }
 function drawMe() {
   $('compare').textContent = compareLine();
-  const rows = [[fmtM(metres()), 'scrolled'], [S.likes, 'posts liked'], [S.swats, 'pop-ups swatted'], [S.polls, 'polls voted'], [S.snakeBest, 'best Snake score'], [TROPHIES.filter(t => S.got[t[0]]).length + '/' + TROPHIES.length, 'trophies']];
+  const rows = [[fmtM(metres()), 'scrolled'], [S.likes, 'posts liked'], [S.vids, 'videos watched'], [S.swats, 'pop-ups swatted'], [S.snakeBest, 'best Snake score'], [TROPHIES.filter(t => S.got[t[0]]).length + '/' + TROPHIES.length, 'trophies']];
   $('stats').innerHTML = rows.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
 }
 $('putdown').onclick = () => { S.grass = 1; $('offmsg').textContent = compareLine() + ' The outside world says hi.'; $('off').classList.add('on'); check(); };
@@ -579,7 +683,7 @@ const KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRig
 window.addEventListener('keydown', e => { if (tab !== 'snake') return; const k = KEYS[e.key]; if (k) { e.preventDefault(); if (!alive) startSnake(); turn(k[0], k[1]); } else if (e.key === ' ' && !alive) { e.preventDefault(); startSnake(); } });
 
 /* ---------- go! ---------- */
-const hello = el('div', 'post', '<div class="text big" style="padding-top:8px">👋 Welcome to scrollr</div><div class="text">There is no bottom. Just scroll and see how far your thumb can go.<br><br>❤️ Double-tap posts to like them<br>🪰 Swat the pop-ups<br>🏆 Collect trophies<br>🐍 Psst… there is a snake down there ↓</div>');
+const hello = el('div', 'post', '<div class="text big" style="padding-top:8px">👋 Welcome to scrollr</div><div class="text">There is no bottom. Just scroll and see how far your thumb can go.<br><br>❤️ Double-tap posts to like them<br>🪰 Swat the pop-ups<br>🎬 Watch videos in the Videos tab<br>🏆 Collect trophies<br>🐍 Psst… there is a snake down there ↓</div>');
 posts.appendChild(hello);
 fill(); hud(); drawTrophies();
 })();
