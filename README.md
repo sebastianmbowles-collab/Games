@@ -51,3 +51,8 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## DOOM SCROLL
+
+`DoomScroll.html` is a silly endless-scrolling game, all in one hand-written file (no build step). Open it in any browser, best on a phone.
+Scroll a fake social feed that never ends and see how far your thumb travels in real metres. Double-tap posts to like them, vote in polls, hatch eggs, pop bubble wrap, swat pop-up traps, collect 22 trophies and find the Snake game in the bottom bar. Progress saves on the device.

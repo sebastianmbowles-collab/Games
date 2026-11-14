@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Doom Scroll</title>
+<style>
+  :root {
+    --bg: #ffffff; --ink: #14171a; --soft: #6b7682; --line: #e7ebef;
+    --tint: #f4f6f8; --brand: #7a3cff; --heart: #ff2d6f; --gold: #f5a300;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(circle at 50% 20%, #2b2350, #0c0a18 70%);
+    color: var(--ink); display: flex; align-items: center; justify-content: center;
+    touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+
+  /* ---------- the phone ---------- */
+  #phone {
+    position: relative; width: 100vw; height: 100vh; height: 100dvh;
+    background: var(--bg); display: flex; flex-direction: column; overflow: hidden;
+  }
+  @media (min-width: 480px) and (min-height: 640px) {
+    #phone {
+      width: 390px; height: min(820px, calc(100vh - 40px));
+      border-radius: 46px; border: 11px solid #111; outline: 2px solid #3a3a44;
+      box-shadow: 0 30px 80px rgba(0,0,0,.6);
+    }
+    #notch { display: block; }
+  }
+  #notch { display: none; position: absolute; top: 7px; left: 50%; width: 96px; height: 24px; margin-left: -48px; background: #111; border-radius: 14px; z-index: 50; pointer-events: none; }
+
+  #status { display: flex; justify-content: space-between; align-items: center; padding: 8px 22px 2px; font-size: 13px; font-weight: 700; flex: none; }
+  #header { display: flex; justify-content: space-between; align-items: center; padding: 6px 16px 10px; border-bottom: 1px solid var(--line); flex: none; }
+  #logo { font-size: 24px; font-weight: 900; letter-spacing: -1px; color: var(--brand); font-style: italic; }
+  #dist { background: var(--tint); border-radius: 99px; padding: 6px 12px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .screen { flex: 1; min-height: 0; overflow-y: auto; display: none; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .screen.on { display: block; }
+
+  #tabs { display: flex; border-top: 1px solid var(--line); flex: none; padding-bottom: env(safe-area-inset-bottom); background: var(--bg); }
+  #tabs button { flex: 1; padding: 9px 0 8px; font-size: 22px; opacity: .4; position: relative; }
+  #tabs button.on { opacity: 1; }
+  #tabs button small { display: block; font-size: 10px; font-weight: 700; margin-top: 1px; }
+  #tabs .dot { position: absolute; top: 6px; left: 58%; width: 9px; height: 9px; border-radius: 50%; background: var(--heart); display: none; }
+
+  /* ---------- posts ---------- */
+  .post { border-bottom: 8px solid var(--tint); padding: 12px 0 8px; position: relative; }
+  .who { display: flex; align-items: center; gap: 10px; padding: 0 14px 8px; }
+  .av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; flex: none; }
+  .name { font-weight: 700; font-size: 14px; }
+  .when { color: var(--soft); font-size: 12px; }
+  .text { padding: 0 14px 10px; font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+  .text.big { font-size: 21px; font-weight: 700; line-height: 1.3; }
+  .pic { height: 240px; display: grid; place-items: center; font-size: 110px; position: relative; overflow: hidden; }
+  .pic span { filter: drop-shadow(0 8px 10px rgba(0,0,0,.25)); }
+  .bar { display: flex; gap: 18px; padding: 8px 14px 2px; font-size: 14px; color: var(--soft); font-weight: 600; align-items: center; }
+  .like { display: flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+  .like i { font-style: normal; font-size: 21px; filter: grayscale(1); opacity: .55; transition: transform .15s; }
+  .like.on { color: var(--heart); }
+  .like.on i { filter: none; opacity: 1; transform: scale(1.2); }
+  .bigheart { position: absolute; left: 50%; top: 45%; font-size: 90px; pointer-events: none; animation: pop .8s ease-out forwards; z-index: 5; }
+  @keyframes pop { 0% { transform: translate(-50%,-50%) scale(0); opacity: 0; } 25% { transform: translate(-50%,-50%) scale(1.25); opacity: 1; } 70% { transform: translate(-50%,-50%) scale(1); opacity: 1; } 100% { transform: translate(-50%,-80%) scale(1); opacity: 0; } }
+
+  .tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .5px; padding: 3px 8px; border-radius: 6px; background: var(--tint); color: var(--soft); margin: 0 14px 8px; text-transform: uppercase; }
+  .tag.news { background: #ffe3e3; color: #c21f1f; }
+  .tag.ad { background: #fff3cf; color: #8a6200; }
+  .truth { margin: 0 14px 10px; padding: 10px 12px; background: #e8f7ee; border-radius: 12px; font-size: 14px; line-height: 1.4; color: #17613a; }
+  .opt { display: block; width: calc(100% - 28px); margin: 0 14px 8px; padding: 12px 14px; border-radius: 12px; background: var(--tint); text-align: left; font-weight: 600; font-size: 15px; position: relative; overflow: hidden; }
+  .opt .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: #dccbff; transition: width .5s; }
+  .opt.mine .fill { background: #b99cff; }
+  .opt b, .opt em { position: relative; font-style: normal; }
+  .opt em { float: right; }
+  .cta { display: block; margin: 0 14px 8px; padding: 12px; width: calc(100% - 28px); border-radius: 12px; background: var(--brand); color: #fff; font-weight: 800; font-size: 15px; }
+  .cta.red { background: #e5242f; box-shadow: 0 5px 0 #9c111a; }
+  .cta.red:active { transform: translateY(4px); box-shadow: 0 1px 0 #9c111a; }
+  .toy { margin: 0 14px 10px; background: var(--tint); border-radius: 16px; padding: 16px; text-align: center; }
+  .toy .thing { font-size: 96px; line-height: 1.1; display: inline-block; transition: transform .08s; }
+  .toy .thing:active { transform: scale(.9) rotate(-6deg); }
+  .toy p { margin: 8px 0 0; font-size: 14px; color: var(--soft); font-weight: 600; min-height: 1.3em; }
+  .wrap { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .wrap button { aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #b9d8ff 60%, #8fbaf0); box-shadow: inset 0 -3px 5px rgba(0,0,0,.12); }
+  .wrap button.popped { background: #dbe4ee; box-shadow: inset 0 2px 4px rgba(0,0,0,.2); transform: scale(.85); }
+  .mile { background: linear-gradient(135deg, #7a3cff, #ff5fa2); color: #fff; padding: 26px 18px; text-align: center; border-bottom: 8px solid var(--tint); }
+  .mile div { font-size: 54px; }
+  .mile h3 { margin: 6px 0 4px; font-size: 20px; }
+  .mile p { margin: 0; font-size: 14px; opacity: .9; }
+
+  /* ---------- pop-ups ---------- */
+  #banner { position: absolute; top: 8px; left: 8px; right: 8px; background: rgba(28,28,34,.96); color: #fff; border-radius: 18px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; z-index: 60; transform: translateY(-140%); transition: transform .3s cubic-bezier(.2,1.2,.4,1); box-shadow: 0 8px 24px rgba(0,0,0,.35); text-align: left; width: calc(100% - 16px); }
+  #banner.on { transform: none; }
+  #banner .ic { font-size: 28px; }
+  #banner b { display: block; font-size: 13px; }
+  #banner span { font-size: 14px; opacity: .9; }
+  #modal { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 70; display: none; align-items: center; justify-content: center; padding: 24px; }
+  #modal.on { display: flex; }
+  #card { background: #fff; border-radius: 22px; padding: 26px 20px 18px; width: 100%; text-align: center; position: relative; animation: drop .3s cubic-bezier(.2,1.4,.4,1); min-height: 250px; }
+  @keyframes drop { from { transform: scale(.6); opacity: 0; } }
+  #card .em { font-size: 64px; }
+  #card h2 { margin: 6px 0; font-size: 21px; }
+  #card p { margin: 0 0 16px; color: var(--soft); font-size: 15px; line-height: 1.4; }
+  #card .cta { margin: 0 0 8px; width: 100%; }
+  #card .cta.ghost { background: var(--tint); color: var(--ink); }
+  #xbtn { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: var(--tint); font-weight: 900; font-size: 15px; top: 10px; right: 10px; transition: top .15s, right .15s, left .15s, bottom .15s; }
+  #toast { position: absolute; left: 50%; top: 96px; transform: translate(-50%, -30px); background: #14171a; color: #fff; padding: 10px 16px; border-radius: 99px; font-size: 14px; font-weight: 700; opacity: 0; transition: .3s; z-index: 80; pointer-events: none; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- other tabs ---------- */
+  .pad { padding: 16px; }
+  .pad h2 { margin: 4px 0 4px; font-size: 22px; }
+  .pad .sub { color: var(--soft); font-size: 14px; margin: 0 0 14px; }
+  .trophy { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 14px; background: var(--tint); margin-bottom: 8px; opacity: .5; }
+  .trophy.got { opacity: 1; background: #fff6dc; }
+  .trophy .ti { font-size: 32px; filter: grayscale(1); }
+  .trophy.got .ti { filter: none; }
+  .trophy b { display: block; font-size: 15px; }
+  .trophy span { font-size: 13px; color: var(--soft); }
+  .stat { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .stat div { background: var(--tint); border-radius: 14px; padding: 14px; }
+  .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--soft); font-weight: 600; }
+  .link { color: var(--soft); font-size: 13px; text-decoration: underline; display: block; margin: 14px auto; }
+
+  #snakeWrap { text-align: center; }
+  #cv { width: 100%; max-width: 330px; aspect-ratio: 1; border-radius: 14px; background: #10261a; touch-action: none; display: block; margin: 0 auto; }
+  #pad { display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(2, 50px); gap: 6px; justify-content: center; margin-top: 12px; }
+  #pad button { background: var(--tint); border-radius: 12px; font-size: 20px; }
+  #pad button:active { background: #dccbff; }
+
+  #off { position: absolute; inset: 0; background: #050507; color: #fff; z-index: 90; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; }
+  #off.on { display: flex; }
+  #off .em { font-size: 70px; }
+  #off h2 { font-size: 24px; margin: 10px 0; }
+  #off p { opacity: .75; line-height: 1.5; margin: 0 0 24px; }
+</style>
+</head>
+<body>
+<div id="phone">
+  <div id="notch"></div>
+  <div id="status"><span id="clock">9:00 PM</span><span id="batt">🔋 100%</span></div>
+  <div id="header"><span id="logo">scrollr</span><span id="dist">0.00 m</span></div>
+
+  <div id="feed" class="screen on"><div id="spacer"></div><div id="posts"></div></div>
+
+  <div id="trophies" class="screen"><div class="pad"><h2>🏆 Trophies</h2><p class="sub" id="tcount"></p><div id="tlist"></div></div></div>
+
+  <div id="snake" class="screen"><div class="pad" id="snakeWrap">
+    <h2>🐍 Snake Break</h2><p class="sub" id="sscore">Tap the board to start. Swipe or use the arrows.</p>
+    <canvas id="cv" width="330" height="330"></canvas>
+    <div id="pad">
+      <span></span><button data-d="0,-1">▲</button><span></span>
+      <button data-d="-1,0">◀</button><button data-d="0,1">▼</button><button data-d="1,0">▶</button>
+    </div>
+  </div></div>
+
+  <div id="me" class="screen"><div class="pad">
+    <h2>👤 Your Scrolling</h2><p class="sub" id="compare"></p>
+    <div class="stat" id="stats"></div>
+    <button class="cta" id="putdown" style="margin:0;width:100%">📴 Put the phone down</button>
+    <button class="link" id="reset">Start over (erase everything)</button>
+  </div></div>
+
+  <div id="tabs">
+    <button data-tab="feed" class="on">🏠<small>Feed</small></button>
+    <button data-tab="trophies">🏆<small>Trophies</small><span class="dot" id="tdot"></span></button>
+    <button data-tab="snake">🐍<small>Snake</small></button>
+    <button data-tab="me">👤<small>Me</small></button>
+  </div>
+
+  <button id="banner"><span class="ic"></span><span><b></b><span class="msg"></span></span></button>
+  <div id="modal"><div id="card"></div></div>
+  <div id="toast"></div>
+  <div id="off"><div class="em">🌳</div><h2>Phone is down.</h2><p id="offmsg"></p><button class="cta" id="pickup" style="width:auto;padding:12px 22px">Pick it back up…</button></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const rnd = n => Math.floor(Math.random() * n);
+const pick = a => a[rnd(a.length)];
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+// A "bag" hands out every item once, in a mixed-up order, before repeating any.
+const bag = items => { let left = []; return () => { if (!left.length) left = items.slice().sort(() => Math.random() - .5); return left.pop(); }; };
+
+/* ---------- saved progress ---------- */
+const KEY = 'doomscroll_v1';
+const fresh = () => ({ px: 0, likes: 0, swats: 0, polls: 0, eggs: 0, wraps: 0, rebel: 0, pets: 0, snakeBest: 0, snakePlays: 0, fastSwat: 0, grass: 0, owl: 0, got: {} });
+let S = fresh();
+try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
+let saveTimer = 0;
+const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }, 400); };
+
+const PX_PER_M = 3779.5; // 96 CSS pixels per inch, so this many pixels in a metre
+const metres = () => S.px / PX_PER_M;
+const fmtM = m => m >= 1000 ? (m / 1000).toFixed(2) + ' km' : m >= 100 ? m.toFixed(0) + ' m' : m.toFixed(m >= 10 ? 1 : 2) + ' m';
+
+const TALL = [[1, 'a big dog standing up', '🐕'], [2, 'a door', '🚪'], [5.5, 'a giraffe', '🦒'], [12, 'a T. rex from nose to tail', '🦖'], [30, 'a blue whale', '🐋'], [57, 'the Leaning Tower of Pisa', '🏛️'], [93, 'the Statue of Liberty', '🗽'], [139, 'the Great Pyramid', '🔺'], [330, 'the Eiffel Tower', '🗼'], [830, 'the tallest building on Earth', '🏙️'], [8849, 'Mount Everest', '🏔️']];
+
+/* ---------- trophies ---------- */
+const TROPHIES = [
+  ['flick', '👆', 'First Flick', 'Scroll 1 metre', () => metres() >= 1],
+  ['giraffe', '🦒', 'Taller Than a Giraffe', 'Scroll 5.5 metres', () => metres() >= 5.5],
+  ['whale', '🐋', 'Whale of a Time', 'Scroll 30 metres', () => metres() >= 30],
+  ['liberty', '🗽', 'Liberty Thumb', 'Scroll 93 metres', () => metres() >= 93],
+  ['eiffel', '🗼', 'Oui Oui Scroll', 'Scroll 330 metres', () => metres() >= 330],
+  ['km', '🏅', 'Thumb Marathon', 'Scroll a whole kilometre', () => metres() >= 1000],
+  ['like1', '❤️', 'Aww', 'Like your first post', () => S.likes >= 1],
+  ['like25', '💕', 'Heart Machine', 'Like 25 posts', () => S.likes >= 25],
+  ['like100', '💖', 'Loves Everything', 'Like 100 posts', () => S.likes >= 100],
+  ['swat1', '🪰', 'Swatter', 'Close a pop-up', () => S.swats >= 1],
+  ['swat10', '🧹', 'Pop-up Sweeper', 'Close 10 pop-ups', () => S.swats >= 10],
+  ['ninja', '🥷', 'Ninja Reflexes', 'Close a pop-up in under 1 second', () => S.fastSwat >= 1],
+  ['egg', '🐣', 'Egg-cellent', 'Hatch an egg', () => S.eggs >= 1],
+  ['wrap', '🫧', 'Pop Star', 'Pop a whole sheet of bubble wrap', () => S.wraps >= 1],
+  ['rebel', '🚨', 'Rule Breaker', 'Press the forbidden button 10 times', () => S.rebel >= 10],
+  ['purr', '🐱', 'Cat Whisperer', 'Pet the cat 20 times', () => S.pets >= 20],
+  ['vote', '🗳️', 'Good Citizen', 'Vote in 5 polls', () => S.polls >= 5],
+  ['snake1', '🐍', 'Sssecret Found', 'Play Snake', () => S.snakePlays >= 1],
+  ['snake10', '🍎', 'Apple Muncher', 'Score 10 in Snake', () => S.snakeBest >= 10],
+  ['snake25', '👑', 'Snake Royalty', 'Score 25 in Snake', () => S.snakeBest >= 25],
+  ['owl', '🦉', 'Night Owl', 'Scroll until the phone clock passes 3 AM', () => S.owl >= 1],
+  ['grass', '🌳', 'Touched Grass', 'Put the phone down', () => S.grass >= 1],
+];
+let toastTimer = 0;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2600); }
+function check() {
+  let fresh = false;
+  for (const [id, icon, name, , test] of TROPHIES) if (!S.got[id] && test()) { S.got[id] = 1; toast(`${icon} Trophy: ${name}!`); fresh = true; }
+  if (fresh) { if (tab !== 'trophies') $('tdot').style.display = 'block'; drawTrophies(); }
+  save();
+}
+function drawTrophies() {
+  const n = TROPHIES.filter(t => S.got[t[0]]).length;
+  $('tcount').textContent = `${n} of ${TROPHIES.length} collected`;
+  $('tlist').innerHTML = TROPHIES.map(([id, icon, name, how]) => `<div class="trophy ${S.got[id] ? 'got' : ''}"><div class="ti">${icon}</div><div><b>${S.got[id] ? name : '???'}</b><span>${how}</span></div></div>`).join('');
+}
+
+/* ---------- things to post ---------- */
+const USERS = [['pancake_wizard', '🥞'], ['grandma_gamer_72', '👵'], ['definitely_not_a_cat', '🐈'], ['sock_collector', '🧦'], ['prof_noodle', '🍜'], ['the_real_potato', '🥔'], ['moon_reviewer', '🌙'], ['captain_nap', '😴'], ['dj_broccoli', '🥦'], ['sir_honks_a_lot', '🦆'], ['tiny_dino', '🦕'], ['wifi_ghost', '👻'], ['beans4ever', '🫘'], ['llama_news', '🦙'], ['toast_enjoyer', '🍞'], ['mr_bubbles', '🐡'], ['queen_of_snacks', '🍿'], ['robot_in_disguise', '🤖']];
+const COLORS = ['#ffd6e0', '#d6f0ff', '#e3ffd6', '#fff3c4', '#e8dcff', '#ffe2c9', '#d2fff4'];
+const GRADS = ['linear-gradient(135deg,#ffb6c9,#ffe29a)', 'linear-gradient(135deg,#9be7ff,#c3b5ff)', 'linear-gradient(135deg,#b6f5c0,#9be7ff)', 'linear-gradient(135deg,#ffd59a,#ff9eb5)', 'linear-gradient(135deg,#d4b8ff,#ffb8e6)', 'linear-gradient(135deg,#fff29a,#b6f5c0)'];
+const TIMES = ['just now', '1m', '2m', '7m', '12m', '34m', '1h', '3h', 'yesterday', 'in the future somehow'];
+
+const STATUS = bag([
+  'I just found out my dog has been pretending not to know how doors work.',
+  'Day 12 of asking my goldfish for homework help. He remains silent. Suspicious.',
+  'Ate 40 pancakes. Regret nothing. Cannot move. Send syrup.',
+  'My little sister says the floor is lava. It has been 3 days. I live on the couch now.',
+  "Why is it called a 'building' if it's already built?",
+  'I told my cat a secret and now the whole neighbourhood knows.',
+  'Just clapped at the end of a movie. I was home alone.',
+  'I put my shoes on the wrong feet to see if anyone would notice. It was me. I noticed.',
+  'My grandma just beat my high score. I am moving out.',
+  'If you are reading this, you scrolled here. Wild.',
+  'The wifi went out for 5 minutes so I met my family. They seem nice.',
+  "Can't sleep. Counted sheep. One of them owes me money.",
+  'Homework update: the dog did not eat it. The dog DID it. Got an A.',
+  'I have been scrolling so long my thumb has its own muscles now.',
+  'Someone on this app is scrolling RIGHT NOW. It is you.',
+  'Tried to eat soup with a fork. Do not recommend. 2 hours so far.',
+  'My robot vacuum ran away from home. If you see it, tell it I am sorry.',
+  'I named my left sock Gerald. Gerald is missing.',
+  'Just waved back at someone who was waving at the person behind me. Moving to a new town.',
+  'Opened the fridge. Nothing. Closed it. Opened it again in case snacks appeared. Nothing.',
+  'My shadow has been following me all day. Kind of rude.',
+  'Sneezed so hard I forgot my own name for a second. Hi, I am possibly Kevin.',
+  'A pigeon looked at my sandwich like it knew my whole life story.',
+  'Trying to whisper to my dog so the cat does not hear. The cat heard.',
+  'I blinked and it was Sunday night again. Who is in charge of this?',
+  'Fell asleep on my arm. My arm is now a noodle that belongs to someone else.',
+  'Tell me why I said "you too" when the waiter said "enjoy your meal".',
+  'This post has no point. You read it anyway. We are the same.',
+]);
+const ANIMALS = [['cat', '🐱'], ['duck', '🦆'], ['llama', '🦙'], ['hamster', '🐹'], ['penguin', '🐧'], ['raccoon', '🦝'], ['frog', '🐸'], ['goat', '🐐'], ['turtle', '🐢'], ['parrot', '🦜'], ['hedgehog', '🦔'], ['sloth', '🦥']];
+const EVENTS = bag(['elected mayor of small town, promises more naps', 'wins spelling bee by spelling "snack"', 'learns to drive, gets stuck in drive-thru for 6 hours', 'opens restaurant that only serves crumbs', 'refuses to leave trampoline', 'caught running lemonade stand with no lemons', 'breaks world record for longest stare', 'found wearing tiny hat, will not explain', 'joins school band, only plays the triangle', 'becomes weather reporter, says every day is "wet probably"', 'starts podcast, 40 episodes of silence', 'builds pillow fort so big it needs a mayor', 'accidentally wins marathon while chasing ice cream truck', 'declares itself king of the backyard']);
+const FACTS = bag([
+  ['Bananas are curved because they are shy.', 'Bananas curve because they grow upward toward the sunlight!'],
+  ['The Moon is made of cheese.', 'The Moon is rock and dust. Astronauts brought some home to check.'],
+  ['Fish invented water.', "Earth's water is over 4 billion years old. That's way older than fish!"],
+  ['Thunder is just clouds bowling.', 'Thunder is the BOOM of air swelling super fast when lightning heats it.'],
+  ['An octopus has 8 arms so it can high-five 4 friends at once.', 'They really do have 8 arms. And THREE hearts!'],
+  ['Snails are slow because they carry their whole house.', 'Snails slide along on one muscly foot, over slime they make themselves.'],
+  ['Wifi is delivered by invisible pigeons.', 'Wifi is radio waves, a kind of light your eyes cannot see.'],
+  ["Yawning is your brain's loading screen.", 'Nobody is totally sure why we yawn! Scientists are still figuring it out.'],
+  ['Honey never goes bad because bees put a spell on it.', 'Honey really can last thousands of years. It is too sugary and dry for germs to grow in.'],
+  ['Cats purr because they have a tiny motor inside.', 'Purring comes from muscles in the voice box twitching really, really fast.'],
+  ['Stars twinkle because they are waving at you.', "Stars twinkle because Earth's wobbly air bends their light on the way down."],
+  ['Your stomach growls because a small bear lives there.', 'The growl is gas and juice getting squeezed through your insides.'],
+]);
+const POLLS = bag([
+  ['Would you rather have spaghetti hair or meatball hands?', ['Spaghetti hair', 'Meatball hands']],
+  ['Is cereal a soup?', ['Yes', 'No', 'I need to lie down']],
+  ['Best superpower?', ['Flying', 'Being invisible', 'Talking to pigeons']],
+  ['Is a hot dog a sandwich?', ['Yes', 'No', 'It is a taco']],
+  ['How many ducks could you carry at once?', ['3', '7', 'All of them']],
+  ['Pineapple on pizza?', ['Yum', 'Yuck', 'Pizza on pineapple']],
+  ['Which is scarier?', ['1 horse-sized duck', '100 duck-sized horses']],
+  ['What time is bedtime?', ['Now', '5 more minutes', 'Bedtime is a myth']],
+  ['Best seat in the car?', ['Window', 'Middle (said nobody)', 'The roof']],
+  ['What would you name a pet rock?', ['Rocky', 'Dwayne', 'Sir Pebbleton III']],
+]);
+const ADS = bag([
+  ['🧦', 'Invisible Socks', 'You cannot see them. Neither can we.', 'Buy now', 'Sold out. Probably. Hard to tell.'],
+  ['💧', 'Dehydrated Water', 'Just add water!', 'Order', 'Out of stock. We ran out of nothing.'],
+  ['🥄', 'Left-Handed Spoon', 'Finally. A spoon for the other hand.', 'Get one', 'Shipping takes 400 years.'],
+  ['💨', 'Air+ Premium', 'Breathing, but fancier. Now with 10% more air.', 'Subscribe', 'You already have this. It is free.'],
+  ['🪨', 'Pet Rock Daycare', 'We watch your rock. It does nothing. We love it.', 'Enroll rock', 'Your rock has been accepted!'],
+  ['🛏️', 'The Loud Pillow', 'The pillow that screams all night. Nobody asked for it.', 'Why', 'Great question. No answer.'],
+  ['🕶️', 'Sunglasses for Night', 'See even less in the dark!', 'Shop', 'We cannot find the store. Too dark.'],
+  ['🧊', 'Hot Ice', 'It is just water. We are being honest.', 'Add to cart', 'It melted on the way.'],
+]);
+const REVIEWS = bag([
+  ['★☆☆☆☆', 'The Moon', 'Too far. No snacks. My sandwich floated away.', '🌕'],
+  ['★★★★★', 'The Floor', 'Always there for me. Especially when I trip.', '🟫'],
+  ['★★☆☆☆', 'Monday', 'Would not recommend. Keeps coming back.', '📅'],
+  ['★★★★☆', 'My Bed', 'Amazing. Very hard to leave. One star off for that.', '🛏️'],
+  ['★★★☆☆', 'The Sun', "Too bright, can't look at it. Warm though.", '☀️'],
+  ['★☆☆☆☆', 'Stairs', 'Just a floor with extra steps.', '🪜'],
+  ['★★★★★', 'Bubble Wrap', 'Best toy ever made. It came with a TV, I think.', '🫧'],
+  ['★★☆☆☆', 'Soup', 'A wet salad. I have questions.', '🍲'],
+]);
+const HATCH = ['🐥', '🦖', '🐢', '🐧', '🦆', '🐍', '🦄', '🐙', '🍳'];
+const NOPE = ['Hey! It says do NOT press.', 'Stop that.', 'Seriously?', 'Okay you pressed it again.', 'The button is getting upset.', 'This is why we cannot have nice buttons.', 'Fine. Press it. See if I care.', 'I care a little.', 'That was the last one. I mean it.', 'You are a rule breaker. Respect.', 'Still going? Wow.', 'The button has given up.'];
+
+function shell(tagHtml) {
+  const [name, emoji] = pick(USERS);
+  const p = el('div', 'post');
+  p.innerHTML = `<div class="who"><div class="av" style="background:${pick(COLORS)}">${emoji}</div><div><div class="name">${name}</div><div class="when">${pick(TIMES)}</div></div></div>${tagHtml || ''}`;
+  return p;
+}
+function addBar(p) {
+  const n = rnd(9) ? rnd(900) + 3 : rnd(90000) + 1000;
+  const bar = el('div', 'bar', `<button class="like"><i>❤️</i><span>${n.toLocaleString()}</span></button><span>💬 ${rnd(200)}</span><span>🔁 ${rnd(80)}</span>`);
+  p.dataset.likes = n;
+  p.appendChild(bar);
+  p.classList.add('likeable');
+  return p;
+}
+const makers = [
+  () => { const p = shell(); p.appendChild(el('div', 'text' + (rnd(3) ? '' : ' big'), STATUS())); return addBar(p); },
+  () => { const p = shell(); p.appendChild(el('div', 'text', STATUS())); return addBar(p); },
+  () => { const [a, e] = pick(ANIMALS); const p = shell('<span class="tag news">Breaking news</span>'); p.appendChild(el('div', 'text big', `Local ${a} ${EVENTS()}`)); p.appendChild(el('div', 'pic', `<span>${e}</span>`)).style.background = pick(GRADS); return addBar(p); },
+  () => { const [joke, real] = FACTS(); const p = shell('<span class="tag">Totally real fact</span>'); p.appendChild(el('div', 'text big', joke)); p.appendChild(el('div', 'truth', `<b>✅ Okay, the real answer:</b> ${real}`)); return addBar(p); },
+  () => { const [stars, thing, words, e] = REVIEWS(); const p = shell('<span class="tag">Review</span>'); p.appendChild(el('div', 'pic', `<span>${e}</span>`)).style.background = pick(GRADS); p.appendChild(el('div', 'text', `<b style="color:var(--gold)">${stars}</b> <b>${thing}</b><br>${words}`)).style.paddingTop = '10px'; return addBar(p); },
+  () => { // poll
+    const [q, opts] = POLLS(); const p = shell('<span class="tag">Poll</span>'); p.appendChild(el('div', 'text big', q));
+    const btns = opts.map(o => p.appendChild(el('button', 'opt', `<span class="fill"></span><b>${o}</b><em></em>`)));
+    btns.forEach((b, i) => b.onclick = () => {
+      if (p.dataset.voted) return; p.dataset.voted = 1;
+      let cuts = opts.map(() => 10 + rnd(60)); const sum = cuts.reduce((a, c) => a + c, 0); cuts = cuts.map(c => Math.round(c / sum * 100));
+      btns.forEach((x, j) => { x.querySelector('.fill').style.width = cuts[j] + '%'; x.querySelector('em').textContent = cuts[j] + '%'; });
+      b.classList.add('mine'); S.polls++; check();
+    });
+    return p;
+  },
+  () => { // silly advert
+    const [e, name, line, btn, reply] = ADS(); const p = el('div', 'post');
+    p.innerHTML = `<span class="tag ad">Ad (a silly fake one)</span><div class="pic" style="background:${pick(GRADS)}"><span>${e}</span></div><div class="text" style="padding-top:10px"><b>${name}</b><br>${line}</div>`;
+    const b = p.appendChild(el('button', 'cta', btn)); b.onclick = () => { b.textContent = reply; b.style.background = '#6b7682'; };
+    return p;
+  },
+  () => { // egg to hatch
+    const p = shell(); p.appendChild(el('div', 'text', 'Found this egg. Somebody tap it, I am too scared.'));
+    const toy = p.appendChild(el('div', 'toy', '<button class="thing">🥚</button><p>Tap the egg!</p>')); const b = toy.firstChild, msg = toy.lastChild;
+    let need = 6 + rnd(6), done = false;
+    b.onclick = () => { if (done) return; need--; b.style.transform = `rotate(${rnd(30) - 15}deg)`; msg.textContent = need > 0 ? `Crack… ${need} more` : ''; if (need <= 0) { done = true; const baby = pick(HATCH); b.textContent = baby; b.style.transform = ''; msg.textContent = baby === '🍳' ? 'Oh. It was breakfast.' : 'It hatched! Hello, little friend.'; S.eggs++; check(); } };
+    return p;
+  },
+  () => { // bubble wrap
+    const p = shell(); p.appendChild(el('div', 'text', 'Free bubble wrap. Go wild.'));
+    const toy = p.appendChild(el('div', 'toy', '<div class="wrap"></div><p>Pop them all!</p>')); const grid = toy.firstChild; let left = 15;
+    for (let i = 0; i < 15; i++) { const b = grid.appendChild(el('button')); b.setAttribute('aria-label', 'bubble'); b.onclick = () => { if (b.classList.contains('popped')) return; b.classList.add('popped'); left--; toy.lastChild.textContent = left ? `${left} left` : 'So satisfying. 😌'; if (!left) { S.wraps++; check(); } }; }
+    return p;
+  },
+  () => { // forbidden button
+    const p = shell(); p.appendChild(el('div', 'text big', 'Whatever you do, do NOT press this button.'));
+    const b = p.appendChild(el('button', 'cta red', 'DO NOT PRESS')); const msg = p.appendChild(el('div', 'text', '&nbsp;')); let n = 0;
+    b.onclick = () => { msg.textContent = NOPE[Math.min(n, NOPE.length - 1)]; n++; S.rebel++; check(); };
+    return p;
+  },
+  () => { // cat to pet
+    const p = shell(); p.appendChild(el('div', 'text', 'This is Biscuit. Biscuit would like pets, please.'));
+    const toy = p.appendChild(el('div', 'toy', '<button class="thing">🐱</button><p>Tap to pet</p>')); let n = 0;
+    toy.firstChild.onclick = () => { n++; S.pets++; toy.firstChild.textContent = n > 12 ? '😻' : n > 5 ? '😺' : '🐱'; toy.lastChild.textContent = 'purr'.padEnd(4 + Math.min(n, 24), 'r') + ` (${n} pets)`; check(); };
+    return p;
+  },
+  () => { // fake ending
+    const p = el('div', 'post'); p.innerHTML = '<div class="text big" style="text-align:center;padding:30px 20px 6px">🎉 You\'re all caught up!</div><div class="text" style="text-align:center;color:var(--soft);padding-bottom:26px">…just kidding. There is no bottom. There was never a bottom.</div>'; return p;
+  },
+];
+const WEIGHTS = [5, 4, 4, 4, 2, 3, 2, 1.2, 1.2, 1, 1.2, .6];
+const TOTALW = WEIGHTS.reduce((a, b) => a + b, 0);
+let lastKind = -1;
+function makePost() {
+  let k; do { let r = Math.random() * TOTALW; k = 0; while ((r -= WEIGHTS[k]) > 0) k++; } while (k === lastKind && k > 1);
+  lastKind = k; return makers[k]();
+}
+
+/* ---------- the endless feed ---------- */
+const feed = $('feed'), posts = $('posts'), spacer = $('spacer');
+let spacerH = 0, lastTop = 0, sessionPx = 0, nextPop = 2600, mileIdx = TALL.findIndex(t => t[0] > metres());
+if (mileIdx < 0) mileIdx = TALL.length;
+let pendingMile = null;
+
+function fill() {
+  // add new posts at the bottom whenever you get close to it
+  while (feed.scrollHeight - feed.scrollTop - feed.clientHeight < 1800) {
+    if (pendingMile) { const [m, what, e] = pendingMile; pendingMile = null; posts.appendChild(el('div', 'mile', `<div>${e}</div><h3>You scrolled ${fmtM(m)}!</h3><p>That is as tall as ${what}. Your thumb did that.</p>`)); }
+    posts.appendChild(makePost());
+  }
+  // swap far-away old posts for empty space, so the phone never gets slow
+  if (posts.children.length > 70) {
+    const before = posts.offsetHeight;
+    for (let i = 0; i < 25; i++) posts.firstChild.remove();
+    spacerH += before - posts.offsetHeight; spacer.style.height = spacerH + 'px';
+  }
+  if (spacerH > 4e6) { const cut = spacerH - 2000; spacerH = 2000; spacer.style.height = '2000px'; feed.scrollTop -= cut; lastTop = feed.scrollTop; }
+}
+function hud() {
+  $('dist').textContent = fmtM(metres());
+  const mins = 21 * 60 + Math.floor(sessionPx / 300); // the phone clock starts at 9 PM
+  const h24 = Math.floor(mins / 60) % 24, m = mins % 60;
+  $('clock').textContent = `${h24 % 12 || 12}:${String(m).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'}`;
+  if (!S.owl && mins >= 27 * 60) S.owl = 1;
+  const b = Math.max(1, 100 - Math.floor(sessionPx / 2500));
+  $('batt').textContent = (b <= 15 ? '🪫 ' : '🔋 ') + b + '%' + (b === 1 ? ' (somehow)' : '');
+}
+feed.addEventListener('scroll', () => {
+  const d = Math.abs(feed.scrollTop - lastTop); lastTop = feed.scrollTop;
+  if (!d) return;
+  S.px += d; sessionPx += d;
+  if (mileIdx < TALL.length && metres() >= TALL[mileIdx][0]) { pendingMile = TALL[mileIdx]; mileIdx++; }
+  if (sessionPx > nextPop && !popOpen) { nextPop = sessionPx + 3200 + rnd(3200); popUp(); }
+  fill(); hud(); check();
+}, { passive: true });
+
+// hearts: tap the heart button, or double-tap anywhere on the post
+function like(p, force) {
+  const b = p.querySelector('.like'); if (!b) return;
+  const on = b.classList.contains('on');
+  if (on && force) return;
+  b.classList.toggle('on', !on);
+  b.querySelector('span').textContent = (+p.dataset.likes + (on ? 0 : 1)).toLocaleString();
+  if (!on) { S.likes++; check(); }
+}
+let lastTap = 0, lastPost = null;
+posts.addEventListener('click', e => {
+  const p = e.target.closest('.likeable'); if (!p) return;
+  if (e.target.closest('.like')) return like(p);
+  if (e.target.closest('button')) return;
+  const now = performance.now();
+  if (lastPost === p && now - lastTap < 350) { like(p, true); const h = p.appendChild(el('div', 'bigheart', '❤️')); setTimeout(() => h.remove(), 800); lastTap = 0; }
+  else { lastTap = now; lastPost = p; }
+});
+
+/* ---------- pop-up traps ---------- */
+let popOpen = false, popAt = 0, bannerTimer = 0;
+function swatted() { popOpen = false; S.swats++; if (performance.now() - popAt < 1000) S.fastSwat = 1; check(); }
+const BANNERS = [['💬', 'Mom', 'are you still on your phone??'], ['🔔', 'scrollr', 'Someone you do not know did something!'], ['🦆', 'sir_honks_a_lot', 'HONK'], ['🔋', 'Battery', 'I am tired. Are you not tired?'], ['👍', 'Your Thumb', 'I would like a day off, please.'], ['🛋️', 'The Couch', 'You have been sitting on me for a while.'], ['🕰️', 'Clock', 'It is later than you think. Probably.'], ['🐕', 'Dog', 'walk? walk? walk? walk? walk?']];
+const MODALS = [
+  { em: '🎁', h: 'YOU WON!!!', p: 'You are the 1,000,000th scroller! Your prize is one million socks.', btns: ['Claim socks'], dodge: 2, after: 'The socks are invisible. Enjoy!' },
+  { em: '🤨', h: 'Still scrolling?', p: 'Just checking. You have been at it a while.', btns: ['Yes', 'Also yes'] },
+  { em: '🍪', h: 'This app uses cookies', p: 'Chocolate chip, mostly. Would you like to eat them?', btns: ['Nom', 'Nom nom'], after: 'Delicious. No cookies left.' },
+  { em: '⭐', h: 'Rate this app!', p: 'How many stars would you give scrollr?', btns: ['5 stars', '6 stars', 'A potato'], after: 'Thanks! We wrote it down on a napkin.' },
+  { em: '🆙', h: 'Update available', p: 'Version 9.9.9 adds more scrolling and removes the bottom (again).', btns: ['Later', 'Even later'], dodge: 1 },
+  { em: '🦖', h: 'A WILD POP-UP APPEARS', p: 'It blocks your way. What will you do?', btns: ['Swat it'], dodge: 3, after: 'It ran away!' },
+];
+function popUp() {
+  popOpen = true; popAt = performance.now();
+  if (rnd(5) < 2) { // a notification that drops from the top
+    const [ic, who, msg] = pick(BANNERS), b = $('banner');
+    b.querySelector('.ic').textContent = ic; b.querySelector('b').textContent = who; b.querySelector('.msg').textContent = msg;
+    b.classList.add('on');
+    clearTimeout(bannerTimer); bannerTimer = setTimeout(() => { b.classList.remove('on'); popOpen = false; }, 6000);
+    return;
+  }
+  const m = pick(MODALS), card = $('card'); let dodges = m.dodge || 0;
+  card.innerHTML = `<button id="xbtn" aria-label="close">✕</button><div class="em">${m.em}</div><h2>${m.h}</h2><p>${m.p}</p>`;
+  const close = msg => { $('modal').classList.remove('on'); swatted(); if (msg) toast(msg); };
+  m.btns.forEach((t, i) => { const b = card.appendChild(el('button', 'cta' + (i ? ' ghost' : ''), t)); b.onclick = () => close(m.after); });
+  const x = card.querySelector('#xbtn');
+  const spots = [{ top: '10px', left: '10px', right: 'auto', bottom: 'auto' }, { bottom: '10px', right: '10px', top: 'auto', left: 'auto' }, { bottom: '10px', left: '10px', top: 'auto', right: 'auto' }, { top: '10px', right: '10px', left: 'auto', bottom: 'auto' }];
+  x.onclick = () => { if (dodges > 0) { dodges--; Object.assign(x.style, spots[dodges % 4]); toast(pick(['Too slow!', 'Missed me!', 'Nope!'])); } else close(); };
+  $('modal').classList.add('on');
+}
+$('banner').onclick = () => { if (!$('banner').classList.contains('on')) return; clearTimeout(bannerTimer); $('banner').classList.remove('on'); swatted(); };
+
+/* ---------- tabs ---------- */
+let tab = 'feed';
+function show(name) {
+  tab = name;
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === name));
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  if (name === 'trophies') { $('tdot').style.display = 'none'; drawTrophies(); }
+  if (name === 'me') drawMe();
+  if (name === 'snake') drawSnake(); else stopSnake();
+  if (name === 'feed') { feed.scrollTop = lastTop; fill(); }
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { if (b.dataset.tab === 'feed' && tab === 'feed') return; show(b.dataset.tab); });
+
+function compareLine() {
+  const m = metres(); let best = null, next = null;
+  for (const t of TALL) { if (m >= t[0]) best = t; else { next = t; break; } }
+  let s = best ? `Your thumb has travelled ${fmtM(m)}. That is taller than ${best[1]} ${best[2]}.` : `Your thumb has travelled ${fmtM(m)}. Keep going!`;
+  if (next) s += ` Next up: ${next[1]} at ${fmtM(next[0])}.`;
+  return s;
+}
+function drawMe() {
+  $('compare').textContent = compareLine();
+  const rows = [[fmtM(metres()), 'scrolled'], [S.likes, 'posts liked'], [S.swats, 'pop-ups swatted'], [S.polls, 'polls voted'], [S.snakeBest, 'best Snake score'], [TROPHIES.filter(t => S.got[t[0]]).length + '/' + TROPHIES.length, 'trophies']];
+  $('stats').innerHTML = rows.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
+}
+$('putdown').onclick = () => { S.grass = 1; $('offmsg').textContent = compareLine() + ' The outside world says hi.'; $('off').classList.add('on'); check(); };
+$('pickup').onclick = () => $('off').classList.remove('on');
+let resetArmed = 0;
+$('reset').onclick = () => {
+  if (Date.now() - resetArmed > 4000) { resetArmed = Date.now(); $('reset').textContent = 'Really erase everything? Tap again to say yes.'; return; }
+  S = fresh(); try { localStorage.removeItem(KEY); } catch (e) {}
+  location.reload();
+};
+
+/* ---------- snake ---------- */
+const cv = $('cv'), cx = cv.getContext('2d'), N = 15;
+let sn, dir, queue, food, score, alive = false, timer = 0, started = false;
+function sizeCanvas() { const w = cv.clientWidth || 330, r = Math.min(window.devicePixelRatio || 1, 3); cv.width = cv.height = Math.round(w * r); }
+function placeFood() { do { food = { x: rnd(N), y: rnd(N) }; } while (sn.some(s => s.x === food.x && s.y === food.y)); }
+function startSnake() {
+  sn = [{ x: 7, y: 7 }, { x: 6, y: 7 }, { x: 5, y: 7 }]; dir = { x: 1, y: 0 }; queue = []; score = 0; alive = true; started = true;
+  placeFood(); S.snakePlays++; check();
+  clearInterval(timer); timer = setInterval(step, 150);
+  $('sscore').textContent = 'Score: 0';
+}
+function stopSnake() { clearInterval(timer); if (alive) { alive = false; started = false; } }
+function turn(x, y) {
+  if (!alive) return;
+  const last = queue.length ? queue[queue.length - 1] : dir;
+  if ((last.x === -x && last.y === -y) || (last.x === x && last.y === y) || queue.length > 2) return;
+  queue.push({ x, y });
+}
+function step() {
+  if (queue.length) dir = queue.shift();
+  const h = { x: sn[0].x + dir.x, y: sn[0].y + dir.y };
+  const ate = h.x === food.x && h.y === food.y;
+  const body = ate ? sn : sn.slice(0, -1); // the tail moves out of the way unless we just ate
+  if (h.x < 0 || h.y < 0 || h.x >= N || h.y >= N || body.some(s => s.x === h.x && s.y === h.y)) {
+    alive = false; clearInterval(timer);
+    if (score > S.snakeBest) S.snakeBest = score;
+    $('sscore').textContent = `Bonk! Score ${score}. Best ${S.snakeBest}. Tap the board to go again.`;
+    check(); drawSnake(); return;
+  }
+  sn.unshift(h);
+  if (ate) { score++; $('sscore').textContent = 'Score: ' + score; if (sn.length < N * N) placeFood(); } else sn.pop();
+  drawSnake();
+}
+function drawSnake() {
+  sizeCanvas(); const c = cv.width / N;
+  cx.fillStyle = '#10261a'; cx.fillRect(0, 0, cv.width, cv.height);
+  cx.fillStyle = '#16321f'; for (let y = 0; y < N; y++) for (let x = (y % 2); x < N; x += 2) cx.fillRect(x * c, y * c, c, c);
+  if (!started) { cx.fillStyle = '#b8f5c8'; cx.font = `bold ${c * 1.1}px sans-serif`; cx.textAlign = 'center'; cx.fillText('Tap to play', cv.width / 2, cv.height / 2); return; }
+  cx.font = `${c * .85}px sans-serif`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('🍎', (food.x + .5) * c, (food.y + .55) * c); cx.textBaseline = 'alphabetic';
+  sn.forEach((s, i) => { cx.fillStyle = alive ? (i ? '#4fd67a' : '#b8f5c8') : '#7b8a80'; const g = c * .08; cx.beginPath(); cx.roundRect ? cx.roundRect(s.x * c + g, s.y * c + g, c - 2 * g, c - 2 * g, c * .25) : cx.rect(s.x * c + g, s.y * c + g, c - 2 * g, c - 2 * g); cx.fill(); });
+}
+let touch0 = null, swiped = false;
+cv.addEventListener('pointerdown', e => { touch0 = { x: e.clientX, y: e.clientY }; swiped = false; });
+cv.addEventListener('pointermove', e => {
+  if (!touch0) return; const dx = e.clientX - touch0.x, dy = e.clientY - touch0.y;
+  if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+  swiped = true; Math.abs(dx) > Math.abs(dy) ? turn(Math.sign(dx), 0) : turn(0, Math.sign(dy)); touch0 = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('pointerup', () => { touch0 = null; });
+cv.addEventListener('click', () => { if (!alive && !swiped) startSnake(); });
+document.querySelectorAll('#pad button').forEach(b => b.addEventListener('pointerdown', () => { const [x, y] = b.dataset.d.split(',').map(Number); if (!alive) startSnake(); turn(x, y); }));
+const KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] };
+window.addEventListener('keydown', e => { if (tab !== 'snake') return; const k = KEYS[e.key]; if (k) { e.preventDefault(); if (!alive) startSnake(); turn(k[0], k[1]); } else if (e.key === ' ' && !alive) { e.preventDefault(); startSnake(); } });
+
+/* ---------- go! ---------- */
+const hello = el('div', 'post', '<div class="text big" style="padding-top:8px">👋 Welcome to scrollr</div><div class="text">There is no bottom. Just scroll and see how far your thumb can go.<br><br>❤️ Double-tap posts to like them<br>🪰 Swat the pop-ups<br>🏆 Collect trophies<br>🐍 Psst… there is a snake down there ↓</div>');
+posts.appendChild(hello);
+fill(); hud(); drawTrophies();
+})();
+</script>
+</body>
+</html>
