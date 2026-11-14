@@ -39,7 +39,7 @@ function frame(now) {
     if (G.scene === 'play') updatePlay(dt);
     worldSync(dt);
     if (locked) { hoverT -= dt; if (hoverT <= 0) { hoverT = 0.08; G.hover = usable() ? pickAt(0, 0) : null; } }
-    cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; drawOverlay();
+    drawOverlay();
   } catch (e) { console.error(e); }
   hudSync();
   requestAnimationFrame(frame);
@@ -103,10 +103,9 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { const k = e.key.toLowerCase(); keys[k] = false; if (k === ' ') eyes(false); });
 addEventListener('blur', () => { eyes(false); for (const k in keys) keys[k] = false; });
-function fit() { const b = document.body, cs = getComputedStyle(b), w = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), h = b.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom); $('stage').style.width = Math.max(200, Math.floor(Math.min(w, h * 16 / 9))) + 'px'; }
-addEventListener('resize', fit); fit();
-
+function fit() { const b = document.body, cs = getComputedStyle(b), w = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), h = b.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom); const sw = Math.max(200, Math.floor(Math.min(w, h * 16 / 9))); $('stage').style.width = sw + 'px'; if (wd.resize) wd.resize(sw * 9 / 16 * Math.min(2, window.devicePixelRatio || 1)); }
 buildWorld();
+addEventListener('resize', fit); fit();
 window.NS = { G, P, PL, get R() { return R; }, acts, startNight, ending, strike, newRun, title, pickAt, setZoom, camera, wd, dlg: k => { if (dlgNext) dlgNext(k); }, docClose: () => { if (docDone) docDone(); },
   fn: { updatePlay, pay, scanItem, answerPhone, togglePlug, restock, takeBottle, frontDoor, waveBack, lightSwitch, toiletDoor, newDoorMenu, watchCam, readPhoto, readBinder, readReceipt, clipboardMenu, stepBack, openRules, startBehind, remember } };
 title();

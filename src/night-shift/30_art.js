@@ -1,5 +1,6 @@
 // ---------- 2D art: the film-grain overlay, camera feeds, the photograph, the face ----------
 // The shop itself is 3D (35_world.js). This canvas sits on top of it.
+cv.width = 960; cv.height = 540;   // drawn in 480x270 units at double resolution
 let cx = cv.getContext('2d');
 const r = (x, y, w, h, c) => { cx.fillStyle = c; cx.fillRect(x, y, w, h); };
 function tx(s, x, y, size, c, align, font) { cx.font = size + 'px ' + (font || 'VT323, "Courier New", monospace'); cx.fillStyle = c; cx.textAlign = align || 'left'; cx.textBaseline = 'alphabetic'; cx.fillText(s, x, y); }
@@ -9,7 +10,7 @@ function poly(p, c) { cx.fillStyle = c; cx.beginPath(); cx.moveTo(p[0][0], p[0][
 const NOISE = document.createElement('canvas'); NOISE.width = NOISE.height = 256;
 (() => { const n = NOISE.getContext('2d'), d = n.createImageData(256, 256); for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } n.putImageData(d, 0, 0); })();
 const VIG = document.createElement('canvas'); VIG.width = W; VIG.height = H;
-(() => { const v = VIG.getContext('2d'), g = v.createRadialGradient(W / 2, H / 2, 90, W / 2, H / 2, 300); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.62)'); v.fillStyle = g; v.fillRect(0, 0, W, H); })();
+(() => { const v = VIG.getContext('2d'), g = v.createRadialGradient(W / 2, H / 2, 90, W / 2, H / 2, 300); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.5)'); v.fillStyle = g; v.fillRect(0, 0, W, H); })();
 function grain(a) { cx.save(); cx.globalAlpha = a; const ox = Math.random() * 256 | 0, oy = Math.random() * 256 | 0; for (let x = -ox; x < W; x += 256) for (let y = -oy; y < H; y += 256) cx.drawImage(NOISE, x, y); cx.restore(); }
 
 const LOOKS = {
@@ -103,7 +104,7 @@ function glimpseFace() {
 }
 // Everything that sits on top of the 3D picture.
 function drawOverlay() {
-  cx.clearRect(0, 0, W, H);
+  cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalAlpha = 1; cx.clearRect(0, 0, cv.width, cv.height); cx.setTransform(2, 0, 0, 2, 0, 0);
   if (G.scene === 'play') {
     if (G.zoom === 'cam') { feed(G.feed, 0, 0, W, H, true); if (G.feed === 98 && G.cam98 > 5) { const words = ["DON'T", 'TRUST', 'THE', 'MANAGER'], n = Math.min(4, Math.floor((G.cam98 - 5) / 1.3) + 1); tx('[ the lips move ]  ' + words.slice(0, n).join(' '), 240, 250, 16, '#dfeee0', 'center'); } }
     else if (G.zoom === 'photo') drawPhoto();
@@ -111,7 +112,7 @@ function drawOverlay() {
     if (G.behind && G.behind.st === 'appear') r(0, 0, W, H, 'rgba(0,0,0,' + (0.12 + 0.08 * Math.sin(G.time * 7)) + ')');
     if (G.glimpse > 0) glimpseFace();
   }
-  cx.drawImage(VIG, 0, 0); grain(0.05);
+  cx.drawImage(VIG, 0, 0); grain(0.035);
   if (G.scene === 'play') {
     if (G.eyes > 0.01) { const e = G.eyes * (H / 2 + 2); r(0, 0, W, e, '#000'); r(0, H - e, W, e, '#000'); }
     if (G.behind && G.behind.st === 'count' && G.eyes > 0.9) tx(String(G.behind.count), 240, 150, 46, 'rgba(216,211,194,.3)', 'center');

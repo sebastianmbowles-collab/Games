@@ -6,6 +6,10 @@ set -e
 cd "$(dirname "$0")"
 {
   echo "import * as THREE from 'three';"
+  echo "import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';"
+  echo "import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';"
+  echo "import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';"
+  echo "import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';"
   cat 10_core.js 20_audio.js 30_art.js 35_world.js 40_ui.js 50_sys.js 60_nights.js 70_flow.js 80_main.js
 } > _all.js
 {
