@@ -37,7 +37,8 @@
   #status { display: flex; justify-content: space-between; align-items: center; padding: 8px 22px 2px; font-size: 13px; font-weight: 700; flex: none; }
   #header { display: flex; justify-content: space-between; align-items: center; padding: 6px 16px 10px; border-bottom: 1px solid var(--line); flex: none; }
   #logo { font-size: 24px; font-weight: 900; letter-spacing: -1px; color: var(--brand); font-style: italic; }
-  #dist { background: var(--tint); border-radius: 99px; padding: 6px 12px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #mute { font-size: 20px; padding: 4px 8px; vertical-align: middle; }
+  #dist { display: inline-block; vertical-align: middle; background: var(--tint); border-radius: 99px; padding: 6px 12px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
   .screen { flex: 1; min-height: 0; overflow-y: auto; display: none; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .screen.on { display: block; }
@@ -185,7 +186,7 @@
 <div id="phone">
   <div id="notch"></div>
   <div id="status"><span id="clock">9:00 PM</span><span id="batt">🔋 100%</span></div>
-  <div id="header"><span id="logo">scrollr</span><span id="dist">0.00 m</span></div>
+  <div id="header"><span id="logo">scrollr</span><span><button id="mute" aria-label="sound on or off">🔊</button><span id="dist">0.00 m</span></span></div>
 
   <div id="feed" class="screen on"><div id="spacer"></div><div id="posts"></div></div>
 
@@ -235,11 +236,76 @@ const bag = items => { let left = []; return () => { if (!left.length) left = it
 
 /* ---------- saved progress ---------- */
 const KEY = 'doomscroll_v1';
-const fresh = () => ({ px: 0, likes: 0, swats: 0, polls: 0, eggs: 0, wraps: 0, rebel: 0, pets: 0, snakeBest: 0, snakePlays: 0, fastSwat: 0, grass: 0, owl: 0, vids: 0, got: {} });
+const fresh = () => ({ px: 0, likes: 0, swats: 0, polls: 0, eggs: 0, wraps: 0, rebel: 0, pets: 0, snakeBest: 0, snakePlays: 0, fastSwat: 0, grass: 0, owl: 0, vids: 0, mute: 0, got: {} });
 let S = fresh();
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
 let saveTimer = 0;
 const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }, 400); };
+
+/* ---------- sounds (made by a tiny synthesizer, no sound files) ---------- */
+let AC = null, master = null, hiss = null;
+function unlock() { // browsers only let sound start after you touch the page
+  if (!AC) {
+    const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+    AC = new C(); master = AC.createGain(); master.gain.value = .6; master.connect(AC.destination);
+    hiss = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+    const d = hiss.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  if (AC.state === 'suspended') AC.resume();
+}
+['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => window.addEventListener(ev, unlock, { passive: true }));
+const canPlay = () => AC && !S.mute && AC.state === 'running';
+// a tone is one note: how high (f), how long (dur), and it can slide to another note (to)
+function tone(f, dur, o = {}) {
+  if (!canPlay()) return;
+  const t = AC.currentTime + (o.at || 0), osc = AC.createOscillator(), g = AC.createGain();
+  osc.type = o.type || 'sine'; osc.frequency.setValueAtTime(f, t);
+  if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + dur);
+  g.gain.setValueAtTime(o.vol || .2, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  osc.connect(g); g.connect(master); osc.start(t); osc.stop(t + dur + .03);
+}
+// noise is a "shhh" sound, good for pops, steps and sizzles
+function noise(dur, o = {}) {
+  if (!canPlay()) return;
+  const t = AC.currentTime + (o.at || 0), src = AC.createBufferSource(), g = AC.createGain();
+  src.buffer = hiss; src.loop = true;
+  g.gain.setValueAtTime(o.vol || .15, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+  let node = src;
+  if (o.hp || o.lp) { const f = AC.createBiquadFilter(); f.type = o.hp ? 'highpass' : 'lowpass'; f.frequency.value = o.hp || o.lp; src.connect(f); node = f; }
+  node.connect(g); g.connect(master); src.start(t, Math.random() * .5); src.stop(t + dur + .03);
+}
+const SFX = {
+  like: () => { tone(660, .08, { type: 'triangle' }); tone(990, .14, { type: 'triangle', at: .07 }); },
+  blip: () => tone(520, .07, { type: 'square', vol: .08 }),
+  tick: () => tone(1400, .03, { vol: .06 }),
+  pop: () => { tone(700 + rnd(500), .07, { to: 180, vol: .25 }); noise(.04, { vol: .12 }); },
+  crack: () => noise(.05, { vol: .2, hp: 1500 + rnd(1500) }),
+  hatch: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .14, { type: 'triangle', at: i * .08 })),
+  buzz: () => tone(110, .28, { type: 'sawtooth', vol: .16, to: 95 }),
+  purr: () => { for (let i = 0; i < 6; i++) tone(48, .05, { type: 'sawtooth', vol: .22, at: i * .045 }); },
+  sad: () => [392, 370, 349, 262].forEach((f, i) => tone(f, i === 3 ? .5 : .2, { type: 'sawtooth', vol: .07, at: i * .2, to: i === 3 ? 240 : 0 })),
+  trophy: () => [784, 988, 1175, 1568].forEach((f, i) => tone(f, .28, { type: 'triangle', vol: .16, at: i * .09 })),
+  alert: () => { tone(880, .1, { type: 'square', vol: .08 }); tone(880, .1, { type: 'square', vol: .08, at: .15 }); },
+  swat: () => { noise(.09, { vol: .25, lp: 1800 }); tone(300, .1, { to: 90, vol: .2 }); },
+  dodge: () => tone(400, .22, { to: 1300, vol: .12 }),
+  eat: () => { tone(600, .05, { type: 'square', vol: .08 }); tone(900, .08, { type: 'square', vol: .08, at: .05 }); },
+  die: () => tone(400, .5, { to: 70, type: 'sawtooth', vol: .12 }),
+  birds: () => { for (let i = 0; i < 7; i++) tone(2200 + rnd(1400), .09, { to: 2800 + rnd(1200), vol: .07, at: i * .16 + Math.random() * .08 }); },
+  // --- video sounds: these repeat while a video plays (i counts up each time) ---
+  step: () => noise(.03, { vol: .07, hp: 2200 }),
+  boing: () => tone(170, .26, { to: 540, vol: .14 }),
+  whoosh: () => noise(.5, { vol: .05, lp: 900 }),
+  plip: () => tone(1100 + rnd(900), .06, { to: 500, vol: .06 }),
+  beat: i => { tone([262, 330, 392, 330][i % 4], .13, { type: 'square', vol: .045 }); i % 2 ? noise(.04, { vol: .06, hp: 5000 }) : tone(95, .12, { to: 50, vol: .22 }); },
+  rumble: () => noise(.32, { vol: .09, lp: 260 }),
+  rise: i => tone(220 * Math.pow(2, (i % 13) / 12), .35, { type: 'triangle', vol: .08 }),
+  chime: i => tone([523, 659, 784, 1047, 784, 659][i % 6], .9, { vol: .07 }),
+  doom: () => tone(70, 1.3, { type: 'sawtooth', vol: .07, to: 62 }),
+  sizzle: () => noise(.6, { vol: .035, hp: 4500 }),
+};
+const sfx = (name, i) => { if (SFX[name]) SFX[name](i || 0); };
+// one sound per kind of video, and how many milliseconds between repeats (the "loading" video is silent, as a joke)
+const VSND = [['step', 170], ['boing', 1100], ['whoosh', 1600], ['plip', 230], ['beat', 380], ['rumble', 280], ['step', 150], ['rise', 460], ['chime', 750], null, ['doom', 1500], ['sizzle', 550]];
 
 const PX_PER_M = 3779.5; // 96 CSS pixels per inch, so this many pixels in a metre
 const metres = () => S.px / PX_PER_M;
@@ -280,7 +346,7 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add
 function check() {
   let fresh = false;
   for (const [id, icon, name, , test] of TROPHIES) if (!S.got[id] && test()) { S.got[id] = 1; toast(`${icon} Trophy: ${name}!`); fresh = true; }
-  if (fresh) { if (tab !== 'trophies') $('tdot').style.display = 'block'; drawTrophies(); }
+  if (fresh) { sfx('trophy'); if (tab !== 'trophies') $('tdot').style.display = 'block'; drawTrophies(); }
   save();
 }
 function drawTrophies() {
@@ -403,39 +469,39 @@ const makers = [
       if (p.dataset.voted) return; p.dataset.voted = 1;
       let cuts = opts.map(() => 10 + rnd(60)); const sum = cuts.reduce((a, c) => a + c, 0); cuts = cuts.map(c => Math.round(c / sum * 100));
       btns.forEach((x, j) => { x.querySelector('.fill').style.width = cuts[j] + '%'; x.querySelector('em').textContent = cuts[j] + '%'; });
-      b.classList.add('mine'); S.polls++; check();
+      b.classList.add('mine'); sfx('blip'); S.polls++; check();
     });
     return p;
   },
   () => { // silly advert
     const [e, name, line, btn, reply] = ADS(); const p = el('div', 'post');
     p.innerHTML = `<span class="tag ad">Ad (a silly fake one)</span><div class="pic" style="background:${pick(GRADS)}"><span>${e}</span></div><div class="text" style="padding-top:10px"><b>${name}</b><br>${line}</div>`;
-    const b = p.appendChild(el('button', 'cta', btn)); b.onclick = () => { b.textContent = reply; b.style.background = '#6b7682'; };
+    const b = p.appendChild(el('button', 'cta', btn)); b.onclick = () => { if (b.textContent !== reply) sfx('sad'); b.textContent = reply; b.style.background = '#6b7682'; };
     return p;
   },
   () => { // egg to hatch
     const p = shell(); p.appendChild(el('div', 'text', 'Found this egg. Somebody tap it, I am too scared.'));
     const toy = p.appendChild(el('div', 'toy', '<button class="thing">🥚</button><p>Tap the egg!</p>')); const b = toy.firstChild, msg = toy.lastChild;
     let need = 6 + rnd(6), done = false;
-    b.onclick = () => { if (done) return; need--; b.style.transform = `rotate(${rnd(30) - 15}deg)`; msg.textContent = need > 0 ? `Crack… ${need} more` : ''; if (need <= 0) { done = true; const baby = pick(HATCH); b.textContent = baby; b.style.transform = ''; msg.textContent = baby === '🍳' ? 'Oh. It was breakfast.' : 'It hatched! Hello, little friend.'; S.eggs++; check(); } };
+    b.onclick = () => { if (done) return; need--; sfx('crack'); b.style.transform = `rotate(${rnd(30) - 15}deg)`; msg.textContent = need > 0 ? `Crack… ${need} more` : ''; if (need <= 0) { done = true; const baby = pick(HATCH); b.textContent = baby; b.style.transform = ''; msg.textContent = baby === '🍳' ? 'Oh. It was breakfast.' : 'It hatched! Hello, little friend.'; sfx('hatch'); S.eggs++; check(); } };
     return p;
   },
   () => { // bubble wrap
     const p = shell(); p.appendChild(el('div', 'text', 'Free bubble wrap. Go wild.'));
     const toy = p.appendChild(el('div', 'toy', '<div class="wrap"></div><p>Pop them all!</p>')); const grid = toy.firstChild; let left = 15;
-    for (let i = 0; i < 15; i++) { const b = grid.appendChild(el('button')); b.setAttribute('aria-label', 'bubble'); b.onclick = () => { if (b.classList.contains('popped')) return; b.classList.add('popped'); left--; toy.lastChild.textContent = left ? `${left} left` : 'So satisfying. 😌'; if (!left) { S.wraps++; check(); } }; }
+    for (let i = 0; i < 15; i++) { const b = grid.appendChild(el('button')); b.setAttribute('aria-label', 'bubble'); b.onclick = () => { if (b.classList.contains('popped')) return; b.classList.add('popped'); sfx('pop'); left--; toy.lastChild.textContent = left ? `${left} left` : 'So satisfying. 😌'; if (!left) { S.wraps++; check(); } }; }
     return p;
   },
   () => { // forbidden button
     const p = shell(); p.appendChild(el('div', 'text big', 'Whatever you do, do NOT press this button.'));
     const b = p.appendChild(el('button', 'cta red', 'DO NOT PRESS')); const msg = p.appendChild(el('div', 'text', '&nbsp;')); let n = 0;
-    b.onclick = () => { msg.textContent = NOPE[Math.min(n, NOPE.length - 1)]; n++; S.rebel++; check(); };
+    b.onclick = () => { msg.textContent = NOPE[Math.min(n, NOPE.length - 1)]; n++; sfx('buzz'); S.rebel++; check(); };
     return p;
   },
   () => { // cat to pet
     const p = shell(); p.appendChild(el('div', 'text', 'This is Biscuit. Biscuit would like pets, please.'));
     const toy = p.appendChild(el('div', 'toy', '<button class="thing">🐱</button><p>Tap to pet</p>')); let n = 0;
-    toy.firstChild.onclick = () => { n++; S.pets++; toy.firstChild.textContent = n > 12 ? '😻' : n > 5 ? '😺' : '🐱'; toy.lastChild.textContent = 'purr'.padEnd(4 + Math.min(n, 24), 'r') + ` (${n} pets)`; check(); };
+    toy.firstChild.onclick = () => { n++; sfx('purr'); S.pets++; toy.firstChild.textContent = n > 12 ? '😻' : n > 5 ? '😺' : '🐱'; toy.lastChild.textContent = 'purr'.padEnd(4 + Math.min(n, 24), 'r') + ` (${n} pets)`; check(); };
     return p;
   },
   () => { const p = shell('<span class="tag">Video</span>'); p.appendChild(makeClip()); return p; },
@@ -469,7 +535,16 @@ const SCENES = [
   () => ({ h: '<div class="mid"><span class="a-pulse">🐱</span></div>', c: 'He knows what you did.' }),
   () => { const [f, e] = pick(FOODS); return { h: `<div class="mid" style="font-size:80px"><span class="a-wob">🧑‍🍳</span><span class="a-spin">${e}</span></div>`, c: `Cooking tutorial: how to make ${f}. Step 1: spin it. There is no step 2.` }; },
 ];
-const watcher = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('playing', e.intersectionRatio >= .6)), { threshold: [0, .6, 1] });
+let nowClip = null; // the video you are looking at right now
+const watcher = new IntersectionObserver(es => es.forEach(e => {
+  const on = e.intersectionRatio >= .6; e.target.classList.toggle('playing', on);
+  if (on) nowClip = e.target; else if (nowClip === e.target) nowClip = null;
+}), { threshold: [0, .6, 1] });
+setInterval(() => {
+  const c = nowClip; if (!c || !c.snd || !c.isConnected || c.classList.contains('paused') || $('off').classList.contains('on')) return;
+  const t = performance.now(); if (c.next && t < c.next) return;
+  c.next = t + c.snd[1]; c.beat = (c.beat || 0) + 1; sfx(c.snd[0], c.beat);
+}, 40);
 let lastScene = -1;
 function makeClip() {
   let k; do k = rnd(SCENES.length); while (k === lastScene); lastScene = k;
@@ -480,8 +555,9 @@ function makeClip() {
   c.addEventListener('click', e => {
     const l = e.target.closest('.vlike');
     if (!l) return c.classList.toggle('paused');
-    if (!l.classList.contains('on')) { l.classList.add('on'); l.lastChild.textContent = (n + 1).toLocaleString(); S.likes++; check(); }
+    if (!l.classList.contains('on')) { l.classList.add('on'); sfx('like'); l.lastChild.textContent = (n + 1).toLocaleString(); S.likes++; check(); }
   });
+  c.snd = VSND[k];
   watcher.observe(c); return c;
 }
 const vids = $('videos'), vspacer = $('vspacer');
@@ -549,7 +625,7 @@ function like(p, force) {
   if (on && force) return;
   b.classList.toggle('on', !on);
   b.querySelector('span').textContent = (+p.dataset.likes + (on ? 0 : 1)).toLocaleString();
-  if (!on) { S.likes++; check(); }
+  if (!on) { sfx('like'); S.likes++; check(); }
 }
 let lastTap = 0, lastPost = null;
 posts.addEventListener('click', e => {
@@ -563,7 +639,7 @@ posts.addEventListener('click', e => {
 
 /* ---------- pop-up traps ---------- */
 let popOpen = false, popAt = 0, bannerTimer = 0;
-function swatted() { popOpen = false; S.swats++; if (performance.now() - popAt < 1000) S.fastSwat = 1; check(); }
+function swatted() { popOpen = false; sfx('swat'); S.swats++; if (performance.now() - popAt < 1000) S.fastSwat = 1; check(); }
 const BANNERS = [['💬', 'Mom', 'are you still on your phone??'], ['🔔', 'scrollr', 'Someone you do not know did something!'], ['🦆', 'sir_honks_a_lot', 'HONK'], ['🔋', 'Battery', 'I am tired. Are you not tired?'], ['👍', 'Your Thumb', 'I would like a day off, please.'], ['🛋️', 'The Couch', 'You have been sitting on me for a while.'], ['🕰️', 'Clock', 'It is later than you think. Probably.'], ['🐕', 'Dog', 'walk? walk? walk? walk? walk?']];
 const MODALS = [
   { em: '🎁', h: 'YOU WON!!!', p: 'You are the 1,000,000th scroller! Your prize is one million socks.', btns: ['Claim socks'], dodge: 2, after: 'The socks are invisible. Enjoy!' },
@@ -574,7 +650,7 @@ const MODALS = [
   { em: '🦖', h: 'A WILD POP-UP APPEARS', p: 'It blocks your way. What will you do?', btns: ['Swat it'], dodge: 3, after: 'It ran away!' },
 ];
 function popUp() {
-  popOpen = true; popAt = performance.now();
+  popOpen = true; popAt = performance.now(); sfx('alert');
   if (rnd(5) < 2) { // a notification that drops from the top
     const [ic, who, msg] = pick(BANNERS), b = $('banner');
     b.querySelector('.ic').textContent = ic; b.querySelector('b').textContent = who; b.querySelector('.msg').textContent = msg;
@@ -588,7 +664,7 @@ function popUp() {
   m.btns.forEach((t, i) => { const b = card.appendChild(el('button', 'cta' + (i ? ' ghost' : ''), t)); b.onclick = () => close(m.after); });
   const x = card.querySelector('#xbtn');
   const spots = [{ top: '10px', left: '10px', right: 'auto', bottom: 'auto' }, { bottom: '10px', right: '10px', top: 'auto', left: 'auto' }, { bottom: '10px', left: '10px', top: 'auto', right: 'auto' }, { top: '10px', right: '10px', left: 'auto', bottom: 'auto' }];
-  x.onclick = () => { if (dodges > 0) { dodges--; Object.assign(x.style, spots[dodges % 4]); toast(pick(['Too slow!', 'Missed me!', 'Nope!'])); } else close(); };
+  x.onclick = () => { if (dodges > 0) { dodges--; sfx('dodge'); Object.assign(x.style, spots[dodges % 4]); toast(pick(['Too slow!', 'Missed me!', 'Nope!'])); } else close(); };
   $('modal').classList.add('on');
 }
 $('banner').onclick = () => { if (!$('banner').classList.contains('on')) return; clearTimeout(bannerTimer); $('banner').classList.remove('on'); swatted(); };
@@ -596,7 +672,7 @@ $('banner').onclick = () => { if (!$('banner').classList.contains('on')) return;
 /* ---------- tabs ---------- */
 let tab = 'feed';
 function show(name) {
-  tab = name;
+  tab = name; sfx('tick');
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === name));
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
   if (name === 'trophies') { $('tdot').style.display = 'none'; drawTrophies(); }
@@ -619,7 +695,7 @@ function drawMe() {
   const rows = [[fmtM(metres()), 'scrolled'], [S.likes, 'posts liked'], [S.vids, 'videos watched'], [S.swats, 'pop-ups swatted'], [S.snakeBest, 'best Snake score'], [TROPHIES.filter(t => S.got[t[0]]).length + '/' + TROPHIES.length, 'trophies']];
   $('stats').innerHTML = rows.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
 }
-$('putdown').onclick = () => { S.grass = 1; $('offmsg').textContent = compareLine() + ' The outside world says hi.'; $('off').classList.add('on'); check(); };
+$('putdown').onclick = () => { S.grass = 1; $('offmsg').textContent = compareLine() + ' The outside world says hi.'; $('off').classList.add('on'); check(); setTimeout(() => sfx('birds'), 700); };
 $('pickup').onclick = () => $('off').classList.remove('on');
 let resetArmed = 0;
 $('reset').onclick = () => {
@@ -652,13 +728,13 @@ function step() {
   const ate = h.x === food.x && h.y === food.y;
   const body = ate ? sn : sn.slice(0, -1); // the tail moves out of the way unless we just ate
   if (h.x < 0 || h.y < 0 || h.x >= N || h.y >= N || body.some(s => s.x === h.x && s.y === h.y)) {
-    alive = false; clearInterval(timer);
+    alive = false; clearInterval(timer); sfx('die');
     if (score > S.snakeBest) S.snakeBest = score;
     $('sscore').textContent = `Bonk! Score ${score}. Best ${S.snakeBest}. Tap the board to go again.`;
     check(); drawSnake(); return;
   }
   sn.unshift(h);
-  if (ate) { score++; $('sscore').textContent = 'Score: ' + score; if (sn.length < N * N) placeFood(); } else sn.pop();
+  if (ate) { sfx('eat'); score++; $('sscore').textContent = 'Score: ' + score; if (sn.length < N * N) placeFood(); } else sn.pop();
   drawSnake();
 }
 function drawSnake() {
@@ -682,8 +758,11 @@ document.querySelectorAll('#pad button').forEach(b => b.addEventListener('pointe
 const KEYS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] };
 window.addEventListener('keydown', e => { if (tab !== 'snake') return; const k = KEYS[e.key]; if (k) { e.preventDefault(); if (!alive) startSnake(); turn(k[0], k[1]); } else if (e.key === ' ' && !alive) { e.preventDefault(); startSnake(); } });
 
+$('mute').textContent = S.mute ? '🔇' : '🔊';
+$('mute').onclick = () => { S.mute = S.mute ? 0 : 1; $('mute').textContent = S.mute ? '🔇' : '🔊'; save(); sfx('like'); };
+
 /* ---------- go! ---------- */
-const hello = el('div', 'post', '<div class="text big" style="padding-top:8px">👋 Welcome to scrollr</div><div class="text">There is no bottom. Just scroll and see how far your thumb can go.<br><br>❤️ Double-tap posts to like them<br>🪰 Swat the pop-ups<br>🎬 Watch videos in the Videos tab<br>🏆 Collect trophies<br>🐍 Psst… there is a snake down there ↓</div>');
+const hello = el('div', 'post', '<div class="text big" style="padding-top:8px">👋 Welcome to scrollr</div><div class="text">There is no bottom. Just scroll and see how far your thumb can go.<br><br>❤️ Double-tap posts to like them<br>🪰 Swat the pop-ups<br>🎬 Watch videos in the Videos tab<br>🏆 Collect trophies<br>🔊 Tap the speaker up top to turn sound on or off<br>🐍 Psst… there is a snake down there ↓</div>');
 posts.appendChild(hello);
 fill(); hud(); drawTrophies();
 })();
