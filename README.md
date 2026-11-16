@@ -51,3 +51,17 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## TONGUE TIED
+
+`TongueTied.html` is a painted storybook platformer about a frog, all in one file. Open it in any browser and pick touch screen or computer at the start.
+Ribbit, a small blue frog, hops through the swamp hunting for the Fly Queen, who is guarded by the giant Fly King.
+
+| Power | What it does | Unlocks |
+|---|---|---|
+| Tongue | Aim anywhere. Eats flies, grabs coins, and sticks to glowing knobs to swing or zip | Level 1 |
+| Super jump | Hold jump to squish down, let go to fly up. Rests for 2 seconds | Level 3 |
+| Fly mask | Flies ignore Ribbit for 10 seconds, but no tongue. Rests for 15 seconds after it falls off | Level 5 |
+
+Ten levels (some go sideways, some climb up) with thorns, deep water, sinking mud and falling logs, plus fish, spiders and beetles. Eating 5 flies heals a heart and 10 flies charge the Mega Tongue. Coins buy upgrades, gems buy skins, and golden lilies unlock the golden frog. Progress is saved in the browser.
+Controls: A/D or arrows to move, Space to jump, mouse to aim and lick, E for the mask, Q for Mega Tongue. On touch screens, use the on-screen buttons and tap where you want to lick.
