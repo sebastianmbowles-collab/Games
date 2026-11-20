@@ -201,7 +201,8 @@ for(const k in U){U[k].value=U[k].value||U[k].cost;}
 const COMBO={soldier:'knight',archer:'crossbow',knight:'rknight',mage:'archmage',cavalry:'warcav',guard:'rguard',crossbow:'marksman',archmage:'grandmage',rknight:'champion',rguard:'protector'};
 const FROM={}; for(const a in COMBO)FROM[COMBO[a]]=a;
 const SHOP=['soldier','archer','guard','knight','cavalry','mage','catapult','king','queen'];
-const START_AP=100;
+const START_AP=200;
+const MAX_PIECES=18; // your side of the board has 18 hexes
 
 // ---------- the hex board: 61 hexes, radius 4 ----------
 const DIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
@@ -292,7 +293,7 @@ function aiChoose(cells,me,level){
 function aiRecruit(){const army={king:1}; let ap=START_AP-25;
   if(Math.random()<0.6){army.queen=1;ap-=35;}
   const opts=['soldier','soldier','soldier','archer','archer','guard','knight','cavalry','mage','catapult'];
-  let tries=0; while(ap>=5&&tries++<200){const t=opts[Math.random()*opts.length|0]; if(U[t].cost<=ap){army[t]=(army[t]||0)+1;ap-=U[t].cost;}}
+  let tries=0; const n=()=>Object.values(army).reduce((a,b)=>a+b,0); while(ap>=5&&tries++<400&&n()<MAX_PIECES){const t=opts[Math.random()*opts.length|0]; if(U[t].cost<=ap){army[t]=(army[t]||0)+1;ap-=U[t].cost;}}
   return army;}
 function autoPlace(cells,o,list){
   const spots=[]; for(let j=0;j<61;j++)if(side(j)===o&&!cells[j])spots.push(j);
@@ -404,16 +405,16 @@ function start(mode){G.mode=mode; G.army=[{king:1},{king:1}]; G.log=[]; recruitS
 
 function spent(a){let s=0; for(const t in a)s+=U[t].cost*a[t]; return s;}
 function recruitScreen(o){G.screen='recruit'; G.recruiting=o; panel.innerHTML='';
-  const a=G.army[o]; const left=START_AP-spent(a);
+  const a=G.army[o]; const left=START_AP-spent(a); const pcs=Object.values(a).reduce((x,y)=>x+y,0);
   panel.append(h('div',{cls:'turn p'+o},(G.mode==='ai'?'RECRUIT YOUR ARMY':COLOR[o].toUpperCase()+': RECRUIT')),
-    h('div',{cls:'ap'},left+' AP left'),
-    h('p',{cls:'hint'},'Every army needs one King. The Queen is optional. Spend your 100 Army Points!'));
+    h('div',{cls:'ap'},left+' AP left'),h('div',{cls:'hint',style:'text-align:center'},pcs+' / '+MAX_PIECES+' pieces'),
+    h('p',{cls:'hint'},'Every army needs one King. The Queen is optional. Spend your 200 Army Points! You can have up to 18 pieces.'));
   const shop=h('div',{cls:'shop'});
   for(const t of SHOP){const n=a[t]||0; const max=t==='king'||t==='queen'?1:99; const min=t==='king'?1:0;
     shop.append(h('div',{cls:'unit',title:U[t].how},spriteEl(t,o,40),h('div',{},h('div',{cls:'nm'},U[t].name),h('div',{cls:'ct'},U[t].cost+' AP')),
       h('div',{cls:'cnt'},h('button',{cls:'alt',on:{click:()=>{if(n>min){a[t]=n-1;recruitScreen(o);}}}},'-'),h('b',{},String(n)),
-        h('button',{on:{click:()=>{if(n<max&&U[t].cost<=left){a[t]=n+1;recruitScreen(o);}}}},'+'))));
-    const last=shop.lastChild.querySelectorAll('button'); if(n<=min)last[0].disabled=true; if(n>=max||U[t].cost>left)last[1].disabled=true;}
+        h('button',{on:{click:()=>{if(n<max&&U[t].cost<=left&&pcs<MAX_PIECES){a[t]=n+1;recruitScreen(o);}}}},'+'))));
+    const last=shop.lastChild.querySelectorAll('button'); if(n<=min)last[0].disabled=true; if(n>=max||U[t].cost>left||pcs>=MAX_PIECES)last[1].disabled=true;}
   panel.append(shop,
     h('div',{cls:'row'},btn('RANDOM ARMY',()=>{G.army[o]=aiRecruit(); recruitScreen(o);},'alt'),btn('CLEAR',()=>{G.army[o]={king:1};recruitScreen(o);},'alt')),
     h('div',{cls:'row'},btn('READY! ▶',()=>{SFX.comb();
@@ -526,7 +527,7 @@ function guideCard(){const g=h('div',{cls:'guide'});
 function rulesCard(){const combos=h('ul',{}); for(const a in COMBO)combos.append(h('li',{},'2 '+U[a].name+'s → '+U[COMBO[a]].name));
   openCard([h('h2',{},'HOW TO PLAY'),
     h('h3',{},'1. The board'),h('p',{},'61 hexagons. Blue owns the bottom 3 rows, Red owns the top 3 rows, and the green middle is the neutral battlefield. Pieces move in 6 straight directions (and some along the 6 diagonals between them).'),
-    h('h3',{},'2. Recruit'),h('p',{},'Each player has 100 Army Points. You must buy 1 King (25 AP). The Queen (35 AP) is optional. Then place your army in your own 3 rows.'),
+    h('h3',{},'2. Recruit'),h('p',{},'Each player has 200 Army Points and can have up to 18 pieces. You must buy 1 King (25 AP). The Queen (35 AP) is optional. Then place your army in your own 3 rows.'),
     h('h3',{},'3. Take turns'),h('p',{},'Blue goes first. On your turn, move one piece. Land on an enemy to capture it, chess-style. No dice, no health: a capture is a capture! You can never make a move that leaves your own King under attack.'),
     h('h3',{},'4. Royal abilities'),h('p',{},'KING · ROYAL CALL: instead of moving, summon any friendly piece within 10 hexes. It teleports right next to the King (or onto a matching piece to combine).'),
       h('p',{},'QUEEN · ROYAL PASSAGE: the Queen can teleport to any empty hex on her own side. Never into enemy land, never onto a piece.'),
