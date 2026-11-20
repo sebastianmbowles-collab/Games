@@ -51,3 +51,10 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## KINGDOMS: THE BATTLE FOR THE CROWN
+
+`Kingdoms.html` is a hexagonal kingdom strategy board game created by Sebastian Bowles, all in one file. Open it in any browser and play against a friend or the computer.
+Each player spends 100 Army Points on an army (one King is required), places it in their own 3 rows of the 61-hex board, then battles chess-style.
+Two matching pieces on one hex combine into a stronger piece (2 Soldiers make a Knight, 2 Knights make a Royal Knight, and so on). The King can use Royal Call and the Queen can use Royal Passage.
+Win by Total Conquest (only the enemy King is left) or Royal Checkmate.

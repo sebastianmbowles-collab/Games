@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kingdoms: The Battle for the Crown</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1a1626;--panel:#2a2340;--panel2:#352c52;--fg:#f4ead0;--dim:#a99fc0;--gold:#f2c14e;--blue:#5b8def;--red:#e0524c;--green:#5fbf6a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:'Nunito',system-ui,sans-serif}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:10px 12px 20px;gap:10px}
+h1{margin:0;font-family:'Cinzel',Georgia,serif;font-weight:900;font-size:clamp(26px,6vw,44px);color:var(--gold);letter-spacing:2px;text-shadow:3px 3px 0 #000;text-align:center}
+h1 small{display:block;font-size:.45em;color:var(--fg);margin-top:8px;letter-spacing:1px}
+#wrap{display:flex;gap:12px;width:100%;max-width:1100px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+#boardBox{position:relative;flex:1 1 560px;max-width:720px}
+canvas#board{width:100%;display:block;background:#14111f;border:4px solid #000;box-shadow:0 0 0 4px var(--gold);touch-action:manipulation;cursor:pointer}
+#panel{flex:0 1 330px;min-width:0;width:100%;background:var(--panel);border:4px solid #000;box-shadow:0 0 0 4px #4a3f6e;padding:12px;display:flex;flex-direction:column;gap:12px;font-size:14px;line-height:1.8}
+button{font:inherit;font-size:13px;color:#1a1626;background:var(--gold);border:3px solid #000;box-shadow:inset -3px -3px 0 #b8862b,inset 3px 3px 0 #ffe9a8;padding:9px 10px;cursor:pointer}
+button:hover{filter:brightness(1.1)}
+button:active{transform:translateY(2px)}
+button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+button:disabled{opacity:.4;cursor:default;transform:none}
+button.alt{background:#8b7fb0;box-shadow:inset -3px -3px 0 #5a4f80,inset 3px 3px 0 #c8bde8}
+button.blue{background:var(--blue);color:#fff;box-shadow:inset -3px -3px 0 #2f56a8,inset 3px 3px 0 #a9c4ff}
+button.red{background:var(--red);color:#fff;box-shadow:inset -3px -3px 0 #962a2a,inset 3px 3px 0 #ffaaa5}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.turn{padding:8px;border:3px solid #000;text-align:center;font-size:15px}
+.turn.p0{background:#2f56a8}.turn.p1{background:#962a2a}
+.spr{display:block}
+.shop{display:flex;flex-direction:column;gap:6px;max-height:440px;overflow:auto;padding-right:4px}
+.unit{display:grid;grid-template-columns:44px 1fr auto;gap:8px;align-items:center;background:var(--panel2);padding:4px 6px;border:2px solid #000}
+.unit .nm{font-size:14px}.unit .ct{color:var(--gold);font-size:12px}
+.cnt{display:flex;align-items:center;gap:4px}.cnt b{width:22px;text-align:center}
+.cnt button{padding:4px 7px}
+.ap{font-size:20px;color:var(--gold);text-align:center}
+.tray{display:flex;flex-wrap:wrap;gap:4px}
+.tray button{padding:2px;background:var(--panel2);box-shadow:none;border:3px solid #000}
+.tray button.sel{border-color:var(--gold);background:#4a3f6e}
+.info{background:var(--panel2);border:2px solid #000;padding:8px;display:grid;grid-template-columns:52px 1fr;gap:8px;align-items:start;min-height:70px}
+.info p{margin:0}
+#log{background:#120f1c;border:2px solid #000;padding:6px;height:120px;overflow:auto;font-size:12px;line-height:1.7;color:var(--dim)}
+#log .b{color:#a9c4ff}#log .r{color:#ffaaa5}#log .g{color:var(--gold)}
+#overlay{position:fixed;inset:0;background:rgba(10,8,18,.88);display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}
+#overlay[hidden]{display:none}
+.card{background:var(--panel);border:4px solid #000;box-shadow:0 0 0 4px var(--gold);padding:18px;max-width:760px;width:100%;max-height:90vh;overflow:auto;font-size:15px;line-height:1.9;display:flex;flex-direction:column;gap:12px}
+.card h2{margin:0;color:var(--gold);font-size:22px;text-align:center}
+.card h3{margin:6px 0 0;color:var(--gold);font-size:16px}
+.card p,.card ul{margin:0}
+.guide{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.guide .g{display:grid;grid-template-columns:48px 1fr;gap:8px;background:var(--panel2);border:2px solid #000;padding:6px;font-size:12px;line-height:1.7}
+.guide .g b{color:var(--gold);font-size:14px}
+#banner{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:clamp(16px,4vw,30px);color:var(--gold);text-shadow:3px 3px 0 #000,-3px -3px 0 #000,3px -3px 0 #000,-3px 3px 0 #000;pointer-events:none;white-space:nowrap}
+#banner[hidden]{display:none}
+.hint{color:var(--dim);font-size:12px}
+.tag{font-size:12px;color:var(--dim);text-align:center}
+button{font-weight:800}.turn{font-weight:800}
+</style>
+</head>
+<body>
+<h1>KINGDOMS<small>The Battle for the Crown</small></h1>
+<div id="wrap">
+  <div id="boardBox"><canvas id="board" width="1024" height="896"></canvas><div id="banner" hidden></div></div>
+  <div id="panel"></div>
+</div>
+<div class="tag">Created by Sebastian Bowles · Build your army. Command your kingdom. Claim the crown.</div>
+<div id="overlay" hidden><div class="card" id="card"></div></div>
+<script>
+'use strict';
+// ================================================================
+//  PIECES  (smooth, hand-drawn chess-style pieces, drawn with code)
+// ================================================================
+// Each team has its own colours: Sapphire (Blue) and Ember (Red), with gold trim.
+const TEAM=[{hi:'#bfe0ff',main:'#3f7fe0',dark:'#163a86',name:'Blue'},{hi:'#ffc7b3',main:'#e0503a',dark:'#7a1c14',name:'Red'}];
+const INK='#1c1527';
+const TIER={crossbow:1,rknight:1,archmage:1,warcav:1,rguard:1,knight:0,marksman:2,grandmage:2,champion:2,protector:2};
+function grad(x,o,x0,x1){const g=x.createLinearGradient(x0,0,x1,0); g.addColorStop(0,TEAM[o].hi); g.addColorStop(.35,TEAM[o].main); g.addColorStop(1,TEAM[o].dark); return g;}
+function goldG(x,x0,x1){const g=x.createLinearGradient(x0,0,x1,0); g.addColorStop(0,'#fff3b8'); g.addColorStop(.4,'#f2c14e'); g.addColorStop(1,'#9a6b1c'); return g;}
+function paint(x,fill,w){x.fillStyle=fill; x.fill(); x.lineWidth=w||3; x.strokeStyle=INK; x.lineJoin='round'; x.stroke();}
+function ell(x,cx,cy,rx,ry){x.beginPath(); x.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);}
+function star(x,cx,cy,r){x.beginPath(); for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5, rr=i%2?r*.45:r; x.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr);} x.closePath();}
+// pedestal + stem shared by every piece. Returns the y of the top of the stem.
+function base(x,o,top,neck,wide){
+  const T=TEAM[o];
+  ell(x,50,113,36,6); x.fillStyle='rgba(0,0,0,.25)'; x.fill();
+  x.beginPath(); x.moveTo(16,110); x.quadraticCurveTo(16,98,26,96); x.lineTo(74,96); x.quadraticCurveTo(84,98,84,110); x.quadraticCurveTo(50,116,16,110); paint(x,grad(x,o,16,84));
+  x.beginPath(); x.moveTo(24,97); x.lineTo(76,97); x.lineTo(72,88); x.lineTo(28,88); x.closePath(); paint(x,goldG(x,24,76));
+  const w=wide||16, n=neck||8;
+  x.beginPath(); x.moveTo(50-w,89); x.bezierCurveTo(50-w+4,75,50-n,top+14,50-n,top); x.lineTo(50+n,top); x.bezierCurveTo(50+n,top+14,50+w-4,75,50+w,89); x.closePath(); paint(x,grad(x,o,50-w,50+w));
+  ell(x,50,top,n+6,4); paint(x,goldG(x,50-n-6,50+n+6),2.5);
+  return top;
+}
+function shine(x,cx,cy,r){x.save(); ell(x,cx,cy,r*.35,r*.22); x.fillStyle='rgba(255,255,255,.55)'; x.fill(); x.restore();}
+function stars(x,n){for(let i=0;i<n;i++){star(x,50+(i-(n-1)/2)*14,104,5.5); paint(x,'#fff3b8',1.5);}}
+const DRAW={
+ soldier(x,o){const t=base(x,o,60,7,15); ell(x,50,t-11,12,12); paint(x,grad(x,o,38,62)); shine(x,45,t-16,12);
+   x.beginPath(); x.moveTo(50,t-33); x.lineTo(55,t-22); x.lineTo(45,t-22); x.closePath(); paint(x,goldG(x,45,55),2.5);},
+ archer(x,o){const t=base(x,o,58,7,15); bow(x,o,t,false);},
+ crossbow(x,o){const t=base(x,o,58,7,15); bow(x,o,t,true); stars(x,1);},
+ marksman(x,o){const t=base(x,o,56,7,16); bow(x,o,t,true); ell(x,50,t-36,6,6); paint(x,goldG(x,44,56),2.5); ell(x,50,t-36,2.5,2.5); x.fillStyle='#5ee0ff'; x.fill(); stars(x,2);},
+ guard(x,o){const t=base(x,o,56,13,18); tower(x,o,t,false);},
+ rguard(x,o){const t=base(x,o,56,13,18); tower(x,o,t,true); stars(x,1);},
+ protector(x,o){const t=base(x,o,56,13,18); tower(x,o,t,true); shield(x,t-15,true); stars(x,2);},
+ knight(x,o){const t=base(x,o,58,8,15); helm(x,o,t,0);},
+ rknight(x,o){const t=base(x,o,58,8,15); helm(x,o,t,1); stars(x,1);},
+ champion(x,o){const t=base(x,o,58,8,15); wings(x,t-14); helm(x,o,t,1); stars(x,2);},
+ cavalry(x,o){const t=base(x,o,60,7,15); shoe(x,o,t,false);},
+ warcav(x,o){const t=base(x,o,60,7,15); shoe(x,o,t,true); stars(x,1);},
+ mage(x,o){const t=base(x,o,62,7,15); spire(x,o,t,0);},
+ archmage(x,o){const t=base(x,o,62,7,15); spire(x,o,t,1); stars(x,1);},
+ grandmage(x,o){const t=base(x,o,62,7,15); spire(x,o,t,2); stars(x,2);},
+ catapult(x,o){const t=base(x,o,66,12,17);
+   x.beginPath(); x.roundRect(30,t-14,40,14,4); paint(x,grad(x,o,30,70));
+   x.save(); x.translate(56,t-10); x.rotate(-.75); x.beginPath(); x.roundRect(-4,-40,8,44,3); paint(x,goldG(x,-4,4)); ell(x,0,-44,9,6); paint(x,grad(x,o,-9,9)); x.restore();
+   ell(x,50+Math.sin(-.75)*-44*-1+6,t-10-Math.cos(.75)*44-6,7,7); x.fillStyle='#8d99a6'; x.fill(); x.lineWidth=2.5; x.strokeStyle=INK; x.stroke();
+   ell(x,40,t-7,4,4); paint(x,goldG(x,36,44),2);},
+ king(x,o){const t=base(x,o,46,9,17);
+   x.beginPath(); x.moveTo(34,t); x.lineTo(30,t-22); x.lineTo(40,t-14); x.lineTo(50,t-28); x.lineTo(60,t-14); x.lineTo(70,t-22); x.lineTo(66,t); x.closePath(); paint(x,goldG(x,30,70));
+   x.beginPath(); x.roundRect(32,t-8,36,8,2); paint(x,grad(x,o,32,68),2.5);
+   [[30,t-23],[70,t-23]].forEach(([a,b])=>{ell(x,a,b,3.5,3.5); paint(x,'#fff3b8',2);});
+   ell(x,50,t-33,6,6); paint(x,grad(x,o,44,56),2.5); shine(x,48,t-35,6);
+   ell(x,50,t-16,4,5); x.fillStyle='#5ee0ff'; x.fill(); x.lineWidth=2; x.stroke();},
+ queen(x,o){const t=base(x,o,48,8,17);
+   x.beginPath(); x.moveTo(34,t); x.quadraticCurveTo(28,t-14,32,t-24); for(let i=0;i<5;i++){const px=32+i*9; x.quadraticCurveTo(px+4.5,t-12,px+9,t-24-(i===1||i===2?4:0)*(i===2?1.5:1));} x.quadraticCurveTo(72,t-14,66,t); x.closePath(); paint(x,goldG(x,30,70));
+   for(let i=0;i<5;i++){const py=t-26-(i===2?6:(i===1||i===3)?3:0); ell(x,32+i*9,py,3.5,3.5); paint(x,'#fff3b8',2);}
+   ell(x,50,t-12,5,4); x.fillStyle=TEAM[o].main; x.fill(); x.lineWidth=2; x.stroke(); ell(x,50,t-12,2,1.5); x.fillStyle='#fff'; x.fill();}
+};
+function bow(x,o,t,cross){
+  x.beginPath(); x.arc(50,t-6,24,Math.PI*1.12,Math.PI*1.88); x.lineWidth=10; x.strokeStyle=INK; x.lineCap='round'; x.stroke(); x.lineWidth=5.5; x.strokeStyle=TEAM[o].main; x.stroke();
+  x.beginPath(); const a1=Math.PI*1.12,a2=Math.PI*1.88; x.moveTo(50+Math.cos(a1)*24,t-6+Math.sin(a1)*24); x.lineTo(50+Math.cos(a2)*24,t-6+Math.sin(a2)*24); x.lineWidth=1.5; x.strokeStyle='#fff3b8'; x.stroke();
+  x.beginPath(); x.moveTo(50,t+2); x.lineTo(50,t-34); x.lineWidth=5; x.strokeStyle=INK; x.stroke(); x.lineWidth=2.5; x.strokeStyle=cross?'#f2c14e':'#c9a46a'; x.stroke(); x.lineCap='butt';
+  x.beginPath(); x.moveTo(50,t-42); x.lineTo(56,t-32); x.lineTo(44,t-32); x.closePath(); paint(x,goldG(x,44,56),2);
+  if(cross){x.beginPath(); x.roundRect(36,t-14,28,6,2); paint(x,goldG(x,36,64),2);}
+}
+function tower(x,o,t,royal){
+  x.beginPath(); x.moveTo(34,t); x.lineTo(32,t-26); x.lineTo(68,t-26); x.lineTo(66,t); x.closePath(); paint(x,grad(x,o,32,68));
+  for(let i=0;i<3;i++){x.beginPath(); x.rect(31+i*14,t-34,10,9); paint(x,royal?goldG(x,31+i*14,41+i*14):grad(x,o,31+i*14,41+i*14),2.5);}
+  shield(x,t-13,royal);
+}
+function shield(x,cy,gold){x.beginPath(); x.moveTo(42,cy-8); x.lineTo(58,cy-8); x.lineTo(58,cy+1); x.quadraticCurveTo(58,cy+9,50,cy+12); x.quadraticCurveTo(42,cy+9,42,cy+1); x.closePath(); paint(x,gold?'#fff3b8':goldG(x,42,58),2);
+  if(gold){star(x,50,cy+1,4.5); x.fillStyle='#d8443a'; x.fill();}}
+function helm(x,o,t,royal){
+  // plume
+  x.beginPath(); x.moveTo(52,t-34); x.bezierCurveTo(70,t-46,82,t-30,76,t-12); x.bezierCurveTo(72,t-24,64,t-28,56,t-26); x.closePath(); paint(x,royal?goldG(x,52,80):TEAM[o].hi,2.5);
+  x.beginPath(); x.moveTo(34,t); x.lineTo(34,t-20); x.quadraticCurveTo(34,t-36,50,t-36); x.quadraticCurveTo(66,t-36,66,t-20); x.lineTo(66,t); x.closePath(); paint(x,grad(x,o,34,66));
+  x.beginPath(); x.roundRect(38,t-20,24,5,2); x.fillStyle=INK; x.fill();
+  x.beginPath(); x.moveTo(50,t-36); x.lineTo(50,t-21); x.lineWidth=3; x.strokeStyle=royal?'#f2c14e':TEAM[o].dark; x.stroke();
+  if(royal){x.beginPath(); x.roundRect(34,t-8,32,5,2); paint(x,goldG(x,34,66),2);}
+  shine(x,42,t-28,12);
+}
+function wings(x,cy){for(const s of [-1,1]){x.beginPath(); x.moveTo(50+s*12,cy); x.bezierCurveTo(50+s*30,cy-26,50+s*44,cy-18,50+s*44,cy-6); x.bezierCurveTo(50+s*38,cy-6,50+s*36,cy+2,50+s*30,cy+2); x.bezierCurveTo(50+s*26,cy+8,50+s*20,cy+8,50+s*14,cy+6); x.closePath(); paint(x,'#fff3b8',2.5);}}
+function shoe(x,o,t,war){
+  x.beginPath(); x.arc(50,t-20,16,Math.PI*.82,Math.PI*2.18); x.lineCap='round'; x.lineWidth=14; x.strokeStyle=INK; x.stroke(); x.lineWidth=9; x.strokeStyle=war?'#f2c14e':TEAM[o].main; x.stroke(); x.lineCap='butt';
+  for(let i=0;i<5;i++){const a=Math.PI*(.95+i*.275); ell(x,50+Math.cos(a)*16,t-20+Math.sin(a)*16,1.8,1.8); x.fillStyle=war?INK:'#fff3b8'; x.fill();}
+  if(war){for(const s of [-1,0,1]){x.beginPath(); x.moveTo(50+s*12-4,t-34+Math.abs(s)*4); x.lineTo(50+s*12,t-46+Math.abs(s)*6); x.lineTo(50+s*12+4,t-34+Math.abs(s)*4); x.closePath(); paint(x,grad(x,o,40,60),2);}}
+}
+function spire(x,o,t,lvl){
+  if(lvl===2){ell(x,50,t-46,16,5); x.lineWidth=3; x.strokeStyle='#f2c14e'; x.stroke();}
+  x.beginPath(); x.moveTo(36,t); x.quadraticCurveTo(44,t-20,50,t-44); x.quadraticCurveTo(56,t-20,64,t); x.closePath(); paint(x,lvl===2?goldG(x,36,64):grad(x,o,36,64));
+  x.beginPath(); x.moveTo(40,t-10); x.quadraticCurveTo(50,t-16,60,t-10); x.lineWidth=3; x.strokeStyle=lvl===2?TEAM[o].main:'#f2c14e'; x.stroke();
+  ell(x,50,t-47,6.5,6.5); paint(x,'#5ee0ff',2.5); shine(x,48,t-49,7);
+  if(lvl>=1){for(const s of [-1,1]){ell(x,50+s*20,t-30,4,4); paint(x,lvl===2?'#fff3b8':'#5ee0ff',2);}}
+}
+const spriteCache={};
+// Each piece is painted once onto its own little canvas, then reused.
+function sprite(type,owner){
+  const key=type+owner; if(spriteCache[key])return spriteCache[key];
+  const cv=document.createElement('canvas'); cv.width=200; cv.height=240; const x=cv.getContext('2d'); x.scale(2,2);
+  DRAW[type](x,owner); return spriteCache[key]=cv;
+}
+function spriteEl(type,owner,px){
+  const c=document.createElement('canvas'); c.width=100; c.height=120; c.className='spr';
+  c.style.width=(px||48)+'px'; c.style.height=((px||48)*1.2)+'px'; c.getContext('2d').drawImage(sprite(type,owner),0,0,100,120); return c;
+}
+
+// ================================================================
+//  UNITS AND RULES
+// ================================================================
+// Move kinds: S = straight line (6 ways), D = diagonal (6 ways), N = knight leap (12 spots)
+const U={
+ soldier:  {name:'Soldier',cost:5,  m:[['S',1]], how:'Steps 1 hex in any of the 6 directions.'},
+ archer:   {name:'Archer',cost:8,   m:[['S',3]], how:'Long range: slides up to 3 hexes in a straight line.'},
+ guard:    {name:'Heavy Guard',cost:12,m:[['S',1],['D',1]], how:'Steps to any of the 12 closest hexes (straight or diagonal).'},
+ knight:   {name:'Knight',cost:15,  m:[['N']], how:'Leaps over anything to one of 12 jump spots, 3 hexes away.'},
+ cavalry:  {name:'Cavalry',cost:18, m:[['S',8]], how:'Charges any distance in a straight line.'},
+ mage:     {name:'Mage',cost:20,    m:[['D',8]], how:'Glides any distance along the 6 diagonals.'},
+ catapult: {name:'Catapult',cost:22,m:[['S',1]], cat:true, how:'Rolls 1 hex. Attacks by flinging over exactly one piece in a straight line onto the first enemy behind it.'},
+ king:     {name:'King',cost:25,    m:[['S',1]], royal:'call', how:'Steps 1 hex. ROYAL CALL: teleport any friendly piece next to the King.'},
+ queen:    {name:'Queen',cost:35,   m:[['S',8],['D',8]], royal:'pass', how:'Slides any distance straight or diagonal. ROYAL PASSAGE: teleport to any empty hex on her own side.'},
+ crossbow: {name:'Crossbowman',value:16,m:[['S',4],['D',1]], how:'Slides up to 4 straight, or 1 diagonal.'},
+ rknight:  {name:'Royal Knight',value:30,m:[['N'],['S',1]], how:'Knight leaps, or steps 1 hex.'},
+ archmage: {name:'Archmage',value:40,m:[['D',8],['S',1]], how:'Glides any distance diagonally, or steps 1 straight.'},
+ warcav:   {name:'War Cavalry',value:36,m:[['S',8],['N']], how:'Charges any distance straight, or makes knight leaps.'},
+ rguard:   {name:'Royal Guard',value:24,m:[['S',2],['D',1]], how:'Moves up to 2 straight, or 1 diagonal.'},
+ marksman: {name:'Marksman',value:32,m:[['S',8],['D',2]], how:'Slides any distance straight, or up to 2 diagonal.'},
+ grandmage:{name:'Grand Mage',value:80,m:[['D',8],['S',8]], how:'Glides any distance in all 12 directions.'},
+ champion: {name:'Champion',value:60,m:[['N'],['S',2],['D',2]], how:'Knight leaps, or moves up to 2 in all 12 directions.'},
+ protector:{name:'Royal Protector',value:48,m:[['S',2],['D',2]], how:'Moves up to 2 in all 12 directions.'}
+};
+for(const k in U){U[k].value=U[k].value||U[k].cost;}
+const COMBO={soldier:'knight',archer:'crossbow',knight:'rknight',mage:'archmage',cavalry:'warcav',guard:'rguard',crossbow:'marksman',archmage:'grandmage',rknight:'champion',rguard:'protector'};
+const FROM={}; for(const a in COMBO)FROM[COMBO[a]]=a;
+const SHOP=['soldier','archer','guard','knight','cavalry','mage','catapult','king','queen'];
+const START_AP=100;
+
+// ---------- the hex board: 61 hexes, radius 4 ----------
+const DIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+const DIAG=[[2,-1],[1,-2],[-1,-1],[-2,1],[-1,2],[1,1]];
+const KN=[[1,2],[2,1],[3,-1],[3,-2],[2,-3],[1,-3],[-1,-2],[-2,-1],[-3,1],[-3,2],[-2,3],[-1,3]];
+const HEX=[]; const IDX={};
+for(let r=-4;r<=4;r++)for(let q=-4;q<=4;q++){const s=-q-r; if(Math.abs(s)>4)continue; IDX[q+','+r]=HEX.length; HEX.push({q,r,x:128+26*(q+r/2),y:112+22*r});}
+const at=(q,r)=>{const i=IDX[q+','+r]; return i===undefined?-1:i;};
+const dist=(a,b)=>{const A=HEX[a],B=HEX[b];return (Math.abs(A.q-B.q)+Math.abs(A.r-B.r)+Math.abs(A.q+A.r-B.q-B.r))/2;};
+// Blue (player 0) owns the bottom 3 rows, Red (player 1) the top 3. The middle 3 rows are the neutral battlefield.
+const side=i=>HEX[i].r>=2?0:HEX[i].r<=-2?1:-1;
+const COLOR=['Blue','Red'];
+
+function addLand(cells,p,f,j,out){const c=cells[j];
+  if(!c)out.push({f,t:j});
+  else if(c.o!==p.o)out.push({f,t:j,cap:1});
+  else if(c.t===p.t&&COMBO[p.t]&&j!==f)out.push({f,t:j,comb:1});
+}
+// Every move a piece could make, before checking if it leaves its own King in danger.
+function pieceMoves(cells,i,out,royal){
+  const p=cells[i], h=HEX[i], u=U[p.t];
+  for(const [kind,n] of u.m){
+    if(kind==='N'){for(const d of KN){const j=at(h.q+d[0],h.r+d[1]); if(j>=0)addLand(cells,p,i,j,out);} continue;}
+    for(const d of (kind==='S'?DIRS:DIAG)){
+      for(let s=1;s<=n;s++){const j=at(h.q+d[0]*s,h.r+d[1]*s); if(j<0)break;
+        if(!cells[j]){out.push({f:i,t:j});continue;}
+        if(!u.cat)addLand(cells,p,i,j,out);
+        break;}
+    }
+  }
+  if(u.cat){ // fling: over exactly one piece, onto first piece behind it if enemy
+    for(const d of DIRS){let screen=false;
+      for(let s=1;s<9;s++){const j=at(h.q+d[0]*s,h.r+d[1]*s); if(j<0)break; const c=cells[j]; if(!c)continue;
+        if(!screen){screen=true;continue;}
+        if(c.o!==p.o)out.push({f:i,t:j,cap:1,fling:1}); break;}
+    }
+  }
+  if(!royal)return;
+  if(u.royal==='pass'){
+    for(let j=0;j<61;j++)if(!cells[j]&&side(j)===p.o&&!out.some(m=>m.f===i&&m.t===j))out.push({f:i,t:j,pass:1});
+  }
+  if(u.royal==='call'){
+    for(let a=0;a<61;a++){const c=cells[a]; if(!c||c.o!==p.o||a===i||c.t==='king'||dist(a,i)>10)continue;
+      for(const d of DIRS){const j=at(h.q+d[0],h.r+d[1]); if(j<0||j===a)continue; const cj=cells[j];
+        if(!cj)out.push({f:a,t:j,call:i});
+        else if(cj.o===p.o&&cj.t===c.t&&COMBO[c.t])out.push({f:a,t:j,call:i,comb:1});
+      }
+    }
+  }
+}
+function apply(cells,m){const n=cells.slice(); const p=n[m.f];
+  n[m.t]=m.comb?{t:COMBO[p.t],o:p.o}:p; n[m.f]=null; return n;}
+function kingOf(cells,o){for(let i=0;i<61;i++){const c=cells[i]; if(c&&c.o===o&&c.t==='king')return i;} return -1;}
+function attacked(cells,sq,by){const out=[];
+  for(let i=0;i<61;i++){const c=cells[i]; if(c&&c.o===by){out.length=0; pieceMoves(cells,i,out,false); for(const m of out)if(m.t===sq&&m.cap)return true;}}
+  return false;}
+function legalMoves(cells,o){const all=[];
+  for(let i=0;i<61;i++){const c=cells[i]; if(c&&c.o===o)pieceMoves(cells,i,all,true);}
+  return all.filter(m=>{const n=apply(cells,m); const k=kingOf(n,o); return k<0||!attacked(n,k,1-o);});
+}
+const count=(cells,o)=>cells.reduce((a,c)=>a+(c&&c.o===o?1:0),0);
+
+// ================================================================
+//  COMPUTER PLAYER
+// ================================================================
+function evaluate(cells,me){let s=0;
+  for(let i=0;i<61;i++){const c=cells[i]; if(!c)continue; let v=c.t==='king'?0:U[c.t].value;
+    const h=HEX[i]; const centre=(4-(Math.abs(h.q)+Math.abs(h.r)+Math.abs(h.q+h.r))/2)*0.4;
+    v+=c.t==='king'?-centre:centre;
+    s+=c.o===me?v:-v;}
+  return s;}
+function aiChoose(cells,me,level){
+  const moves=legalMoves(cells,me); if(!moves.length)return null;
+  let best=-1e9, pick=[];
+  for(const m of moves){const n=apply(cells,m); let score;
+    if(m.cap&&count(n,1-me)<=1&&kingOf(n,1-me)>=0)score=1e6; // total conquest
+    else if(level===1){score=evaluate(n,me)+Math.random()*6;}
+    else{ const replies=legalMoves(n,1-me);
+      if(!replies.length){const k=kingOf(n,1-me); score=(k>=0&&attacked(n,k,me))?1e6:-50;}
+      else{let worst=1e9; for(const r of replies){const n2=apply(n,r); let v;
+          if(r.cap&&count(n2,me)<=1)v=-1e6; else v=evaluate(n2,me); if(v<worst)worst=v; if(worst<best)break;}
+        score=worst+Math.random()*0.5;
+        const k=kingOf(n,1-me); if(k>=0&&attacked(n,k,me))score+=1.5;}
+    }
+    if(score>best){best=score;pick=[m];}else if(score===best)pick.push(m);}
+  return pick[Math.random()*pick.length|0];
+}
+function aiRecruit(){const army={king:1}; let ap=START_AP-25;
+  if(Math.random()<0.6){army.queen=1;ap-=35;}
+  const opts=['soldier','soldier','soldier','archer','archer','guard','knight','cavalry','mage','catapult'];
+  let tries=0; while(ap>=5&&tries++<200){const t=opts[Math.random()*opts.length|0]; if(U[t].cost<=ap){army[t]=(army[t]||0)+1;ap-=U[t].cost;}}
+  return army;}
+function autoPlace(cells,o,list){
+  const spots=[]; for(let j=0;j<61;j++)if(side(j)===o&&!cells[j])spots.push(j);
+  const back=j=>o===0?HEX[j].r:-HEX[j].r; // 2 front, 4 back
+  const order=list.slice().sort((a,b)=>rank(b)-rank(a));
+  function rank(t){return {king:9,queen:7,catapult:6,mage:5,archer:4,cavalry:4,guard:2,knight:3,soldier:0}[t]||1;}
+  for(const t of order){spots.sort((a,b)=>(rank(t)>=5?back(b)-back(a):back(a)-back(b))||(Math.abs(HEX[a].q+HEX[a].r/2)-Math.abs(HEX[b].q+HEX[b].r/2))+(Math.random()-.5)*2);
+    const j=spots.shift(); if(j!==undefined)cells[j]={t,o};}
+}
+
+// ================================================================
+//  DRAWING THE BOARD (smooth, 4x resolution)
+// ================================================================
+const cv=document.getElementById('board'), ctx=cv.getContext('2d'); const SC=4; ctx.setTransform(SC,0,0,SC,0,0);
+function hexPath(x,y,s){s=s||1; ctx.beginPath(); for(let k=0;k<6;k++){const a=Math.PI/180*(60*k-90); ctx.lineTo(x+Math.cos(a)*15*s,y+Math.sin(a)*15*s);} ctx.closePath();}
+const LAND={0:['#4f74b8','#2c4a85'],1:['#b85a4f','#7e3027'],'-1':['#6fa35d','#3f6e35']};
+function tileFill(i){const h=HEX[i], L=LAND[side(i)]; const g=ctx.createLinearGradient(h.x-10,h.y-14,h.x+10,h.y+14); g.addColorStop(0,L[0]); g.addColorStop(1,L[1]); return g;}
+function ring(i,col,w,s){const h=HEX[i]; hexPath(h.x,h.y,s||.86); ctx.lineWidth=w; ctx.strokeStyle=col; ctx.stroke();}
+const G={screen:'title',mode:'ai',level:2,cells:Array(61).fill(null),turn:0,sel:-1,moves:[],last:null,anims:[],parts:[],callMode:false,callPick:-1,hover:-1,over:false,army:[{},{}],tray:[],trayPick:-1,placing:0,busy:false};
+const PW=23, PH=27.6;
+function drawPiece(c,x,y,alpha,lift){
+  ctx.globalAlpha=alpha==null?1:alpha; ctx.drawImage(sprite(c.t,c.o),x-PW/2,y-PH+7-(lift||0),PW,PH); ctx.globalAlpha=1;}
+function draw(now){
+  ctx.fillStyle='#14111f'; ctx.fillRect(0,0,256,224);
+  const bg=ctx.createRadialGradient(128,112,20,128,112,150); bg.addColorStop(0,'#2b2442'); bg.addColorStop(1,'#14111f'); ctx.fillStyle=bg; ctx.fillRect(0,0,256,224);
+  drawBanner(14,10,1); drawBanner(242,10,1); drawBanner(14,192,0); drawBanner(242,192,0);
+  // board rim
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=8; ctx.shadowOffsetY=3;
+  ctx.beginPath(); for(let k=0;k<6;k++){const a=Math.PI/180*(60*k); ctx.lineTo(128+Math.cos(a)*126,112+Math.sin(a)*109);} ctx.closePath(); ctx.fillStyle='#3a2f22'; ctx.fill(); ctx.restore();
+  for(let i=0;i<61;i++){const h=HEX[i]; hexPath(h.x,h.y,.97); ctx.fillStyle=tileFill(i); ctx.fill(); ctx.lineWidth=.6; ctx.strokeStyle='rgba(20,14,30,.8)'; ctx.stroke();
+    hexPath(h.x,h.y,.8); ctx.lineWidth=.5; ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.stroke();}
+  if(G.last){ring(G.last.f,'rgba(255,255,255,.55)',1); ring(G.last.t,'rgba(255,255,255,.75)',1.2);}
+  if(G.screen==='deploy'){const p=.5+.3*Math.sin(now/250); for(let i=0;i<61;i++)if(side(i)===G.placing&&!G.cells[i])ring(i,'rgba(255,225,78,'+p+')',1.2);}
+  if(G.hover>=0)ring(G.hover,'rgba(255,255,255,.5)',1);
+  if(G.sel>=0)ring(G.sel,'#ffe14e',2);
+  if(G.callPick>=0)ring(G.callPick,'#5ee0ff',2);
+  if(G.screen==='battle'&&!G.over){const k=kingOf(G.cells,G.turn); if(k>=0&&attacked(G.cells,k,1-G.turn))ring(k,'rgba(255,48,48,'+(.5+.5*Math.sin(now/120))+')',2.2);}
+  const animTo={}; for(const a of G.anims)animTo[a.t]=a;
+  for(let i=0;i<61;i++){const c=G.cells[i]; if(!c)continue; const h=HEX[i]; const a=animTo[i];
+    const lift=(i===G.sel)?1.5+Math.sin(now/180)*1:0;
+    if(a){const k=Math.min(1,(now-a.start)/a.dur);
+      if(a.tele){drawPiece(c,h.x,h.y,k,0); if(k<1)sparkle(h.x,h.y,k);}
+      else{const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2; drawPiece(c,a.x+(h.x-a.x)*e,a.y+(h.y-a.y)*e,1,Math.sin(k*Math.PI)*6);}
+    } else drawPiece(c,h.x,h.y,1,lift);}
+  G.anims=G.anims.filter(a=>now-a.start<a.dur);
+  if(G.screen==='battle'){
+    for(const m of G.moves){const hx=HEX[m.t]; const pulse=1+.12*Math.sin(now/200);
+      if(m.cap){ctx.beginPath(); ctx.arc(hx.x,hx.y,11*pulse,0,Math.PI*2); ctx.lineWidth=1.8; ctx.strokeStyle='#ff4a4a'; ctx.stroke();}
+      else if(m.comb){ctx.save(); ctx.setTransform(SC,0,0,SC,0,0); star(ctx,hx.x,hx.y-12,4.5*pulse); ctx.fillStyle='#f2c14e'; ctx.fill(); ctx.lineWidth=.8; ctx.strokeStyle=INK; ctx.stroke(); ctx.restore();}
+      else{const col=m.call!=null?'#5ee0ff':m.pass?'#ff9be0':'#ffe14e'; ctx.beginPath(); ctx.arc(hx.x,hx.y,3.2*pulse,0,Math.PI*2); ctx.fillStyle=col; ctx.fill(); ctx.lineWidth=.8; ctx.strokeStyle=INK; ctx.stroke();}}
+  }
+  for(const p of G.parts){p.x+=p.vx;p.y+=p.vy;p.vy+=.12;p.life--; ctx.beginPath(); ctx.arc(p.x,p.y,p.s*.8,0,Math.PI*2); ctx.fillStyle=p.c; ctx.fill();}
+  G.parts=G.parts.filter(p=>p.life>0);
+  if(G.screen==='title')drawTitle(now);
+  requestAnimationFrame(draw);
+}
+function sparkle(x,y,k){const r=14*(1-k); for(let a=0;a<8;a++){ctx.beginPath(); ctx.arc(x+Math.cos(a*.785+k*3)*r,y-4+Math.sin(a*.785+k*3)*r,1.2,0,7); ctx.fillStyle=a%2?'#fff':'#5ee0ff'; ctx.fill();}}
+function burst(i,cols,n){const h=HEX[i]; for(let k=0;k<(n||16);k++)G.parts.push({x:h.x,y:h.y-4,vx:(Math.random()-.5)*3,vy:-Math.random()*3,life:20+Math.random()*15|0,c:cols[k%cols.length],s:Math.random()<.3?2:1});}
+function drawBanner(x,y,o){ctx.fillStyle='#c9b48a'; ctx.fillRect(x-.6,y,1.2,22); ctx.beginPath(); ctx.arc(x,y,1.6,0,7); ctx.fillStyle='#f2c14e'; ctx.fill();
+  const s=x>128?-1:1; ctx.beginPath(); ctx.moveTo(x,y+1); ctx.quadraticCurveTo(x+s*7,y-1,x+s*13,y+2); ctx.lineTo(x+s*11,y+6); ctx.lineTo(x+s*13,y+10); ctx.quadraticCurveTo(x+s*7,y+8,x,y+10); ctx.closePath();
+  ctx.fillStyle=TEAM[o].main; ctx.fill(); ctx.lineWidth=.6; ctx.strokeStyle=INK; ctx.stroke(); ctx.beginPath(); ctx.arc(x+s*5.5,y+5.5,2,0,7); ctx.fillStyle='#f2c14e'; ctx.fill();}
+function drawTitle(now){
+  ctx.fillStyle='rgba(20,17,31,.6)'; ctx.fillRect(0,0,256,224);
+  const parade=['soldier','archer','guard','knight','cavalry','mage','catapult','queen','king'];
+  parade.forEach((t,i)=>{const x=((now/40+i*28)%300)-22; drawPiece({t,o:0},x,180,1,Math.abs(Math.sin(now/200+i))*2);});
+  parade.forEach((t,i)=>{const x=256-(((now/40+i*28)%300)-22); drawPiece({t,o:1},x,62,1,Math.abs(Math.sin(now/200+i))*2);});
+  // big crown
+  const y=112+Math.sin(now/500)*2; ctx.save(); ctx.translate(128,y);
+  ctx.beginPath(); ctx.moveTo(-30,14); ctx.lineTo(-34,-16); ctx.lineTo(-16,-2); ctx.lineTo(0,-24); ctx.lineTo(16,-2); ctx.lineTo(34,-16); ctx.lineTo(30,14); ctx.closePath();
+  const g=ctx.createLinearGradient(-34,0,34,0); g.addColorStop(0,'#fff3b8'); g.addColorStop(.4,'#f2c14e'); g.addColorStop(1,'#9a6b1c'); ctx.fillStyle=g; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle=INK; ctx.stroke();
+  [[-34,-17],[0,-25],[34,-17]].forEach(([a,b])=>{ctx.beginPath(); ctx.arc(a,b,3,0,7); ctx.fillStyle='#fff3b8'; ctx.fill(); ctx.stroke();});
+  [[-16,6,TEAM[0].main],[0,4,'#5ee0ff'],[16,6,TEAM[1].main]].forEach(([a,b,c])=>{ctx.beginPath(); ctx.ellipse(a,b,4,5,0,0,7); ctx.fillStyle=c; ctx.fill(); ctx.stroke();});
+  ctx.restore();
+}
+
+// ================================================================
+//  SOUND (tiny bleeps)
+// ================================================================
+let AC=null, muted=false;
+function beep(f,d,type,v){if(muted)return; try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+  const o=AC.createOscillator(),g=AC.createGain(); o.type=type||'square'; o.frequency.value=f; g.gain.value=v||.05;
+  g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d); o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime+d);}catch(e){}}
+const SFX={move:()=>beep(330,.08),cap:()=>{beep(140,.18,'sawtooth',.07);setTimeout(()=>beep(90,.2,'sawtooth',.06),60)},
+  comb:()=>[523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.12,'square',.05),i*70)),
+  magic:()=>[880,660,990].forEach((f,i)=>setTimeout(()=>beep(f,.1,'triangle',.07),i*60)),
+  win:()=>[392,523,659,784,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.18,'square',.06),i*130)),
+  check:()=>{beep(600,.1);setTimeout(()=>beep(600,.1),140)}};
+
+// ================================================================
+//  SCREENS / PANEL
+// ================================================================
+const panel=document.getElementById('panel'), overlay=document.getElementById('overlay'), card=document.getElementById('card'), banner=document.getElementById('banner');
+function h(tag,attrs,...kids){const e=document.createElement(tag); for(const k in attrs||{}){if(k==='on')for(const ev in attrs.on)e.addEventListener(ev,attrs.on[ev]); else if(k==='cls')e.className=attrs[k]; else if(k==='html')e.innerHTML=attrs[k]; else e.setAttribute(k,attrs[k]);}
+  for(const c of kids){if(c==null)continue; e.append(c.nodeType?c:document.createTextNode(c));} return e;}
+function btn(text,fn,cls){return h('button',{cls:cls||'',on:{click:fn}},text);}
+function showBanner(t,ms){banner.textContent=t; banner.hidden=false; clearTimeout(showBanner.t); showBanner.t=setTimeout(()=>banner.hidden=true,ms||1200);}
+function openCard(nodes){card.innerHTML=''; nodes.forEach(n=>card.append(n)); overlay.hidden=false;}
+function closeCard(){overlay.hidden=true;}
+const playerName=o=>G.mode==='ai'?(o===0?'Your':'The Computer\'s'):COLOR[o]+' Kingdom\'s';
+
+function titleScreen(){G.screen='title'; G.cells=Array(61).fill(null); G.sel=-1; G.moves=[]; G.last=null; G.over=false; closeCard();
+  panel.innerHTML='';
+  panel.append(h('p',{},'A hexagonal kingdom strategy board game for 2 players. Chess meets kingdom warfare.'),
+    h('div',{cls:'row'},btn('VS COMPUTER',()=>start('ai'),'blue'),btn('VS FRIEND',()=>start('pvp'),'red')),
+    h('div',{cls:'row'},h('span',{},'Computer:'),btn(G.level===1?'SQUIRE (EASY)':'WARLORD (HARD)',e=>{G.level=G.level===1?2:1; titleScreen();},'alt')),
+    h('div',{cls:'row'},btn('HOW TO PLAY',rulesCard,'alt'),btn('UNIT GUIDE',guideCard,'alt'),btn(muted?'SOUND: OFF':'SOUND: ON',()=>{muted=!muted;titleScreen();},'alt')));
+}
+function start(mode){G.mode=mode; G.army=[{king:1},{king:1}]; G.log=[]; recruitScreen(0);}
+
+function spent(a){let s=0; for(const t in a)s+=U[t].cost*a[t]; return s;}
+function recruitScreen(o){G.screen='recruit'; G.recruiting=o; panel.innerHTML='';
+  const a=G.army[o]; const left=START_AP-spent(a);
+  panel.append(h('div',{cls:'turn p'+o},(G.mode==='ai'?'RECRUIT YOUR ARMY':COLOR[o].toUpperCase()+': RECRUIT')),
+    h('div',{cls:'ap'},left+' AP left'),
+    h('p',{cls:'hint'},'Every army needs one King. The Queen is optional. Spend your 100 Army Points!'));
+  const shop=h('div',{cls:'shop'});
+  for(const t of SHOP){const n=a[t]||0; const max=t==='king'||t==='queen'?1:99; const min=t==='king'?1:0;
+    shop.append(h('div',{cls:'unit',title:U[t].how},spriteEl(t,o,40),h('div',{},h('div',{cls:'nm'},U[t].name),h('div',{cls:'ct'},U[t].cost+' AP')),
+      h('div',{cls:'cnt'},h('button',{cls:'alt',on:{click:()=>{if(n>min){a[t]=n-1;recruitScreen(o);}}}},'-'),h('b',{},String(n)),
+        h('button',{on:{click:()=>{if(n<max&&U[t].cost<=left){a[t]=n+1;recruitScreen(o);}}}},'+'))));
+    const last=shop.lastChild.querySelectorAll('button'); if(n<=min)last[0].disabled=true; if(n>=max||U[t].cost>left)last[1].disabled=true;}
+  panel.append(shop,
+    h('div',{cls:'row'},btn('RANDOM ARMY',()=>{G.army[o]=aiRecruit(); recruitScreen(o);},'alt'),btn('CLEAR',()=>{G.army[o]={king:1};recruitScreen(o);},'alt')),
+    h('div',{cls:'row'},btn('READY! ▶',()=>{SFX.comb();
+      if(o===0){ if(G.mode==='ai'){G.army[1]=aiRecruit(); deployStart(0);} else passCard(1,'recruit',()=>recruitScreen(1)); }
+      else deployStart(0);
+    },o?'red':'blue'),btn('MENU',titleScreen,'alt')));
+}
+function passCard(o,what,fn){openCard([h('h2',{},'PASS TO '+COLOR[o].toUpperCase()),h('p',{style:'text-align:center'},COLOR[1-o]+', look away! It is '+COLOR[o]+"'s turn to "+what+'.'),h('div',{cls:'row',style:'justify-content:center'},btn("I'M "+COLOR[o].toUpperCase()+' ▶',()=>{closeCard();fn();},o?'red':'blue'))]);}
+
+function deployStart(o){G.screen='deploy'; G.placing=o; if(o===0)G.cells=Array(61).fill(null);
+  G.tray=[]; for(const t of SHOP)for(let k=0;k<(G.army[o][t]||0);k++)G.tray.push(t); G.trayPick=0; deployPanel();}
+function deployPanel(){const o=G.placing; panel.innerHTML='';
+  const tray=h('div',{cls:'tray'});
+  G.tray.forEach((t,i)=>{const b=h('button',{cls:i===G.trayPick?'sel':'',title:U[t].name,on:{click:()=>{G.trayPick=i;deployPanel();}}},spriteEl(t,o,36)); tray.append(b);});
+  const sel=G.tray[G.trayPick];
+  panel.append(h('div',{cls:'turn p'+o},(G.mode==='ai'?'PLACE YOUR ARMY':COLOR[o].toUpperCase()+': PLACE ARMY')),
+    h('p',{cls:'hint'},'Pick a piece, then tap a glowing hex in your territory ('+(o===0?'bottom':'top')+' 3 rows). Tap a placed piece to pick it back up.'),
+    tray.childNodes.length?tray:h('p',{},'All pieces placed!'),
+    sel?infoBox(sel,o):'',
+    h('div',{cls:'row'},btn('AUTO-PLACE',()=>{autoPlace(G.cells,o,G.tray); G.tray=[]; G.trayPick=-1; SFX.move(); deployPanel();},'alt'),
+      h('button',{cls:o?'red':'blue',on:{click:deployDone},...(G.tray.length?{disabled:''}:{})},'TO BATTLE! ▶')),
+    btn('MENU',titleScreen,'alt'));
+}
+function deployDone(){if(G.tray.length)return;
+  if(G.placing===0){ if(G.mode==='ai'){const l=[]; for(const t of SHOP)for(let k=0;k<(G.army[1][t]||0);k++)l.push(t); autoPlace(G.cells,1,l); battleStart();}
+    else passCard(1,'place their army',()=>deployStart(1)); }
+  else battleStart();
+}
+function infoBox(t,o){return h('div',{cls:'info'},spriteEl(t,o,52),h('div',{},h('b',{style:'color:var(--gold)'},U[t].name),
+  h('p',{},U[t].how), COMBO[t]?h('p',{cls:'hint'},'2 '+U[t].name+'s on one hex = '+U[COMBO[t]].name):null, FROM[t]?h('p',{cls:'hint'},'Made from 2 '+U[FROM[t]].name+'s'):null));}
+
+function battleStart(){G.screen='battle'; G.turn=0; G.sel=-1; G.moves=[]; G.last=null; G.over=false; G.callMode=false; G.callPick=-1; G.turnNo=1;
+  log('The battle for the crown begins!','g'); showBanner('BATTLE!',1200); SFX.win(); battlePanel(); maybeAI();}
+function log(t,c){G.log.push([t,c]); if(G.log.length>80)G.log.shift(); const el=document.getElementById('log'); if(el){el.append(h('div',{cls:c||''},t)); el.scrollTop=1e6;}}
+function battlePanel(){panel.innerHTML=''; const o=G.turn; const sel=G.sel>=0?G.cells[G.sel]:null;
+  const inCheck=(()=>{const k=kingOf(G.cells,o); return k>=0&&attacked(G.cells,k,1-o);})();
+  panel.append(h('div',{cls:'turn p'+o},(G.over?'GAME OVER':playerName(o).toUpperCase()+" TURN")+(inCheck&&!G.over?' · CHECK!':'')));
+  if(sel)panel.append(infoBox(sel.t,sel.o)); else panel.append(h('div',{cls:'info'},h('div',{}),h('p',{cls:'hint'},G.mode==='ai'&&o===1?'The computer is thinking...':'Tap one of your pieces to see where it can go.')));
+  if(sel&&sel.t==='king'&&sel.o===o&&!G.over&&!(G.mode==='ai'&&o===1)){
+    panel.append(h('div',{cls:'row'},btn(G.callMode?'CANCEL CALL':'👑 ROYAL CALL',()=>{G.callMode=!G.callMode; G.callPick=-1; refreshMoves(); battlePanel();},G.callMode?'alt':'')),
+      h('p',{cls:'hint'},G.callMode?(G.callPick<0?'Tap any friendly piece to summon it.':'Now tap a blue-dot hex next to the King.'):'Summon a friendly piece to the King\'s side.'));}
+  const legend=h('div',{cls:'hint'},'Markers: dot = move · red X = capture · star = combine · blue = Royal Call · pink = Royal Passage');
+  panel.append(legend);
+  const lg=h('div',{id:'log'}); G.log.forEach(([t,c])=>lg.append(h('div',{cls:c||''},t))); panel.append(lg); setTimeout(()=>lg.scrollTop=1e6);
+  panel.append(h('div',{cls:'row'},btn('UNIT GUIDE',guideCard,'alt'),btn('RULES',rulesCard,'alt'),btn('MENU',()=>confirmCard('Quit this battle?',titleScreen),'alt')));
+}
+function confirmCard(q,fn){openCard([h('h2',{},q),h('div',{cls:'row',style:'justify-content:center'},btn('YES',()=>{closeCard();fn();},'red'),btn('NO',closeCard,'alt'))]);}
+
+function refreshMoves(){G.moves=[]; if(G.screen!=='battle'||G.sel<0||G.over)return;
+  const all=legalMoves(G.cells,G.turn);
+  if(G.callMode){ if(G.callPick>=0)G.moves=all.filter(m=>m.call===G.sel&&m.f===G.callPick); }
+  else G.moves=all.filter(m=>m.f===G.sel&&m.call==null);
+}
+function name(c){return U[c.t].name;}
+function doMove(m){const p=G.cells[m.f], target=G.cells[m.t]; const who=COLOR[p.o];
+  const a={t:m.t,x:HEX[m.f].x,y:HEX[m.f].y,start:performance.now(),dur:m.call!=null||m.pass?450:260,tele:m.call!=null||m.pass};
+  G.cells=apply(G.cells,m); G.anims=[a]; G.last={f:m.f,t:m.t};
+  const cls=p.o?'r':'b';
+  if(m.call!=null)log(who+' King uses ROYAL CALL: '+name(p)+' teleports!',cls);
+  else if(m.pass)log(who+' Queen uses ROYAL PASSAGE!',cls);
+  if(m.comb){const n=G.cells[m.t]; log(who+': 2 '+name(p)+'s combine into a '+name(n)+'!','g'); setTimeout(()=>{burst(m.t,['#f2c14e','#fff','#ffe08a'],24);SFX.comb();showBanner(name(n).toUpperCase()+'!',1100);},a.dur);}
+  else if(m.cap){log(who+' '+name(p)+(m.fling?' flings a boulder at ':' captures ')+COLOR[target.o]+' '+name(target)+'!',cls); setTimeout(()=>{burst(m.t,[TEAM[target.o].main,TEAM[target.o].hi,'#fff']);SFX.cap();},a.dur*.8);}
+  else if(m.call==null&&!m.pass)log(who+' '+name(p)+' moves.',cls);
+  if(m.call!=null||m.pass)SFX.magic(); else if(!m.cap&&!m.comb)SFX.move();
+  G.sel=-1; G.moves=[]; G.callMode=false; G.callPick=-1;
+  // win checks
+  const opp=1-G.turn;
+  if(m.cap&&count(G.cells,opp)<=1){return endGame(G.turn,'TOTAL CONQUEST','Every enemy soldier has fallen. Only their King is left, alone!');}
+  const replies=legalMoves(G.cells,opp); const k=kingOf(G.cells,opp); const check=k>=0&&attacked(G.cells,k,G.turn);
+  if(!replies.length){ if(check)return endGame(G.turn,'ROYAL CHECKMATE','The enemy King is trapped with no escape!'); return endGame(-1,'STALEMATE','Nobody can move. The kingdoms make peace (a draw).'); }
+  G.turn=opp; G.turnNo++;
+  if(check){setTimeout(()=>{showBanner('CHECK!',900);SFX.check();},a.dur); log(COLOR[opp]+' King is in CHECK!','g');}
+  battlePanel(); maybeAI();
+}
+function endGame(w,how,why){G.over=true; battlePanel(); setTimeout(()=>{SFX.win();
+  const title=w<0?'DRAW':(G.mode==='ai'?(w===0?'VICTORY!':'DEFEAT...'):COLOR[w].toUpperCase()+' WINS!');
+  const kids=[h('h2',{},title),h('div',{cls:'row',style:'justify-content:center'},spriteEl('king',w<0?0:w,96),spriteEl('queen',w<0?1:w,96)),
+    h('p',{style:'text-align:center;color:var(--gold)'},how),h('p',{style:'text-align:center'},why),
+    h('div',{cls:'row',style:'justify-content:center'},btn('PLAY AGAIN',()=>{closeCard();start(G.mode);},'blue'),btn('LOOK AT BOARD',closeCard,'alt'),btn('MENU',titleScreen,'alt'))];
+  openCard(kids); log((w<0?'Draw':COLOR[w]+' wins')+' by '+how+'!','g');},700);}
+function maybeAI(){if(G.over||G.mode!=='ai'||G.turn!==1)return; G.busy=true;
+  setTimeout(()=>{const m=aiChoose(G.cells,1,G.level); G.busy=false; if(m)doMove(m);},550);}
+
+// ---------- input ----------
+function hexAt(ev){const r=cv.getBoundingClientRect(); const x=(ev.clientX-r.left)/r.width*256, y=(ev.clientY-r.top)/r.height*224;
+  let best=-1,bd=1e9; for(let i=0;i<61;i++){const d=(HEX[i].x-x)**2+((HEX[i].y-y)*1.15)**2; if(d<bd){bd=d;best=i;}} return bd<15*15?best:-1;}
+cv.addEventListener('pointermove',e=>{G.hover=hexAt(e);});
+cv.addEventListener('pointerleave',()=>{G.hover=-1;});
+cv.addEventListener('click',e=>{const i=hexAt(e); if(i<0)return;
+  if(G.screen==='deploy')return deployClick(i);
+  if(G.screen!=='battle'||G.over||G.busy||(G.mode==='ai'&&G.turn===1))return;
+  const c=G.cells[i];
+  const m=G.moves.find(m=>m.t===i);
+  if(m){doMove(m);return;}
+  if(G.callMode){ if(c&&c.o===G.turn&&i!==G.sel&&c.t!=='king'){G.callPick=i; refreshMoves(); beep(700,.05); battlePanel(); return;} G.callMode=false; G.callPick=-1; }
+  if(c&&c.o===G.turn){G.sel=i===G.sel?-1:i; beep(500,.04);} else G.sel=-1;
+  refreshMoves(); battlePanel();
+});
+function deployClick(i){const o=G.placing; const c=G.cells[i];
+  if(c&&c.o===o){G.tray.push(c.t); G.cells[i]=null; G.trayPick=G.tray.length-1; beep(400,.05); deployPanel(); return;}
+  if(side(i)!==o||c||G.trayPick<0||!G.tray.length){beep(120,.08); return;}
+  G.cells[i]={t:G.tray[G.trayPick],o}; G.tray.splice(G.trayPick,1); G.trayPick=Math.min(G.trayPick,G.tray.length-1); SFX.move(); deployPanel();}
+overlay.addEventListener('click',e=>{if(e.target===overlay&&!G.over)closeCard();});
+addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.hidden)closeCard();});
+
+// ---------- info cards ----------
+function guideCard(){const g=h('div',{cls:'guide'});
+  for(const t in U){g.append(h('div',{cls:'g'},spriteEl(t,0,48),h('div',{},h('b',{},U[t].name),h('div',{},U[t].cost?U[t].cost+' AP':'Fusion · worth '+U[t].value),h('div',{},U[t].how),FROM[t]?h('div',{style:'color:var(--gold)'},'= 2 × '+U[FROM[t]].name):null)));}
+  openCard([h('h2',{},'UNIT GUIDE'),g,h('div',{cls:'row',style:'justify-content:center'},btn('CLOSE',closeCard,'alt'))]);}
+function rulesCard(){const combos=h('ul',{}); for(const a in COMBO)combos.append(h('li',{},'2 '+U[a].name+'s → '+U[COMBO[a]].name));
+  openCard([h('h2',{},'HOW TO PLAY'),
+    h('h3',{},'1. The board'),h('p',{},'61 hexagons. Blue owns the bottom 3 rows, Red owns the top 3 rows, and the green middle is the neutral battlefield. Pieces move in 6 straight directions (and some along the 6 diagonals between them).'),
+    h('h3',{},'2. Recruit'),h('p',{},'Each player has 100 Army Points. You must buy 1 King (25 AP). The Queen (35 AP) is optional. Then place your army in your own 3 rows.'),
+    h('h3',{},'3. Take turns'),h('p',{},'Blue goes first. On your turn, move one piece. Land on an enemy to capture it, chess-style. No dice, no health: a capture is a capture! You can never make a move that leaves your own King under attack.'),
+    h('h3',{},'4. Royal abilities'),h('p',{},'KING · ROYAL CALL: instead of moving, summon any friendly piece within 10 hexes. It teleports right next to the King (or onto a matching piece to combine).'),
+      h('p',{},'QUEEN · ROYAL PASSAGE: the Queen can teleport to any empty hex on her own side. Never into enemy land, never onto a piece.'),
+    h('h3',{},'5. Combine (free!)'),h('p',{},'Move a piece onto a friendly piece of the same type and they fuse into a stronger warrior:'),combos,
+    h('h3',{},'6. Winning'),h('p',{},'TOTAL CONQUEST: capture every enemy piece except the King, who is left alone. ROYAL CHECKMATE: attack the enemy King so it has no legal escape.'),
+    h('div',{cls:'row',style:'justify-content:center'},btn('CLOSE',closeCard,'alt'))]);}
+
+titleScreen(); requestAnimationFrame(draw);
+// handy for testing
+window.KINGDOMS={G,legalMoves,apply,attacked,kingOf,aiChoose,U,HEX};
+</script>
+</body>
+</html>
