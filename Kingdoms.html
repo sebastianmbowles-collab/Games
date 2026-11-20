@@ -60,7 +60,7 @@ button{font-weight:800}.turn{font-weight:800}
 <body>
 <h1>KINGDOMS<small>The Battle for the Crown</small></h1>
 <div id="wrap">
-  <div id="boardBox"><canvas id="board" width="1024" height="896"></canvas><div id="banner" hidden></div></div>
+  <div id="boardBox"><canvas id="board" width="1024" height="960"></canvas><div id="banner" hidden></div></div>
   <div id="panel"></div>
 </div>
 <div class="tag">Created by Sebastian Bowles · Build your army. Command your kingdom. Claim the crown.</div>
@@ -176,44 +176,49 @@ function spriteEl(type,owner,px){
 // ================================================================
 //  UNITS AND RULES
 // ================================================================
-// Move kinds: S = straight line (6 ways), D = diagonal (6 ways), N = knight leap (12 spots)
+// Move kinds: S = straight line (6 ways), D = diagonal (6 ways), N = knight leap (12 spots).
+// 'Any direction' = straight + diagonal (12 lines). Movement profile v1.0 by Sebastian Bowles.
 const U={
- soldier:  {name:'Soldier',cost:5,  m:[['S',1]], how:'Steps 1 hex in any of the 6 directions.'},
- archer:   {name:'Archer',cost:8,   m:[['S',3]], how:'Long range: slides up to 3 hexes in a straight line.'},
- guard:    {name:'Heavy Guard',cost:12,m:[['S',1],['D',1]], how:'Steps to any of the 12 closest hexes (straight or diagonal).'},
- knight:   {name:'Knight',cost:15,  m:[['N']], how:'Leaps over anything to one of 12 jump spots, 3 hexes away.'},
- cavalry:  {name:'Cavalry',cost:18, m:[['S',8]], how:'Charges any distance in a straight line.'},
- mage:     {name:'Mage',cost:20,    m:[['D',8]], how:'Glides any distance along the 6 diagonals.'},
- catapult: {name:'Catapult',cost:22,m:[['S',1]], cat:true, how:'Rolls 1 hex. Attacks by flinging over exactly one piece in a straight line onto the first enemy behind it.'},
- king:     {name:'King',cost:25,    m:[['S',1]], royal:'call', how:'Steps 1 hex. ROYAL CALL: teleport any friendly piece next to the King.'},
- queen:    {name:'Queen',cost:35,   m:[['S',8],['D',8]], royal:'pass', how:'Slides any distance straight or diagonal. ROYAL PASSAGE: teleport to any empty hex on her own side.'},
- crossbow: {name:'Crossbowman',value:16,m:[['S',4],['D',1]], how:'Slides up to 4 straight, or 1 diagonal.'},
- rknight:  {name:'Royal Knight',value:30,m:[['N'],['S',1]], how:'Knight leaps, or steps 1 hex.'},
- archmage: {name:'Archmage',value:40,m:[['D',8],['S',1]], how:'Glides any distance diagonally, or steps 1 straight.'},
- warcav:   {name:'War Cavalry',value:36,m:[['S',8],['N']], how:'Charges any distance straight, or makes knight leaps.'},
- rguard:   {name:'Royal Guard',value:24,m:[['S',2],['D',1]], how:'Moves up to 2 straight, or 1 diagonal.'},
- marksman: {name:'Marksman',value:32,m:[['S',8],['D',2]], how:'Slides any distance straight, or up to 2 diagonal.'},
- grandmage:{name:'Grand Mage',value:80,m:[['D',8],['S',8]], how:'Glides any distance in all 12 directions.'},
- champion: {name:'Champion',value:60,m:[['N'],['S',2],['D',2]], how:'Knight leaps, or moves up to 2 in all 12 directions.'},
- protector:{name:'Royal Protector',value:48,m:[['S',2],['D',2]], how:'Moves up to 2 in all 12 directions.'}
+ soldier:  {name:'Soldier',cost:5,  m:[], pawn:true, how:'Moves 1 hex forward. Captures 1 hex diagonally forward.'},
+ archer:   {name:'Archer',cost:8,   m:[['S',3]], how:'Up to 3 hexes in any straight direction.'},
+ guard:    {name:'Heavy Guard',cost:12,m:[['S',1]], how:'1 hex in any of the 6 directions.'},
+ knight:   {name:'Knight',cost:15,  m:[['N']], how:'Jumps in an L-shaped hexagonal pattern, over anything in the way.'},
+ cavalry:  {name:'Cavalry',cost:18, m:[['S',3]], how:'Up to 3 hexes in any straight direction.'},
+ mage:     {name:'Mage',cost:20,    m:[['S',2],['D',2]], how:'Up to 2 hexes in any direction.'},
+ catapult: {name:'Catapult',cost:22,m:[['S',2]], cat:4, how:'Moves up to 2 hexes. Shoots enemies up to 4 hexes away in a straight line (needs a clear shot) without moving.'},
+ king:     {name:'King',cost:25,    m:[['S',1],['D',1]], royal:'call', how:'1 hex in any direction. ROYAL CALL: summon a friendly piece within 10 hexes to the King\'s side.'},
+ queen:    {name:'Queen',cost:35,   m:[['S',5],['D',5]], royal:'pass', how:'Up to 5 hexes in any direction. ROYAL PASSAGE: teleport to any empty hex on her own side.'},
+ crossbow: {name:'Crossbowman',value:16,m:[['S',4]], how:'Up to 4 hexes straight.'},
+ rknight:  {name:'Royal Knight',value:30,m:[['N'],['S',2]], how:'Knight jump, or up to 2 hexes straight.'},
+ archmage: {name:'Archmage',value:40,m:[['S',4],['D',4]], how:'Up to 4 hexes in any direction.'},
+ warcav:   {name:'War Cavalry',value:36,m:[['S',5]], how:'Up to 5 hexes straight.'},
+ rguard:   {name:'Royal Guard',value:24,m:[['S',2],['D',2]], how:'Up to 2 hexes in any direction.'},
+ marksman: {name:'Marksman',value:32,m:[['S',6]], how:'Up to 6 hexes straight.'},
+ grandmage:{name:'Grand Mage',value:80,m:[['S',5],['D',5]], how:'Up to 5 hexes in any direction.'},
+ champion: {name:'Champion',value:60,m:[['S',4],['D',4]], how:'Up to 4 hexes in any direction.'},
+ protector:{name:'Royal Protector',value:48,m:[['S',3],['D',3]], how:'Up to 3 hexes in any direction.'}
 };
 for(const k in U){U[k].value=U[k].value||U[k].cost;}
 const COMBO={soldier:'knight',archer:'crossbow',knight:'rknight',mage:'archmage',cavalry:'warcav',guard:'rguard',crossbow:'marksman',archmage:'grandmage',rknight:'champion',rguard:'protector'};
 const FROM={}; for(const a in COMBO)FROM[COMBO[a]]=a;
 const SHOP=['soldier','archer','guard','knight','cavalry','mage','catapult','king','queen'];
 const START_AP=200;
-const MAX_PIECES=18; // your side of the board has 18 hexes
+const MAX_PIECES=24; // your side of the board has 24 hexes
 
 // ---------- the hex board: 61 hexes, radius 4 ----------
 const DIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
 const DIAG=[[2,-1],[1,-2],[-1,-1],[-2,1],[-1,2],[1,1]];
 const KN=[[1,2],[2,1],[3,-1],[3,-2],[2,-3],[1,-3],[-1,-2],[-2,-1],[-3,1],[-3,2],[-2,3],[-1,3]];
 const HEX=[]; const IDX={};
-for(let r=-4;r<=4;r++)for(let q=-4;q<=4;q++){const s=-q-r; if(Math.abs(s)>4)continue; IDX[q+','+r]=HEX.length; HEX.push({q,r,x:128+26*(q+r/2),y:112+22*r});}
+for(let r=-4;r<=4;r++)for(let q=-4;q<=4;q++){const s=-q-r; if(Math.abs(s)>4)continue; IDX[q+','+r]=HEX.length; HEX.push({q,r,x:128+21*q,y:120+24.25*(r+q/2)});}
 const at=(q,r)=>{const i=IDX[q+','+r]; return i===undefined?-1:i;};
 const dist=(a,b)=>{const A=HEX[a],B=HEX[b];return (Math.abs(A.q-B.q)+Math.abs(A.r-B.r)+Math.abs(A.q+A.r-B.q-B.r))/2;};
-// Blue (player 0) owns the bottom 3 rows, Red (player 1) the top 3. The middle 3 rows are the neutral battlefield.
-const side=i=>HEX[i].r>=2?0:HEX[i].r<=-2?1:-1;
+// Hexes are flat on top, so every hex has one straight 'forward' neighbour.
+// Blue (player 0) owns the bottom 4 rows, Red (player 1) the top 4. The zigzag row in the middle is neutral.
+const lvl=i=>2*HEX[i].r+HEX[i].q; // -8 (top) .. 8 (bottom)
+const side=i=>lvl(i)>=2?0:lvl(i)<=-2?1:-1;
+// forward for Blue is up, for Red is down; FWD[o] = [straight, diag-left, diag-right]
+const FWD=[[[0,-1],[-1,0],[1,-1]],[[0,1],[1,0],[-1,1]]];
 const COLOR=['Blue','Red'];
 
 function addLand(cells,p,f,j,out){const c=cells[j];
@@ -230,14 +235,18 @@ function pieceMoves(cells,i,out,royal){
       for(let s=1;s<=n;s++){const j=at(h.q+d[0]*s,h.r+d[1]*s); if(j<0)break;
         if(!cells[j]){out.push({f:i,t:j});continue;}
         if(!u.cat)addLand(cells,p,i,j,out);
+        else if(cells[j].o===p.o&&cells[j].t===p.t&&COMBO[p.t])addLand(cells,p,i,j,out);
         break;}
     }
   }
-  if(u.cat){ // fling: over exactly one piece, onto first piece behind it if enemy
-    for(const d of DIRS){let screen=false;
-      for(let s=1;s<9;s++){const j=at(h.q+d[0]*s,h.r+d[1]*s); if(j<0)break; const c=cells[j]; if(!c)continue;
-        if(!screen){screen=true;continue;}
-        if(c.o!==p.o)out.push({f:i,t:j,cap:1,fling:1}); break;}
+  if(u.pawn){const F=FWD[p.o];
+    const j=at(h.q+F[0][0],h.r+F[0][1]); if(j>=0){const c=cells[j]; if(!c)out.push({f:i,t:j}); else if(c.o===p.o&&c.t===p.t)out.push({f:i,t:j,comb:1});}
+    for(const d of [F[1],F[2]]){const k=at(h.q+d[0],h.r+d[1]); if(k>=0&&cells[k]&&cells[k].o!==p.o)out.push({f:i,t:k,cap:1});}
+  }
+  if(u.cat){ // ranged shot: first piece in a straight line within range; if it's an enemy, it's hit
+    for(const d of DIRS){
+      for(let s=1;s<=u.cat;s++){const j=at(h.q+d[0]*s,h.r+d[1]*s); if(j<0)break; const c=cells[j]; if(!c)continue;
+        if(c.o!==p.o)out.push({f:i,t:j,cap:1,shot:1}); break;}
     }
   }
   if(!royal)return;
@@ -253,7 +262,7 @@ function pieceMoves(cells,i,out,royal){
     }
   }
 }
-function apply(cells,m){const n=cells.slice(); const p=n[m.f];
+function apply(cells,m){const n=cells.slice(); if(m.shot){n[m.t]=null; return n;} const p=n[m.f];
   n[m.t]=m.comb?{t:COMBO[p.t],o:p.o}:p; n[m.f]=null; return n;}
 function kingOf(cells,o){for(let i=0;i<61;i++){const c=cells[i]; if(c&&c.o===o&&c.t==='king')return i;} return -1;}
 function attacked(cells,sq,by){const out=[];
@@ -297,10 +306,10 @@ function aiRecruit(){const army={king:1}; let ap=START_AP-25;
   return army;}
 function autoPlace(cells,o,list){
   const spots=[]; for(let j=0;j<61;j++)if(side(j)===o&&!cells[j])spots.push(j);
-  const back=j=>o===0?HEX[j].r:-HEX[j].r; // 2 front, 4 back
+  const back=j=>o===0?lvl(j):-lvl(j); // bigger = further back
   const order=list.slice().sort((a,b)=>rank(b)-rank(a));
   function rank(t){return {king:9,queen:7,catapult:6,mage:5,archer:4,cavalry:4,guard:2,knight:3,soldier:0}[t]||1;}
-  for(const t of order){spots.sort((a,b)=>(rank(t)>=5?back(b)-back(a):back(a)-back(b))||(Math.abs(HEX[a].q+HEX[a].r/2)-Math.abs(HEX[b].q+HEX[b].r/2))+(Math.random()-.5)*2);
+  for(const t of order){spots.sort((a,b)=>(rank(t)>=5?back(b)-back(a):back(a)-back(b))||(Math.abs(HEX[a].q)-Math.abs(HEX[b].q))+(Math.random()-.5)*2);
     const j=spots.shift(); if(j!==undefined)cells[j]={t,o};}
 }
 
@@ -308,7 +317,7 @@ function autoPlace(cells,o,list){
 //  DRAWING THE BOARD (smooth, 4x resolution)
 // ================================================================
 const cv=document.getElementById('board'), ctx=cv.getContext('2d'); const SC=4; ctx.setTransform(SC,0,0,SC,0,0);
-function hexPath(x,y,s){s=s||1; ctx.beginPath(); for(let k=0;k<6;k++){const a=Math.PI/180*(60*k-90); ctx.lineTo(x+Math.cos(a)*15*s,y+Math.sin(a)*15*s);} ctx.closePath();}
+function hexPath(x,y,s){s=s||1; ctx.beginPath(); for(let k=0;k<6;k++){const a=Math.PI/180*(60*k); ctx.lineTo(x+Math.cos(a)*14*s,y+Math.sin(a)*14*s);} ctx.closePath();}
 const LAND={0:['#4f74b8','#2c4a85'],1:['#b85a4f','#7e3027'],'-1':['#6fa35d','#3f6e35']};
 function tileFill(i){const h=HEX[i], L=LAND[side(i)]; const g=ctx.createLinearGradient(h.x-10,h.y-14,h.x+10,h.y+14); g.addColorStop(0,L[0]); g.addColorStop(1,L[1]); return g;}
 function ring(i,col,w,s){const h=HEX[i]; hexPath(h.x,h.y,s||.86); ctx.lineWidth=w; ctx.strokeStyle=col; ctx.stroke();}
@@ -317,12 +326,12 @@ const PW=23, PH=27.6;
 function drawPiece(c,x,y,alpha,lift){
   ctx.globalAlpha=alpha==null?1:alpha; ctx.drawImage(sprite(c.t,c.o),x-PW/2,y-PH+7-(lift||0),PW,PH); ctx.globalAlpha=1;}
 function draw(now){
-  ctx.fillStyle='#14111f'; ctx.fillRect(0,0,256,224);
-  const bg=ctx.createRadialGradient(128,112,20,128,112,150); bg.addColorStop(0,'#2b2442'); bg.addColorStop(1,'#14111f'); ctx.fillStyle=bg; ctx.fillRect(0,0,256,224);
-  drawBanner(14,10,1); drawBanner(242,10,1); drawBanner(14,192,0); drawBanner(242,192,0);
+  ctx.fillStyle='#14111f'; ctx.fillRect(0,0,256,240);
+  const bg=ctx.createRadialGradient(128,120,20,128,120,160); bg.addColorStop(0,'#2b2442'); bg.addColorStop(1,'#14111f'); ctx.fillStyle=bg; ctx.fillRect(0,0,256,240);
+  drawBanner(14,12,1); drawBanner(242,12,1); drawBanner(14,206,0); drawBanner(242,206,0);
   // board rim
   ctx.save(); ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=8; ctx.shadowOffsetY=3;
-  ctx.beginPath(); for(let k=0;k<6;k++){const a=Math.PI/180*(60*k); ctx.lineTo(128+Math.cos(a)*126,112+Math.sin(a)*109);} ctx.closePath(); ctx.fillStyle='#3a2f22'; ctx.fill(); ctx.restore();
+  ctx.beginPath(); for(let k=0;k<6;k++){const a=Math.PI/180*(60*k-90); ctx.lineTo(128+Math.cos(a)*114,120+Math.sin(a)*114);} ctx.closePath(); ctx.fillStyle='#3a2f22'; ctx.fill(); ctx.restore();
   for(let i=0;i<61;i++){const h=HEX[i]; hexPath(h.x,h.y,.97); ctx.fillStyle=tileFill(i); ctx.fill(); ctx.lineWidth=.6; ctx.strokeStyle='rgba(20,14,30,.8)'; ctx.stroke();
     hexPath(h.x,h.y,.8); ctx.lineWidth=.5; ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.stroke();}
   if(G.last){ring(G.last.f,'rgba(255,255,255,.55)',1); ring(G.last.t,'rgba(255,255,255,.75)',1.2);}
@@ -339,6 +348,8 @@ function draw(now){
       else{const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2; drawPiece(c,a.x+(h.x-a.x)*e,a.y+(h.y-a.y)*e,1,Math.sin(k*Math.PI)*6);}
     } else drawPiece(c,h.x,h.y,1,lift);}
   G.anims=G.anims.filter(a=>now-a.start<a.dur);
+  if(G.proj){const P=G.proj, k=(now-P.start)/P.dur; if(k>=1)G.proj=null; else{const px=P.x0+(P.x1-P.x0)*k, py=P.y0+(P.y1-P.y0)*k-Math.sin(k*Math.PI)*22;
+    ctx.beginPath(); ctx.arc(px,py,2.8,0,7); ctx.fillStyle='#8d99a6'; ctx.fill(); ctx.lineWidth=.8; ctx.strokeStyle=INK; ctx.stroke();}}
   if(G.screen==='battle'){
     for(const m of G.moves){const hx=HEX[m.t]; const pulse=1+.12*Math.sin(now/200);
       if(m.cap){ctx.beginPath(); ctx.arc(hx.x,hx.y,11*pulse,0,Math.PI*2); ctx.lineWidth=1.8; ctx.strokeStyle='#ff4a4a'; ctx.stroke();}
@@ -356,12 +367,12 @@ function drawBanner(x,y,o){ctx.fillStyle='#c9b48a'; ctx.fillRect(x-.6,y,1.2,22);
   const s=x>128?-1:1; ctx.beginPath(); ctx.moveTo(x,y+1); ctx.quadraticCurveTo(x+s*7,y-1,x+s*13,y+2); ctx.lineTo(x+s*11,y+6); ctx.lineTo(x+s*13,y+10); ctx.quadraticCurveTo(x+s*7,y+8,x,y+10); ctx.closePath();
   ctx.fillStyle=TEAM[o].main; ctx.fill(); ctx.lineWidth=.6; ctx.strokeStyle=INK; ctx.stroke(); ctx.beginPath(); ctx.arc(x+s*5.5,y+5.5,2,0,7); ctx.fillStyle='#f2c14e'; ctx.fill();}
 function drawTitle(now){
-  ctx.fillStyle='rgba(20,17,31,.6)'; ctx.fillRect(0,0,256,224);
+  ctx.fillStyle='rgba(20,17,31,.6)'; ctx.fillRect(0,0,256,240);
   const parade=['soldier','archer','guard','knight','cavalry','mage','catapult','queen','king'];
-  parade.forEach((t,i)=>{const x=((now/40+i*28)%300)-22; drawPiece({t,o:0},x,180,1,Math.abs(Math.sin(now/200+i))*2);});
-  parade.forEach((t,i)=>{const x=256-(((now/40+i*28)%300)-22); drawPiece({t,o:1},x,62,1,Math.abs(Math.sin(now/200+i))*2);});
+  parade.forEach((t,i)=>{const x=((now/40+i*28)%300)-22; drawPiece({t,o:0},x,196,1,Math.abs(Math.sin(now/200+i))*2);});
+  parade.forEach((t,i)=>{const x=256-(((now/40+i*28)%300)-22); drawPiece({t,o:1},x,58,1,Math.abs(Math.sin(now/200+i))*2);});
   // big crown
-  const y=112+Math.sin(now/500)*2; ctx.save(); ctx.translate(128,y);
+  const y=124+Math.sin(now/500)*2; ctx.save(); ctx.translate(128,y);
   ctx.beginPath(); ctx.moveTo(-30,14); ctx.lineTo(-34,-16); ctx.lineTo(-16,-2); ctx.lineTo(0,-24); ctx.lineTo(16,-2); ctx.lineTo(34,-16); ctx.lineTo(30,14); ctx.closePath();
   const g=ctx.createLinearGradient(-34,0,34,0); g.addColorStop(0,'#fff3b8'); g.addColorStop(.4,'#f2c14e'); g.addColorStop(1,'#9a6b1c'); ctx.fillStyle=g; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle=INK; ctx.stroke();
   [[-34,-17],[0,-25],[34,-17]].forEach(([a,b])=>{ctx.beginPath(); ctx.arc(a,b,3,0,7); ctx.fillStyle='#fff3b8'; ctx.fill(); ctx.stroke();});
@@ -408,7 +419,7 @@ function recruitScreen(o){G.screen='recruit'; G.recruiting=o; panel.innerHTML=''
   const a=G.army[o]; const left=START_AP-spent(a); const pcs=Object.values(a).reduce((x,y)=>x+y,0);
   panel.append(h('div',{cls:'turn p'+o},(G.mode==='ai'?'RECRUIT YOUR ARMY':COLOR[o].toUpperCase()+': RECRUIT')),
     h('div',{cls:'ap'},left+' AP left'),h('div',{cls:'hint',style:'text-align:center'},pcs+' / '+MAX_PIECES+' pieces'),
-    h('p',{cls:'hint'},'Every army needs one King. The Queen is optional. Spend your 200 Army Points! You can have up to 18 pieces.'));
+    h('p',{cls:'hint'},'Every army needs one King. The Queen is optional. Spend your 200 Army Points! You can have up to 24 pieces.'));
   const shop=h('div',{cls:'shop'});
   for(const t of SHOP){const n=a[t]||0; const max=t==='king'||t==='queen'?1:99; const min=t==='king'?1:0;
     shop.append(h('div',{cls:'unit',title:U[t].how},spriteEl(t,o,40),h('div',{},h('div',{cls:'nm'},U[t].name),h('div',{cls:'ct'},U[t].cost+' AP')),
@@ -431,7 +442,7 @@ function deployPanel(){const o=G.placing; panel.innerHTML='';
   G.tray.forEach((t,i)=>{const b=h('button',{cls:i===G.trayPick?'sel':'',title:U[t].name,on:{click:()=>{G.trayPick=i;deployPanel();}}},spriteEl(t,o,36)); tray.append(b);});
   const sel=G.tray[G.trayPick];
   panel.append(h('div',{cls:'turn p'+o},(G.mode==='ai'?'PLACE YOUR ARMY':COLOR[o].toUpperCase()+': PLACE ARMY')),
-    h('p',{cls:'hint'},'Pick a piece, then tap a glowing hex in your territory ('+(o===0?'bottom':'top')+' 3 rows). Tap a placed piece to pick it back up.'),
+    h('p',{cls:'hint'},'Pick a piece, then tap a glowing hex in your territory ('+(o===0?'bottom':'top')+' 4 rows). Tap a placed piece to pick it back up.'),
     tray.childNodes.length?tray:h('p',{},'All pieces placed!'),
     sel?infoBox(sel,o):'',
     h('div',{cls:'row'},btn('AUTO-PLACE',()=>{autoPlace(G.cells,o,G.tray); G.tray=[]; G.trayPick=-1; SFX.move(); deployPanel();},'alt'),
@@ -456,7 +467,7 @@ function battlePanel(){panel.innerHTML=''; const o=G.turn; const sel=G.sel>=0?G.
   if(sel&&sel.t==='king'&&sel.o===o&&!G.over&&!(G.mode==='ai'&&o===1)){
     panel.append(h('div',{cls:'row'},btn(G.callMode?'CANCEL CALL':'👑 ROYAL CALL',()=>{G.callMode=!G.callMode; G.callPick=-1; refreshMoves(); battlePanel();},G.callMode?'alt':'')),
       h('p',{cls:'hint'},G.callMode?(G.callPick<0?'Tap any friendly piece to summon it.':'Now tap a blue-dot hex next to the King.'):'Summon a friendly piece to the King\'s side.'));}
-  const legend=h('div',{cls:'hint'},'Markers: dot = move · red X = capture · star = combine · blue = Royal Call · pink = Royal Passage');
+  const legend=h('div',{cls:'hint'},'Markers: dot = move · red ring = capture · star = combine · blue = Royal Call · pink = Royal Passage');
   panel.append(legend);
   const lg=h('div',{id:'log'}); G.log.forEach(([t,c])=>lg.append(h('div',{cls:c||''},t))); panel.append(lg); setTimeout(()=>lg.scrollTop=1e6);
   panel.append(h('div',{cls:'row'},btn('UNIT GUIDE',guideCard,'alt'),btn('RULES',rulesCard,'alt'),btn('MENU',()=>confirmCard('Quit this battle?',titleScreen),'alt')));
@@ -471,12 +482,13 @@ function refreshMoves(){G.moves=[]; if(G.screen!=='battle'||G.sel<0||G.over)retu
 function name(c){return U[c.t].name;}
 function doMove(m){const p=G.cells[m.f], target=G.cells[m.t]; const who=COLOR[p.o];
   const a={t:m.t,x:HEX[m.f].x,y:HEX[m.f].y,start:performance.now(),dur:m.call!=null||m.pass?450:260,tele:m.call!=null||m.pass};
-  G.cells=apply(G.cells,m); G.anims=[a]; G.last={f:m.f,t:m.t};
+  G.cells=apply(G.cells,m); G.anims=m.shot?[]:[a]; G.last={f:m.f,t:m.t};
+  if(m.shot){a.dur=420; G.proj={x0:HEX[m.f].x,y0:HEX[m.f].y-10,x1:HEX[m.t].x,y1:HEX[m.t].y-4,start:a.start,dur:a.dur};}
   const cls=p.o?'r':'b';
   if(m.call!=null)log(who+' King uses ROYAL CALL: '+name(p)+' teleports!',cls);
   else if(m.pass)log(who+' Queen uses ROYAL PASSAGE!',cls);
   if(m.comb){const n=G.cells[m.t]; log(who+': 2 '+name(p)+'s combine into a '+name(n)+'!','g'); setTimeout(()=>{burst(m.t,['#f2c14e','#fff','#ffe08a'],24);SFX.comb();showBanner(name(n).toUpperCase()+'!',1100);},a.dur);}
-  else if(m.cap){log(who+' '+name(p)+(m.fling?' flings a boulder at ':' captures ')+COLOR[target.o]+' '+name(target)+'!',cls); setTimeout(()=>{burst(m.t,[TEAM[target.o].main,TEAM[target.o].hi,'#fff']);SFX.cap();},a.dur*.8);}
+  else if(m.cap){log(who+' '+name(p)+(m.shot?' fires a boulder at ':' captures ')+COLOR[target.o]+' '+name(target)+'!',cls); setTimeout(()=>{burst(m.t,[TEAM[target.o].main,TEAM[target.o].hi,'#fff']);SFX.cap();},a.dur*.8);}
   else if(m.call==null&&!m.pass)log(who+' '+name(p)+' moves.',cls);
   if(m.call!=null||m.pass)SFX.magic(); else if(!m.cap&&!m.comb)SFX.move();
   G.sel=-1; G.moves=[]; G.callMode=false; G.callPick=-1;
@@ -499,8 +511,8 @@ function maybeAI(){if(G.over||G.mode!=='ai'||G.turn!==1)return; G.busy=true;
   setTimeout(()=>{const m=aiChoose(G.cells,1,G.level); G.busy=false; if(m)doMove(m);},550);}
 
 // ---------- input ----------
-function hexAt(ev){const r=cv.getBoundingClientRect(); const x=(ev.clientX-r.left)/r.width*256, y=(ev.clientY-r.top)/r.height*224;
-  let best=-1,bd=1e9; for(let i=0;i<61;i++){const d=(HEX[i].x-x)**2+((HEX[i].y-y)*1.15)**2; if(d<bd){bd=d;best=i;}} return bd<15*15?best:-1;}
+function hexAt(ev){const r=cv.getBoundingClientRect(); const x=(ev.clientX-r.left)/r.width*256, y=(ev.clientY-r.top)/r.height*240;
+  let best=-1,bd=1e9; for(let i=0;i<61;i++){const d=(HEX[i].x-x)**2+(HEX[i].y-y)**2; if(d<bd){bd=d;best=i;}} return bd<14*14?best:-1;}
 cv.addEventListener('pointermove',e=>{G.hover=hexAt(e);});
 cv.addEventListener('pointerleave',()=>{G.hover=-1;});
 cv.addEventListener('click',e=>{const i=hexAt(e); if(i<0)return;
@@ -526,10 +538,10 @@ function guideCard(){const g=h('div',{cls:'guide'});
   openCard([h('h2',{},'UNIT GUIDE'),g,h('div',{cls:'row',style:'justify-content:center'},btn('CLOSE',closeCard,'alt'))]);}
 function rulesCard(){const combos=h('ul',{}); for(const a in COMBO)combos.append(h('li',{},'2 '+U[a].name+'s → '+U[COMBO[a]].name));
   openCard([h('h2',{},'HOW TO PLAY'),
-    h('h3',{},'1. The board'),h('p',{},'61 hexagons. Blue owns the bottom 3 rows, Red owns the top 3 rows, and the green middle is the neutral battlefield. Pieces move in 6 straight directions (and some along the 6 diagonals between them).'),
-    h('h3',{},'2. Recruit'),h('p',{},'Each player has 200 Army Points and can have up to 18 pieces. You must buy 1 King (25 AP). The Queen (35 AP) is optional. Then place your army in your own 3 rows.'),
-    h('h3',{},'3. Take turns'),h('p',{},'Blue goes first. On your turn, move one piece. Land on an enemy to capture it, chess-style. No dice, no health: a capture is a capture! You can never make a move that leaves your own King under attack.'),
-    h('h3',{},'4. Royal abilities'),h('p',{},'KING · ROYAL CALL: instead of moving, summon any friendly piece within 10 hexes. It teleports right next to the King (or onto a matching piece to combine).'),
+    h('h3',{},'1. The board'),h('p',{},'61 hexagons. Blue owns the bottom 4 rows, Red owns the top 4 rows, and the green zigzag row in the middle is the neutral battlefield. "Straight" means the 6 directions to the hexes touching yours. "Any direction" adds the 6 diagonals in between (12 lines). Pieces cannot move through other pieces, except the Knight, who jumps.'),
+    h('h3',{},'2. Recruit'),h('p',{},'Each player has 200 Army Points and can have up to 24 pieces. You must buy 1 King (25 AP). The Queen (35 AP) is optional (only 1 allowed). Then place your army in your own 4 rows.'),
+    h('h3',{},'3. Take turns'),h('p',{},'Blue goes first. On your turn, move one piece. Land on an enemy to capture it, chess-style (the Catapult can also shoot from a distance). No dice, no health: a capture is a capture! You can never make a move that leaves your own King under attack.'),
+    h('h3',{},'4. Royal abilities'),h('p',{},'KING · ROYAL CALL: instead of moving, summon any friendly piece within 10 hexes. It teleports right next to the King. If it lands on a matching friendly piece there, they combine!'),
       h('p',{},'QUEEN · ROYAL PASSAGE: the Queen can teleport to any empty hex on her own side. Never into enemy land, never onto a piece.'),
     h('h3',{},'5. Combine (free!)'),h('p',{},'Move a piece onto a friendly piece of the same type and they fuse into a stronger warrior:'),combos,
     h('h3',{},'6. Winning'),h('p',{},'TOTAL CONQUEST: capture every enemy piece except the King, who is left alone. ROYAL CHECKMATE: attack the enemy King so it has no legal escape.'),
