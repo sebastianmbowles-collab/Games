@@ -27,7 +27,7 @@ export const G = {
   mode: 'title', D: DIFF.normal, time: 0, hour: 0, wakeAt: [], over: false, fear: 0, rustle: 0, introDone: false, secret: false,
   caught: (who) => caught(who), trip: (m) => trip(m), scare: (k) => { C.fx.glitch = Math.max(C.fx.glitch, k); }, blackout: (d, cb) => blackout(d, cb),
 };
-let hands, titleT = 0, seq = null;
+let hands, titleT = 0, seq = null, scareLight;
 const $ = id => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('on', on);
 let hintT = 0;
@@ -39,6 +39,7 @@ function blackout(d, cb) { C.fx.fade = 1; setTimeout(() => { cb && cb(); C.fx.fa
 export function initGame() {
   buildVillains();
   hands = makeHands(); C.camera.add(hands.root);
+  scareLight = new THREE.PointLight(0xffe2d0, 0, 5, 1.5); scareLight.position.set(0, 0.25, 0.1); C.camera.add(scareLight);
   resetVillains(G);
   setVolume(SET.volume);
   initMenus();
@@ -282,9 +283,10 @@ async function caught(who) {
       const at = cam.position.clone().add(fwd.clone().multiplyScalar(dist));
       if (who === 'pages') {
         pg.m.setCreepy(true);
-        pg.m.root.position.set(at.x + sh, at.y - 1.95 + sh, at.z);
-        pg.m.root.rotation.y = Math.atan2(cam.position.x - at.x, cam.position.z - at.z);
-        pg.m.animate(0.016, 0, C.t, 1);
+        const pd = cam.position.clone().add(fwd.clone().setY(0).normalize().multiplyScalar(0.55 + dist * 0.45));
+        pg.m.root.position.set(pd.x + sh, cam.position.y - 1.6 + sh, pd.z);
+        pg.m.root.rotation.y = Math.atan2(cam.position.x - pd.x, cam.position.z - pd.z);
+        pg.m.animate(0.016, 0, C.t, 0.25 + k * 0.2);
       } else if (who === 'worm') {
         const w = V.worm.m; w.root.visible = true;
         w.segs.forEach((s, i) => s.position.copy(cam.position).add(fwd.clone().multiplyScalar(dist + i * 0.45)).add(new THREE.Vector3(sh, sh - 0.15, 0)));
@@ -299,11 +301,13 @@ async function caught(who) {
         m.m.animate(C.t, 2, 1.2);
       }
       cam.position.x += sh * 0.3;
+      scareLight.intensity = 4 + Math.random() * 4;
       C.fx.red = 0.25 + Math.random() * 0.2; C.fx.glitch = 1; C.fx.flash = k < 0.08 ? 0.5 : 0;
       if (k < 1) requestAnimationFrame(anim); else res();
     };
     anim();
   });
+  scareLight.intensity = 0;
   C.fx.fade = 1; C.fx.red = 0; C.fx.flash = 0; ambience(false);
   await wait(500); if (seq !== run) return;
   if (who !== 'pages') await runMinigame(who);

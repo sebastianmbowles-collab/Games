@@ -278,7 +278,7 @@ function addAtrium() {
   }
   g.position.set(cx, cy, cz); C.scene.add(g); WLD.chandelier = g;
   // moonlight pouring through a skylight
-  const sky = new THREE.Mesh(plane(6, 3), new THREE.MeshBasicMaterial({ color: 0x5a6a90, fog: false }));
+  const sky = new THREE.Mesh(plane(6, 3), new THREE.MeshBasicMaterial({ color: 0x2a3450, fog: false }));
   sky.rotation.x = Math.PI / 2; sky.position.set(cx, FLOOR_H * 2 - 0.02, cz); C.scene.add(sky); WLD.skylight = sky;
 
 }
@@ -318,5 +318,5 @@ export function sunrise(k) {
   WLD.moon.color.setRGB(0.4 + k * 0.6, 0.5 + k * 0.35, 0.75 - k * 0.2); WLD.moon.intensity = 0.25 + k * 2.5;
   C.scene.fog.density = 0.045 - k * 0.03;
   C.scene.fog.color.setRGB(0.01 + k * 0.25, 0.015 + k * 0.18, 0.02 + k * 0.1);
-  WLD.skylight.material.color.setRGB(0.35 + k, 0.41 + k * 0.7, 0.56 + k * 0.2);
+  WLD.skylight.material.color.setRGB(0.16 + k * 1.2, 0.2 + k * 0.9, 0.31 + k * 0.4);
 }

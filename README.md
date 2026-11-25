@@ -51,3 +51,21 @@ Private Shelly, a white egg, fights in Egg War III to win back the Golden Egg fr
 
 Supplies built in the factory carry into the other modes. Voice lines are listed in `EggshellVoiceScript.md`; recordings go in a `voices/` folder.
 Source lives in `src/eggshell/`; rebuild the file with `sh src/eggshell/build.sh`.
+
+## OVERDUE
+
+`Overdue.html` is a first-person 3D horror game, all in one file. Open it in any browser on a computer or phone (headphones recommended).
+You fell asleep reading and got locked in the library. Survive one night, from 12 AM to 6 AM (5 minutes), with only a flashlight whose battery never refills.
+
+| Villain | What it does | If it catches you |
+|---|---|---|
+| Mr. Pages | Stands on his podium until you look away. Sees and hears you, can't climb stairs, checks hiding spots he saw you use | Jump scare |
+| The Bookworm | Shoots down a hallway, again and again, if you stay in it too long. Crouch! | Creepy Snake mini game |
+| The Book Bats | Swarm your flashlight | Flappy Flight mini game |
+| The Bookmarks | Slither after you and trip you; mash to break free | Find the Page mini game |
+
+The extra villains wake up one by one, in a random order each game. Hide under desks, in cabinets and in shelf gaps, but after 20 seconds you start breathing loudly. Difficulty: Easy, Normal or Nightmare. Controls: WASD + mouse, arrow keys, or an on-screen joystick (pick in Settings); a game controller works too.
+The mini games tell the library's story, and there's a secret password for the computer lab.
+
+All 36 voice lines were made by Claude (`src/overdue/voices/`, script in `OverdueVoiceScript.md`, listen to `Overdue_Voice_Reel.mp3`).
+Source lives in `src/overdue/` and `od.html`; rebuild the file with `npm run build:od`.
