@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>OVERDUE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=VT323&family=Special+Elite&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#e8e0c8;--dim:#8a8270;--red:#d8261a;--bg:#000;--vhs:'VT323','Courier New',monospace;--scary:'Creepster','Special Elite',Georgia,serif;--type:'Special Elite','Courier New',monospace}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;font-family:var(--type)}
+#gl{position:fixed;inset:0;display:block}
+.ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:16px;z-index:20}
+.ov.on{display:flex}
+button{font:24px var(--vhs);color:var(--ink);background:rgba(20,10,8,.75);border:1px solid rgba(232,224,200,.35);padding:8px 22px;margin:5px;min-width:220px;cursor:pointer;letter-spacing:2px;touch-action:manipulation}
+button:hover,button:focus-visible{background:rgba(120,20,14,.8);border-color:var(--red);outline:none}
+button.sel{background:rgba(140,24,16,.85);border-color:#ff5a4a}
+.row{display:flex;flex-wrap:wrap;justify-content:center;gap:4px}
+.row button{min-width:0;font-size:20px;padding:6px 12px}
+
+/* title */
+#title{justify-content:flex-end;padding-bottom:6vh;background:linear-gradient(transparent 40%,rgba(0,0,0,.85))}
+@media (min-aspect-ratio:5/4){#title{justify-content:center;align-items:flex-start;padding-left:7vw;background:linear-gradient(90deg,rgba(0,0,0,.85),transparent 60%)}#title .row{justify-content:flex-start}#logo{font-size:clamp(64px,10vw,140px)}}
+#logo{font:clamp(64px,15vw,150px) var(--scary);color:var(--red);letter-spacing:4px;text-shadow:0 0 18px #000,0 0 40px rgba(200,20,10,.5);margin:0;line-height:.9;animation:twitch 7s infinite}
+@keyframes twitch{0%,96%,100%{transform:none}97%{transform:translate(3px,-2px) skewX(6deg)}98%{transform:translate(-4px,1px)}}
+#tag{font:20px var(--vhs);color:var(--dim);letter-spacing:3px;margin:4px 0 14px}
+.small{font:18px var(--vhs);color:var(--dim)}
+#how .box,#settings .box{background:rgba(8,5,4,.92);border:1px solid rgba(232,224,200,.25);padding:18px 22px;max-width:640px;max-height:86vh;overflow:auto;text-align:left;font:20px/1.35 var(--vhs)}
+#how h2,#settings h2,#pause h2{font:44px var(--scary);color:var(--red);margin:0 0 8px;text-align:center}
+#how b{color:#ffcf8a}
+label{display:block;margin:12px 0 4px;color:#ffcf8a}
+input[type=range]{width:100%}
+
+/* HUD */
+#hud{position:fixed;inset:0;pointer-events:none;display:none;z-index:5;font-family:var(--vhs)}
+body.playing #hud{display:block}
+#vhs{position:absolute;left:max(16px,env(safe-area-inset-left));top:12px;font-size:30px;color:#fff;text-shadow:2px 0 #f0f,-2px 0 #0ff;letter-spacing:2px}
+#vhs span{animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+#clock{position:absolute;right:max(16px,env(safe-area-inset-right));top:12px;font-size:34px;color:#fff;text-shadow:2px 0 #f0f,-2px 0 #0ff;text-align:right}
+#clock small{display:block;font-size:18px;color:#ccc}
+#bars{position:absolute;left:max(16px,env(safe-area-inset-left));top:52px;width:150px;font-size:16px}
+.bar{height:8px;border:1px solid rgba(255,255,255,.6);margin:2px 0 6px;background:rgba(0,0,0,.4)}
+.bar i{display:block;height:100%;background:#e8e0c8}
+#battBar i{background:#ffe07a}
+#battBar.low i{background:#ff4a2a;animation:blink .5s steps(1) infinite}
+#stamW{transition:opacity .4s}
+#cross{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:rgba(255,255,255,.5)}
+#prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:26px;color:#fff;text-shadow:0 0 6px #000;white-space:nowrap}
+#hint{position:absolute;left:50%;top:20%;transform:translateX(-50%);font-size:clamp(22px,4vw,32px);color:#fff;text-shadow:0 0 8px #000,0 0 3px #000;text-align:center;width:90%;transition:opacity .6s;opacity:0}
+#hint.on{opacity:1}
+#sub{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:88%;font:clamp(18px,3.2vw,26px)/1.25 var(--vhs);background:rgba(0,0,0,.7);padding:4px 14px;color:#fff;opacity:0;transition:opacity .3s;z-index:40;pointer-events:none;text-align:center}
+#sub.on{opacity:1}
+#sub b{color:#ffcf8a}
+#bigText{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:clamp(28px,6vw,60px) var(--type);color:#fff;text-shadow:0 0 12px #000;opacity:0;transition:opacity 1.2s;pointer-events:none;z-index:30;text-align:center;padding:16px;white-space:pre-line}
+#bigText.on{opacity:1}
+
+/* hiding views */
+#hideov{position:fixed;inset:0;pointer-events:none;z-index:4;display:none}
+body[data-hide] #hideov{display:block}
+body[data-hide=cabinet] #hideov{background:repeating-linear-gradient(#000 0 18px,transparent 18px 30px);-webkit-mask:radial-gradient(ellipse 70% 60% at 50% 50%,#000 40%,#000 100%)}
+body[data-hide=gap] #hideov{background:linear-gradient(90deg,#120a05 0 34%,transparent 40% 60%,#120a05 66% 100%)}
+body[data-hide=desk] #hideov{background:linear-gradient(#1a0f08 0 22%,transparent 26%)}
+#hideT{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);font:22px var(--vhs);color:#fff;text-shadow:0 0 4px #000}
+
+/* struggle */
+#mash{position:fixed;left:50%;top:62%;transform:translateX(-50%);display:none;text-align:center;font:30px var(--vhs);color:#fff;z-index:12;text-shadow:0 0 6px #000;pointer-events:none}
+#mash.on{display:block;animation:shake .1s infinite}
+@keyframes shake{50%{transform:translate(-50%,2px)}}
+#mash .bar{width:220px;height:14px;margin:6px auto}
+#mash .bar i{background:#ff5a3a}
+
+/* touch controls */
+#touch{position:fixed;inset:0;z-index:6;display:none}
+body.playing.touchUI #touch{display:block}
+#lookpad{position:absolute;right:0;top:0;width:58%;height:100%}
+#stick{position:absolute;left:max(24px,env(safe-area-inset-left));bottom:calc(30px + env(safe-area-inset-bottom));width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.3)}
+#nub{position:absolute;left:39px;top:39px;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.3);pointer-events:none}
+.tb{position:absolute;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.4);color:#fff;font:18px var(--vhs);display:flex;align-items:center;justify-content:center;text-align:center;line-height:1}
+.tb.down{background:rgba(200,40,30,.45)}
+.tb.hot{border-color:#ffcf8a;background:rgba(255,200,120,.25)}
+#bUse{right:calc(20px + env(safe-area-inset-right));bottom:calc(110px + env(safe-area-inset-bottom));width:84px;height:84px;font-size:20px}
+#bRun{right:calc(116px + env(safe-area-inset-right));bottom:calc(28px + env(safe-area-inset-bottom))}
+#bCrouch{right:calc(20px + env(safe-area-inset-right));bottom:calc(24px + env(safe-area-inset-bottom))}
+#bLight{right:calc(116px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom))}
+#bPause{right:calc(16px + env(safe-area-inset-right));top:62px;width:48px;height:48px;font-size:22px}
+.tb.on{background:rgba(255,224,122,.35)}
+
+/* dead / credits */
+#dead h1,#credits h1{font:clamp(48px,10vw,96px) var(--scary);color:var(--red);margin:0;text-shadow:0 0 20px rgba(0,0,0,.9)}
+#deadTip{font:22px var(--vhs);color:#ffcf8a;margin:10px 0 18px;max-width:560px}
+#credits p{font:22px var(--vhs);color:var(--dim);margin:6px}
+
+/* the secret computer */
+#comp{background:rgba(0,0,0,.6)}
+#comp .scr{background:#021006;border:3px solid #3a3a30;box-shadow:0 0 40px rgba(60,255,120,.25) inset;width:min(560px,94vw);padding:18px;text-align:left;font:24px var(--vhs);color:#7dff9a;text-shadow:0 0 6px #3f8}
+#comp input{font:26px var(--vhs);background:transparent;color:#7dff9a;border:none;border-bottom:2px solid #7dff9a;outline:none;width:100%;text-transform:uppercase;letter-spacing:3px}
+#compOut{min-height:60px;margin-top:10px;white-space:pre-line}
+#compOut.secret{font:clamp(30px,7vw,54px) var(--scary);color:#ff3a2a;text-shadow:0 0 14px #f00;animation:twitch 1.2s infinite}
+
+/* mini games */
+#mg{display:none;position:fixed;inset:0;z-index:35;background:#000;align-items:center;justify-content:center;flex-direction:column}
+#mg.on{display:flex}
+#mgc{width:min(96vw,calc(82vh*4/3));image-rendering:pixelated;border-radius:18px/14px;box-shadow:0 0 60px rgba(120,255,160,.12);filter:contrast(1.15) saturate(1.1)}
+#mgpad{display:none;margin-top:8px;gap:6px}
+body.touchUI[data-mg=worm] #mgpad{display:flex}
+#mgpad button{min-width:64px;font-size:26px;padding:10px}
+#mgskip{position:absolute;right:12px;top:12px;min-width:0;font-size:16px;opacity:.6}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="hideov"><div id="hideT"></div></div>
+<div id="hud">
+  <div id="vhs">PLAY <span>&#9654;</span></div>
+  <div id="clock">12:00 AM<small>NIGHT</small></div>
+  <div id="bars">
+    <div>LIGHT</div><div class="bar" id="battBar"><i></i></div>
+    <div id="stamW"><div>STAMINA</div><div class="bar" id="stamBar"><i></i></div></div>
+  </div>
+  <div id="cross"></div>
+  <div id="prompt"></div>
+  <div id="hint"></div>
+</div>
+<div id="touch">
+  <div id="lookpad"></div>
+  <div id="stick"><div id="nub"></div></div>
+  <div class="tb" id="bUse">HIDE</div>
+  <div class="tb" id="bRun">RUN</div>
+  <div class="tb" id="bCrouch">DUCK</div>
+  <div class="tb" id="bLight">LIGHT</div>
+  <div class="tb" id="bPause">II</div>
+</div>
+<div id="mash">BREAK FREE!<div class="bar"><i></i></div><span id="mashKey">MASH SPACE / E</span></div>
+<div id="sub"></div>
+<div id="bigText"></div>
+
+<div class="ov on" id="title">
+  <h1 id="logo">OVERDUE</h1>
+  <div id="tag">SURVIVE THE NIGHT IN THE LIBRARY</div>
+  <button id="btnPlay">PLAY</button>
+  <div class="row" id="diffRow">
+    <button data-diff="easy">EASY</button><button data-diff="normal">NORMAL</button><button data-diff="nightmare">NIGHTMARE</button>
+  </div>
+  <button id="btnHow">HOW TO PLAY</button>
+  <button id="btnSet">SETTINGS</button>
+  <div class="small" style="margin-top:8px">Headphones recommended. Very scary.</div>
+</div>
+
+<div class="ov" id="how"><div class="box">
+  <h2>HOW TO PLAY</h2>
+  You fell asleep reading and got <b>locked in the library</b>. Survive from <b>12 AM to 6 AM</b> (5 minutes).<br><br>
+  <b>MR. PAGES</b> stands on his podium... until you look away. He <b>sees</b> and <b>hears</b> you. Running is loud. He can't climb stairs. If he sees you hide, he'll check that spot!<br>
+  <b>THE BOOKWORM</b> shoots down hallways if you stay in one too long. <b>Crouch</b> in hallways!<br>
+  <b>THE BOOK BATS</b> swarm your flashlight. Turn it off to lose them.<br>
+  <b>THE BOOKMARKS</b> trip you. Mash to break free!<br>
+  Your flashlight battery <b>never refills</b>. Hide under desks, in cabinets and in shelf gaps, but after <b>20 seconds</b> you start breathing loudly.<br><br>
+  <b>KEYS:</b> WASD move &middot; Mouse look &middot; Shift run &middot; C crouch &middot; F flashlight &middot; E hide/use &middot; Esc pause<br>
+  <b>ARROWS mode:</b> &uarr;&darr; walk &middot; &larr;&rarr; turn &middot; , . sidestep<br>
+  <b>PHONE:</b> left joystick &middot; swipe right side to look &middot; buttons<br><br>
+  <i>Some say the computer lab still remembers a password...</i>
+  <div style="text-align:center;margin-top:10px"><button data-back>BACK</button></div>
+</div></div>
+
+<div class="ov" id="settings"><div class="box">
+  <h2>SETTINGS</h2>
+  <label>CONTROLS</label>
+  <div class="row" id="schemeRow"><button data-scheme="wasd">WASD + MOUSE</button><button data-scheme="arrows">ARROW KEYS</button><button data-scheme="joystick">JOYSTICK</button></div>
+  <label for="vol">VOLUME</label><input type="range" id="vol" min="0" max="1" step="0.05">
+  <label for="sens">LOOK SENSITIVITY</label><input type="range" id="sens" min="0.3" max="2.5" step="0.05">
+  <div class="small" style="margin-top:8px">A game controller works in every mode.</div>
+  <div style="text-align:center;margin-top:12px"><button data-back>BACK</button></div>
+</div></div>
+
+<div class="ov" id="pause">
+  <h2>PAUSED</h2>
+  <button id="btnResume">RESUME</button>
+  <button id="btnPSet">SETTINGS</button>
+  <button id="btnQuit">QUIT TO MENU</button>
+</div>
+
+<div class="ov" id="dead">
+  <h1 id="deadTitle">CAUGHT</h1>
+  <div id="deadTip"></div>
+  <button id="btnRetry">TRY AGAIN</button>
+  <button id="btnMenu">MENU</button>
+</div>
+
+<div class="ov" id="credits">
+  <h1>THE END...?</h1>
+  <p>OVERDUE</p>
+  <p>Designed in 100 questions</p>
+  <p>Built by Claude</p>
+  <p id="credSecret"></p>
+  <button id="btnAgain">PLAY AGAIN</button>
+  <button id="btnMenu2">MENU</button>
+</div>
+
+<div class="ov" id="comp"><div class="scr">
+  MIDNIGHT LIBRARY SYSTEM v1.0<br>ENTER PASSWORD:
+  <form id="compForm" autocomplete="off"><input id="compIn" maxlength="16" spellcheck="false" autocapitalize="characters"></form>
+  <div id="compOut"></div>
+  <div style="text-align:right"><button id="compClose" style="min-width:0;font-size:18px">LOG OFF</button></div>
+</div></div>
+
+<div id="mg"><canvas id="mgc"></canvas>
+  <div id="mgpad"><button data-d="l">&larr;</button><button data-d="u">&uarr;</button><button data-d="d">&darr;</button><button data-d="r">&rarr;</button></div>
+  <button id="mgskip">SKIP</button>
+</div>
+
+<script type="module" src="/src/overdue/main.js"></script>
+</body>
+</html>

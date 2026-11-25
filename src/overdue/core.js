@@ -33,7 +33,7 @@ void main(){
   col.r = samp(uv + vec2(ca,0.0)).r;
   col.g = samp(uv).g;
   col.b = samp(uv - vec2(ca*1.4,0.0)).b;
-  col = aces(col*1.15);
+  col = aces(col*1.75);
   col = pow(col, vec3(1.0/2.2));
   // VHS colour: a little washed out, slightly blue-green
   float lum = dot(col, vec3(0.299,0.587,0.114));
@@ -55,12 +55,12 @@ void main(){
 export function initCore(canvas) {
   const r = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   r.shadowMap.enabled = true;
-  r.shadowMap.type = THREE.PCFSoftShadowMap;
+  r.shadowMap.type = THREE.PCFShadowMap;
   r.toneMapping = THREE.NoToneMapping;
   C.renderer = r;
   C.scene = new THREE.Scene();
   C.scene.background = new THREE.Color(0x020304);
-  C.scene.fog = new THREE.FogExp2(0x030405, 0.06);
+  C.scene.fog = new THREE.FogExp2(0x030405, 0.045);
   C.camera = new THREE.PerspectiveCamera(72, 1, 0.05, 120);
   C.scene.add(C.camera);
   rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthBuffer: true });
