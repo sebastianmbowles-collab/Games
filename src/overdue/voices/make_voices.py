@@ -86,25 +86,28 @@ SPEAKER = 'highpass=f=320,lowpass=f=3400,acrusher=bits=10:mix=0.25,aecho=0.8:0.6
 ROOM = 'aecho=0.8:0.7:90|260:0.3|0.18'
 PAGES = 'rms'
 
-# ---------------- MR. PAGES ----------------
-a = speak('Storytime!', PAGES, tmp('i1'), pitch=1.45, tempo=1.1)
-b = speak('starts', PAGES, tmp('i2'), pitch=0.82, tempo=0.6)
-c = speak('NOW!', PAGES, tmp('i3'), pitch=0.48, tempo=0.55, fx='volume=1.8,acrusher=bits=8:mix=0.35')
+# ---------------- MR. PAGES: grandpa storyteller voice, at the old robot voice's speed ----------------
+LIB = 'en_US-libritts_r-medium'
+def gp(text, path, pitch=1.0, tempo=1.0, fx=''):
+    return piper(LIB, text, path, sid=135, speed=tempo, pitch=0.95 * pitch, fx=fx)
+a = gp('Storytime!', tmp('i1'), pitch=1.45, tempo=1.1)
+b = gp('starts...', tmp('i2'), pitch=0.82, tempo=0.6)
+c = gp('NOW!', tmp('i3'), pitch=0.48, tempo=0.55, fx='volume=1.8,acrusher=bits=8:mix=0.35')
 intro = concat([a, silence(0.55, 's1'), b, silence(0.75, 's2'), c, silence(1.2, 's3')], tmp('intro'))
 ff('-i', intro, '-af', SPEAKER, tmp('intro_fx'))
 mp3(tmp('intro_fx'), 'pages_intro')
 
-mp3(speak('heh heh heh', PAGES, tmp('l1'), pitch=0.58, tempo=0.85, fx=ROOM), 'pages_laugh1')
-mp3(speak('hm hm hm hm', PAGES, tmp('l2'), pitch=0.55, tempo=0.9, fx=ROOM), 'pages_laugh2')
-h1 = speak('ha', PAGES, tmp('h1'), pitch=0.72, tempo=0.7)
-h2 = speak('ha', PAGES, tmp('h2'), pitch=0.56, tempo=0.65)
-h3 = speak('ha', PAGES, tmp('h3'), pitch=0.42, tempo=0.6)
+mp3(gp('Heh heh heh...', tmp('l1'), pitch=0.6, tempo=0.85, fx=ROOM), 'pages_laugh1')
+mp3(gp('Hm hm hm hm...', tmp('l2'), pitch=0.58, tempo=0.9, fx=ROOM), 'pages_laugh2')
+h1 = gp('Ha.', tmp('h1'), pitch=0.72, tempo=0.7)
+h2 = gp('Ha.', tmp('h2'), pitch=0.56, tempo=0.65)
+h3 = gp('Ha.', tmp('h3'), pitch=0.44, tempo=0.6)
 ha = concat([h1, silence(0.5, 'g1'), h2, silence(0.6, 'g2'), h3], tmp('ha'))
 ff('-i', ha, '-af', ROOM, tmp('ha_fx')); mp3(tmp('ha_fx'), 'pages_laugh3')
-mp3(speak('HA!', PAGES, tmp('spot'), pitch=0.55, tempo=0.9, fx='volume=2,acrusher=bits=9:mix=0.3,' + ROOM), 'pages_spot')
-mp3(speak('hmmmmmmm', PAGES, tmp('lost'), pitch=0.5, tempo=0.6, fx=ROOM), 'pages_lost')
-mp3(speak('heh.', PAGES, tmp('check'), pitch=0.5, tempo=0.8, fx=ROOM), 'pages_check', 0.8)
-mp3(speak('Welcome... to the shelf.', PAGES, tmp('end'), pitch=0.86, tempo=0.72, fx='aecho=0.8:0.5:60:0.15'), 'pages_end')
+mp3(gp('HA!', tmp('spot'), pitch=0.58, tempo=0.9, fx='volume=2,acrusher=bits=9:mix=0.3,' + ROOM), 'pages_spot')
+mp3(gp('Hmmmmm...', tmp('lost'), pitch=0.52, tempo=0.6, fx=ROOM), 'pages_lost')
+mp3(gp('Heh.', tmp('check'), pitch=0.52, tempo=0.8, fx=ROOM), 'pages_check', 0.8)
+mp3(gp('Welcome... to the shelf.', tmp('end'), pitch=0.9, tempo=0.72, fx='aecho=0.8:0.5:60:0.15'), 'pages_end')
 
 # ---------------- THE KID (sounds only) ----------------
 # breathing: pink noise shaped into in-out breaths
@@ -120,7 +123,6 @@ mp3(concat([st1, silence(0.25, 'g3'), st2], tmp('struggle')), 'kid_struggle')
 mp3(noise(tmp('hands'), 4.5, "bandpass=f=800:width_type=h:w=1000,volume='0.1+0.9*pow(max(0,sin(2*PI*t*0.55)),2)*(0.7+0.3*sin(2*PI*t*9))':eval=frame,afade=t=out:st=4:d=0.5"), 'kid_hands', 0.8)
 
 # ---------------- THE BOOKWORM: a fast, nervous kid (he was a speed reader) ----------------
-LIB = 'en_US-libritts_r-medium'
 def worm(text, path, speed=1.35):
     return piper(LIB, text, path, sid=150, speed=speed, pitch=1.12,
                  fx='vibrato=f=6.5:d=0.12,highpass=f=140,aecho=0.8:0.4:35:0.25')
@@ -130,6 +132,9 @@ mp3(mix([rush_noise, rush_voice], tmp('rush'), [0, 120]), 'worm_rush')
 mp3(worm('I-I read a hundred books in one night.', tmp('w1')), 'mg_worm1')
 mp3(worm("I couldn't stop. Faster. Faster! FASTER!", tmp('w2'), speed=1.55), 'mg_worm2')
 mp3(worm('Now I... I only run the halls.', tmp('w3'), speed=1.05), 'mg_worm3')
+mp3(worm("Don't stand still. Don't stand still!", tmp('wt1'), speed=1.5), 'worm_taunt1')
+mp3(worm('I can hear you in my hallway...', tmp('wt2')), 'worm_taunt2')
+mp3(worm('The halls are mine. Mine, mine, mine!', tmp('wt3'), speed=1.6), 'worm_taunt3')
 
 # ---------------- THE BOOK BATS: a whispery chorus of night readers ----------------
 BAT_SPEAKERS = [(60, 1.0, 0), (315, 1.08, 70), (285, 0.96, 140), (765, 1.04, 45), (15, 1.1, 190)]
@@ -146,6 +151,9 @@ mp3(bats('Light... light... we see your light.', tmp('bw')), 'bats_whisper')
 mp3(bats('We snuck in with flashlights.', tmp('b_1')), 'mg_bats1')
 mp3(bats('Just one more chapter...', tmp('b_2'), 0.85), 'mg_bats2')
 mp3(bats('Then the lights went out. Forever.', tmp('b_3'), 0.8), 'mg_bats3')
+mp3(bats('One more page... one more page...', tmp('bc1')), 'bats_chatter1')
+mp3(bats('Turn it on... turn it on...', tmp('bc2')), 'bats_chatter2')
+mp3(bats('So bright... so warm...', tmp('bc3'), 0.9), 'bats_chatter3')
 
 # ---------------- THE BOOKMARKS: soft, sad ghosts ----------------
 def marks(text, path):
@@ -157,10 +165,13 @@ mp3(marks('Stay... stay with us.', tmp('mw')), 'marks_whisper')
 mp3(marks('We saved our place.', tmp('m1')), 'mg_marks1')
 mp3(marks("We said we'd come back to finish.", tmp('m2')), 'mg_marks2')
 mp3(marks('We never came back... so we stayed.', tmp('m3')), 'mg_marks3')
+mp3(marks('Ohhhh... where... was I...?', tmp('mm1')), 'marks_moan1')
+mp3(marks("Don't leave us... unfinished...", tmp('mm2')), 'marks_moan2')
+mp3(marks('Ahhhh... the end... we never read the end...', tmp('mm3')), 'marks_moan3')
 
 # ---------------- ALL OF THEM ----------------
 line = 'Everything here was alive.'
-p = speak(line, PAGES, tmp('a1'), pitch=0.5, tempo=0.6)
+p = gp(line, tmp('a1'), pitch=0.55, tempo=0.6)
 w = worm(line, tmp('a2'), speed=0.75)
 bt = bats(line, tmp('a3'), 0.7)
 mk = marks(line, tmp('a4'))

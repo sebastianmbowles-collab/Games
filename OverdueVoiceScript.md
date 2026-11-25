@@ -17,15 +17,19 @@ Then rebuild the game. Want to hear them all at once? Open `Overdue_Voice_Reel.m
 
 ## The cast
 
-**MR. PAGES:** The library's mascot: a giant walking book, as tall as a grown-up, with a smiling face on his cover. In the daytime he does storytime for little kids. At night his true nature comes out: a ripped-paper grin, black ink dripping from his eyes, and a mouth full of sharp pages. He talks only twice in the whole game. The rest of the time he just **laughs**. Voice: starts like a happy kids' TV host, then sinks down slow and deep.
+**MR. PAGES:** The library's mascot: a giant walking book, as tall as a grown-up, with a smiling face on his cover. In the daytime he does storytime for little kids. At night his true nature comes out: a ripped-paper grin, black ink dripping from his eyes, and a mouth full of sharp pages. He talks only twice in the whole game. The rest of the time he just **laughs**. Voice: a grandpa storyteller. Starts happy and high, then sinks down slow and deep.
 
 **THE KID (YOU):** No name, because the kid is you. They fell asleep reading and got locked in. They never say words, only sounds: breathing, gasps and panting.
 
-**THE BOOKWORM:** A speed reader who read so fast they couldn't stop. Now they're a giant worm that shoots down hallways. Voice: a fast, hissing whisper.
+**THE BOOKWORM:** A speed reader who read so fast they couldn't stop. Now they're a giant worm that shoots down hallways. Voice: a fast, nervous kid.
 
 **THE BOOK BATS:** Night readers who snuck in with flashlights to read after closing. Now they're torn pages flapping in a swarm, hunting for light. Voice: lots of tiny whispers all at once (record yourself 3 times and layer them if you can!).
 
-**THE BOOKMARKS:** People who always saved their place and said they'd come back to finish... and never did. Now they're ribbons that slither and wrap around ankles. Voice: slow, sad, sticky whisper.
+**THE BOOKMARKS:** People who always saved their place and said they'd come back to finish... and never did. Now they're ribbons that slither and wrap around ankles. Voice: soft, sad ghosts.
+
+## Names on screen
+
+In the game, every line shows a subtitle with the speaker's name, like **MR. PAGES:** Storytime... starts... NOW!
 
 ## The lines
 
@@ -62,7 +66,16 @@ Then rebuild the game. Want to hear them all at once? Open `Overdue_Voice_Reel.m
 |---|---|---|---|
 | `worm_rush` | THE BOOKWORM | SSSSHHHRRRAAAAA! | A rushing hiss, like a train made of paper |
 | `bats_whisper` | THE BOOK BATS | Light... light... we see your light... | Many whispers, fluttery |
-| `marks_whisper` | THE BOOKMARKS | Stay... stay with us... | Slow and sticky, very close to the mic |
+| `marks_whisper` | THE BOOKMARKS | Stay... stay with us... | Slow, sad and ghostly |
+| `worm_taunt1` | THE BOOKWORM | Don't stand still. Don't stand still! | Nervous and fast |
+| `worm_taunt2` | THE BOOKWORM | I can hear you in my hallway... | Jittery whisper |
+| `worm_taunt3` | THE BOOKWORM | The halls are mine. Mine, mine, mine! | Super fast |
+| `bats_chatter1` | THE BOOK BATS | One more page... one more page... | Chorus, as they swarm your light |
+| `bats_chatter2` | THE BOOK BATS | Turn it on... turn it on... | Chorus |
+| `bats_chatter3` | THE BOOK BATS | So bright... so warm... | Chorus, dreamy |
+| `marks_moan1` | THE BOOKMARKS | Ohhhh... where... was I...? | Sad ghost sigh |
+| `marks_moan2` | THE BOOKMARKS | Don't leave us... unfinished... | Sad ghost |
+| `marks_moan3` | THE BOOKMARKS | Ahhhh... the end... we never read the end... | Saddest of all |
 
 ### Death mini games (old creepy arcade)
 
