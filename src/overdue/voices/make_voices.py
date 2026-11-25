@@ -1,8 +1,19 @@
 #!/usr/bin/env python3
-"""Makes every voice line in OVERDUE with ffmpeg's built-in speech (flite) plus effects.
+"""Makes every voice line in OVERDUE.
+Mr. Pages and the kid: ffmpeg's built-in speech (flite) plus effects.
+The Bookworm, Book Bats and Bookmarks: Piper voices (more human) through sherpa-onnx.
+
+Setup (once):
+  pip install sherpa-onnx==1.12.40 numpy
+  mkdir -p ~/.cache/overdue-tts && cd ~/.cache/overdue-tts
+  for m in en_US-libritts_r-medium en_US-amy-medium en_GB-jenny_dioco-medium; do
+    curl -L https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-$m.tar.bz2 | tar xj
+  done
 Run:  python3 src/overdue/voices/make_voices.py   (needs ffmpeg with flite + rubberband)
 Writes one .mp3 per line ID (see OverdueVoiceScript.md) next to this file."""
-import os, subprocess, tempfile
+import os, subprocess, tempfile, wave
+import numpy as np
+import sherpa_onnx
 
 OUT = os.path.dirname(os.path.abspath(__file__))
 TMP = tempfile.mkdtemp()
@@ -10,6 +21,26 @@ SR = 22050
 
 def ff(*args):
     subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', *args], check=True)
+
+TTS_DIR = os.environ.get('OVERDUE_TTS_DIR', os.path.expanduser('~/.cache/overdue-tts'))
+_models = {}
+def piper(model, text, path, sid=0, speed=1.0, pitch=1.0, fx=''):
+    """Say text with a Piper voice (sid picks one of the speakers), then add effects."""
+    if model not in _models:
+        d = os.path.join(TTS_DIR, 'vits-piper-' + model)
+        cfg = sherpa_onnx.OfflineTtsConfig(model=sherpa_onnx.OfflineTtsModelConfig(
+            vits=sherpa_onnx.OfflineTtsVitsModelConfig(model=f'{d}/{model}.onnx', tokens=f'{d}/tokens.txt', data_dir=f'{d}/espeak-ng-data'), num_threads=4))
+        _models[model] = sherpa_onnx.OfflineTts(cfg)
+    a = _models[model].generate(text, sid=sid, speed=speed)
+    raw = path + '.raw.wav'
+    pcm = (np.clip(np.array(a.samples), -1, 1) * 32767).astype('<i2')
+    with wave.open(raw, 'wb') as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(a.sample_rate); w.writeframes(pcm.tobytes())
+    chain = f'aresample={SR}'
+    if pitch != 1: chain += f',rubberband=pitch={pitch}:formant=shifted'
+    if fx: chain += ',' + fx
+    ff('-i', raw, '-af', chain, '-ac', '1', path)
+    return path
 
 def speak(text, voice, path, pitch=1.0, tempo=1.0, fx=''):
     """Say text with a flite voice, then shift pitch / speed and add effects."""
@@ -88,39 +119,49 @@ st2 = speak('hnnnh!', 'slt', tmp('st2'), pitch=1.3, tempo=1.0)
 mp3(concat([st1, silence(0.25, 'g3'), st2], tmp('struggle')), 'kid_struggle')
 mp3(noise(tmp('hands'), 4.5, "bandpass=f=800:width_type=h:w=1000,volume='0.1+0.9*pow(max(0,sin(2*PI*t*0.55)),2)*(0.7+0.3*sin(2*PI*t*9))':eval=frame,afade=t=out:st=4:d=0.5"), 'kid_hands', 0.8)
 
-# ---------------- THE BOOKWORM (fast hissing whisper) ----------------
-def worm(text, path, tempo=1.5):
-    return speak(text, 'kal16', path, pitch=0.85, tempo=tempo, fx=WHISPER + ',highpass=f=500,aecho=0.7:0.5:40:0.3')
+# ---------------- THE BOOKWORM: a fast, nervous kid (he was a speed reader) ----------------
+LIB = 'en_US-libritts_r-medium'
+def worm(text, path, speed=1.35):
+    return piper(LIB, text, path, sid=150, speed=speed, pitch=1.12,
+                 fx='vibrato=f=6.5:d=0.12,highpass=f=140,aecho=0.8:0.4:35:0.25')
 rush_noise = noise(tmp('rushn'), 1.6, "highpass=f=300,lowpass=f=5000,volume='if(lt(t,0.15),t/0.15,exp(-(t-0.15)*2.2))':eval=frame", 'brown')
-rush_voice = speak('SHRRRAAAAAAA', 'kal16', tmp('rushv'), pitch=0.6, tempo=1.4, fx=WHISPER + ',volume=1.5')
-mp3(mix([rush_noise, rush_voice], tmp('rush')), 'worm_rush')
-mp3(worm('I read a hundred books in one night.', tmp('w1')), 'mg_worm1')
-mp3(worm('I could not stop. Faster. Faster. FASTER.', tmp('w2'), tempo=1.7), 'mg_worm2')
-mp3(worm('Now I only run the halls.', tmp('w3'), tempo=1.1), 'mg_worm3')
+rush_voice = worm('Faster faster faster!', tmp('rushv'), speed=1.9)
+mp3(mix([rush_noise, rush_voice], tmp('rush'), [0, 120]), 'worm_rush')
+mp3(worm('I-I read a hundred books in one night.', tmp('w1')), 'mg_worm1')
+mp3(worm("I couldn't stop. Faster. Faster! FASTER!", tmp('w2'), speed=1.55), 'mg_worm2')
+mp3(worm('Now I... I only run the halls.', tmp('w3'), speed=1.05), 'mg_worm3')
 
-# ---------------- THE BOOK BATS (many whispers at once, fluttery) ----------------
-def bats(text, path, tempo=1.0):
-    v1 = speak(text, 'slt', tmp('b1'), pitch=1.0, tempo=tempo)
-    v2 = speak(text, 'slt', tmp('b2'), pitch=1.25, tempo=tempo * 1.05)
-    v3 = speak(text, 'kal16', tmp('b3'), pitch=1.1, tempo=tempo * 0.97)
-    return mix([v1, v2, v3], path, [0, 110, 210], WHISPER + ',highpass=f=900,tremolo=f=14:d=0.5,' + ROOM)
-mp3(bats('Light. Light. We see your light.', tmp('bw')), 'bats_whisper')
+# ---------------- THE BOOK BATS: a whispery chorus of night readers ----------------
+BAT_SPEAKERS = [(60, 1.0, 0), (315, 1.08, 70), (285, 0.96, 140), (765, 1.04, 45), (15, 1.1, 190)]
+def bats(text, path, speed=1.05):
+    voices = []
+    for i, (sid, sp, _) in enumerate(BAT_SPEAKERS):
+        v = piper(LIB, text, tmp(f'bat{i}'), sid=sid, speed=speed * sp, pitch=1.06)
+        if i % 2:  # every other voice is a breathy whisper, the rest stay clear
+            ff('-i', v, '-af', WHISPER + ',volume=0.7', tmp(f'batw{i}')); v = tmp(f'batw{i}')
+        voices.append(v)
+    return mix(voices, path, [d for _, _, d in BAT_SPEAKERS],
+               'volume=0.45,highpass=f=260,tremolo=f=11:d=0.35,aecho=0.8:0.6:70|150:0.25|0.15')
+mp3(bats('Light... light... we see your light.', tmp('bw')), 'bats_whisper')
 mp3(bats('We snuck in with flashlights.', tmp('b_1')), 'mg_bats1')
-mp3(bats('Just one more chapter.', tmp('b_2'), 0.8), 'mg_bats2')
-mp3(bats('Then the lights went out. Forever.', tmp('b_3'), 0.75), 'mg_bats3')
+mp3(bats('Just one more chapter...', tmp('b_2'), 0.85), 'mg_bats2')
+mp3(bats('Then the lights went out. Forever.', tmp('b_3'), 0.8), 'mg_bats3')
 
-# ---------------- THE BOOKMARKS (slow, sad, sticky) ----------------
+# ---------------- THE BOOKMARKS: soft, sad ghosts ----------------
 def marks(text, path):
-    return speak(text, 'awb', path, pitch=0.78, tempo=0.62, fx=WHISPER + ',lowpass=f=2600,chorus=0.6:0.9:55:0.4:0.25:2,aecho=0.8:0.8:400:0.3')
-mp3(marks('Stay. Stay with us.', tmp('mw')), 'marks_whisper')
+    a = piper('en_US-amy-medium', text, tmp('mk_a'), speed=0.72, pitch=0.97)
+    b = piper('en_GB-jenny_dioco-medium', text, tmp('mk_b'), speed=0.74, pitch=0.93, fx='volume=0.45')
+    return mix([a, b], path, [0, 55],
+               "lowpass=f=5200,chorus=0.7:0.9:45|60:0.3|0.25:0.3|0.4:1.5|2,aecho=0.85:0.75:320|700|1100:0.35|0.25|0.15,afade=t=in:d=0.25")
+mp3(marks('Stay... stay with us.', tmp('mw')), 'marks_whisper')
 mp3(marks('We saved our place.', tmp('m1')), 'mg_marks1')
-mp3(marks('We said we would come back to finish.', tmp('m2')), 'mg_marks2')
-mp3(marks('We never came back. So we stayed.', tmp('m3')), 'mg_marks3')
+mp3(marks("We said we'd come back to finish.", tmp('m2')), 'mg_marks2')
+mp3(marks('We never came back... so we stayed.', tmp('m3')), 'mg_marks3')
 
 # ---------------- ALL OF THEM ----------------
 line = 'Everything here was alive.'
 p = speak(line, PAGES, tmp('a1'), pitch=0.5, tempo=0.6)
-w = worm(line, tmp('a2'), tempo=0.6)
-bt = bats(line, tmp('a3'), 0.6)
+w = worm(line, tmp('a2'), speed=0.75)
+bt = bats(line, tmp('a3'), 0.7)
 mk = marks(line, tmp('a4'))
 mp3(mix([p, w, bt, mk], tmp('alive'), [0, 40, 80, 0], ROOM), 'mg_alive')
