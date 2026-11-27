@@ -15,6 +15,7 @@ const ev = e => I.events.push(e);
 addEventListener('keydown', e => {
   if (e.repeat) return;
   I.keys[e.code] = true;
+  if (e.code === 'KeyR') I.runToggle = !I.runToggle;
   const map = { KeyC: 'crouch', ControlLeft: 'crouch', KeyF: 'light', KeyE: 'use', Space: 'mash', Escape: 'pause', KeyP: 'pause', Enter: 'enter' };
   if (map[e.code]) ev(map[e.code]);
   if (e.code === 'KeyE' || e.code === 'Space') ev('mashAny');
@@ -36,7 +37,7 @@ export function initTouch() {
   const stick = document.getElementById('stick'), nub = document.getElementById('nub');
   let sid = null, sx = 0, sy = 0, lid = null, lx = 0, ly = 0;
   const R = 55;
-  stick.addEventListener('pointerdown', e => { sid = e.pointerId; const r = stick.getBoundingClientRect(); sx = r.left + r.width / 2; sy = r.top + r.height / 2; stick.setPointerCapture(e.pointerId); moveStick(e); e.preventDefault(); });
+  stick.addEventListener('pointerdown', e => { sid = e.pointerId; const r = stick.getBoundingClientRect(); sx = r.left + r.width / 2; sy = r.top + r.height / 2; try { stick.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } moveStick(e); e.preventDefault(); });
   const moveStick = e => {
     let dx = e.clientX - sx, dy = e.clientY - sy; const d = Math.hypot(dx, dy);
     if (d > R) { dx *= R / d; dy *= R / d; }
@@ -48,12 +49,12 @@ export function initTouch() {
   const endStick = e => { if (e.pointerId !== sid) return; sid = null; I.mx = I.mz = 0; nub.style.transform = ''; };
   stick.addEventListener('pointerup', endStick); stick.addEventListener('pointercancel', endStick);
   const pad = document.getElementById('lookpad');
-  pad.addEventListener('pointerdown', e => { lid = e.pointerId; lx = e.clientX; ly = e.clientY; pad.setPointerCapture(e.pointerId); ev('mashAny'); });
+  pad.addEventListener('pointerdown', e => { lid = e.pointerId; lx = e.clientX; ly = e.clientY; try { pad.setPointerCapture(e.pointerId); } catch (err) { /* fine */ } ev('mashAny'); });
   pad.addEventListener('pointermove', e => { if (e.pointerId !== lid) return; I.lookX += (e.clientX - lx) * 2.2; I.lookY += (e.clientY - ly) * 2.2; lx = e.clientX; ly = e.clientY; });
   const endLook = e => { if (e.pointerId === lid) lid = null; };
   pad.addEventListener('pointerup', endLook); pad.addEventListener('pointercancel', endLook);
   const btn = (id, down, up) => { const b = document.getElementById(id); b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); down(); b.classList.add('down'); }); const u = () => { b.classList.remove('down'); up && up(); }; b.addEventListener('pointerup', u); b.addEventListener('pointercancel', u); b.addEventListener('pointerleave', u); };
-  btn('bRun', () => { I.touchRun = true; }, () => { I.touchRun = false; });
+  btn('bRun', () => { I.runToggle = !I.runToggle; });
   btn('bCrouch', () => ev('crouch'));
   btn('bLight', () => ev('light'));
   btn('bUse', () => { ev('use'); ev('mashAny'); });
@@ -72,7 +73,7 @@ function readInput(dt) {
     if (k.KeyA) mx -= 1; if (k.KeyD) mx += 1;
     if (k.ArrowLeft) turn -= 1; if (k.ArrowRight) turn += 1;
   }
-  run = !!(k.ShiftLeft || k.ShiftRight) || I.touchRun;
+  run = !!(k.ShiftLeft || k.ShiftRight) || I.touchRun || I.runToggle;
   // game controller
   const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g) : null;
   if (gp) {
@@ -164,8 +165,9 @@ export function updatePlayer(dt, G) {
   if (P.frozen) { placeCamera(dt); return; }
 
   // crouch makes you short, slow and quiet. You can't run crouched.
-  const wantRun = inp.run && !P.crouch && !P.tired && (inp.mx || inp.mz);
-  if (wantRun) { P.stamina -= dt / 4.5; if (P.stamina <= 0) { P.stamina = 0; P.tired = true; say('kid_pant', null, 0.7, { sub: false }); } }
+  if (inp.run && P.crouch && (inp.mx || inp.mz)) P.crouch = false; // running stands you up
+  const wantRun = inp.run && !P.tired && (inp.mx || inp.mz);
+  if (wantRun) { P.stamina -= dt / 4.5; if (P.stamina <= 0) { P.stamina = 0; P.tired = true; I.runToggle = false; say('kid_pant', null, 0.7, { sub: false }); } }
   else { P.stamina = Math.min(1, P.stamina + dt / 7); if (P.tired && P.stamina > 0.35) P.tired = false; }
   const speed = P.crouch ? 1.45 : wantRun ? 4.6 : (P.tired ? 1.9 : 2.6);
   const sin = Math.sin(P.yaw), cos = Math.cos(P.yaw);
@@ -191,7 +193,7 @@ export function updatePlayer(dt, G) {
   placeCamera(dt);
 }
 
-export function toggleCrouch() { if (!P.hidden && !P.tripped) P.crouch = !P.crouch; }
+export function toggleCrouch() { if (!P.hidden && !P.tripped) { P.crouch = !P.crouch; if (P.crouch) I.runToggle = false; } }
 
 const _e = new THREE.Euler(0, 0, 0, 'YXZ');
 export function placeCamera(dt) {

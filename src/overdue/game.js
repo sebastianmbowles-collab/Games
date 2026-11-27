@@ -105,7 +105,7 @@ async function startNight() {
   show('title', false);
   const D = G.D = DIFF[SET.diff] || DIFF.normal;
   G.time = 0; G.hour = 0; G.over = false; G.introDone = false; G.fear = 0; G.secret = false;
-  resetPlayer(D.battery); resetVillains(G); sunrise(0); hands.root.visible = false;
+  resetPlayer(D.battery); I.runToggle = false; resetVillains(G); sunrise(0); hands.root.visible = false;
   C.fx.red = 0; C.fx.flash = 0; C.fx.glitch = 0.3;
   // who wakes up when (random order every game!)
   const order = ['worm', 'bats', 'marks'].sort(() => Math.random() - 0.5).slice(0, D.extras);
@@ -218,6 +218,7 @@ function drawHud() {
   $('bUse').classList.toggle('hot', !!pr);
   $('bLight').classList.toggle('on', P.light);
   $('bCrouch').classList.toggle('on', P.crouch);
+  $('bRun').classList.toggle('on', !!I.runToggle);
   $('hideT').textContent = P.hidden ? (P.hideT > 20 ? 'YOU CAN\'T HOLD YOUR BREATH!' : 'HOLD YOUR BREATH... ' + Math.ceil(20 - P.hideT)) : '';
 }
 
