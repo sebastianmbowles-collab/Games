@@ -119,20 +119,27 @@ function std(t, rough, rep) {
 }
 
 function buildBooks() {
-  // one book shape (with a spine texture), copied thousands of times with its own size, angle and colour
+  // one book shape (with a spine texture), copied thousands of times with its own size, angle and colour.
+  // The books are split into neighbourhoods so the ones behind you are skipped.
   const geo = new THREE.BoxGeometry(1, 1, 1);
   const mat = new THREE.MeshStandardMaterial({ map: X.bookTex(), roughness: 0.75 });
-  const mesh = new THREE.InstancedMesh(geo, mat, BOOKS.length);
   const COLS = ['#6a1c18', '#1d4030', '#1e2e58', '#5a3a1a', '#3a2248', '#7a6a32', '#3e3e3c', '#8a3420', '#1e4040', '#5e4630', '#9a8a68', '#2c1c10', '#4a1030', '#2a3a1a'].map(c => new THREE.Color(c));
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YXZ'), p = new THREE.Vector3(), sc = new THREE.Vector3();
-  BOOKS.forEach((b, i) => {
-    const [x, y, z, ry, lean, w, h, d, ci] = b;
-    e.set(0, ry, lean); q.setFromEuler(e); p.set(x, y, z); sc.set(w, h, d);
-    m4.compose(p, q, sc); mesh.setMatrixAt(i, m4);
-    mesh.setColorAt(i, COLS[Math.floor(ci * COLS.length)].clone().multiplyScalar(0.8 + (ci * 7 % 1) * 0.4));
-  });
-  mesh.receiveShadow = true; mesh.castShadow = false;
-  C.scene.add(mesh);
+  const CH = 12; // neighbourhood size in metres
+  const groups = new Map();
+  for (const b of BOOKS) { const k = Math.floor(b[0] / CH) + ',' + Math.floor(b[2] / CH) + ',' + (b[1] > FLOOR_H ? 1 : 0); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(b); }
+  for (const list of groups.values()) {
+    const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach((b, i) => {
+      const [x, y, z, ry, lean, w, h, d, ci] = b;
+      e.set(0, ry, lean); q.setFromEuler(e); p.set(x, y, z); sc.set(w, h, d);
+      m4.compose(p, q, sc); mesh.setMatrixAt(i, m4);
+      mesh.setColorAt(i, COLS[Math.floor(ci * COLS.length)].clone().multiplyScalar(0.8 + (ci * 7 % 1) * 0.4));
+    });
+    mesh.computeBoundingSphere();
+    mesh.receiveShadow = true; mesh.castShadow = false;
+    C.scene.add(mesh);
+  }
   WLD.bookCount = BOOKS.length;
 }
 
@@ -168,7 +175,7 @@ function addShelf(L, c, r, gap) {
   put('frame', box(e[1] + e[3], SHELF_H, e[0] + e[2]), x + cx, y0 + SHELF_H / 2, z + cz);
   put('frame', rbox(T + 0.08, 0.12, T + 0.08, 0.03), x, y0 + SHELF_H + 0.06, z);          // crown
   put('frame', box(T - 0.02, 0.12, T - 0.02), x, y0 + 0.06, z);                         // kick board
-  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put('frame', rbox(0.1, SHELF_H, 0.1, 0.02), x + sx * 0.95, y0 + SHELF_H / 2, z + sz * 0.95); // corner posts
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put('frame', box(0.1, SHELF_H, 0.1), x + sx * 0.95, y0 + SHELF_H / 2, z + sz * 0.95); // corner posts
   const ROWS = 5, rowH = (SHELF_H - 0.2) / ROWS;
   DIRS.forEach(([dc, dr, ry], fi) => {
     if (!open[fi]) return;
@@ -177,7 +184,7 @@ function addShelf(L, c, r, gap) {
     const bg = plane(T - 0.14, SHELF_H - 0.2); local(bg, 0, 0, 0.665);
     put(m, bg, x, y0 + SHELF_H / 2, z, ry);
     for (let k = 0; k <= ROWS; k++) { // shelf boards
-      const g = rbox(T - 0.12, 0.04, 0.34, 0.012); local(g, 0, 0, 0.83);
+      const g = box(T - 0.12, 0.04, 0.34); local(g, 0, 0, 0.83);
       put('wood', g, x, y0 + 0.12 + k * rowH, z, ry);
     }
     const isGap = gap && fi === open.indexOf(true);
@@ -189,7 +196,7 @@ function addShelf(L, c, r, gap) {
       let u = -0.9;
       const by = y0 + 0.14 + k * rowH;
       while (u < 0.88) {
-        const w = (0.035 + Math.random() * 0.05) * mob, h = rowH * (0.62 + Math.random() * 0.3), d = 0.2 + Math.random() * 0.08;
+        const w = (0.042 + Math.random() * 0.05) * mob, h = rowH * (0.62 + Math.random() * 0.3), d = 0.2 + Math.random() * 0.08;
         if (isGap && Math.abs(u) < 0.32) { u += w; continue; }
         if (Math.random() < 0.045) { u += 0.08 + Math.random() * 0.12; continue; } // a gap where books are missing
         let lean = 0;
@@ -381,7 +388,7 @@ function addLights() {
   const exit = new THREE.PointLight(0xff2010, 3, 9, 2); exit.position.set(...WLD.exitLightPos); S.add(exit); WLD.flicker.push(exit);
   const p = findTile('P');
   const spot = new THREE.SpotLight(0xffd8a0, 45, 12, 0.5, 0.6, 2);
-  spot.position.set(tileX(p.c) - 1.6, 4.1, tileZ(p.r) + 0.6); spot.target.position.set(tileX(p.c), 1.8, tileZ(p.r)); S.add(spot, spot.target);
+  spot.position.set(tileX(p.c) - 1.6, 4.1, tileZ(p.r) + 0.6); spot.target.position.set(tileX(p.c), 2.2, tileZ(p.r)); S.add(spot, spot.target);
   WLD.podiumLight = spot;
   for (const [x, y, z] of (WLD.lampSpots || []).slice(0, 3)) { const l = new THREE.PointLight(0x9aff8a, 1.2, 4, 2); l.position.set(x, y, z); S.add(l); WLD.flicker.push(l); }
   const lab = new THREE.PointLight(0x50ff80, 2.5, 7, 2); lab.position.set(tileX(20), 1.6, tileZ(3)); S.add(lab); WLD.labLight = lab;

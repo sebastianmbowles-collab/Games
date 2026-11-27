@@ -157,6 +157,7 @@ export function updatePlayer(dt, G) {
   if (P.light) { P.battery -= dt; if (P.battery <= 0) { P.battery = 0; P.light = false; sfx('click'); } }
   const low = P.battery < 20 && P.light;
   flash.intensity = P.light ? (low && Math.random() < 0.08 ? 4 : 38) : 0;
+  flash.castShadow = P.light; // shadows cost a lot: only when the flashlight is on
 
   if (P.hidden) { updateHidden(dt, inp); placeCamera(dt); return; }
   if (P.tripped) { placeCamera(dt); return; }

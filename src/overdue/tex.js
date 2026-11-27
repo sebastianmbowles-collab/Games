@@ -324,3 +324,115 @@ export function bookTex() {
   noise(g, 64, 256, 40);
   const t = tex(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
 }
+
+// ======================= CARTOON FACES (from the OVERDUE character sheet) =======================
+const INK = '#120a0c';
+// a classic "pie-cut" cartoon eye: a tall black oval with a little wedge cut out for the shine
+function pieEye(g, x, y, rx, ry, look = 0, angry = 0) {
+  g.save(); g.translate(x, y);
+  g.fillStyle = INK; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, 7); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.95)';
+  g.beginPath(); g.moveTo(rx * 0.25 + look, -ry * 0.35); g.arc(rx * 0.25 + look, -ry * 0.35, rx * 0.42, -1.1, -0.2); g.closePath(); g.fill();
+  if (angry) { // heavy brow cutting the eye
+    g.fillStyle = angry; g.beginPath(); g.moveTo(-rx * 1.6, -ry * 1.3); g.lineTo(rx * 1.6, -ry * 1.3); g.lineTo(rx * 1.6 * Math.sign(x || 1) * 0 + rx * 1.4, -ry * 0.35 * (x < 256 ? 1 : -0.2)); g.lineTo(-rx * 1.4, -ry * 0.35 * (x < 256 ? -0.2 : 1)); g.closePath(); g.fill();
+  }
+  g.restore();
+}
+function grin(g, cx, cy, w, h, sharp, open = 0) {
+  g.save(); g.translate(cx, cy);
+  g.lineWidth = 10; g.strokeStyle = INK; g.lineJoin = 'round'; g.lineCap = 'round';
+  // mouth shape: a wide crescent, or a scream when open
+  g.beginPath();
+  g.moveTo(-w, -h * 0.25 - open * h * 0.4);
+  g.quadraticCurveTo(0, -h * 0.05 - open * h * 0.9, w, -h * 0.25 - open * h * 0.4);
+  g.quadraticCurveTo(w * 0.9, h * (1 + open), 0, h * (1 + open * 1.4));
+  g.quadraticCurveTo(-w * 0.9, h * (1 + open), -w, -h * 0.25 - open * h * 0.4);
+  g.closePath();
+  g.fillStyle = '#2a0a0c'; g.fill();
+  g.save(); g.clip();
+  g.fillStyle = '#f6f0e2';
+  const n = sharp ? 11 : 7;
+  if (sharp) {
+    for (let i = 0; i < n; i++) { const x = -w + (2 * w) * (i + 0.5) / n; g.beginPath(); g.moveTo(x - w / n, -h); g.lineTo(x + w / n, -h); g.lineTo(x, h * (0.35 + open * 0.3)); g.fill(); g.beginPath(); g.moveTo(x - w / n, h * (1.2 + open * 1.4)); g.lineTo(x + w / n, h * (1.2 + open * 1.4)); g.lineTo(x, h * (0.55 + open * 1.0)); g.fill(); }
+  } else {
+    g.fillRect(-w, -h, 2 * w, h * 0.85);
+    g.strokeStyle = INK; g.lineWidth = 4; for (let i = 1; i < n; i++) { const x = -w + 2 * w * i / n; g.beginPath(); g.moveTo(x, -h); g.lineTo(x, -h * 0.15); g.stroke(); }
+    g.fillStyle = '#c84a50'; g.beginPath(); g.ellipse(0, h * 0.7, w * 0.35, h * 0.3, 0, 0, 7); g.fill(); // tongue
+  }
+  g.restore();
+  g.stroke();
+  g.restore();
+}
+// Mr. Pages' face on the front page of his book head: mood = 'happy' | 'angry' | 'scream'
+export function pagesToonFace(mood) {
+  const [c, g] = canvas(512, 576);
+  const bg = mood === 'happy' ? '#efe3c6' : '#c9b78f';
+  g.fillStyle = bg; g.fillRect(0, 0, 512, 576);
+  g.strokeStyle = 'rgba(120,90,50,.18)'; g.lineWidth = 2; for (let y = 30; y < 576; y += 26) { g.beginPath(); g.moveTo(20, y); g.lineTo(492, y); g.stroke(); }
+  if (mood !== 'happy') { const gr = g.createRadialGradient(256, 260, 60, 256, 260, 360); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(40,10,10,.55)'); g.fillStyle = gr; g.fillRect(0, 0, 512, 576); }
+  if (mood === 'happy') {
+    pieEye(g, 176, 190, 46, 70, 4); pieEye(g, 336, 190, 46, 70, 4);
+    g.strokeStyle = INK; g.lineWidth = 8; g.lineCap = 'round';
+    g.beginPath(); g.arc(80, 330, 30, -0.4, 0.9); g.stroke(); g.beginPath(); g.arc(432, 330, 30, Math.PI - 0.9, Math.PI + 0.4); g.stroke(); // cheek lines
+    grin(g, 256, 360, 170, 70, false);
+  } else if (mood === 'angry') {
+    pieEye(g, 176, 200, 44, 56); pieEye(g, 336, 200, 44, 56);
+    g.fillStyle = bg; // narrow the eyes into a glare
+    g.beginPath(); g.moveTo(100, 100); g.lineTo(252, 100); g.lineTo(252, 182); g.lineTo(100, 122); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(260, 100); g.lineTo(412, 100); g.lineTo(412, 122); g.lineTo(260, 182); g.closePath(); g.fill();
+    g.strokeStyle = INK; g.lineWidth = 16; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(110, 120); g.lineTo(230, 170); g.stroke(); g.beginPath(); g.moveTo(402, 120); g.lineTo(282, 170); g.stroke(); // angry brows
+    g.fillStyle = '#ff3a2a'; g.beginPath(); g.arc(190, 205, 7, 0, 7); g.fill(); g.beginPath(); g.arc(322, 205, 7, 0, 7); g.fill(); // red glints
+    grin(g, 256, 370, 200, 70, true);
+  } else {
+    g.fillStyle = INK; for (const x of [170, 342]) { g.beginPath(); g.ellipse(x, 170, 56, 74, 0, 0, 7); g.fill(); }
+    g.fillStyle = '#fff'; for (const x of [170, 342]) { g.beginPath(); g.arc(x, 175, 9, 0, 7); g.fill(); }
+    grin(g, 256, 330, 190, 60, true, 1);
+  }
+  g.strokeStyle = INK; g.lineWidth = 12; g.strokeRect(6, 6, 500, 564);
+  const t = tex(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
+}
+// a face painted on the front of a sphere (sphere UV: the front (+z) is at u = 0.25)
+function sphereFace(draw, w = 1024, h = 512, bg = '#7ab84e') {
+  const [c, g] = canvas(w, h);
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  g.save(); g.translate(w * 0.25, h * 0.5); draw(g); g.restore();
+  const t = tex(c); t.wrapS = THREE.RepeatWrapping; return t;
+}
+export function wormToonFace() {
+  return sphereFace(g => {
+    pieEye(g, -62, -40, 34, 50, 3); pieEye(g, 62, -40, 34, 50, 3);
+    grin(g, 0, 70, 120, 40, true);
+    g.strokeStyle = 'rgba(20,50,10,.5)'; g.lineWidth = 6; g.beginPath(); g.arc(-150, 30, 24, 0, 1.4); g.stroke(); g.beginPath(); g.arc(150, 30, 24, Math.PI - 1.4, Math.PI); g.stroke();
+  }, 1024, 512, '#79b84a');
+}
+export function batToonFace(v) {
+  return sphereFace(g => {
+    g.fillStyle = '#e9d2c8'; g.beginPath(); g.ellipse(0, 30, 150, 120, 0, 0, 7); g.fill(); // pale muzzle
+    pieEye(g, -55, -10, 34, 52, 2); pieEye(g, 55, -10, 34, 52, 2);
+    g.lineWidth = 8; g.strokeStyle = INK; g.fillStyle = '#5a1018';
+    if (v === 0) { g.beginPath(); g.arc(0, 70, 40, 0.1, Math.PI - 0.1); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(-25, 72); g.lineTo(-15, 72); g.lineTo(-20, 88); g.fill(); g.beginPath(); g.moveTo(15, 72); g.lineTo(25, 72); g.lineTo(20, 88); g.fill(); }
+    else if (v === 1) { g.beginPath(); g.ellipse(0, 85, 26, 32, 0, 0, 7); g.fill(); g.stroke(); }
+    else { g.beginPath(); g.moveTo(-40, 80); g.quadraticCurveTo(0, 60, 40, 80); g.stroke(); }
+  }, 1024, 512, '#3a2350');
+}
+// a sad ghost bookmark (drawn flat, with a wavy tail; the background is see-through)
+export function ghostToonTex(fill, face) {
+  const [c, g] = canvas(256, 640);
+  g.clearRect(0, 0, 256, 640);
+  g.beginPath();
+  g.moveTo(40, 30); g.lineTo(216, 30);
+  g.quadraticCurveTo(232, 300, 214, 520);
+  for (let i = 0; i < 4; i++) { const x0 = 214 - i * 44; g.quadraticCurveTo(x0 - 22, 640 - (i % 2) * 70, x0 - 44, 560 + (i % 2) * 20); }
+  g.quadraticCurveTo(22, 300, 40, 30); g.closePath();
+  const gr = g.createLinearGradient(0, 0, 0, 640); gr.addColorStop(0, fill); gr.addColorStop(1, 'rgba(160,150,200,.8)');
+  g.fillStyle = gr; g.fill();
+  g.lineWidth = 10; g.strokeStyle = INK; g.stroke();
+  if (face) {
+    g.fillStyle = INK; g.beginPath(); g.ellipse(92, 200, 20, 34, 0.15, 0, 7); g.fill(); g.beginPath(); g.ellipse(164, 200, 20, 34, -0.15, 0, 7); g.fill();
+    g.lineWidth = 7; g.beginPath(); g.moveTo(64, 164); g.lineTo(108, 146); g.stroke(); g.beginPath(); g.moveTo(192, 164); g.lineTo(148, 146); g.stroke(); // sad brows (inner ends up)
+    g.fillStyle = '#2a0a10'; g.beginPath(); g.moveTo(98, 300); g.quadraticCurveTo(128, 255, 158, 300); g.quadraticCurveTo(128, 285, 98, 300); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(120,180,255,.8)'; g.beginPath(); g.ellipse(80, 252, 7, 12, 0, 0, 7); g.fill(); // a tear
+  }
+  const t = tex(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
+}

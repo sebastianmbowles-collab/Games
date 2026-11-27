@@ -61,7 +61,7 @@ export function initCore(canvas) {
   C.scene = new THREE.Scene();
   C.scene.background = new THREE.Color(0x020304);
   C.scene.fog = new THREE.FogExp2(0x030405, 0.045);
-  C.camera = new THREE.PerspectiveCamera(72, 1, 0.05, 120);
+  C.camera = new THREE.PerspectiveCamera(72, 1, 0.05, 48); // things further away are lost in the fog anyway
   C.scene.add(C.camera);
   rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthBuffer: true });
   postMat = new THREE.ShaderMaterial({
@@ -107,7 +107,7 @@ export function render() {
 export function startLoop(update) {
   let last = performance.now();
   function frame(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
     C.t += dt;
     update(dt);
     render();

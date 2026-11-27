@@ -4,6 +4,7 @@ import { C } from './core.js';
 import { FLOOR_H, tileX, tileZ, findTile, toC, toR } from './map.js';
 import { P, I, SET, saveSettings, resetPlayer, updatePlayer, placeCamera, toggleCrouch, toggleLight, nearestHide, enterHide, exitHide, requestLock, releaseLock, noise, flash } from './player.js';
 import { V, buildVillains, resetVillains, updateVillains, wake } from './villains.js';
+import { animBats } from './models.js';
 import { say, sfx, ambience, updateAudio, setVolume, setListener, initAudio } from './audio.js';
 import { WLD, sunrise } from './world.js';
 import { runMinigame } from './minigames.js';
@@ -87,7 +88,7 @@ function toTitle() {
   // camera in the entrance hall, looking up at Mr. Pages on his podium
   const p = findTile('P');
   C.camera.position.set(tileX(p.c) + 1.2, 1.5, tileZ(p.r) + 3.6);
-  C.camera.lookAt(tileX(p.c), 1.9, tileZ(p.r));
+  C.camera.lookAt(tileX(p.c), 2.1, tileZ(p.r));
 }
 
 function pause() {
@@ -180,10 +181,17 @@ function titleUpdate(dt) {
   const tw = (titleT % 6.3) > 6.15;
   pg.m.setCreepy(tw);
   C.fx.glitch = tw ? 0.8 : C.fx.glitch;
-  const p = findTile('P');
-  C.camera.position.set(tileX(p.c) + 1.2 + Math.sin(titleT * 0.2) * 0.3, 1.5, tileZ(p.r) + 3.6);
+  const p = findTile('P'), px = tileX(p.c), pz = tileZ(p.r);
+  // the whole gang hangs around the podium on the title screen
+  const w = V.worm.m; w.root.visible = true;
+  w.segs.forEach((sg, i) => sg.position.set(px + 1.7 + Math.sin(i * 0.35 + titleT) * 0.15 + i * 0.12, 0.45 + Math.sin(titleT * 1.5) * 0.06 + (i ? -0.05 : 0.05), pz - 0.6 - i * 0.26));
+  w.head.rotation.y = -0.5 + Math.sin(titleT * 0.7) * 0.2; w.wiggle(titleT * 0.3);
+  V.marks.forEach((mk, i) => { mk.m.root.visible = true; mk.m.root.position.set(px - 1.3 - i * 0.75, 0, pz + 0.9 - i * 0.6); mk.m.root.rotation.y = Math.PI + 0.4 + i * 0.15; mk.m.animate(titleT + i * 2, 0.3, 0); });
+  const b = V.bats.m; b.root.visible = true; animBats(b, dt, titleT * 0.5, { x: px + 0.3, y: 3.3, z: pz - 0.8 }, 0.9);
+  if (WLD.podiumLight) WLD.podiumLight.intensity = Math.random() < 0.04 ? 8 : 45;
+  C.camera.position.set(px + 1.2 + Math.sin(titleT * 0.2) * 0.3, 1.55, pz + 4.3);
   const wide = C.w / C.h > 1.25;
-  C.camera.lookAt(tileX(p.c) - (wide ? 1.5 : 0), wide ? 1.85 : 1.4, tileZ(p.r));
+  C.camera.lookAt(px - (wide ? 1.9 : 0), wide ? 2.0 : 1.6, pz);
 }
 
 // ---------------- using things ----------------
@@ -270,46 +278,59 @@ async function caught(who) {
   if (P.hidden) { exitHide(); }
   document.body.classList.remove('playing'); delete document.body.dataset.hide;
   show('hint', false);
-  // JUMP SCARE: the villain's face rushes at you
+  // JUMP SCARE: a split second of darkness and silence... then the face, RIGHT THERE
   const cam = C.camera, fwd = new THREE.Vector3(); cam.getWorldDirection(fwd);
-  sfx('screech', null, 1.4);
-  const t0 = performance.now();
+  const camPos = cam.position.clone(), fov0 = cam.fov;
+  ambience(false); C.fx.fade = 1; flash.intensity = 0;
+  await wait(260); if (seq !== run) return;
+  sfx('screech', null, 2.2); sfx('thud', null, 2); sfx('tear', null, 1.4); sfx('static', null, 1);
+  setTimeout(() => sfx('screech', null, 1.6), 90);
+  C.fx.fade = 0;
+  const t0 = performance.now(), DUR = 1150;
   const pg = V.pages;
   await new Promise(res => {
     const anim = () => {
-      const k = Math.min(1, (performance.now() - t0) / 1300);
-      const dist = 1.9 - Math.min(1, k * 2.2) * 1.35;
-      const sh = (Math.random() - 0.5) * 0.08;
-      const at = cam.position.clone().add(fwd.clone().multiplyScalar(dist));
+      const ms = performance.now() - t0, k = Math.min(1, ms / DUR);
+      const pop = Math.max(0, 1 - ms / 180);                       // the first instant: big and bright
+      const dist = 0.62 - Math.min(1, k * 1.6) * 0.2 - pop * 0.12;  // lunges closer
+      const amp = 0.12 * (1 - k * 0.5) + pop * 0.1;
+      const sh = () => (Math.random() - 0.5) * amp;
+      const at = camPos.clone().add(fwd.clone().multiplyScalar(dist));
       if (who === 'pages') {
-        pg.m.setCreepy(true);
-        const pd = cam.position.clone().add(fwd.clone().setY(0).normalize().multiplyScalar(0.55 + dist * 0.45));
-        pg.m.root.position.set(pd.x + sh, cam.position.y - 1.6 + sh, pd.z);
-        pg.m.root.rotation.y = Math.atan2(cam.position.x - pd.x, cam.position.z - pd.z);
-        pg.m.animate(0.016, 0, C.t, 0.25 + k * 0.2);
+        pg.m.setCreepy(true); pg.m.root.visible = true;
+        const pd = camPos.clone().add(fwd.clone().setY(0).normalize().multiplyScalar(0.55 + dist * 0.5));
+        pg.m.root.position.set(pd.x + sh(), camPos.y - pg.m.eyeH + sh() * 0.5, pd.z);
+        pg.m.root.rotation.y = Math.atan2(camPos.x - pd.x, camPos.z - pd.z) + sh() * 0.5;
+        pg.m.animate(0.016, 0, C.t, 1);
+        pg.m.head.rotation.z = sh() * 3;
       } else if (who === 'worm') {
         const w = V.worm.m; w.root.visible = true;
-        w.segs.forEach((s, i) => s.position.copy(cam.position).add(fwd.clone().multiplyScalar(dist + 0.25 + i * w.spacing)).add(new THREE.Vector3(sh, sh - 0.12 - i * 0.02, 0)));
-        w.wiggle(C.t);
-        w.head.lookAt(cam.position);
+        w.segs.forEach((s, i) => s.position.copy(camPos).add(fwd.clone().multiplyScalar(dist + 0.2 + i * w.spacing)).add(new THREE.Vector3(sh(), sh() - 0.1 - i * 0.02, 0)));
+        w.wiggle(C.t * 3); w.head.lookAt(camPos);
       } else if (who === 'bats') {
         const b = V.bats.m; b.root.visible = true;
-        for (const bt of b.bats) { const u = bt.userData; bt.position.copy(at).add(u.off.clone().multiplyScalar(0.35 * dist)); bt.lookAt(cam.position); u.wl.rotation.z = Math.sin(C.t * 40) * 1.2; u.wr.rotation.z = -u.wl.rotation.z; }
+        for (const bt of b.bats) { const u = bt.userData; bt.position.copy(at).add(u.off.clone().multiplyScalar(0.28)).add(new THREE.Vector3(sh(), sh(), 0)); bt.lookAt(camPos); u.wl.rotation.y = Math.sin(C.t * 60 + u.ph) * 1.2; u.wr.rotation.y = -u.wl.rotation.y; }
       } else {
         const m = V.marks[0]; m.m.root.visible = true;
-        m.m.root.position.copy(at).add(new THREE.Vector3(0, -0.6, 0));
-        m.m.root.rotation.y = Math.atan2(cam.position.x - at.x, cam.position.z - at.z) + Math.PI;
-        m.m.animate(C.t, 2, 1.2);
+        m.m.root.position.copy(at).add(new THREE.Vector3(sh(), -0.85, 0));
+        m.m.root.rotation.y = Math.atan2(camPos.x - at.x, camPos.z - at.z) + Math.PI;
+        m.m.animate(C.t * 2, 3, 1.6);
       }
-      cam.position.x += sh * 0.3;
-      scareLight.intensity = 4 + Math.random() * 4;
-      C.fx.red = 0.25 + Math.random() * 0.2; C.fx.glitch = 1; C.fx.flash = k < 0.08 ? 0.5 : 0;
+      // violent camera shake + zoom punch + roll
+      cam.position.copy(camPos).add(new THREE.Vector3(sh() * 0.5, sh() * 0.5, sh() * 0.3));
+      cam.rotation.z += sh() * 0.6;
+      cam.fov = fov0 - 22 * pop - 8 * (1 - k); cam.updateProjectionMatrix();
+      scareLight.intensity = 6 + Math.random() * 6;
+      const strobe = Math.floor(ms / 60) % 2;
+      C.fx.red = strobe ? 0.65 : 0.2; C.fx.glitch = 1; C.fx.flash = pop > 0.6 ? 0.9 : (strobe && Math.random() < 0.25 ? 0.25 : 0);
       if (k < 1) requestAnimationFrame(anim); else res();
     };
     anim();
   });
-  scareLight.intensity = 0;
-  C.fx.fade = 1; C.fx.red = 0; C.fx.flash = 0; ambience(false);
+  // hard cut to black
+  scareLight.intensity = 0; cam.fov = fov0; cam.updateProjectionMatrix(); cam.position.copy(camPos);
+  C.fx.fade = 1; C.fx.red = 0; C.fx.flash = 0;
+  sfx('static', null, 1.5);
   await wait(500); if (seq !== run) return;
   if (who !== 'pages') await runMinigame(who);
   if (seq !== run) return;
@@ -359,7 +380,7 @@ async function ending() {
   P.pitch = 0; placeCamera(0.016); cam.getWorldDirection(fwd);
   const at = cam.position.clone().add(fwd.setY(0).normalize().multiplyScalar(1.5));
   pg.m.setCreepy(false); pg.m.root.visible = true;
-  pg.m.root.position.set(at.x, P.pos.y + (P.eye - 1.95) + 0.05, at.z);
+  pg.m.root.position.set(at.x, P.pos.y + P.eye - pg.m.eyeH + 0.1, at.z);
   pg.m.root.rotation.y = Math.atan2(cam.position.x - at.x, cam.position.z - at.z);
   pg.m.animate(0.016, 0, C.t, 0);
   C.fx.glitch = 0; C.fx.fear = 0;
