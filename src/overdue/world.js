@@ -1,6 +1,7 @@
 // Builds the 3D library from the map letters.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { C } from './core.js';
 import { GRID, W, H, T, FLOOR_H, at, STAIRS, tileX, tileZ, stairAt, canStand, findTile } from './map.js';
 import * as X from './tex.js';
@@ -18,6 +19,15 @@ function put(mat, geo, x, y, z, ry = 0, rx = 0) {
 const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const plane = (w, h) => new THREE.PlaneGeometry(w, h);
 const cyl = (r1, r2, h, s = 12) => new THREE.CylinderGeometry(r1, r2, h, s);
+const rbox = (w, h, d, r = 0.02, s = 2) => new RoundedBoxGeometry(w, h, d, s, r);
+// a turned wooden leg (like a chess piece), made by spinning a curve
+function turned(h, r) {
+  const pts = [[0, 0], [r * 0.8, 0], [r * 0.9, 0.04], [r * 0.6, 0.12], [r * 0.55, 0.3], [r, 0.42], [r * 0.6, 0.5], [r * 0.5, 0.85], [r * 0.75, 0.93], [r * 0.85, 1], [0, 1]];
+  return new THREE.LatheGeometry(pts.map(([a, b]) => new THREE.Vector2(a, b * h)), 10);
+}
+// local geometry (x along the face, z outwards) placed on one side of a tile
+const local = (g, ax, ay, az) => g.translate(ax, ay, az);
+const BOOKS = []; // instanced 3D books: [x,y,z, ry, lean, w,h,d, colorIndex]
 
 const SHELF_H = 3.0, CEIL = FLOOR_H - 0.3;
 const DIRS = [[0, -1, Math.PI], [1, 0, Math.PI / 2], [0, 1, 0], [-1, 0, -Math.PI / 2]]; // dc, dr, plane rotation facing that way
@@ -97,6 +107,7 @@ export function buildWorld() {
     mesh.receiveShadow = true;
     S.add(mesh);
   }
+  buildBooks();
   addLights();
   addDust();
 }
@@ -105,6 +116,24 @@ function std(t, rough, rep) {
   const m = new THREE.MeshStandardMaterial({ map: t.map, bumpMap: t.bump, bumpScale: 1.2, roughness: rough });
   if (rep) { t.map.repeat.set(...rep); t.bump.repeat.set(...rep); }
   return m;
+}
+
+function buildBooks() {
+  // one book shape (with a spine texture), copied thousands of times with its own size, angle and colour
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const mat = new THREE.MeshStandardMaterial({ map: X.bookTex(), roughness: 0.75 });
+  const mesh = new THREE.InstancedMesh(geo, mat, BOOKS.length);
+  const COLS = ['#6a1c18', '#1d4030', '#1e2e58', '#5a3a1a', '#3a2248', '#7a6a32', '#3e3e3c', '#8a3420', '#1e4040', '#5e4630', '#9a8a68', '#2c1c10', '#4a1030', '#2a3a1a'].map(c => new THREE.Color(c));
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YXZ'), p = new THREE.Vector3(), sc = new THREE.Vector3();
+  BOOKS.forEach((b, i) => {
+    const [x, y, z, ry, lean, w, h, d, ci] = b;
+    e.set(0, ry, lean); q.setFromEuler(e); p.set(x, y, z); sc.set(w, h, d);
+    m4.compose(p, q, sc); mesh.setMatrixAt(i, m4);
+    mesh.setColorAt(i, COLS[Math.floor(ci * COLS.length)].clone().multiplyScalar(0.8 + (ci * 7 % 1) * 0.4));
+  });
+  mesh.receiveShadow = true; mesh.castShadow = false;
+  C.scene.add(mesh);
+  WLD.bookCount = BOOKS.length;
 }
 
 function addWindow(x, y0, z, ry) {
@@ -132,61 +161,119 @@ function addDoor(x, z) { // z = the inside face of the wall; the room is towards
 
 function addShelf(L, c, r, gap) {
   const x = tileX(c), z = tileZ(r), y0 = L * FLOOR_H;
-  put('frame', box(T - 0.04, SHELF_H, T - 0.04), x, y0 + SHELF_H / 2, z);
-  put('frame', box(T + 0.06, 0.1, T + 0.06), x, y0 + SHELF_H + 0.05, z);
-  let i = 0;
-  for (const [dc, dr, ry] of DIRS) {
-    const n = at(L, c + dc, r + dr);
-    if (['#', 'S', 'g', 'E'].includes(n)) continue;
-    const m = 'books' + ((c * 3 + r * 5 + i++ + L) % 3);
-    const g = plane(T - 0.12, SHELF_H - 0.1);
-    const off = ((c * 7 + r * 3 + i) % 4) * 0.25; const uv = g.attributes.uv;
-    for (let k = 0; k < uv.count; k++) uv.setX(k, uv.getX(k) * 0.9 + off);
-    put(m, g, x + dc * (T / 2 - 0.0), y0 + SHELF_H / 2 - 0.02, z + dr * (T / 2 - 0.0), ry);
-    if (gap && i === 1) put('dark', plane(0.55, 2.2), x + dc * (T / 2 + 0.01), y0 + 1.15, z + dr * (T / 2 + 0.01), ry);
-  }
+  const open = DIRS.map(([dc, dr]) => !['#', 'S', 'g', 'E'].includes(at(L, c + dc, r + dr)));
+  // the solid middle of the stack, pulled back on the open sides so the shelves have depth
+  const e = open.map(o => o ? 0.66 : 0.98); // N, E, S, W extents
+  const cx = (e[1] - e[3]) / 2, cz = (e[2] - e[0]) / 2;
+  put('frame', box(e[1] + e[3], SHELF_H, e[0] + e[2]), x + cx, y0 + SHELF_H / 2, z + cz);
+  put('frame', rbox(T + 0.08, 0.12, T + 0.08, 0.03), x, y0 + SHELF_H + 0.06, z);          // crown
+  put('frame', box(T - 0.02, 0.12, T - 0.02), x, y0 + 0.06, z);                         // kick board
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put('frame', rbox(0.1, SHELF_H, 0.1, 0.02), x + sx * 0.95, y0 + SHELF_H / 2, z + sz * 0.95); // corner posts
+  const ROWS = 5, rowH = (SHELF_H - 0.2) / ROWS;
+  DIRS.forEach(([dc, dr, ry], fi) => {
+    if (!open[fi]) return;
+    const m = 'books' + ((c * 3 + r * 5 + fi + L) % 3);
+    // a dim painted backboard of books (seen through the gaps between the real books)
+    const bg = plane(T - 0.14, SHELF_H - 0.2); local(bg, 0, 0, 0.665);
+    put(m, bg, x, y0 + SHELF_H / 2, z, ry);
+    for (let k = 0; k <= ROWS; k++) { // shelf boards
+      const g = rbox(T - 0.12, 0.04, 0.34, 0.012); local(g, 0, 0, 0.83);
+      put('wood', g, x, y0 + 0.12 + k * rowH, z, ry);
+    }
+    const isGap = gap && fi === open.indexOf(true);
+    if (isGap) { const d = plane(0.6, SHELF_H - 0.3); local(d, 0, 0, 0.67); put('dark', d, x, y0 + SHELF_H / 2, z, ry); }
+    // real 3D books
+    const nx = dc, nz = dr, tx = -dr, tz = dc;
+    const mob = C.mobile ? 1.6 : 1;
+    for (let k = 0; k < ROWS; k++) {
+      let u = -0.9;
+      const by = y0 + 0.14 + k * rowH;
+      while (u < 0.88) {
+        const w = (0.035 + Math.random() * 0.05) * mob, h = rowH * (0.62 + Math.random() * 0.3), d = 0.2 + Math.random() * 0.08;
+        if (isGap && Math.abs(u) < 0.32) { u += w; continue; }
+        if (Math.random() < 0.045) { u += 0.08 + Math.random() * 0.12; continue; } // a gap where books are missing
+        let lean = 0;
+        if (Math.random() < 0.04 && u < 0.7) lean = 0.25 + Math.random() * 0.2;
+        if (Math.random() < 0.025) { // a book lying flat
+          const fw = 0.25 + Math.random() * 0.06;
+          BOOKS.push([x + nx * (0.97 - d / 2) + tx * (u + fw / 2), by + 0.02, z + nz * (0.97 - d / 2) + tz * (u + fw / 2), ry, Math.PI / 2, 0.04, fw, d, Math.random()]);
+          u += fw + 0.01; continue;
+        }
+        const out = 0.97 - d / 2 - Math.random() * 0.03;
+        const uu = u + w / 2 + (lean ? Math.sin(lean) * h * 0.5 : 0);
+        BOOKS.push([x + nx * out + tx * uu, by + h / 2 * Math.cos(lean), z + nz * out + tz * uu, ry, -lean, w, h, d, Math.random()]);
+        u += w + (lean ? Math.sin(lean) * h + 0.02 : 0.003);
+      }
+    }
+  });
 }
 
 function addDesk(L, x, z, front, lamp) {
   const y0 = L * FLOOR_H;
   if (front) {
-    put('wood', box(T, 0.08, 1.4), x, y0 + 1.1, z); put('wood', box(0.08, 1.1, 1.4), x - T / 2 + 0.04, y0 + 0.55, z);
-    put('wood', box(0.08, 1.1, 1.4), x + T / 2 - 0.04, y0 + 0.55, z); put('wood', box(T, 1.1, 0.06), x, y0 + 0.55, z - 0.67);
-    put('plastic', box(0.4, 0.32, 0.35), x + 0.3, y0 + 1.3, z); put('brass', cyl(0.06, 0.08, 0.06), x - 0.5, y0 + 1.17, z + 0.3);
+    put('wood', rbox(T, 0.08, 1.45, 0.03), x, y0 + 1.1, z); put('wood', rbox(0.08, 1.1, 1.4, 0.02), x - T / 2 + 0.04, y0 + 0.55, z);
+    put('wood', rbox(0.08, 1.1, 1.4, 0.02), x + T / 2 - 0.04, y0 + 0.55, z); put('wood', box(T, 1.1, 0.06), x, y0 + 0.55, z - 0.67);
+    for (let i = 0; i < 3; i++) put('frame', rbox(0.55, 0.85, 0.02, 0.01), x - 0.62 + i * 0.62, y0 + 0.55, z - 0.7); // panels
+    put('plastic', rbox(0.42, 0.34, 0.36, 0.04), x + 0.3, y0 + 1.31, z); put('brass', cyl(0.06, 0.08, 0.06, 16), x - 0.5, y0 + 1.17, z + 0.3);
+    put('paper', rbox(0.3, 0.12, 0.22, 0.01), x - 0.1, y0 + 1.2, z + 0.25, 0.2);
     return;
   }
-  put('wood', box(T - 0.1, 0.07, 1.6), x, y0 + 0.78, z);
-  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put('frame', box(0.08, 0.75, 0.08), x + sx * 0.85, y0 + 0.375, z + sz * 0.7);
-  for (const sz of [-1, 1]) { // chairs
-    put('wood', box(0.45, 0.05, 0.45), x + 0.3 * sz, y0 + 0.47, z + sz * 1.05);
-    put('wood', box(0.45, 0.55, 0.05), x + 0.3 * sz, y0 + 0.75, z + sz * 1.27);
-    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put('frame', box(0.04, 0.47, 0.04), x + 0.3 * sz + a * 0.2, y0 + 0.235, z + sz * 1.05 + b * 0.2);
+  put('wood', rbox(T - 0.08, 0.07, 1.62, 0.03), x, y0 + 0.78, z);
+  put('frame', box(T - 0.3, 0.1, 1.4), x, y0 + 0.69, z); // apron under the top
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put('frame', turned(0.74, 0.055), x + sx * 0.82, y0, z + sz * 0.66);
+  for (const sz of [-1, 1]) { // spindle-back chairs
+    const cxx = x + 0.3 * sz, czz = z + sz * 1.05;
+    put('wood', rbox(0.46, 0.05, 0.44, 0.02), cxx, y0 + 0.47, czz);
+    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put('frame', turned(0.46, 0.028), cxx + a * 0.19, y0, czz + b * 0.18);
+    for (const a of [-1, 1]) put('frame', cyl(0.022, 0.022, 0.6, 8), cxx + a * 0.19, y0 + 0.78, czz + sz * 0.2);
+    put('wood', rbox(0.46, 0.08, 0.05, 0.02), cxx, y0 + 1.07, czz + sz * 0.2);
+    for (let i = -1; i <= 1; i++) put('frame', cyl(0.012, 0.012, 0.52, 6), cxx + i * 0.1, y0 + 0.78, czz + sz * 0.2);
   }
-  // open books on the table
-  put('paper', box(0.42, 0.03, 0.3), x - 0.4, y0 + 0.83, z + 0.2, 0.3);
-  if (lamp) {
-    put('brass', cyl(0.08, 0.1, 0.03), x + 0.5, y0 + 0.83, z - 0.3); put('brass', cyl(0.015, 0.015, 0.35), x + 0.5, y0 + 1.0, z - 0.3);
-    const shade = new THREE.CylinderGeometry(0.11, 0.11, 0.4, 12, 1, true, 0, Math.PI); shade.rotateZ(Math.PI / 2);
+  // open books and loose pages on the table
+  const ob = rbox(0.44, 0.035, 0.3, 0.01); put('paper', ob, x - 0.4, y0 + 0.83, z + 0.2, 0.3);
+  put('velvet', rbox(0.2, 0.06, 0.28, 0.008), x + 0.1, y0 + 0.845, z + 0.4, -0.4);
+  if (lamp) { // a banker's lamp
+    put('brass', cyl(0.06, 0.11, 0.04, 20), x + 0.5, y0 + 0.835, z - 0.3);
+    put('brass', cyl(0.012, 0.012, 0.32, 8), x + 0.5, y0 + 1.0, z - 0.3);
+    const shade = new THREE.LatheGeometry([[0.02, 0], [0.09, 0.02], [0.13, 0.07], [0.14, 0.09]].map(([a, b]) => new THREE.Vector2(a, b)), 20, 0, Math.PI);
+    shade.rotateX(Math.PI / 2); shade.rotateY(Math.PI / 2); shade.scale(1.6, 1, 1);
     put('green', shade, x + 0.5, y0 + 1.2, z - 0.3);
+    put('brass', rbox(0.34, 0.02, 0.03, 0.008), x + 0.5, y0 + 1.15, z - 0.3);
     WLD.lampSpots = (WLD.lampSpots || []); WLD.lampSpots.push([x + 0.5, y0 + 1.1, z - 0.3]);
   }
 }
 
 function addCabinet(L, c, r) {
   const x = tileX(c), z = tileZ(r), y0 = L * FLOOR_H;
-  put('slats', box(1.5, 2.3, 1.2), x, y0 + 1.15, z);
-  put('frame', box(1.6, 0.08, 1.3), x, y0 + 2.34, z);
-  put('brass', box(0.04, 0.2, 0.04), x - 0.08, y0 + 1.2, z + 0.62); put('brass', box(0.04, 0.2, 0.04), x + 0.08, y0 + 1.2, z + 0.62);
+  put('frame', rbox(1.56, 2.36, 1.24, 0.03), x, y0 + 1.18, z);
+  put('frame', rbox(1.68, 0.1, 1.36, 0.03), x, y0 + 2.38, z);
+  // slatted doors on every side you can see
+  for (const [dc, dr, ry] of DIRS) {
+    if (!canStand(L, c + dc, r + dr)) continue;
+    const off = (dc ? 0.78 : 0.62) + 0.005;
+    for (const s of [-1, 1]) { const d = plane(0.62, 1.95); local(d, s * 0.34, 0, off); put('slats', d, x, y0 + 1.15, z, ry); }
+    const h1 = box(0.03, 0.18, 0.04); local(h1, -0.05, 0, off + 0.02); put('brass', h1, x, y0 + 1.2, z, ry);
+    const h2 = box(0.03, 0.18, 0.04); local(h2, 0.05, 0, off + 0.02); put('brass', h2, x, y0 + 1.2, z, ry);
+  }
 }
 
 function addComputer(L, c, r, secret) {
   const x = tileX(c), z = tileZ(r), y0 = L * FLOOR_H;
-  put('wood', box(T - 0.15, 0.06, 1.2), x, y0 + 0.76, z); put('frame', box(T - 0.2, 0.74, 0.05), x, y0 + 0.37, z - 0.55);
-  put('plastic', box(0.55, 0.45, 0.5), x, y0 + 1.03, z - 0.15); put('plastic', box(0.6, 0.04, 0.2), x, y0 + 0.8, z + 0.3);
+  put('wood', rbox(T - 0.15, 0.06, 1.2, 0.02), x, y0 + 0.76, z); put('frame', box(T - 0.2, 0.74, 0.05), x, y0 + 0.37, z - 0.55);
+  put('plastic', rbox(0.56, 0.46, 0.36, 0.06, 3), x, y0 + 1.05, z - 0.07);       // CRT front
+  put('plastic', rbox(0.42, 0.34, 0.3, 0.08, 3), x, y0 + 1.03, z - 0.36);        // CRT back bulge
+  put('plastic', rbox(0.3, 0.05, 0.25, 0.02), x, y0 + 0.81, z - 0.12);          // stand
+  put('plastic', rbox(0.62, 0.035, 0.2, 0.012), x, y0 + 0.81, z + 0.32);        // keyboard
+  for (let i = 0; i < 4; i++) for (let k = 0; k < 13; k++) put('dark', box(0.035, 0.012, 0.032), x - 0.27 + k * 0.045, y0 + 0.832, z + 0.26 + i * 0.04);
+  put('plastic', rbox(0.06, 0.03, 0.1, 0.015), x + 0.45, y0 + 0.81, z + 0.32);  // mouse
   const lines = secret ? ['MIDNIGHT LIBRARY', 'SYSTEM v1.0', '', 'PASSWORD: _'] : [['CARD CATALOG', 'SEARCH: _'], ['DUE DATES', '...OVERDUE', '...OVERDUE'], ['ZZZ', ''], ['ERROR 451']][(c + r) % 4];
   const t = X.screenTex(lines, secret ? '#ff7a6a' : '#7dff9a');
-  const m = new THREE.Mesh(plane(0.44, 0.33), new THREE.MeshBasicMaterial({ map: t, color: 0xaaaaaa }));
-  m.position.set(x, y0 + 1.05, z + 0.105); C.scene.add(m);
+  const sg = new THREE.PlaneGeometry(0.46, 0.36, 8, 6); // a slightly bulging glass screen
+  const sp = sg.attributes.position;
+  for (let i = 0; i < sp.count; i++) { const u = sp.getX(i) / 0.23, v = sp.getY(i) / 0.18; sp.setZ(i, 0.025 * (1 - u * u) * (1 - v * v)); }
+  sg.computeVertexNormals();
+  const m = new THREE.Mesh(sg, new THREE.MeshBasicMaterial({ map: t, color: 0xaaaaaa }));
+  m.position.set(x, y0 + 1.06, z + 0.112); C.scene.add(m);
   WLD.screens.push(m);
   if (secret) WLD.secretScreen = m;
 }
@@ -198,9 +285,12 @@ function addPodium(x, z) {
   lbl.position.set(x, 0.3, z + 0.93); C.scene.add(lbl);
 }
 
-function addArmchair(x, z) {
-  put('velvet', box(1.1, 0.5, 0.9), x, 0.25, z); put('velvet', box(1.1, 1.1, 0.25), x + 0, 0.8, z - 0.45);
-  put('velvet', box(0.2, 0.75, 0.9), x - 0.55, 0.45, z); put('velvet', box(0.2, 0.75, 0.9), x + 0.55, 0.45, z);
+function addArmchair(x, z) { // a big puffy velvet storytime chair (faces east, towards the kids)
+  put('velvet', rbox(0.9, 0.45, 1.1, 0.12, 3), x, 0.32, z);
+  put('velvet', rbox(0.75, 0.16, 0.95, 0.07, 3), x + 0.05, 0.6, z);
+  put('velvet', rbox(0.28, 1.25, 1.15, 0.12, 3), x - 0.42, 0.75, z);
+  for (const s of [-1, 1]) put('velvet', rbox(0.95, 0.38, 0.24, 0.1, 3), x, 0.72, z + s * 0.52);
+  for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) put('frame', turned(0.12, 0.05), x + a * 0.38, 0, z + b * 0.48);
 }
 
 function addRail(L, c, r) {

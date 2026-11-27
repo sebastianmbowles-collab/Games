@@ -150,7 +150,7 @@ export function paperTex(dark = 0, w = 256, h = 256, lines = true) {
 }
 
 // ---------- Mr. Pages' face (on his front cover) ----------
-export function drawPagesFace(g, w, h, creepy, t = 0) {
+export function drawPagesFace(g, w, h, creepy, t = 0, noEyes = false) {
   // leather cover
   const grd = g.createLinearGradient(0, 0, w, h);
   grd.addColorStop(0, creepy ? '#4a1410' : '#b8322a'); grd.addColorStop(1, creepy ? '#240806' : '#7a1c16');
@@ -163,7 +163,7 @@ export function drawPagesFace(g, w, h, creepy, t = 0) {
   g.fillText(creepy ? 'MR. P̷AGES' : 'MR. PAGES', w / 2, 82);
   const ex = [w * 0.33, w * 0.67], ey = h * 0.4;
   if (!creepy) {
-    for (const x of ex) { // big friendly eyes
+    if (!noEyes) for (const x of ex) { // big friendly eyes
       g.fillStyle = '#fff'; g.beginPath(); g.ellipse(x, ey, 46, 56, 0, 0, 7); g.fill();
       g.fillStyle = '#1a1a1a'; g.beginPath(); g.arc(x + 6, ey + 10, 24, 0, 7); g.fill();
       g.fillStyle = '#fff'; g.beginPath(); g.arc(x + 14, ey + 0, 8, 0, 7); g.fill();
@@ -176,6 +176,11 @@ export function drawPagesFace(g, w, h, creepy, t = 0) {
   } else {
     // ripped-paper grin, ink eyes, page teeth
     for (const x of ex) {
+      if (noEyes) { // just dark sockets with ink running down
+        g.fillStyle = 'rgba(0,0,0,.85)'; g.beginPath(); g.ellipse(x, ey, 58, 66, 0, 0, 7); g.fill();
+        for (let i = 0; i < 4; i++) { const dx = x - 30 + i * 19, len = 70 + ((i * 53) % 110); g.fillStyle = '#050203'; g.fillRect(dx, ey + 40, 7, len); g.beginPath(); g.arc(dx + 3, ey + 40 + len, 6, 0, 7); g.fill(); }
+        continue;
+      }
       g.fillStyle = '#000'; g.beginPath(); g.ellipse(x, ey, 42, 50, 0, 0, 7); g.fill();
       g.fillStyle = '#e8e0c8'; g.beginPath(); g.arc(x + Math.sin(t * 3) * 4, ey - 4, 5, 0, 7); g.fill();
       for (let i = 0; i < 4; i++) { // ink drips
@@ -205,9 +210,9 @@ export function drawPagesFace(g, w, h, creepy, t = 0) {
     for (let i = 0; i < 8; i++) { g.beginPath(); const x = (i * 97) % w, y = (i * 61) % h; g.moveTo(x, y); g.lineTo(x + 40, y + 70); g.stroke(); }
   }
 }
-export function pagesFaceTex(creepy) {
+export function pagesFaceTex(creepy, noEyes = false) {
   const [c, g] = canvas(512, 704);
-  drawPagesFace(g, 512, 704, creepy);
+  drawPagesFace(g, 512, 704, creepy, 0, noEyes);
   noise(g, 512, 704, 16);
   const t = tex(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   return t;
@@ -267,4 +272,55 @@ export function slatsTex() {
   g.strokeStyle = '#1a0e06'; g.lineWidth = 4; g.strokeRect(4, 4, 120, 248);
   noise(g, 128, 256, 20);
   return tex(c);
+}
+
+// soft felt for the mascot costume (fuzzy noise + faint stitching)
+export function feltTex() {
+  const [c, g] = canvas(256, 256);
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 6000; i++) { const v = 200 + rnd() * 55; g.strokeStyle = `rgba(${v},${v},${v},.5)`; g.lineWidth = 1; const x = rnd() * 256, y = rnd() * 256, a = rnd() * 6.3; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * 3, y + Math.sin(a) * 3); g.stroke(); }
+  noise(g, 256, 256, 36);
+  g.strokeStyle = 'rgba(120,120,120,.5)'; g.setLineDash([6, 5]); g.lineWidth = 2; g.strokeRect(10, 10, 236, 236); g.setLineDash([]);
+  const t = tex(c, [2, 2]);
+  return { map: t, bump: bumpOf(c) };
+}
+// the Bookworm's skin: wrinkled, with smudged lines of printed text and ring creases
+export function wormSkinTex() {
+  const [c, g] = canvas(512, 256);
+  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#d8b4a0'); gr.addColorStop(1, '#a07868');
+  g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
+  for (let y = 0; y < 256; y += 16) { g.fillStyle = 'rgba(70,30,20,.35)'; g.fillRect(0, y, 512, 3); g.fillStyle = 'rgba(255,230,210,.2)'; g.fillRect(0, y + 3, 512, 2); }
+  g.fillStyle = 'rgba(40,20,15,.45)';
+  for (let y = 8; y < 256; y += 16) { let x = rnd() * 20; while (x < 500) { const ww = 6 + rnd() * 22; g.fillRect(x, y, ww, 2); x += ww + 5; } }
+  for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(90,40,40,${rnd() * 0.25})`; g.beginPath(); g.arc(rnd() * 512, rnd() * 256, 4 + rnd() * 20, 0, 7); g.fill(); }
+  noise(g, 512, 256, 30);
+  return { map: tex(c), bump: bumpOf(c) };
+}
+
+// a staring eyeball with red veins (the Bookworm read too long without blinking)
+export function bloodshotTex() {
+  const [c, g] = canvas(256, 128);
+  g.fillStyle = '#f4ecd8'; g.fillRect(0, 0, 256, 128);
+  g.strokeStyle = 'rgba(190,30,30,.75)';
+  for (let i = 0; i < 26; i++) {
+    let x = rnd() * 256, y = rnd() < 0.5 ? 128 : 0; g.lineWidth = 0.6 + rnd() * 1.6; g.beginPath(); g.moveTo(x, y);
+    for (let k = 0; k < 6; k++) { x += (rnd() - 0.5) * 30; y += (y > 64 ? -1 : 1) * (6 + rnd() * 8); g.lineTo(x, y); }
+    g.stroke();
+  }
+  const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(160,40,30,.35)'); gr.addColorStop(0.35, 'rgba(0,0,0,0)'); gr.addColorStop(0.65, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(160,40,30,.35)');
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 128);
+  return tex(c);
+}
+
+// one book spine (white so each book can be tinted its own colour): gold bands, a title label, worn edges
+export function bookTex() {
+  const [c, g] = canvas(64, 256);
+  g.fillStyle = '#e8e8e8'; g.fillRect(0, 0, 64, 256);
+  const gr = g.createLinearGradient(0, 0, 64, 0); gr.addColorStop(0, 'rgba(0,0,0,.45)'); gr.addColorStop(0.25, 'rgba(0,0,0,0)'); gr.addColorStop(0.75, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.5)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 256);
+  g.fillStyle = '#f0d890'; for (const y of [18, 26, 228, 236]) g.fillRect(4, y, 56, 4);
+  g.fillStyle = 'rgba(30,20,10,.5)'; g.fillRect(10, 80, 44, 60);
+  g.fillStyle = '#f0d890'; for (let i = 0; i < 4; i++) g.fillRect(16, 90 + i * 12, 32 - (i % 2) * 10, 4);
+  noise(g, 64, 256, 40);
+  const t = tex(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
 }

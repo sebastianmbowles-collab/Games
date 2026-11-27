@@ -289,7 +289,8 @@ async function caught(who) {
         pg.m.animate(0.016, 0, C.t, 0.25 + k * 0.2);
       } else if (who === 'worm') {
         const w = V.worm.m; w.root.visible = true;
-        w.segs.forEach((s, i) => s.position.copy(cam.position).add(fwd.clone().multiplyScalar(dist + i * 0.45)).add(new THREE.Vector3(sh, sh - 0.15, 0)));
+        w.segs.forEach((s, i) => s.position.copy(cam.position).add(fwd.clone().multiplyScalar(dist + 0.25 + i * w.spacing)).add(new THREE.Vector3(sh, sh - 0.12 - i * 0.02, 0)));
+        w.wiggle(C.t);
         w.head.lookAt(cam.position);
       } else if (who === 'bats') {
         const b = V.bats.m; b.root.visible = true;

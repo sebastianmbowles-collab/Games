@@ -207,10 +207,11 @@ function updateWorm(dt, G) {
   const done = Math.sign(axisLen) > 0 ? headS > a.to + 6 : headS < a.to - 6;
   w.m.root.visible = true;
   w.m.segs.forEach((sg, i) => {
-    const s = headS - Math.sign(axisLen) * i * 0.5;
+    const s = headS - Math.sign(axisLen) * i * w.m.spacing;
     const wob = Math.sin(C.t * 30 + i) * 0.06;
     if (hl.axis === 'x') sg.position.set(s, y + wob, tileZ(hl.fixed)); else sg.position.set(tileX(hl.fixed), y + wob, s);
   });
+  w.m.wiggle(C.t);
   w.m.head.rotation.y = hl.axis === 'x' ? (axisLen > 0 ? Math.PI / 2 : -Math.PI / 2) : (axisLen > 0 ? 0 : Math.PI);
   if (!a.sounded) { a.sounded = true; say('worm_rush', w.m.head.position.clone(), 1.4, { sub: true }); sfx('whoosh', w.m.head.position.clone(), 1.2); }
   // did it hit you? only if you're standing up in its hallway
