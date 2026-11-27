@@ -24,7 +24,10 @@ export function buildVillains() {
 
 export function resetVillains(G) {
   const pg = V.pages, p = findTile('P');
-  pg.pos.set(tileX(p.c), 0.58, tileZ(p.r)); pg.yaw = -Math.PI / 2; // facing the storytime corner, where you wake up pg.state = 'statue'; pg.path = null; pg.unseenT = 0; pg.timer = 0; pg.seenAgo = 99; pg.hide = null; pg.laughT = rand(10, 18);
+  pg.pos.set(tileX(p.c), 0.58, tileZ(p.r));
+  pg.yaw = -Math.PI / 2; // facing the storytime corner, where you wake up
+  pg.state = 'statue'; pg.path = null; pg.unseenT = 0; pg.timer = 0; pg.seenAgo = 99; pg.hide = null; pg.laughT = rand(10, 18);
+  pg.mouth = 0; pg.stepD = 0; pg.saidCheck = false; pg.leaving = false;
   pg.m.setCreepy(false); pg.m.root.visible = true; place(pg);
   const w = V.worm; w.awake = false; w.hallT = 0; w.cool = 0; w.attack = null; w.m.root.visible = false;
   const b = V.bats; b.awake = false; b.state = 'sleep'; b.m.root.visible = false; b.lightT = 0; b.said = false;
@@ -95,7 +98,7 @@ function updatePages(dt, G) {
     pg.m.animate(dt, 0, C.t, 0); place(pg);
     if (!G.introDone) return;
     // he only moves when you look away...
-    if (playerSees(pg.pos)) { pg.unseenT = 0; pg.timer += dt; if (pg.timer > 25) G.blackout(0.4, () => leavePodium(pg)); }
+    if (playerSees(pg.pos)) { pg.unseenT = 0; pg.timer += dt; if (pg.timer > 25 && !pg.leaving) { pg.leaving = true; G.blackout(0.4, () => leavePodium(pg)); } }
     else { pg.unseenT += dt; if (pg.unseenT > 0.25) leavePodium(pg); }
     return;
   }
