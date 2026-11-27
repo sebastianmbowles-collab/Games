@@ -28,8 +28,22 @@ export const LINES = {
 export const A = { ctx: null, master: null, buffers: {}, volume: 1, heart: 0, rustle: 0, subtitle: null };
 let noiseBuf, amb;
 
+// The voices are built into the page as base64 text. Turn that text straight into bytes
+// (no fetch: some pages block fetching even built-in data).
+function loadBytes(url) {
+  if (url.startsWith('data:')) {
+    const bin = atob(url.slice(url.indexOf(',') + 1));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return Promise.resolve(bytes.buffer);
+  }
+  return fetch(url).then(r => r.arrayBuffer());
+}
+// older Safari only knows the callback form of decodeAudioData
+const decode = (ctx, b) => new Promise((res, rej) => { const p = ctx.decodeAudioData(b, res, rej); if (p && p.then) p.then(res, rej); });
+
 export function initAudio() {
-  if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return; }
+  if (A.ctx) { if (A.ctx.state !== 'running') A.ctx.resume(); return; }
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   A.ctx = ctx;
   A.master = ctx.createGain(); A.master.gain.value = A.volume; A.master.connect(ctx.destination);
@@ -37,7 +51,7 @@ export function initAudio() {
   const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   for (const [path, url] of Object.entries(FILES)) {
     const id = path.split('/').pop().replace('.mp3', '');
-    fetch(url).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).then(buf => { A.buffers[id] = buf; }).catch(() => {});
+    loadBytes(url).then(b => decode(ctx, b)).then(buf => { A.buffers[id] = buf; A.loaded = (A.loaded || 0) + 1; }).catch(e => { A.errors = (A.errors || 0) + 1; console.warn('voice', id, e); });
   }
   startAmbience();
 }

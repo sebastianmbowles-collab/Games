@@ -4,7 +4,7 @@ import { setAniso } from './tex.js';
 import { buildWorld, updateWorld } from './world.js';
 import { initPlayer, initTouch } from './player.js';
 import { initGame, updateGame, G } from './game.js';
-import { initAudio } from './audio.js';
+import { initAudio, A } from './audio.js';
 import { V } from './villains.js';
 import { P } from './player.js';
 
@@ -14,11 +14,10 @@ buildWorld();
 initPlayer();
 initTouch();
 initGame();
-addEventListener('pointerdown', initAudio);
-addEventListener('keydown', initAudio);
+for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, initAudio, { passive: true });
 startLoop(dt => {
   updateGame(dt);
   updateWorld(dt, C.camera);
 });
 // handy for testing
-window.__OD = { C, G, V, P };
+window.__OD = { C, G, V, P, A };
